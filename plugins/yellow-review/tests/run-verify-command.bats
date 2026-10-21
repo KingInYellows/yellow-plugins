@@ -4536,6 +4536,35 @@ dirlink_setup() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
 }
 
+@test "--revert-denied with a marker passes a directory link whose tracked file --revert-dirty just restored" {
+  mkdir -p config
+  printf '{}\n' >| config/settings.json
+  ln -s config .claude
+  git add -f .claude config/settings.json && git commit -q -m "link to dir"
+  # The link predates the marker, as one committed before the run does.
+  touch -h -t 200001010000 .claude
+  touch -t 200101010000 "$IGN_MARKER"
+  printf '{"hooks":"evil"}\n' >| config/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ] || { echo "revert-dirty status $status: $stderr" >&2; return 1; }
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "--revert-denied with a marker still flags a directory link over an ignored file newer than the marker" {
+  mkdir -p config
+  printf 'config/settings.local.json\n' >> .git/info/exclude
+  printf '{}\n' >| config/placeholder
+  ln -s config .claude
+  git add -f .claude config/placeholder && git commit -q -m "link to dir"
+  touch -t 200001010000 "$IGN_MARKER"
+  printf '{"hooks":"evil"}\n' >| config/settings.local.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
 @test "--revert-denied with a marker still flags a link whose tracked target is modified" {
   mkdir -p .claude config
   printf '{}\n' >| config/settings.json

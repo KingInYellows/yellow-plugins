@@ -1208,6 +1208,21 @@ check_trusted_links() {
         # large. With <physical>, the worktree-relative path of an in-worktree
         # target, P only counts when <physical>/P is not itself trusted-config
         # (the tree listing already covers that spelling).
+        # tracked_clean <rel>: 0 when the worktree path <rel> is a tracked
+        # regular file with a plain H tag that git does not list as changed,
+        # so it matches HEAD whatever its mtime (--revert-dirty restores an
+        # owned file with a new one).
+        tracked_clean() {
+            local tagged c
+            case "$1" in .git|.git/*) return 1 ;; esac
+            [ -f "$top/$1" ] && [ ! -L "$top/$1" ] || return 1
+            tagged=$(lgit ls-files -v -z -- "$1" 2>/dev/null | tr '\0' '\n' | head -n 1) || return 1
+            [ "$tagged" = "H $1" ] || return 1
+            for c in ${changed[@]+"${changed[@]}"}; do
+                [ "$c" != "$1" ] || return 1
+            done
+            return 0
+        }
         dir_link_hit() {
             local x rel c lnew n=0 cap fl=-L
             cap=$(rp_walk_cap)
@@ -1256,6 +1271,7 @@ check_trusted_links() {
                 [ -z "$IGNORED_SINCE" ] || { rp_file_or_special "$x" && [ "$x" -nt "$IGNORED_SINCE" ]; } || continue
                 rp_trusted_config "$2/$rel" || continue
                 [ -n "${3:-}" ] && rp_trusted_config "$3/$rel" && continue
+                [ -n "${3:-}" ] && [ -n "$IGNORED_SINCE" ] && { [ "$3" = . ] && tracked_clean "$rel" || tracked_clean "$3/$rel"; } && continue
                 return 0
             done < <(find "$fl" "$1" -name .git -prune -o -print0 2>/dev/null || printf '\001ERR\0')
             return 1
@@ -1319,19 +1335,11 @@ check_trusted_links() {
                 if [ "$hit" = 1 ] && [ "$rc" -eq 0 ] && [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then
                     rel="${canon#"$top"/}"
                     ! rp_trusted_config "$rel" || hit=0
-                    # A tracked target git lists as unchanged matches HEAD:
-                    # --revert-dirty restores an owned target with a new mtime.
-                    if [ "$hit" = 1 ] && [ -f "$canon" ] && [ ! -L "$canon" ]; then
-                        case "$rel" in .git|.git/*) ;; *)
-                            tagged=$(lgit ls-files -v -z -- "$rel" 2>/dev/null | tr '\0' '\n' | head -n 1) || tagged=""
-                            if [ "$tagged" = "H $rel" ]; then
-                                hit=0
-                                for c in ${changed[@]+"${changed[@]}"}; do
-                                    [ "$c" != "$rel" ] || { hit=1; break; }
-                                done
-                            fi
-                            ;;
-                        esac
+                    [ "$hit" = 0 ] || ! tracked_clean "$rel" || hit=0
+                    # An in-worktree directory target: judge each newer entry,
+                    # so a tracked file restored to HEAD does not count.
+                    if [ "$hit" = 1 ] && [ -d "$canon" ] && [ "$canon" != "$top" ]; then
+                        dir_link_hit "$probe" "$f" "$rel" || hit=0
                     fi
                 fi
             else
