@@ -71,7 +71,13 @@ it before editing a command, library or the staging pipeline.
 - `/statusline:setup`, `/setup:all`, `/setup:claude-web`
 - `/worktree:cleanup`, `/worktree:restack` (logic lives in
   `skills/git-worktree/scripts/worktree-restack.sh`; the command holds no `gt` /
-  `gh stack` literals)
+  `gh stack` literals). `--abort` / `--continue` touch only recorded worktrees
+  (run, detached entries, github `owner`s; `owners N` tells a run with none
+  from a legacy state). Every refusal it cannot prove safe exits `31` with the
+  state kept and a final `kept: <reason>` token; add a token to `kept()` and
+  the restack.md table together. `status` labels: `on branch`, `detached`,
+  `moved`, `missing`, `replaced`, `owner`, `rebasing`, `busy`, `unreadable`,
+  `not recorded`
 
 ### Skills (22)
 
@@ -262,11 +268,15 @@ PreCompact 3s (`catalog/plugins/yellow-core.json`).
   entries. Manually `rm -rf` the staging dir to reclaim disk; the directory is
   inert without the hooks installed.
 
-- **`$ARGUMENTS` word-splitting in `/worktree:restack` (won't-fix).**
-  `commands/worktree/restack.md` (the flag block at the `$ARGUMENTS` assignment,
-  about lines 41–60) parses flags in a `bash /dev/fd/3` child because zsh does
-  not word-split `$ARGUMENTS`. That heredoc is a host-shell limitation. Do not
-  replace it with a zsh-native parser.
+- **`$ARGUMENTS` word-splitting in `/worktree:restack` (won't-fix).** The
+  "Phase 1: Parse flags" block in `commands/worktree/restack.md` runs in a
+  `bash /dev/fd/3` child and splits `$ARGUMENTS` unquoted (`set -f; set --
+  $ARGUMENTS`), because zsh does not word-split it. The residual concern is
+  that a quoted value with a space, such as `--remote "a b"`, splits into two
+  tokens. It is accepted because no flag takes such a value (remote names
+  cannot hold spaces) and the stray token is rejected as an unexpected
+  argument (exit `2`), so it fails closed. Do not replace the block with a
+  zsh-native parser.
 
 ## Codex compatibility expansion
 

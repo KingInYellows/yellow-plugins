@@ -23,7 +23,7 @@ setup() {
   local s
   for s in gt gh git; do ln -s "$MOCKS/$s" "$STUB_DIR/bin/$s"; done
   export PATH="$STUB_DIR/bin:$PATH"
-  unset STUB_SKIP STUB_FORK STUB_GH_VERSION STUB_GH_UPGRADE STUB_GT_VERSION CLAUDE_PLUGIN_ROOT CLAUDE_CONFIG_DIR
+  unset STUB_SKIP STUB_FORK STUB_LIST_FAILS_AFTER_CHECKOUT STUB_GH_VERSION STUB_GH_UPGRADE STUB_GT_VERSION CLAUDE_PLUGIN_ROOT CLAUDE_CONFIG_DIR
   WTFMT='wt-%s'
   REPO="$T/repo"
 }
@@ -1414,6 +1414,17 @@ SH
   [[ $output != *"warning: "* ]]
 }
 
+@test "the moved-branch message asks for git worktree prune when the branch's holder was deleted" {
+  moved_by_hand
+  git -C "$REPO" worktree add -q "$T/wt-gone" a
+  rm -rf "$T/wt-gone"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output != *"git -C $T/wt-gone reset --hard"* ]]
+  [[ $output == *"fix: git worktree prune"*"fix: git branch -f a "* ]]
+  [[ $output == *"kept: moved-tips" ]]
+}
+
 @test "the moved-branch message warns before a reset --hard that would discard uncommitted changes" {
   moved_by_hand
   printf 'local edit\n' >|"$(wtp a)/scratch.txt"
@@ -1603,7 +1614,17 @@ legacy_tipless() {
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]
   [[ $output == *"no recorded start tips"* ]]
+  # --continue refuses phase aborting, so only restore is offered.
+  [[ $output == *"phase aborting"*"run restore"* ]]
+  [[ $output != *"Then run --continue"* ]]
+  [[ $output == *"kept: no-start-tips" ]]
   [ -e "$SD/state" ]
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  git -C "$(wtp a)" checkout -q a
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 0 ]
+  assert_all_restored
 }
 
 @test "--abort keeps state when gh-stack no longer records a rebase in a non-run worktree" {
@@ -1669,10 +1690,15 @@ legacy_tipless() {
   run rebase_marker "$(wtp a)"
   [ "$status" -eq 1 ]
   rebase_marker "$(wtp c)"
-  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  # Complete the stuck marker in place (nothing is removed), so the second
+  # --abort clears the same rebase the first one could not.
+  gd=$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)
+  ino=$(ls -di "$gd/rebase-merge" | awk '{print $1}')
   plant_rebase "$(wtp c)" c b
+  [ "$(ls -di "$gd/rebase-merge" | awk '{print $1}')" = "$ino" ]
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 0 ]
+  [[ $output == *"aborted a stack rebase in $(wtp c)"* ]]
   [[ $output == *"aborted"* ]]
   assert_all_restored
   run rebase_marker "$(wtp c)"
@@ -1979,6 +2005,98 @@ legacy_tipless() {
   [[ $output == *"still in progress in $(wtp b), $(wtp c)"* ]]
   [[ $output == *"fix: git -C $(wtp b) rebase --abort"* ]]
   [[ $output == *"fix: git -C $(wtp c) rebase --abort"* ]]
+  [[ $output == *"kept: rebase-stuck" ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a partial --abort names the worktrees it already aborted beside the stuck ones" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  plant_stuck_rebase "$(wtp b)" b
+  plant_rebase "$(wtp c)" c b
+  run --separate-stderr bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"aborted a stack rebase in $(wtp c)"* ]]
+  [[ $stderr == *"still in progress in $(wtp b) "*"Already aborted: $(wtp c)."* ]]
+  # The reason token is the last stderr line.
+  [ "${stderr##*$'\n'}" = "worktree-restack: kept: rebase-stuck" ]
+  run rebase_marker "$(wtp c)"
+  [ "$status" -eq 1 ]
+  [ -e "$SD/state" ]
+}
+
+@test "--abort names git's cause when the run worktree checkout is refused, then finishes" {
+  mk_stack b
+  orig_a=$(git rev-parse a)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  lose_graphite_record "$orig_a"
+  # The hand abort left the run worktree on b; a local edit to a file a lacks
+  # makes git refuse the checkout of a.
+  [ "$(branch_of "$(wtp a)")" = b ]
+  printf 'local edit\n' >>"$(wtp a)/b.txt"
+  run --separate-stderr bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $stderr == *"checkout of a in $(wtp a) was refused: "*"local changes"* ]]
+  [[ $stderr == *"could not return the run worktree $(wtp a) to a"* ]]
+  [[ $stderr == *"git -C $(wtp a) checkout a"* ]]
+  [ "${stderr##*$'\n'}" = "worktree-restack: kept: run-worktree-checkout" ]
+  [ -e "$SD/state" ]
+  git -C "$(wtp a)" checkout -q -- b.txt
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "--abort keeps the state when the worktree list fails after the run worktree is returned" {
+  mk_stack b
+  orig_a=$(git rev-parse a)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  lose_graphite_record "$orig_a"
+  STUB_LIST_FAILS_AFTER_CHECKOUT=1 run --separate-stderr bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $stderr == *"could not list worktrees; state kept, nothing restored"* ]]
+  [ "${stderr##*$'\n'}" = "worktree-restack: kept: worktree-list" ]
+  [ -e "$SD/state" ]
+  [ -z "$(branch_of "$(wtp b)")" ]
+  rm -f "$STUB_DIR/list-fails"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "--abort clears a rebase started in a detached stack worktree from its recorded commit" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  # c's worktree is detached at c; rebasing it onto main conflicts on b.txt.
+  run git -C "$(wtp c)" rebase main
+  [ "$status" -ne 0 ]
+  gd=$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)
+  [ "$(cat "$gd/rebase-merge/head-name")" = "detached HEAD" ]
+  run bash "$SCRIPT" status
+  [[ $output == *"  rebasing:     $(wtp c) (a stack branch; --abort aborts it)"* ]]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"aborted a stack rebase in $(wtp c)"* ]]
+  assert_all_restored
+  run rebase_marker "$(wtp c)"
+  [ "$status" -eq 1 ]
+}
+
+@test "a detached rebase from another commit in a stack worktree is not aborted" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  git -C "$(wtp c)" checkout -q --detach b
+  run git -C "$(wtp c)" rebase main
+  [ "$status" -ne 0 ]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"kept: busy" ]]
+  rebase_marker "$(wtp c)"
   [ -e "$SD/state" ]
 }
 
@@ -1997,6 +2115,7 @@ legacy_tipless() {
   [[ $output == *"in progress; not checking out a"* ]]
   [[ $output == *"could not return the run worktree $(wtp a) to a"* ]]
   [[ $output == *"Finish or abort the operation in progress there, then run --abort again"* ]]
+  [[ $output == *"kept: run-worktree-busy" ]]
   # A checkout is not the fix while the merge is in progress.
   [[ $output != *"checkout a"* ]]
   [ -e "$SD/state" ]
@@ -2011,7 +2130,8 @@ legacy_tipless() {
   mk_stack b
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
   [ "$status" -eq 10 ]
-  [ "$(grep -c '^owner' "$SD/state")" -eq 2 ]
+  [ "$(grep -c '^owner	' "$SD/state")" -eq 2 ]
+  grep -qx "owners	2" "$SD/state"
   grep -qx "owner	$(wtp b)" "$SD/state"
   grep -qx "owner	$(wtp c)" "$SD/state"
   run bash "$SCRIPT" status
@@ -2023,6 +2143,89 @@ legacy_tipless() {
   assert_all_restored
   run rebase_marker "$(wtp c)"
   [ "$status" -eq 1 ]
+}
+
+@test "github: a run that recorded no owners does not keep the state over an unrelated detached rebase" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  git -C "$REPO" worktree remove "$(wtp b)"
+  git -C "$REPO" worktree remove "$(wtp c)"
+  git -C "$REPO" worktree add -q --detach "$T/wt-extra" c
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  # No worktree held a restacked branch, yet the state says so, so it is not
+  # mistaken for one written before owners were recorded.
+  grep -qx "owners	0" "$SD/state"
+  ! grep -q '^owner	' "$SD/state"
+  plant_stuck_rebase "$T/wt-extra" c
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 0 ]
+  [[ $output == *"not recorded: $T/wt-extra is rebasing a stack branch"* ]]
+  [[ $output != *"records no worktrees that held a stack branch"* ]]
+  [ ! -e "$SD/state" ]
+  [ "$(branch_of "$(wtp a)")" = a ]
+  # The unrecorded rebase is left alone.
+  rebase_marker "$T/wt-extra"
+}
+
+@test "github: a state with owner lines but no owners count still rules out an unrelated rebase" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  git -C "$REPO" worktree add -q --detach "$T/wt-extra" c
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  # A state written before the owners count existed, with its owner lines.
+  grep -v '^owners	' "$SD/state" >|"$SD/state.legacy"
+  mv -f "$SD/state.legacy" "$SD/state"
+  [ "$(grep -c '^owner	' "$SD/state")" -eq 2 ]
+  plant_stuck_rebase "$T/wt-extra" c
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 0 ]
+  [[ $output == *"not recorded: $T/wt-extra is rebasing a stack branch"* ]]
+  [[ $output != *"records no worktrees that held a stack branch"* ]]
+  assert_all_restored
+  rebase_marker "$T/wt-extra"
+}
+
+@test "an owners count that does not match the owner lines, or one in graphite state, is rejected (exit 4)" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  cp "$SD/state" "$T/state.good"
+  sed -i 's/^owners	2$/owners	3/' "$SD/state"
+  run bash "$SCRIPT" status
+  [ "$status" -eq 4 ]
+  [[ $output == *"owners count does not match the owner lines"* ]]
+  sed -i 's/^owners	3$/owners	x/' "$SD/state"
+  run bash "$SCRIPT" status
+  [ "$status" -eq 4 ]
+  cp "$T/state.good" "$SD/state"
+  run bash "$SCRIPT" status
+  [ "$status" -eq 0 ]
+}
+
+@test "graphite: an owners line in graphite state is rejected before anything runs" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  printf 'owners\t0\n' >>"$SD/state"
+  run bash "$SCRIPT" status
+  [ "$status" -eq 4 ]
+  [[ $output == *"only github state records owner worktrees"* ]]
+}
+
+@test "status names the run worktree's rebase when the provider lost its record of it" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  run bash "$SCRIPT" status
+  [[ $output == *"a conflict is paused in the run worktree"* ]]
+  [[ $output != *"rebasing:     $(wtp a)"* ]]
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  run bash "$SCRIPT" status
+  [[ $output != *"a conflict is paused in the run worktree"* ]]
+  [[ $output == *"  rebasing:     $(wtp a) (a stack branch; --abort aborts it)"* ]]
 }
 
 @test "github: --abort never aborts a rebase in a worktree registered again at a recorded path" {

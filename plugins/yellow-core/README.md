@@ -45,6 +45,18 @@ skills from Claude command wrappers. See
 | `/worktree:cleanup`     | Scan git worktrees, classify by state, and remove stale worktrees with safeguards |
 | `/worktree:restack` | Restack branches in separate worktrees; restore after; pause with `--continue` / `--abort` |
 
+### `/worktree:restack` recovery
+
+`--abort` and `--continue` act only on the worktrees the run recorded: the run
+worktree, the worktrees Graphite detached, and for GitHub the worktrees that
+held a restacked branch at start. A rebase in any other worktree is named and
+left alone. Anything the script cannot prove safe fails closed: it exits `31`,
+keeps the state, names each stuck worktree with a fix line, and ends with a
+`kept: <reason>` token (listed in `commands/worktree/restack.md`). `--status`
+labels each recorded worktree `on branch`, `detached`, `moved`, `missing`,
+`replaced`, `owner`, `rebasing`, `busy` or `unreadable`, and an unrecorded one
+`not recorded`.
+
 ## Statusline
 
 `/statusline:setup` copies a generated `yellow-statusline.py` into your Claude
