@@ -843,6 +843,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   for f in "$RESOLVE_STACK" "$SWEEP_ALL"; do
     grep -qF 'MARKER=$(mktemp "${TMPDIR:-/tmp}/review-cleanup-marker.XXXXXX" 2>/dev/null) || MARKER=none' "$f"
     grep -qF "printf 'cleanup_marker: %s\\n' \"\$MARKER\"" "$f"
+    grep -qF 'case "$MARKER" in none) ;; *[!A-Za-z0-9._/-]*) rm -f -- "$MARKER"; MARKER=none ;; esac' "$f"
     grep -qF "this PR's number and \`<marker>\`" "$f"
     grep -qF 'rm -f -- "<marker>"' "$f"
     # an early stop must not leak the marker either

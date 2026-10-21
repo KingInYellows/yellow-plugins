@@ -82,6 +82,8 @@ if [ "$MARKER" != none ]; then
   TOP=$(git rev-parse --show-toplevel 2>/dev/null) && TOP=$(cd -- "$TOP" 2>/dev/null && pwd -P) || TOP=""
   case "$MDIR/" in /|"$TOP"/*) rm -f -- "$MARKER"; MARKER=none ;; esac
 fi
+# The path is replayed literally into later Bash: allow only shell-safe bytes.
+case "$MARKER" in none) ;; *[!A-Za-z0-9._/-]*) rm -f -- "$MARKER"; MARKER=none ;; esac
 printf 'cleanup_marker: %s\n' "$MARKER"
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner) || {
   printf '[review:resolve-stack] Error: could not determine repo (not a GitHub remote?).\n' >&2
@@ -114,7 +116,7 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" --locate >/dev/null
 The tree was clean, so `cleanup_marker:` names a file older than every edit
 this run can make. Capture it as a literal `<marker>` and pass it to the
 dirty-tree cleanup, which uses it to catch a gitignored trusted-config edit.
-`none` (mktemp failed, or `TMPDIR` is inside the worktree) is passed as is.
+`none` (mktemp failed, `TMPDIR` is inside the worktree, or its path holds a byte outside `[A-Za-z0-9._/-]`) is passed as is.
 Whenever the run ends from here on, after the final summary or at any
 earlier stop (a failed check, no open PR left, a cancel), run `rm -f -- "<marker>"` unless it is `none`.
 
