@@ -241,8 +241,10 @@ the wrong PR; a stale, restacked or locally rewritten branch was reviewed, and
 had its ignore rules judged, at a commit other than the PR head. `/review:pr`
 may have published fixes as a commit on top or by amending the head in place,
 so `HEAD` need not equal `<head-sha>`. The `HEAD` reflog entries written since
-Step 1b say where the review started: the newest one that is not a commit
-(the checkout), or `<start-head>` when there is none. That commit must be
+Step 1b say where the review started: the last move that is not a commit (the
+checkout) before the first commit, or `<start-head>` when there is none. Moves
+after that first commit, such as a restack that returns to the amended tip,
+are publishing and do not count. That commit must be
 `<head-sha>`, so only `/review:pr`'s own commits and amends sit on top of it.
 When `HEAD` moved but the reflog recorded nothing (reflogs are off), only
 commits on top of `<head-sha>` pass, and an amend stops as `head-mismatch`.
@@ -286,7 +288,10 @@ if [ "$NEW" -eq 0 ] && [ "$(git rev-parse HEAD 2>/dev/null)" != '<start-head>' ]
       ;;
   esac
 fi
-START=$(git reflog show --format='%H %gs' HEAD 2>/dev/null | head -n "$NEW" | awk '$2 !~ /^commit/ { print $1; exit }')
+# Oldest first: the last move before the first commit is where the review
+# started; moves after it (a restack returning to the tip) are publishing.
+START=$(git reflog show --format='%H %gs' HEAD 2>/dev/null | head -n "$NEW" \
+  | awk '{ l[NR] = $0 } END { for (i = NR; i >= 1; i--) { split(l[i], f, " "); if (f[2] ~ /^commit/) break; s = f[1] } print s }')
 [ -n "$START" ] || START='<start-head>'
 [ "$START" = '<head-sha>' ] || {
   printf '[review:sweep] Error: the review started at %s, not the PR head commit <head-sha>. Aborting resolve.\n' "$START" >&2

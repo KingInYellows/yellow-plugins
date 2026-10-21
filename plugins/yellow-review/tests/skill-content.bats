@@ -407,8 +407,8 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   run grep -nF 'or when it printed `unignored` and this probe printed `head=ignored`' "$SWEEP"
   [ "$status" -eq 1 ]
   # Step 2a binds the review to the judged head commit; /review:pr may commit on top.
-  # The review must start from the judged head; only /review:pr's commits and amends follow.
-  [[ "$step2a" == *"awk '\$2 !~ /^commit/ { print \$1; exit }'"* ]]
+  # The review must start from the judged head: the last move before the first commit.
+  [[ "$step2a" == *'if (f[2] ~ /^commit/) break; s = f[1]'* ]]
   [[ "$step2a" == *"[ \"\$START\" = '<head-sha>' ]"* ]]
   [[ "$step1b" == *'Keep the first line as `<start-head>` and the second as `<reflog-mark>`'* ]]
   [[ "$step2a" == *'ending with `Sweep: skipped (head-mismatch)`'* ]]
@@ -1456,7 +1456,7 @@ sweep_head_binding() {
 # mark: Step 1b's starting-point record, as "<start-head> <reflog-mark>".
 sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --format=%H HEAD | wc -l | tr -d ' ')"; }
 
-@test "sweep Step 2a: a review from the PR head passes with a fix on top or an amend; a stale or unpushed branch is head-mismatch" {
+@test "sweep Step 2a: a review from the PR head passes with a fix on top, an amend or a restack; a stale or unpushed branch is head-mismatch" {
   export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@e GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@e
   repo="$BATS_TEST_TMPDIR/bind-repo"
   git init -q -b main "$repo" && cd "$repo"
@@ -1473,6 +1473,13 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   git reset -q --hard "$head" && git checkout -q main
   read -r start mark <<<"$(sweep_mark)"
   git checkout -q feat && git commit -q --amend --allow-empty -m amended
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 0 ]
+  # Amend, then a restack visits an upstack branch and returns to the tip.
+  git reset -q --hard "$head" && git branch -f child "$head" && git checkout -q main
+  read -r start mark <<<"$(sweep_mark)"
+  git checkout -q feat && git commit -q --amend --allow-empty -m amended
+  git checkout -q child && git reset -q --hard feat && git checkout -q feat
   run sweep_head_binding "$head" "$start" "$mark"
   [ "$status" -eq 0 ]
   # Started on the branch already at the head, no checkout.
