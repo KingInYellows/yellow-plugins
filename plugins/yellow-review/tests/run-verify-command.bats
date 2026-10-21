@@ -4752,7 +4752,9 @@ dirlink_setup() {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   dirlink_setup
   rm -f "$EXTDIR/settings.json"
-  mkfifo "$EXTDIR/settings.json" "$EXTDIR/p2" "$EXTDIR/p3"
+  mkfifo "$EXTDIR/settings.json"
+  # ordinary files count toward the cap too, so a large plain tree is bounded
+  printf 'a\n' >| "$EXTDIR/a"; printf 'b\n' >| "$EXTDIR/b"; printf 'c\n' >| "$EXTDIR/c"
   printf 'secret\n' >| CLAUDE.md
   YR_DIR_LINK_WALK_CAP=2 run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]

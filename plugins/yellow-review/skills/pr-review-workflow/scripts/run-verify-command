@@ -1406,7 +1406,7 @@ check_untracked_special() {
                 rp_is_special "$x" || continue
                 [ -z "$IGNORED_SINCE" ] || [ "$x" -nt "$IGNORED_SINCE" ] || continue
                 printf '%s\0' "${x#./}"
-            done < <(find -H "./$l" -name .git -prune -o \( -type p -o -type s -o -type b -o -type c -o -type l \) -print0 2>/dev/null || printf '\001ERR\0')
+            done < <(find -H "./$l" -name .git -prune -o -print0 2>/dev/null || printf '\001ERR\0')
         done < <(find . -name .git -prune -o -type l -print0 2>/dev/null || printf '\001ERR\0')
     ) >|"$out" 2>/dev/null || { rm -f -- "$out"; die 2 "cannot look for special files at trusted-config paths"; }
     while IFS= read -r -d '' f; do
