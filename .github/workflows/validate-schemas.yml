@@ -1079,11 +1079,24 @@ jobs:
             # ("security-issues" names secrets and tokens as subjects), and
             # rewording it would change the sha256 every jev eval results row
             # records. It carries no config fields that could hold a value.
+            # The exemption covers keyword matches only: that file is still
+            # scanned below for credential-shaped values (vendor prefixes,
+            # private key headers, JWTs, and any 40+ character token run).
             SENSITIVE=$(grep -rniE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ catalog/ --include="*.json" \
               | grep -vE '^plugins/yellow-core/lib/jev-category-criteria\.json:' \
               | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{[A-Za-z_][A-Za-z0-9_.]*(:-(\$\{?[A-Za-z_][A-Za-z0-9_.]*\}?)?)?\}|"description":|"title":' \
               | grep -viE '(api[_-]?key|password|token|secret)[A-Za-z]' \
               || true)
+            CRED_SHAPE='(sk-[A-Za-z0-9_-]{20,}|(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|[A-Za-z0-9+/_=-]{40,})'
+            CRITERIA_HITS=$(grep -nE "$CRED_SHAPE" plugins/yellow-core/lib/jev-category-criteria.json \
+              | sed 's/^/plugins\/yellow-core\/lib\/jev-category-criteria.json:/' || true)
+            if [ -n "$CRITERIA_HITS" ]; then
+              echo "$CRITERIA_HITS" | while IFS=: read -r sfile sline _; do
+                echo "${sfile}:${sline}: credential-shaped value [REDACTED]"
+              done
+              echo "::error::Credential-shaped value found in the jev criteria file"
+              exit 1
+            fi
             if [ -n "$SENSITIVE" ]; then
               echo "$SENSITIVE" | while IFS=: read -r sfile sline scontent; do
                 ctype=$(grep -oiE '(api[_-]?key|password|token|secret)' <<< "$scontent" | sort -u | paste -sd, -)

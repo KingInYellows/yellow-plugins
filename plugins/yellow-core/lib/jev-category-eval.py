@@ -799,6 +799,8 @@ def _inside(child, parent):
 
 
 def cmd_run(args):
+    if args.model is not None and not MODEL_RE.fullmatch(args.model):
+        raise UsageError("--model must look like jev-1.13.0")
     criteria, criteria_sha = load_criteria()
     repo = os.path.realpath(args.repo)
     try:

@@ -281,6 +281,19 @@ PY
   [[ "$stderr" == *"writable by other users"* ]]
 }
 
+@test "run: a malformed --model is a usage error before the key check or any request" {
+  start_stub ok
+  run --separate-stderr env -u TYPESAFE_API_KEY python3 "$EVAL" run --repo "$REPO" --out "$OUT" --url "$URL" --model jev-1.13.0x
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--model must look like"* ]]
+
+  run --separate-stderr env -u TYPESAFE_API_KEY python3 "$EVAL" run --repo "$REPO" --url "$URL" --dry-run --model gpt-5
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--model must look like"* ]]
+  [ ! -s "$LOG" ]
+  [ ! -e "$OUT" ]
+}
+
 @test "run: no eligible docs is a usage error and writes nothing" {
   local empty="$BATS_TEST_TMPDIR/empty"
   mkdir -p "$empty" && git -C "$empty" init -q
