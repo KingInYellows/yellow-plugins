@@ -810,11 +810,19 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty' "$DIRTY_REF"
   # The unrecognized branch reverts trusted config through the shared predicate,
   # never a model-built path list.
-  grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-denied --no-ignored-guard' "$DIRTY_REF"
+  grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-denied --ignored-since "<marker>"' "$DIRTY_REF"
+  # CLAUDE-156: --no-ignored-guard only when the caller holds no marker.
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'When `<marker>` is `none`'
+  grep -qF 'ignored trusted-config changed' "$DIRTY_REF"
+  # CLAUDE-119: the call is never skipped; links dirty only their targets.
+  run ! grep -qF 'Skip the call' "$DIRTY_REF"
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'Run it even when step 2 found no trusted-config path'
   run ! grep -qF -- '--revert-only -- ' "$DIRTY_REF"
   grep -qF 'rp_trusted_config' "$DIRTY_REF"
   grep -q 'deniedClean: false' "$DIRTY_REF"
   grep -q 'do NOT run `--revert-dirty`' "$DIRTY_REF"
+  # the owned branch runs the trusted-config check after --revert-dirty too
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'Whatever it returned, success included, always run the `--revert-denied` call below next'
   grep -q 'treeClean: false' "$DIRTY_REF"
   grep -q 'revert incomplete' "$DIRTY_REF"
   grep -q 'unrecognized changes left in place' "$DIRTY_REF"
@@ -829,6 +837,20 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   # agent memory is not trusted config, and the reference says why
   grep -qF 'except `.claude/agent-memory/`' "$DIRTY_REF"
   grep -q 'memory: project' "$DIRTY_REF"
+}
+
+@test "dirty-tree cleanup: both callers create the marker at pre-flight and pass it on (CLAUDE-156)" {
+  for f in "$RESOLVE_STACK" "$SWEEP_ALL"; do
+    grep -qF 'MARKER=$(mktemp "${TMPDIR:-/tmp}/review-cleanup-marker.XXXXXX" 2>/dev/null) || MARKER=none' "$f"
+    grep -qF "printf 'cleanup_marker: %s\\n' \"\$MARKER\"" "$f"
+    grep -qF 'case "$MARKER" in none) ;; *[!A-Za-z0-9._/-]*) rm -f -- "$MARKER"; MARKER=none ;; esac' "$f"
+    grep -qF "this PR's number and \`<marker>\`" "$f"
+    grep -qF 'rm -f -- "<marker>"' "$f"
+    # an early stop must not leak the marker either
+    tr '\n' ' ' <"$f" | tr -s ' ' | grep -qF 'Whenever the run ends from here on, after the final summary or at any earlier stop'
+    # a marker inside the worktree would itself dirty the tree
+    grep -qF 'case "$MDIR/" in /|"$TOP"/*) rm -f -- "$MARKER"; MARKER=none ;; esac' "$f"
+  done
 }
 
 @test "dirty-tree-cleanup: previous filenames come from pr-changed-ranges --previous, validated by the script" {
@@ -1298,7 +1320,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   step6flat=$(sed -n '/^### Step 6/,/^### Step 7/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
   [[ "$step6flat" == *'Non-interactive runs it as is. Interactive asks first'* ]]
   [[ "$step6flat" == *'Add `--dry-run` to the same call'* ]]
-  [[ "$step6flat" == *'Read only those five fields'* ]]
+  [[ "$step6flat" == *'Read only those seven fields'* ]]
   # A failed listing never falls back to the unasked revert: it asks without a list.
   [[ "$step6flat" == *'means the files could not be listed: ask the question in step 4 with that said and no list'* ]]
   [[ "$step6flat" == *'With `pendingCount` 0 there is nothing to revert: ask nothing and make no second call'* ]]
@@ -1316,8 +1338,10 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$step6flat" == *'trusted-config symlink target may have been edited (left in place)'* ]]
   [[ "$step6flat" == *'deny-listed edit left on disk (kept by the user)'* ]]
   [[ "$step6flat" == *'run the dry-run call again and report each `pending` path'* ]]
-  # Link hits found by that second dry run are reported too, not only pending paths.
+  # Link hits and special-file hits found by that second dry run are reported too, not only pending paths.
   [[ "$step6flat" == *'Report that run'"'"'s `linkHits` and `linkHitCount` as in step 3 too'* ]]
+  [[ "$step6flat" == *'Report that run'"'"'s `specialHits` and `specialHitCount` as in step 3 too'* ]]
+  [[ "$step6flat" == *'`specialHits` / `specialHitCount`'* ]]
   [[ "$step6flat" != *'offer only Revert'* ]]
   [[ "$step6flat" != *'Any other non-zero dry-run exit: ask nothing, run the call without'* ]]
   dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')

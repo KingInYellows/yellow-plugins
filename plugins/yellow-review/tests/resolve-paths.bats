@@ -2920,6 +2920,27 @@ walk_fixture() {
   [ "$status" -eq 0 ]
 }
 
+@test "rp_link_target_changed trusted counts a newer FIFO in a linked directory" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  EXT="$BATS_TEST_TMPDIR/ext"
+  mkdir -p "$EXT"
+  ln -s "$EXT" lnk
+  MARKER="$BATS_TEST_TMPDIR/marker"
+  touch -t 202001010000 "$MARKER"
+  mkfifo "$EXT/pipe"
+  run rp_link_target_changed lnk "$MARKER" trusted
+  [ "$status" -eq 0 ]
+  # follow/default still judge only regular files, so an ignored dir link
+  # with a FIFO is not an ignored-file refusal.
+  run rp_link_target_changed lnk "$MARKER" follow
+  [ "$status" -eq 1 ]
+  run rp_link_target_changed lnk "$MARKER"
+  [ "$status" -eq 1 ]
+  touch -t 201901010000 "$EXT/pipe"
+  run rp_link_target_changed lnk "$MARKER" trusted
+  [ "$status" -eq 1 ]
+}
+
 @test "harden_git_config refuses a global config whose program value names a file inside the worktree" {
   mkdir -p tools "$BATS_TEST_TMPDIR/own"
   printf '#!/bin/sh\nexit 0\n' >| tools/evil

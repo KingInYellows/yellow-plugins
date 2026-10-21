@@ -1869,6 +1869,19 @@ rp_walk_cap() {
     printf '%s' "$cap"
 }
 
+# rp_is_special <path>: 0 when <path> is a FIFO, socket, block or character
+# device. Never opens it. A symlink is judged by its target.
+rp_is_special() {
+    [ -p "$1" ] || [ -S "$1" ] || [ -b "$1" ] || [ -c "$1" ]
+}
+
+# rp_file_or_special <path>: 0 when <path> is a regular file or a special
+# file (see rp_is_special). Never opens it. A symlink is judged by its
+# target (same as [ -f ]).
+rp_file_or_special() {
+    [ -f "$1" ] || rp_is_special "$1"
+}
+
 # rp_link_target_changed <symlink> <marker>: judge what a symlink points to,
 # not the link: a write through it changes the target's mtime and leaves the
 # link's alone. The operating system resolves the chain, so a relative target
@@ -1883,7 +1896,17 @@ rp_walk_cap() {
 # targets: those inside the worktree are skipped (covered by the tree listing
 # and the ignored scan), those outside are walked once each (a repeat, a loop
 # or a dangling link is skipped); a find error returns 2 (cannot tell). The trusted-config symlink check uses it, and so
-# does rp_ignored_changed_since, filtered or not. The walk is bounded: see rp_walk_cap (at the cap the target counts as changed). Run it from the working
+# does rp_ignored_changed_since, filtered or not. The value `trusted` (the
+# trusted-config symlink check only) follows as `follow` does and also counts
+# what `follow` lets pass: a nested link whose own mtime is newer than <marker>
+# (created or retargeted after it, CLAUDE-115), and a nested link whose target
+# lies inside the worktree (a write through `.claude/settings.json ->
+# <worktree>/src/a.txt` lands on a path the tree check does not treat as
+# trusted config, or cannot see under assume-unchanged, CLAUDE-94): a file
+# target is judged by its mtime, a directory target is walked. In `trusted`
+# mode a FIFO, socket or device counts as a leaf too (CLAUDE-121), so a
+# special file live through `.claude -> elsewhere` is not treated as a
+# clean target. The walk is bounded: see rp_walk_cap (at the cap the target counts as changed). Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
     local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" cjson="" ijson="" top c v dup qi queue seen
@@ -1906,7 +1929,7 @@ rp_link_target_changed() {
             # link to a file is judged by its target.
             cap=$(rp_walk_cap)
             queue=("$l")
-            if [ "$follow" = follow ]; then
+            if [ "$follow" = follow ] || [ "$follow" = trusted ]; then
                 top=$(pwd -P) || return 2
                 seen=$(yr_canon_path "$l") || return 2
                 seen=("$seen")
@@ -1920,22 +1943,35 @@ rp_link_target_changed() {
                     n=$((n + 1))
                     [ "$n" -le "$cap" ] || return 0
                     if [ -L "$x" ]; then
-                        [ "$follow" = follow ] && [ "$x" != "$d" ] || continue
+                        { [ "$follow" = follow ] || [ "$follow" = trusted ]; } && [ "$x" != "$d" ] || continue
+                        if [ "$follow" = trusted ]; then
+                            # The link's own mtime (find -P never follows it).
+                            v=$(find -P "$x" -prune -newer "$marker" -print 2>/dev/null) || return 2
+                            [ -z "$v" ] || return 0
+                        fi
                         [ -e "$x" ] || continue
                         c=$(yr_canon_path "$x") || continue
-                        ! yr_inside_root "$c" "$top" || continue
+                        [ "$follow" = trusted ] || ! yr_inside_root "$c" "$top" || continue
                         if [ -d "$c" ]; then
                             dup=""
                             for v in "${seen[@]}"; do
                                 [ "$v" != "$c" ] || { dup=1; break; }
                             done
                             [ -n "$dup" ] || { seen+=("$c"); queue+=("$x"); }
-                        elif [ -f "$c" ] && [ "$c" -nt "$marker" ]; then
-                            return 0
+                        elif [ "$c" -nt "$marker" ]; then
+                            if [ "$follow" = trusted ]; then
+                                rp_file_or_special "$c" && return 0
+                            else
+                                [ -f "$c" ] && return 0
+                            fi
                         fi
                         continue
                     fi
-                    [ -f "$x" ] || continue
+                    if [ "$follow" = trusted ]; then
+                        rp_file_or_special "$x" || continue
+                    else
+                        [ -f "$x" ] || continue
+                    fi
                     [ "$x" -nt "$marker" ] && return 0
                 done < <(find -H "$d" -name .git -prune -o -path "$skip" -prune \
                     -o \( -path "$cjson" -type f \) -prune \
@@ -1944,7 +1980,11 @@ rp_link_target_changed() {
             done
             return 1
         fi
-        [ -f "$l" ] || return 1
+        if [ "$follow" = trusted ]; then
+            rp_file_or_special "$l" || return 1
+        else
+            [ -f "$l" ] || return 1
+        fi
         [ "$l" -nt "$marker" ] && return 0
         return 1
     fi

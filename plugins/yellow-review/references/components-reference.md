@@ -219,7 +219,8 @@ flags, exit codes, trust-boundary rules and library behavior.
   trusted-config file) or `--no-ignored-guard`, and with `--dry-run` lists those
   paths (`pending`) and a `snapshot` digest without reverting, so an interactive
   `/review:resolve` can ask first and then revert with `--expect-snapshot`,
-  which refuses when the files or link hits changed since the preview; a tracked
+  which refuses when the files, link hits or special-file hits changed since
+  the preview; a tracked
   trusted-config symlink whose target was written since the marker (or, with
   `--no-ignored-guard`, resolves outside the worktree, onto a directory, onto
   anything but a tracked regular file with a plain `H` tag, or onto a target git

@@ -57,7 +57,24 @@ STATUS=$(git status --porcelain=v1 --untracked-files=all 2>&1) || {
   printf '[review:sweep-all] Error: uncommitted changes detected. Commit or stash first.\n' >&2
   exit 1
 }
+MARKER=$(mktemp "${TMPDIR:-/tmp}/review-cleanup-marker.XXXXXX" 2>/dev/null) || MARKER=none
+# A marker inside the worktree would itself be a dirty path: refuse one there.
+if [ "$MARKER" != none ]; then
+  MDIR=$(cd -- "$(dirname -- "$MARKER")" 2>/dev/null && pwd -P) || MDIR=""
+  TOP=$(git rev-parse --show-toplevel 2>/dev/null) && TOP=$(cd -- "$TOP" 2>/dev/null && pwd -P) || TOP=""
+  case "$MDIR/" in /|"$TOP"/*) rm -f -- "$MARKER"; MARKER=none ;; esac
+fi
+# The path is replayed literally into later Bash: allow only shell-safe bytes.
+case "$MARKER" in none) ;; *[!A-Za-z0-9._/-]*) rm -f -- "$MARKER"; MARKER=none ;; esac
+printf 'cleanup_marker: %s\n' "$MARKER"
 ```
+
+The tree was clean, so `cleanup_marker:` names a file older than every edit
+this run can make. Capture it as a literal `<marker>` and pass it to the
+dirty-tree cleanup, which uses it to catch a gitignored trusted-config edit.
+`none` (mktemp failed, `TMPDIR` is inside the worktree, or its path holds a byte outside `[A-Za-z0-9._/-]`) is passed as is.
+Whenever the run ends from here on, after the final summary or at any
+earlier stop (a failed check, an empty list, a cancel), run `rm -f -- "<marker>"` unless it is `none`.
 
 `gt` is not checked here — each per-PR sweep invocation runs its own
 pre-flight and will surface a `gt` failure inline.
@@ -330,7 +347,7 @@ For each iteration:
    non-zero exit is a dirty tree with unknown contents, never a clean one:
    revert nothing and report `revert incomplete`. If it is dirty, Read
    `${CLAUDE_PLUGIN_ROOT}/references/review-sweep-all/dirty-tree-cleanup.md` and run its
-   procedure with this PR's number to revert the sweep's own edits. Add
+   procedure with this PR's number and `<marker>` to revert the sweep's own edits. Add
    `working tree dirty after sweep (patch: <patch>)` to this PR's `Notes` —
    or `revert incomplete: <files>` when the procedure reports it — and
    `unrecognized changes left in place: <files>` for any unrecognized paths.

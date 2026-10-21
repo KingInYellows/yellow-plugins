@@ -75,8 +75,19 @@ STATUS=$(git status --porcelain=v1 --untracked-files=all 2>&1) || {
   printf '[review:resolve-stack] Error: uncommitted changes detected. Commit or stash first.\n' >&2
   exit 1
 }
+MARKER=$(mktemp "${TMPDIR:-/tmp}/review-cleanup-marker.XXXXXX" 2>/dev/null) || MARKER=none
+# A marker inside the worktree would itself be a dirty path: refuse one there.
+if [ "$MARKER" != none ]; then
+  MDIR=$(cd -- "$(dirname -- "$MARKER")" 2>/dev/null && pwd -P) || MDIR=""
+  TOP=$(git rev-parse --show-toplevel 2>/dev/null) && TOP=$(cd -- "$TOP" 2>/dev/null && pwd -P) || TOP=""
+  case "$MDIR/" in /|"$TOP"/*) rm -f -- "$MARKER"; MARKER=none ;; esac
+fi
+# The path is replayed literally into later Bash: allow only shell-safe bytes.
+case "$MARKER" in none) ;; *[!A-Za-z0-9._/-]*) rm -f -- "$MARKER"; MARKER=none ;; esac
+printf 'cleanup_marker: %s\n' "$MARKER"
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner) || {
   printf '[review:resolve-stack] Error: could not determine repo (not a GitHub remote?).\n' >&2
+  [ "$MARKER" = none ] || rm -f -- "$MARKER"
   exit 1
 }
 printf 'repo: %s\n' "$REPO"
@@ -101,6 +112,13 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" --locate >/dev/null
   exit 1
 }
 ```
+
+The tree was clean, so `cleanup_marker:` names a file older than every edit
+this run can make. Capture it as a literal `<marker>` and pass it to the
+dirty-tree cleanup, which uses it to catch a gitignored trusted-config edit.
+`none` (mktemp failed, `TMPDIR` is inside the worktree, or its path holds a byte outside `[A-Za-z0-9._/-]`) is passed as is.
+Whenever the run ends from here on, after the final summary or at any
+earlier stop (a failed check, no open PR left, a cancel), run `rm -f -- "<marker>"` unless it is `none`.
 
 Capture the printed `repo:` value — substitute it as a literal `<owner/repo>`
 in every later Bash block (variables do not survive across Bash tool calls).
@@ -361,7 +379,7 @@ stop or item 3b's dirty-tree or config stop ends the walk.
    `[review:resolve-stack] aborted at PR #<PR#>: working tree dirty after resolve`
    followed by the file list. Read
    `${CLAUDE_PLUGIN_ROOT}/references/review-resolve-stack/dirty-tree-cleanup.md` and run its
-   procedure with this PR's number to revert the resolve's own edits. Print
+   procedure with this PR's number and `<marker>` to revert the resolve's own edits. Print
    the `patch` path it reports when it is not null. If it reports `revert
    incomplete`, print `[review:resolve-stack] revert incomplete:` with the
    output of `git status --porcelain=v1 --untracked-files=all` and list the PR

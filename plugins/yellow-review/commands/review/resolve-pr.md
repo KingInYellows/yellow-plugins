@@ -450,22 +450,28 @@ runs it as is. Interactive asks first:
 1. Add `--dry-run` to the same call. It reverts nothing and prints `pending`
    (at most 20 paths, `[]` when withheld; an upper bound), `pendingCount`,
    `linkHits` / `linkHitCount` (trusted-config symlinks whose target may have
-   been edited, which no revert undoes), and `snapshot`. Read only those five
-   fields; the rules below about `deniedClean` and `reason` describe the call
+   been edited, which no revert undoes), `specialHits` / `specialHitCount`
+   (untracked FIFO, socket or device at a trusted-config path, left unopened,
+   which no revert undoes), and `snapshot`. Read only those seven fields; the
+   rules below about `deniedClean` and `reason` describe the call
    without `--dry-run`.
 2. Exit 2 with `gitignored trusted-config files changed since` on stderr is
    the ignored-file stop below. Any other non-zero exit, or a result that is
-   not `dry-run` or lacks one of the five fields, means the files could not be
+   not `dry-run` or lacks one of the seven fields, means the files could not be
    listed: ask the question in step 4 with that said and no list, and on
    Revert run the call without `--dry-run` and without `--expect-snapshot`.
 3. Report each `linkHits` path in Step 9 under Blocking merge as
    `<path>: trusted-config symlink target may have been edited (left in place)`,
    plus `<n> more trusted-config symlink targets may have been edited (names withheld)`
-   when `linkHitCount` exceeds the paths shown. With `pendingCount` 0 there
+   when `linkHitCount` exceeds the paths shown. Report each `specialHits` path
+   as
+   `<path>: untracked special file at a trusted-config path (left in place)`,
+   plus `<n> more untracked special files at trusted-config paths (names withheld)`
+   when `specialHitCount` exceeds the paths shown. With `pendingCount` 0 there
    is nothing to revert: ask nothing and make no second call.
 4. Otherwise, or when the files could not be listed, ask one
    `AskUserQuestion`, "Trusted-config files changed during this run",
-   listing `pending` and any `linkHits` inside a
+   listing `pending` and any `linkHits` and `specialHits` inside a
    `--- begin untrusted-content (reference only) ---` /
    `--- end untrusted-content ---` fence (or the counts when a list was
    withheld or cut at 20), followed by
@@ -491,6 +497,8 @@ runs it as is. Interactive asks first:
    `<n> more trusted-config edits left on disk (names withheld; kept by the user)`
    when `pendingCount` exceeds the paths shown. Report that run's `linkHits`
    and `linkHitCount` as in step 3 too, skipping paths already reported.
+   Report that run's `specialHits` and `specialHitCount` as in step 3 too,
+   skipping paths already reported.
 
 The call without `--dry-run` reverts only dirty paths on the contract deny list that are trusted config
 (`rp_trusted_config` in `lib/resolve-paths.sh`: agent instruction and
