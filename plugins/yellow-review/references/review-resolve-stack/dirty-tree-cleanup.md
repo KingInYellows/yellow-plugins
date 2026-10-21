@@ -92,9 +92,10 @@ JSON before acting. Exit `2` means it refused and reverted nothing.
 
   Print its `patch` path when it is not null. A non-zero exit,
   `treeClean: false`, or an incomplete-revert `reason` (below) is
-  `revert incomplete`. Then run the `--revert-denied` call below as well:
-  `--revert-dirty` cannot see a gitignored trusted-config edit or a write
-  through a trusted-config symlink, and that call checks both.
+  `revert incomplete`. Whatever it returned, success included, always run
+  the `--revert-denied` call below next: `--revert-dirty` cannot see a
+  gitignored trusted-config edit or a write through a trusted-config
+  symlink, and that call checks both.
 - **Any dirty path is unrecognized** — do NOT run `--revert-dirty`. Revert
   only the trusted-config paths; the script lists them itself with
   `rp_trusted_config`, so no path goes on the command line. Run it even when
