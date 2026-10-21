@@ -389,20 +389,32 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   # The probe reads the head through gh api; the old fetch of refs/pull is gone.
   run grep -nF 'refs/pull/<PR#>/head' "$SWEEP"
   [ "$status" -eq 1 ]
-  [[ "$step1b" == *'`head=tracked`, `head=ignored` or `head=unignored` (exit `0`) is the result'* ]]
+  [[ "$step1b" == *'`head=tracked`, `head=ignored` or `head=unignored`, then `sha=<oid>` (exit `0`), is the result'* ]]
+  [[ "$step1b" == *'Keep the `sha=` value as `<head-sha>`'* ]]
   [[ "$step1b" == *'Exit `4` with `error=<class>` is specific to this PR'* ]]
   [[ "$step1b" == *'ending with `Sweep: skipped (head-ignore-unreadable)`'* ]]
-  [[ "$step1b" == *'Exit `3` (a rate limit, a network error or timeout, failed authentication, an HTTP 403, or a 404 from the tree or blob read, such as a token without Contents read, or a local git failure) or any other exit'* ]]
+  [[ "$step1b" == *'Exit `3` (a rate limit, a network error or timeout, failed authentication, an HTTP 403, or a 404 from the tree or blob read, such as a token without Contents read, a local git failure, or this clone'"'"'s own attributes transforming `.gitignore`, `error=local-attributes`) or any other exit'* ]]
   [[ "$step1b" == *'could not read the PR head ignore rules'* ]]
   # A config tracked here and ignored on the PR head is never snapshotted: the abort is pinned.
   [[ "$step1b" == *'do not snapshot: the snapshot would keep the tracked repository bytes'* ]]
   [[ "$step1b" == *'is tracked on this branch but ignored on the PR head; rerun /review:sweep from the PR'* ]]
   [[ "$step1b" == *'ending with `Sweep: skipped (tracked-here-ignored-on-head)`'* ]]
-  [[ "$step1b" == *'End that stop with `Sweep: skipped (untracked-here-ignored-on-head)`'* ]]
-  # The snapshot condition itself: ignored here, or unignored here and ignored on the head.
-  [[ "$step1b" == *'snapshot when the work-tree probe printed `ignored`, or when it printed `unignored` and this probe printed `head=ignored`'* ]]
+  [[ "$step1b" == *'stop before Step 2, ending with `Sweep: skipped (untracked-here-ignored-on-head)`'* ]]
+  # The snapshot condition itself: whenever this work tree does not track the path,
+  # whatever the head probe printed (CLAUDE-150).
+  [[ "$step1b" == *'snapshot whenever the work-tree probe printed `ignored` or `unignored`, whatever this probe printed'* ]]
+  [[ "$step1b" == *'When the work-tree probe printed `tracked` or `unknown`, log'* ]]
+  run grep -nF 'or when it printed `unignored` and this probe printed `head=ignored`' "$SWEEP"
+  [ "$status" -eq 1 ]
+  # Step 2a binds the review to the judged head commit; /review:pr may commit on top.
+  # The review must start from the judged head: the last move before the first commit.
+  [[ "$step2a" == *'if (f[2] ~ /^commit/) break; s = f[1]'* ]]
+  [[ "$step2a" == *"[ \"\$START\" = '<head-sha>' ]"* ]]
+  [[ "$step1b" == *'Keep the first line as `<start-head>` and the second as `<reflog-mark>`'* ]]
+  [[ "$step2a" == *'ending with `Sweep: skipped (head-mismatch)`'* ]]
+  [[ "$step2a" == *'When it prints `tracked` or `unknown`, run no `guard-local-config` call'* ]]
   [[ "$step1b" == *'not an ignored untracked file; not guarded'* ]]
-  [[ "$step2a" == *'Exit 2 means `gh pr view` or `git rev-parse` failed or printed nothing, so no mismatch was established'* ]]
+  [[ "$step2a" == *'Exit 2 means `gh pr view`, `git rev-parse` or `git reflog` failed or printed nothing, so no mismatch was established'* ]]
   [[ "$step2a" == *'print no `Sweep:` or `Resolve:` line, so `/review:sweep-all` records `no contract`'* ]]
   # Only a read-and-differ comparison reaches the skip line; a failed read exits 2 first.
   [[ "$step2a" == *'|| EXPECTED=""'* && "$step2a" == *'|| ACTUAL=""'* ]]
@@ -415,12 +427,16 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   step2b=$(awk '/^### Step 2b:/ { p = 1 } /^### Step 3: Run \/review:resolve/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
   [[ "$step2b" == *'whatever `<guard-dir>` is'* ]]
   # A PR head that tracks the path must not get the starting branch's snapshot restored over it.
-  [[ "$step2b" == *'Anything but `ignored`, and `<guard-dir>` is not `none`'* ]]
+  [[ "$step2b" == *'**`tracked` or `unknown`, and `<guard-dir>` is not `none`:**'* ]]
+  # An unignored path on the checked-out tree is still checked against the snapshot.
+  [[ "$step2b" == *'**`ignored` or `unignored`, and `<guard-dir>` is set:**'* ]]
+  [[ "$step2b" == *'`<start-class>` was `unignored` and `<start-present>` was `present`'* ]]
+  [[ "$step2b" == *"stop with Step 1b's \`untracked-here-ignored-on-head\` message and skip line"* ]]
   [[ "$step2b" == *'Run no `guard-local-config` call'* ]]
   [[ "$step2b" == *'set `<guard-dir>` to `none`, and continue unguarded'* ]]
   [[ "$step2b" == *"Run Step 1b's first probe (the work-tree classification, not the PR head probe) again"* ]]
   [[ "$step2b" == *'git -C "$TOP" check-ignore -q -- yellow-plugins.local.md'* ]]
-  [[ "$step2b" == *'**`ignored` and `<guard-dir>` is `none`:** the config was not snapshotted before the review'* ]]
+  [[ "$step2b" == *'**`ignored` and `<guard-dir>` is `none`:** Step 1b found the path tracked or could not classify it, so the config was not snapshotted before the review'* ]]
   [[ "$step2b" == *'is ignored on the PR branch but was not snapshotted before the review; rerun /review:sweep from the PR'* ]]
   [[ "$step2b" == *'stop without invoking `/review:resolve`'* ]]
 }
@@ -644,12 +660,12 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   text=$(flat "$SWEEP")
   [[ "$text" == *'`Sweep: skipped (pr-not-open)`'* ]]
   [[ "$text" == *'`Sweep: skipped (branch-mismatch)`'* ]]
-  re='^Sweep: skipped \((pr-not-open|branch-mismatch|head-ignore-unreadable|tracked-here-ignored-on-head|untracked-here-ignored-on-head)\)$'
+  re='^Sweep: skipped \((pr-not-open|branch-mismatch|head-mismatch|head-ignore-unreadable|tracked-here-ignored-on-head|untracked-here-ignored-on-head)\)$'
   [[ "$text" == *"$re"* ]]
   all=$(flat "$SWEEP_ALL")
   [[ "$all" == *"$re"* ]]
   # Every reason the regex accepts is printed somewhere in sweep.md.
-  for r in head-ignore-unreadable tracked-here-ignored-on-head untracked-here-ignored-on-head; do
+  for r in head-mismatch head-ignore-unreadable tracked-here-ignored-on-head untracked-here-ignored-on-head; do
     grep -qF "Sweep: skipped ($r)" "$SWEEP"
   done
   [[ "$all" == *'outcome is `skipped — <reason>`'* ]]
@@ -1387,7 +1403,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -qF 'compound-staging drain; sweep-all runs no compounding pass of its own' "$SWEEP_ALL"
 }
 
-# Runs sweep Step 1b's existing-path guard (the fenced block that starts at
+# Runs sweep Step 1b's existing-path check (the fenced block that starts at
 # 'p="$TOP/yellow-plugins.local.md"') in a scratch repo, under bash and zsh
 # noclobber when zsh is present.
 sweep_unignored_guard() {
@@ -1399,32 +1415,127 @@ sweep_unignored_guard() {
     symlink) ln -s /nonexistent-target "$repo/yellow-plugins.local.md" ;;
     absent) ;;
   esac
-  awk '/^p="\$TOP\/yellow-plugins.local.md"$/ { p = 1 } p { print } p && /^fi$/ { exit }' "$SWEEP" >"$BATS_TEST_TMPDIR/guard.sh"
-  [ "$(wc -l <"$BATS_TEST_TMPDIR/guard.sh")" -eq 5 ]
-  (cd "$repo" && "$sh" -c 'setopt noclobber 2>/dev/null; set -C; TOP=$(git rev-parse --show-toplevel); . "$1"; echo CONTINUE' _ "$BATS_TEST_TMPDIR/guard.sh")
+  awk '/^p="\$TOP\/yellow-plugins.local.md"$/ { p = 1 } p { print } p && /fi$/ { exit }' "$SWEEP" >"$BATS_TEST_TMPDIR/guard.sh"
+  [ "$(wc -l <"$BATS_TEST_TMPDIR/guard.sh")" -eq 2 ]
+  (cd "$repo" && "$sh" -c 'setopt noclobber 2>/dev/null; set -C; TOP=$(git rev-parse --show-toplevel); . "$1"' _ "$BATS_TEST_TMPDIR/guard.sh")
 }
 
-@test "sweep Step 1b: an existing unignored config file or symlink stops before the snapshot, an absent one continues" {
+@test "sweep Step 1b: an existing unignored config file or symlink is present, an absent one is absent" {
   # status.showUntrackedFiles=no hides the file from the Step 1 clean-tree check.
   run sweep_unignored_guard file
-  [ "$status" -eq 1 ]
-  [[ "$output" == *'exists untracked and unignored on this branch'* ]]
-  [[ "$output" != *CONTINUE* ]]
+  [ "$status" -eq 0 ]
+  [ "$output" = present ]
   run sweep_unignored_guard symlink
-  [ "$status" -eq 1 ]
+  [ "$output" = present ]
   run sweep_unignored_guard absent
   [ "$status" -eq 0 ]
-  [ "$output" = CONTINUE ]
+  [ "$output" = absent ]
   if command -v zsh >/dev/null 2>&1; then
     run sweep_unignored_guard file zsh
-    [ "$status" -eq 1 ]
+    [ "$output" = present ]
     run sweep_unignored_guard absent zsh
-    [ "$status" -eq 0 ]
+    [ "$output" = absent ]
   fi
-  # The guard sits after the tracked-abort and before the snapshot call.
+  # A present file stops only against head=ignored, before the snapshot call.
+  step1b=$(awk '/^### Step 1b:/ { p = 1; next } /^### Step 2:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step1b" == *'When it printed `present` and this probe printed `head=ignored`'* ]]
+  [[ "$step1b" == *'exists untracked and unignored on this branch but is ignored on the PR head'* ]]
   guard=$(grep -n '^p="\$TOP/yellow-plugins.local.md"$' "$SWEEP" | cut -d: -f1)
   snap=$(grep -n 'guard-local-config" snapshot' "$SWEEP" | head -1 | cut -d: -f1)
   [ -n "$guard" ] && [ "$guard" -lt "$snap" ]
+}
+
+# Runs sweep Step 2a's head-binding lines (from `N=$(git reflog` to the final
+# `}`) with the placeholders substituted, in the current directory.
+sweep_head_binding() {
+  awk '/^N=\$\(git reflog show/ { p = 1 } p { print } p && /^}$/ { exit }' "$SWEEP" \
+    | sed -e "s/<head-sha>/$1/g" -e "s/<start-head>/$2/g" -e "s/<reflog-mark>/$3/g" >"$BATS_TEST_TMPDIR/bind.sh"
+  bash "$BATS_TEST_TMPDIR/bind.sh"
+}
+
+# mark: Step 1b's starting-point record, as "<start-head> <reflog-mark>".
+sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --format=%H HEAD | wc -l | tr -d ' ')"; }
+
+@test "sweep Step 2a: a review from the PR head passes with a fix on top, an amend or a restack; a stale or unpushed branch is head-mismatch" {
+  export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@e GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@e
+  repo="$BATS_TEST_TMPDIR/bind-repo"
+  git init -q -b main "$repo" && cd "$repo"
+  git commit -q --allow-empty -m base
+  git checkout -q -b feat && git commit -q --allow-empty -m pr-head
+  head=$(git rev-parse HEAD)
+  git checkout -q main
+  # Fix commit on top (GitHub provider).
+  read -r start mark <<<"$(sweep_mark)"
+  git checkout -q feat && git commit -q --allow-empty -m fix
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 0 ]
+  # Amend in place (Graphite).
+  git reset -q --hard "$head" && git checkout -q main
+  read -r start mark <<<"$(sweep_mark)"
+  git checkout -q feat && git commit -q --amend --allow-empty -m amended
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 0 ]
+  # Amend, then a restack visits an upstack branch and returns to the tip.
+  git reset -q --hard "$head" && git branch -f child "$head" && git checkout -q main
+  read -r start mark <<<"$(sweep_mark)"
+  git checkout -q feat && git commit -q --amend --allow-empty -m amended
+  git checkout -q child && git reset -q --hard feat && git checkout -q feat
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 0 ]
+  # Started on the branch already at the head, no checkout.
+  git reset -q --hard "$head"
+  read -r start mark <<<"$(sweep_mark)"
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 0 ]
+  # A same-parent local rewrite of the head is stale.
+  git commit -q --amend --allow-empty -m sibling && git checkout -q main
+  read -r start mark <<<"$(sweep_mark)"
+  git checkout -q feat
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 3 ]
+  # An unpushed local commit made before the sweep is not the review's.
+  git reset -q --hard "$head" && git commit -q --allow-empty -m unpushed
+  read -r start mark <<<"$(sweep_mark)"
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 3 ]
+}
+
+@test "sweep Step 2a: with the HEAD reflog off, only commits on top of the PR head pass" {
+  export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@e GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@e
+  repo="$BATS_TEST_TMPDIR/noreflog-repo"
+  git init -q -b main "$repo" && cd "$repo"
+  git config core.logAllRefUpdates false
+  rm -rf .git/logs
+  git commit -q --allow-empty -m base
+  git checkout -q -b feat && git commit -q --allow-empty -m pr-head
+  head=$(git rev-parse HEAD)
+  git checkout -q main
+  read -r start mark <<<"$(sweep_mark)"
+  [ "$mark" -eq 0 ]
+  git checkout -q feat && git commit -q --allow-empty -m fix
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 0 ]
+  # A stale same-parent rewrite does not contain the PR head.
+  git reset -q --hard "$head~1" && git commit -q --allow-empty -m stale && git checkout -q main
+  read -r start mark <<<"$(sweep_mark)"
+  git checkout -q feat
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"reflog is off"* ]]
+}
+
+@test "sweep-all: a rate-limited pre-check gives the current row an outcome (CLAUDE-125)" {
+  all=$(flat "$SWEEP_ALL")
+  [[ "$all" == *'record `rate limited` in this PR'"'"'s `Notes`, set this PR'"'"'s row to `Outcome` `skipped`, `Skip Reason` `rate limited` and `Blocking` `?`'* ]]
+}
+
+@test "resolve: a rate-limited PR file listing in the push or verify helper sets ratelimited=1 (CLAUDE-63)" {
+  text=$(flat "$COMMANDS_DIR/resolve-pr.md")
+  [[ "$text" == *'A `skipped` result with `rateLimited: true`'*'also sets `ratelimited=1`'* ]]
+  [[ "$text" == *'Exit 7 (stderr `reason=rate-limit`'*'also sets `ratelimited=1`'* ]]
+  for f in review-sweep review-sweep-all review-resolve-stack; do
+    grep -qF '(exit 7) or `run-verify-command` (`rateLimited: true`) hit a rate limit' "$BATS_TEST_DIRNAME/../references/$f/resolve-contract.md"
+  done
 }
 
 @test "review:pr: high-confidence P2 safe_auto tier is capped and anchor-100 only" {

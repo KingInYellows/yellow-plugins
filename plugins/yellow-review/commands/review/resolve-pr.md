@@ -615,7 +615,10 @@ A rejected path is left for the OS temp sweep, never deleted.
 opted in → `verify=none` after the `--check-ignored` guard above, and the
 commit proceeds. `skipped` (a script reason,
 or the interactive user declining the command) → `verify=skipped`
-(`verify skipped (<reason>)`): a refusal, so revert as above. `fail`/`timeout`
+(`verify skipped (<reason>)`): a refusal, so revert as above. A `skipped`
+result with `rateLimited: true` (the PR file listing hit a GitHub rate limit)
+also sets `ratelimited=1`: write nothing in Step 7, mark every thread
+`not attempted (rate limit)`, and skip Step 8. `fail`/`timeout`
 → `verify=fail`: the files were reverted and a patch saved, every `fixed`
 thread becomes blocking `verify failed (<patch>)`, and the commit is skipped
 (`push=skipped`). If `treeClean` is false, stop after Step 9 with the dirty
@@ -637,8 +640,11 @@ outside a file's changed lines (plus the margin). Omit it only when the
 interactive user chose "Include them".
 
 `PUSHED` → `push=ok`, keep `sha`. `NOOP` → `push=noop`. Any non-zero exit →
-`push=failed` with its stderr (exit codes in the contract); exits 2, 3 and 4
-revert first, as above, while 5 and 6 keep the local commit. Only `PUSHED`
+`push=failed` with its stderr (exit codes in the contract); exits 2, 3, 4 and 7
+revert first, as above, while 5 and 6 keep the local commit. Exit 7 (stderr
+`reason=rate-limit`: listing the PR's changed files hit a GitHub rate limit)
+also sets `ratelimited=1`: write nothing in Step 7, mark every thread
+`not attempted (rate limit)`, and skip Step 8. Only `PUSHED`
 keeps `fixed` threads `fixed`; otherwise they become `unclear`. Exit 3 with
 stderr `credential-shaped` (interactive only) is handled **before** any
 revert, because the edits are still on disk: ask once more, naming the files;

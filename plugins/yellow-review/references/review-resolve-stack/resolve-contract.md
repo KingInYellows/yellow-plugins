@@ -25,7 +25,9 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   `pass`, `fail`, `skipped`, `none`; `none` means verification was not
   configured, not opted in, or there was no code edit, and is never a failure.
 - `ratelimited=1` means a write helper exited 4 with `reason=rate-limit` (or
-  no recognizable reason) and mutations stopped. An exit 4 with
+  no recognizable reason), or the PR file listing in `commit-resolve-fixes`
+  (exit 7) or `run-verify-command` (`rateLimited: true`) hit a rate limit, and
+  mutations stopped. An exit 4 with
   `reason=timeout` stops mutations too but leaves `ratelimited=0`.
 
 - **Reading `ratelimited` (callers).** The contract is the LAST line of the

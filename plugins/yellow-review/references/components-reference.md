@@ -46,13 +46,16 @@ flags, exit codes, trust-boundary rules and library behavior.
   fully unattended — then `/review:triage --non-interactive` (reconcile only), a
   Ledger line and a `Merge:` row (not ready while P0-P2 ledger findings are
   pending) in its summary. Before `/review:pr` it snapshots
-  `yellow-plugins.local.md` when this work tree ignores it, or when the file is
-  absent here and the PR head ignores it (`head-ignore-probe`, read through
-  `gh api` at `headRefOid`). A config tracked here but ignored on the PR head,
-  an existing untracked unignored file there, or a head whose rules the probe
-  cannot judge for that PR (its exit 4) stops before the checkout with a
-  `Sweep: skipped (...)` line; a probe exit 3 (rate limit, network, auth, a 403)
-  stops with no skip line
+  `yellow-plugins.local.md` whenever this work tree does not track it (ignored
+  or unignored, present or absent), so a config created or edited during the
+  run is restored whatever ignore rule hides it. It judges the PR head first
+  (`head-ignore-probe`, read through `gh api` at `headRefOid`): a config
+  tracked here but ignored on the PR head, an existing untracked unignored file
+  there, or a head whose rules the probe cannot judge for that PR (its exit 4)
+  stops before the checkout with a `Sweep: skipped (...)` line; a probe exit 3
+  (rate limit, network, auth, a 403, this clone's own attributes) stops with no
+  skip line. After `/review:pr` it requires the checked-out branch to contain
+  the judged `headRefOid` (`Sweep: skipped (head-mismatch)` otherwise)
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary (with `Blocking` and `Residual` pending/attention
@@ -374,14 +377,16 @@ verify command the caller's `PATH` (`YR_ORIG_PATH`). Both scripts, and
 parameter expansion, not `dirname`.
 
 - `head-ignore-probe <PR#>` — `/review:sweep` Step 1b: prints
-  `head=tracked|ignored|unignored` for `yellow-plugins.local.md` on the PR head,
+  `head=tracked|ignored|unignored sha=<headRefOid>` for `yellow-plugins.local.md` on the PR head,
   read through `gh api` at `headRefOid` (root listing, `.gitignore` and
   `.gitattributes` blobs written as data to a temp work tree, judged with this
   clone's git dir and an empty index). It refuses a symlinked `.gitignore` or
   `.gitattributes`, a case-only alias of the three root names, and a
   content-transforming attribute on `.gitignore`. Failures print
   `error=<class>`: exit 3 is systemic (`rate-limited` tested before any 403,
-  `auth`, `forbidden` for a 403 or a tree/blob 404, `network`, `local`), exit 4
+  `auth`, `forbidden` for a 403 or a tree/blob 404, `network`, `local`,
+  `local-attributes` when this clone's own attributes transform `.gitignore`
+  and the head does not clear them), exit 4
   is this PR only (`not-found` from `gh pr view`, `unreadable`, `symlink`,
   `case-alias`, `attributes`). The API host and repository come from the PR's
   URL, passed as `gh api --hostname`.

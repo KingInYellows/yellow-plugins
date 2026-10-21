@@ -10,9 +10,11 @@
 # core.excludesFile still apply. Nothing from the head is executed.
 # Usage: head-ignore-probe <PR#>
 # Output (stdout, one line):
-#   head=tracked     the head commit has yellow-plugins.local.md at the root
-#   head=ignored     the head's rules (with this clone's) ignore it
-#   head=unignored   they do not
+#   head=tracked sha=<oid>    the head commit has yellow-plugins.local.md at the root
+#   head=ignored sha=<oid>    the head's rules (with this clone's) ignore it
+#   head=unignored sha=<oid>  they do not
+#   (<oid> is the headRefOid judged, so the caller can bind the result to the
+#   commit it checks out)
 #   error=<class>    on failure; stderr says why (gh's own stderr, at most
 #                    five lines, control characters removed, is forwarded)
 # Exit codes:
@@ -23,7 +25,10 @@
 #     or blob read: a token without Contents read is refused on every PR, and
 #     GitHub can report that as 404 on a private repository), network (a
 #     timeout, or a gh failure that is neither a 404 nor a 403), local (git
-#     itself failed here)
+#     itself failed here), local-attributes (this clone's info/attributes or
+#     core.attributesFile alone sets a content-transforming attribute on
+#     .gitignore and the head does not clear it, which would refuse every PR
+#     the same way)
 #   4 this PR only, so a batch caller skips it: not-found (gh pr view found no
 #     such pull request; only that call's 404 is PR-specific), unreadable (a malformed or truncated answer or URL, a head entry that is not a
 #     regular-file blob), symlink (.gitignore or .gitattributes is a symlink,
@@ -31,8 +36,9 @@
 #     .gitignore, .gitattributes or yellow-plugins.local.md only in ASCII case,
 #     or any non-ASCII root entry name: a case-insensitive filesystem may fold
 #     either onto one of those files, and Unicode folding is not ASCII's),
-#     attributes (.gitignore has a content-transforming attribute, so the
-#     checked-out file would not be the blob)
+#     attributes (the head's .gitattributes gives .gitignore a
+#     content-transforming attribute, so the checked-out file would not be
+#     the blob)
 # Every gh call runs under timeout(1) or gtimeout(1) when one is installed
 # (lib/resolve-gh.sh, YELLOW_REVIEW_GH_TIMEOUT).
 
@@ -109,9 +115,10 @@ REPO_PATH="repos/$NWO"
 API_STAGE=1
 
 # The root listing only (non-recursive): it is never truncated in practice,
-# and a truncated or malformed one is refused.
+# and a truncated or malformed one is refused. GitHub always sends
+# `truncated`, so a listing without it (an altering proxy) is refused too.
 gh_call "$WORK/tree" api --hostname "$HOST" "$REPO_PATH/git/trees/$SHA"
-jq -e '(.tree | type) == "array" and (.truncated | not)' "$WORK/tree" >/dev/null 2>&1 \
+jq -e '(.tree | type) == "array" and .truncated == false' "$WORK/tree" >/dev/null 2>&1 \
     || fail 4 unreadable "the PR head's root listing is malformed or truncated"
 
 ALIASES=$(jq -r '[.tree[].path
@@ -126,7 +133,7 @@ NONASCII=$(jq -r '[.tree[].path | select(explode | any(. > 127))] | length' "$WO
 [ "$NONASCII" = 0 ] || fail 4 case-alias "the PR head has a non-ASCII root entry name, which a case-insensitive filesystem may fold onto .gitignore, .gitattributes or yellow-plugins.local.md"
 
 if jq -e 'any(.tree[]; .path == "yellow-plugins.local.md")' "$WORK/tree" >/dev/null 2>&1; then
-    printf 'head=tracked\n'
+    printf 'head=tracked sha=%s\n' "$SHA"
     exit 0
 fi
 
@@ -158,34 +165,50 @@ hgit() {
     GIT_INDEX_FILE="$WORK/index" git -C "$WT" --git-dir="$GD" --work-tree="$WT" -c core.fsmonitor=false "$@"
 }
 
-if fetch_entry .gitignore; then
-    # The raw blob is only what checkout writes when .gitignore has no
-    # content-transforming attribute (the head's root .gitattributes, this
-    # clone's info/attributes and core.attributesFile all count).
-    fetch_entry .gitattributes || true
-    ATTRS=$(hgit check-attr filter eol working-tree-encoding ident -- .gitignore 2>/dev/null) \
+# attrs_bad: 0 when .gitignore in the temp work tree has a content-transforming
+# attribute, 1 when it has none. Exits 3 when git fails.
+attrs_bad() {
+    local attrs line drv bad=0 n=0
+    attrs=$(hgit check-attr filter eol working-tree-encoding ident -- .gitignore 2>/dev/null) \
         || fail 3 local "git check-attr failed"
     # A PR can set filter=unspecified as a literal value, which check-attr
     # prints like the unset sentinel; it passes only with no such driver.
     git -C "$TOP" config --get-regexp '^filter\.unspecified\.' >/dev/null 2>&1
     case $? in
-        0) DRV=1 ;;
-        1) DRV=0 ;;
+        0) drv=1 ;;
+        1) drv=0 ;;
         *) fail 3 local "cannot read the git config" ;;
     esac
-    BAD=0
-    N=0
     while IFS= read -r line; do
-        N=$((N + 1))
+        n=$((n + 1))
         case "$line" in
-            '.gitignore: filter: unspecified') [ "$DRV" -eq 0 ] || BAD=1 ;;
+            '.gitignore: filter: unspecified') [ "$drv" -eq 0 ] || bad=1 ;;
             '.gitignore: eol: unspecified' | '.gitignore: eol: lf') ;;
             '.gitignore: working-tree-encoding: unspecified' | '.gitignore: ident: unspecified') ;;
-            *) BAD=1 ;;
+            *) bad=1 ;;
         esac
-    done <<<"$ATTRS"
-    [ "$N" -eq 4 ] || fail 3 local "git check-attr printed an unexpected answer"
-    [ "$BAD" -eq 0 ] || fail 4 attributes "the PR head sets content-transforming attributes on .gitignore, so its ignore rules cannot be read from the blob"
+    done <<<"$attrs"
+    [ "$n" -eq 4 ] || fail 3 local "git check-attr printed an unexpected answer"
+    [ "$bad" -eq 1 ]
+}
+
+if fetch_entry .gitignore; then
+    # The raw blob is only what checkout writes when .gitignore has no
+    # content-transforming attribute (the head's root .gitattributes, this
+    # clone's info/attributes and core.attributesFile all count). Judge this
+    # clone's own attributes first, before the head's .gitattributes is in the
+    # temp tree, then again with it, since the head can override them. A
+    # transform that survives and comes from this clone alone fails every PR
+    # the same way, so that is systemic rather than this PR's.
+    local_bad=0
+    ! attrs_bad || local_bad=1
+    if fetch_entry .gitattributes && attrs_bad; then
+        [ "$local_bad" -eq 1 ] \
+            && fail 3 local-attributes "this clone's info/attributes or core.attributesFile sets a content-transforming attribute on .gitignore"
+        fail 4 attributes "the PR head sets content-transforming attributes on .gitignore, so its ignore rules cannot be read from the blob"
+    elif [ "$local_bad" -eq 1 ] && [ ! -e "$WT/.gitattributes" ]; then
+        fail 3 local-attributes "this clone's info/attributes or core.attributesFile sets a content-transforming attribute on .gitignore"
+    fi
 fi
 
 # -q exit only: with -v a negated match exits 0 too. --no-index: the real
@@ -193,7 +216,7 @@ fi
 rc=0
 hgit check-ignore -q --no-index -- yellow-plugins.local.md || rc=$?
 case "$rc" in
-    0) printf 'head=ignored\n' ;;
-    1) printf 'head=unignored\n' ;;
+    0) printf 'head=ignored sha=%s\n' "$SHA" ;;
+    1) printf 'head=unignored sha=%s\n' "$SHA" ;;
     *) fail 3 local "git check-ignore failed" ;;
 esac

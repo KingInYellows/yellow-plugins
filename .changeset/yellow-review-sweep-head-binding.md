@@ -1,0 +1,5 @@
+---
+"yellow-review": patch
+---
+
+Harden `/review:sweep`'s local-config guard and its rate-limit reporting. Step 1b now snapshots `yellow-plugins.local.md` whenever the work tree does not track it, so a config that `/review:pr` creates behind a new ignore rule is removed before `/review:resolve` reads it (CLAUDE-150). `head-ignore-probe` prints the `headRefOid` it judged, and Step 2a stops with `Sweep: skipped (head-mismatch)` when the checked-out branch does not contain it; Step 2b re-applies the unignored-file abort to the tree actually checked out (CLAUDE-84). The probe refuses a tree listing without `truncated: false` and reports a transforming attribute from this clone's own attributes as systemic (`error=local-attributes`, exit 3) instead of failing every PR (CLAUDE-147). `commit-resolve-fixes` exits 7 and `run-verify-command --unattended` reports `rateLimited: true` when listing the PR's changed files hits a rate limit, and `/review:resolve` maps both to `ratelimited=1` (CLAUDE-63). `/review:sweep-all` gives a rate-limited PR's row a `skipped` outcome (CLAUDE-125).
