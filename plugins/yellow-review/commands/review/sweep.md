@@ -226,9 +226,11 @@ matches the PR's head branch, and that it contains the head commit Step 1b
 judged (`<head-sha>`). If `/review:pr` errored mid-way or a tool checked out a
 different branch, `/review:resolve` would commit fixes against the wrong PR;
 a stale or restacked local branch was reviewed, and had its ignore rules
-judged, at a commit other than the PR head. `/review:pr` may have committed
-fixes on top, so the head commit must be an ancestor of `HEAD`, not equal
-to it.
+judged, at a commit other than the PR head. `/review:pr` may have pushed
+fixes, so `HEAD` need not equal `<head-sha>`: it passes when `<head-sha>` is an
+ancestor of `HEAD` (a fix commit on top, the GitHub provider) or when `HEAD`
+has exactly `<head-sha>`'s parents (the head amended in place, which
+Graphite's `gt modify` does).
 
 ```bash
 set -u
@@ -247,6 +249,11 @@ git cat-file -e '<head-sha>^{commit}' 2>/dev/null || {
   exit 3
 }
 git merge-base --is-ancestor '<head-sha>' HEAD; rc=$?
+if [ "$rc" -eq 1 ]; then
+  # An amend keeps the parents: accept HEAD when they match <head-sha>'s.
+  P_HEAD=$(git rev-parse 'HEAD^@' 2>/dev/null) && P_PR=$(git rev-parse '<head-sha>^@' 2>/dev/null) || rc=2
+  [ "$rc" -ne 1 ] || [ "$P_HEAD" != "$P_PR" ] || rc=0
+fi
 case "$rc" in
   0) ;;
   1) printf '[review:sweep] Error: the checked-out branch does not contain the PR head commit <head-sha>. Aborting resolve.\n' >&2
@@ -259,8 +266,8 @@ esac
 Exit 1 means both names were read and they differ: stop, do not proceed to
 Step 3, and end the output with the skip line
 `Sweep: skipped (branch-mismatch)` (see "Skip line"). Exit 3 means the branch
-matches but does not contain `<head-sha>` (the local branch is stale or was
-restacked): stop the same way, ending with `Sweep: skipped (head-mismatch)`.
+matches but neither contains `<head-sha>` nor amends it (the local branch is
+stale or was restacked): stop the same way, ending with `Sweep: skipped (head-mismatch)`.
 Exit 2 means `gh pr view`, `git rev-parse` or `git merge-base` failed or
 printed nothing, so no mismatch was established (a failed fetch can be a rate
 limit): stop the same way, but print no `Sweep:` or `Resolve:` line, so
@@ -531,7 +538,7 @@ cut off, which stays `no contract`. `pr-not-open` is printed only when
 `gh pr view` succeeded and returned a state other than `OPEN`, and
 `branch-mismatch` only when `gh pr view` and `git rev-parse` both succeeded and
 their branch names differ, and `head-mismatch` only when the branch matched and
-`git` confirmed it does not contain `<head-sha>`. The three Step 1b reasons are
+`git` confirmed it neither contains nor amends `<head-sha>`. The three Step 1b reasons are
 printed only on `head-ignore-probe`'s exit `4` (`head-ignore-unreadable`), on
 its `head=ignored` result against this branch's tracked or untracked file, or
 (`untracked-here-ignored-on-head`) on Step 2b finding that untracked file

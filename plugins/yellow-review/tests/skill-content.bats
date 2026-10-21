@@ -408,6 +408,8 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   [ "$status" -eq 1 ]
   # Step 2a binds the review to the judged head commit; /review:pr may commit on top.
   [[ "$step2a" == *"git merge-base --is-ancestor '<head-sha>' HEAD"* ]]
+  # gt modify amends the head in place, so a HEAD with the same parents passes.
+  [[ "$step2a" == *"P_HEAD=\$(git rev-parse 'HEAD^@' 2>/dev/null) && P_PR=\$(git rev-parse '<head-sha>^@' 2>/dev/null)"* ]]
   [[ "$step2a" == *"git cat-file -e '<head-sha>^{commit}'"* ]]
   [[ "$step2a" == *'ending with `Sweep: skipped (head-mismatch)`'* ]]
   [[ "$step2a" == *'When it prints `tracked` or `unknown`, run no `guard-local-config` call'* ]]
@@ -1441,6 +1443,35 @@ sweep_unignored_guard() {
   guard=$(grep -n '^p="\$TOP/yellow-plugins.local.md"$' "$SWEEP" | cut -d: -f1)
   snap=$(grep -n 'guard-local-config" snapshot' "$SWEEP" | head -1 | cut -d: -f1)
   [ -n "$guard" ] && [ "$guard" -lt "$snap" ]
+}
+
+# Runs sweep Step 2a's head-binding lines (from `git cat-file` to `esac`) with
+# <head-sha> substituted, in the current directory.
+sweep_head_binding() {
+  awk '/^git cat-file -e .<head-sha>/ { p = 1 } p { print } p && /^esac$/ { exit }' "$SWEEP" \
+    | sed "s/<head-sha>/$1/g" >"$BATS_TEST_TMPDIR/bind.sh"
+  bash "$BATS_TEST_TMPDIR/bind.sh"
+}
+
+@test "sweep Step 2a: a fix commit on top or an amend of the PR head passes; a stale branch is head-mismatch" {
+  repo="$BATS_TEST_TMPDIR/bind-repo"
+  git init -q "$repo" && cd "$repo"
+  git -c user.name=t -c user.email=t@e commit -q --allow-empty -m base
+  git -c user.name=t -c user.email=t@e commit -q --allow-empty -m pr-head
+  head=$(git rev-parse HEAD)
+  git -c user.name=t -c user.email=t@e commit -q --allow-empty -m fix
+  run sweep_head_binding "$head"
+  [ "$status" -eq 0 ]
+  git reset -q --hard "$head"
+  git -c user.name=t -c user.email=t@e commit -q --amend --allow-empty -m amended
+  [ "$(git rev-parse HEAD)" != "$head" ]
+  run sweep_head_binding "$head"
+  [ "$status" -eq 0 ]
+  git reset -q --hard HEAD~1
+  run sweep_head_binding "$head"
+  [ "$status" -eq 3 ]
+  run sweep_head_binding 0123456789abcdef0123456789abcdef01234567
+  [ "$status" -eq 3 ]
 }
 
 @test "sweep-all: a rate-limited pre-check gives the current row an outcome (CLAUDE-125)" {
