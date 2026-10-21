@@ -821,6 +821,8 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -qF 'rp_trusted_config' "$DIRTY_REF"
   grep -q 'deniedClean: false' "$DIRTY_REF"
   grep -q 'do NOT run `--revert-dirty`' "$DIRTY_REF"
+  # the owned branch runs the trusted-config check after --revert-dirty too
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'Then run the `--revert-denied` call below as well'
   grep -q 'treeClean: false' "$DIRTY_REF"
   grep -q 'revert incomplete' "$DIRTY_REF"
   grep -q 'unrecognized changes left in place' "$DIRTY_REF"
