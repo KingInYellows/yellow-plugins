@@ -199,6 +199,15 @@ probe() { run --separate-stderr "$SCRIPT" 7; }
   [ "$output" = error=local-attributes ]
 }
 
+@test "a head .gitattributes that clears this clone's transform on .gitignore passes" {
+  head_commit '.gitignore=yellow-plugins.local.md\n' '.gitattributes=.gitignore !filter\n'
+  printf '.gitignore filter=lfs\n' >|"$BATS_TEST_TMPDIR/attrs"
+  git -C "$REPO" config core.attributesFile "$BATS_TEST_TMPDIR/attrs"
+  probe
+  [ "$status" -eq 0 ]
+  [ "$output" = "head=ignored sha=$(cat "$FIX/oid")" ]
+}
+
 @test "a head .gitattributes that transforms .gitignore stays PR-specific with clean local attributes" {
   head_commit '.gitignore=yellow-plugins.local.md\n' '.gitattributes=.gitignore ident\n'
   mkdir -p "$REPO/.git/info"

@@ -27,7 +27,8 @@
 #     timeout, or a gh failure that is neither a 404 nor a 403), local (git
 #     itself failed here), local-attributes (this clone's info/attributes or
 #     core.attributesFile alone sets a content-transforming attribute on
-#     .gitignore, which would refuse every PR the same way)
+#     .gitignore and the head does not clear it, which would refuse every PR
+#     the same way)
 #   4 this PR only, so a batch caller skips it: not-found (gh pr view found no
 #     such pull request; only that call's 404 is PR-specific), unreadable (a malformed or truncated answer or URL, a head entry that is not a
 #     regular-file blob), symlink (.gitignore or .gitattributes is a symlink,
@@ -196,11 +197,17 @@ if fetch_entry .gitignore; then
     # content-transforming attribute (the head's root .gitattributes, this
     # clone's info/attributes and core.attributesFile all count). Judge this
     # clone's own attributes first, before the head's .gitattributes is in the
-    # temp tree: when they alone transform .gitignore, every PR fails the same
-    # way, so that is systemic rather than this PR's.
-    ! attrs_bad || fail 3 local-attributes "this clone's info/attributes or core.attributesFile sets a content-transforming attribute on .gitignore"
-    if fetch_entry .gitattributes; then
-        ! attrs_bad || fail 4 attributes "the PR head sets content-transforming attributes on .gitignore, so its ignore rules cannot be read from the blob"
+    # temp tree, then again with it, since the head can override them. A
+    # transform that survives and comes from this clone alone fails every PR
+    # the same way, so that is systemic rather than this PR's.
+    local_bad=0
+    ! attrs_bad || local_bad=1
+    if fetch_entry .gitattributes && attrs_bad; then
+        [ "$local_bad" -eq 1 ] \
+            && fail 3 local-attributes "this clone's info/attributes or core.attributesFile sets a content-transforming attribute on .gitignore"
+        fail 4 attributes "the PR head sets content-transforming attributes on .gitignore, so its ignore rules cannot be read from the blob"
+    elif [ "$local_bad" -eq 1 ] && [ ! -e "$WT/.gitattributes" ]; then
+        fail 3 local-attributes "this clone's info/attributes or core.attributesFile sets a content-transforming attribute on .gitignore"
     fi
 fi
 

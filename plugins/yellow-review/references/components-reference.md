@@ -385,7 +385,8 @@ parameter expansion, not `dirname`.
   content-transforming attribute on `.gitignore`. Failures print
   `error=<class>`: exit 3 is systemic (`rate-limited` tested before any 403,
   `auth`, `forbidden` for a 403 or a tree/blob 404, `network`, `local`,
-  `local-attributes` when this clone's own attributes transform `.gitignore`), exit 4
+  `local-attributes` when this clone's own attributes transform `.gitignore`
+  and the head does not clear them), exit 4
   is this PR only (`not-found` from `gh pr view`, `unreadable`, `symlink`,
   `case-alias`, `attributes`). The API host and repository come from the PR's
   URL, passed as `gh api --hostname`.

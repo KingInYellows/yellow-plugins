@@ -1493,6 +1493,30 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   [ "$status" -eq 3 ]
 }
 
+@test "sweep Step 2a: with the HEAD reflog off, only commits on top of the PR head pass" {
+  export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@e GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@e
+  repo="$BATS_TEST_TMPDIR/noreflog-repo"
+  git init -q -b main "$repo" && cd "$repo"
+  git config core.logAllRefUpdates false
+  rm -rf .git/logs
+  git commit -q --allow-empty -m base
+  git checkout -q -b feat && git commit -q --allow-empty -m pr-head
+  head=$(git rev-parse HEAD)
+  git checkout -q main
+  read -r start mark <<<"$(sweep_mark)"
+  [ "$mark" -eq 0 ]
+  git checkout -q feat && git commit -q --allow-empty -m fix
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 0 ]
+  # A stale same-parent rewrite does not contain the PR head.
+  git reset -q --hard "$head~1" && git commit -q --allow-empty -m stale && git checkout -q main
+  read -r start mark <<<"$(sweep_mark)"
+  git checkout -q feat
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"reflog is off"* ]]
+}
+
 @test "sweep-all: a rate-limited pre-check gives the current row an outcome (CLAUDE-125)" {
   all=$(flat "$SWEEP_ALL")
   [[ "$all" == *'record `rate limited` in this PR'"'"'s `Notes`, set this PR'"'"'s row to `Outcome` `skipped`, `Skip Reason` `rate limited` and `Blocking` `?`'* ]]

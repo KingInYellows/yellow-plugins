@@ -244,6 +244,8 @@ so `HEAD` need not equal `<head-sha>`. The `HEAD` reflog entries written since
 Step 1b say where the review started: the newest one that is not a commit
 (the checkout), or `<start-head>` when there is none. That commit must be
 `<head-sha>`, so only `/review:pr`'s own commits and amends sit on top of it.
+When `HEAD` moved but the reflog recorded nothing (reflogs are off), only
+commits on top of `<head-sha>` pass, and an amend stops as `head-mismatch`.
 
 ```bash
 set -u
@@ -265,6 +267,24 @@ NEW=$((N - <reflog-mark>))
 if [ "$N" -lt 0 ] || [ "$NEW" -lt 0 ]; then
   printf '[review:sweep] Error: could not compare the checked-out branch with the PR head commit. Aborting resolve.\n' >&2
   exit 2
+fi
+if [ "$NEW" -eq 0 ] && [ "$(git rev-parse HEAD 2>/dev/null)" != '<start-head>' ]; then
+  # HEAD moved but its reflog recorded nothing (core.logAllRefUpdates=false):
+  # accept only commits on top of <head-sha>, since an amend cannot be told
+  # from a stale rewrite without the reflog.
+  rc=0
+  git merge-base --is-ancestor '<head-sha>' HEAD 2>/dev/null || rc=$?
+  case "$rc" in
+    0) exit 0 ;;
+    1)
+      printf '[review:sweep] Error: HEAD does not contain the PR head commit <head-sha>, and the HEAD reflog is off, so the start cannot be checked. Aborting resolve.\n' >&2
+      exit 3
+      ;;
+    *)
+      printf '[review:sweep] Error: could not compare the checked-out branch with the PR head commit. Aborting resolve.\n' >&2
+      exit 2
+      ;;
+  esac
 fi
 START=$(git reflog show --format='%H %gs' HEAD 2>/dev/null | head -n "$NEW" | awk '$2 !~ /^commit/ { print $1; exit }')
 [ -n "$START" ] || START='<start-head>'
