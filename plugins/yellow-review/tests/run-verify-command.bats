@@ -4731,6 +4731,36 @@ dirlink_setup() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
 }
 
+@test "CLAUDE-121: a trusted-config directory link under a dash-named directory is walked, not parsed as a predicate" {
+  mkdir -p -- -x cfgdir
+  printf 'x\n' >| cfgdir/a.json
+  ln -s ../cfgdir -- -x/.claude
+  git add -- -x/.claude cfgdir/a.json && git commit -q -m "dash-named config link"
+  touch -t 201901010000 cfgdir/a.json cfgdir
+  touch -h -t 201901010000 -- -x/.claude
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  command -v mkfifo >/dev/null 2>&1 || return 0
+  mkfifo cfgdir/settings.json
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c .specialHits)" = '["-x/.claude/settings.json"]' ]
+}
+
+@test "CLAUDE-121: past the walk cap a trusted-config directory link is reported and the revert still runs" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  dirlink_setup
+  rm -f "$EXTDIR/settings.json"
+  mkfifo "$EXTDIR/settings.json" "$EXTDIR/p2" "$EXTDIR/p3"
+  printf 'secret\n' >| CLAUDE.md
+  YR_DIR_LINK_WALK_CAP=2 run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(printf '%s' "$output" | jq -c .reverted)" = '["CLAUDE.md"]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'special file'*'.claude'* ]]
+}
+
 @test "CLAUDE-113: a nested link below an alias into agent memory, retargeted after the marker at an old outside tree, counts" {
   OLDT="$BATS_TEST_TMPDIR/old-tree"
   NEWT="$BATS_TEST_TMPDIR/empty-tree"

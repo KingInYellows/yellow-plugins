@@ -127,7 +127,10 @@ the resolve scripts: `references/resolve/dispositions.md`.
 - `commit-resolve-fixes`, `run-verify-command` — commit and verify resolver
   fixes; both refuse worktree-resident `git`/`gh`/`jq` and screen `PATH` and git
   config (`yr_safe_path`, `harden_git_config`), `commit-resolve-fixes` also
-  refuses worktree-resident `gt`/`node`/`awk`; neither pushes
+  refuses worktree-resident `gt`/`node`/`awk`; neither pushes.
+  `run-verify-command --revert-denied` also judges trusted-config symlinks
+  (tracked, untracked or nested) and leaves FIFO, socket and device paths in
+  place, reporting them instead of opening them
 - `head-ignore-probe`, `guard-local-config` — protect the ignored
   `yellow-plugins.local.md` for sweep and resolve-stack
 - `file-line-counts` — base/head line counts for `thermonuclear-reviewer`

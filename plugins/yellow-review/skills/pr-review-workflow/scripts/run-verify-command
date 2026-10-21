@@ -1236,7 +1236,9 @@ check_trusted_links() {
                     if [ -d "$x" ]; then
                         c=$(yr_canon_path "$x" 2>/dev/null) || return 0
                         if [ -n "$lnew" ]; then
-                            IGNORED_SINCE="" dir_link_hit "$x" "$2/$rel" && return 0
+                            # A subshell: bash 3.2 keeps a prefix assignment
+                            # on a function call after it returns.
+                            (IGNORED_SINCE=""; dir_link_hit "$x" "$2/$rel") && return 0
                             continue
                         fi
                         if ! yr_inside_root "$c" "$top"; then
@@ -1265,6 +1267,8 @@ check_trusted_links() {
             direct=0
             ! rp_trusted_config "$f" || direct=1
             probe="$f"
+            # A path such as `-x/.claude` would parse as a find predicate.
+            case "$f" in -*) probe="./$f" ;; esac
             dirty=0
             for c in ${changed[@]+"${changed[@]}"}; do
                 [ "$c" != "$f" ] || { dirty=1; break; }
@@ -1368,7 +1372,8 @@ check_trusted_links() {
 # counts. `.git` directories are pruned; a walk failure stops the run.
 # The first find does not follow directory symlinks (pnpm stores; `-type p`
 # does not match the link). Each trusted-config directory link is then
-# walked with find -H (follows only the starting point, capped) so a FIFO
+# walked with find -H (follows only the starting point; past the walk cap the
+# link itself is reported instead of failing the run) so a FIFO
 # live at `.claude/settings.json` through `.claude -> elsewhere` is listed
 # under that spelling.
 SPECIAL_HITS=()
@@ -1395,14 +1400,17 @@ check_untracked_special() {
             while IFS= read -r -d '' x; do
                 [ "$x" != $'\001ERR' ] || exit 1
                 n=$((n + 1))
-                [ "$n" -le "$cap" ] || exit 1
+                # Past the cap the link itself is reported (\002 marks it, as
+                # HEAD may track it), so the revert still runs.
+                [ "$n" -le "$cap" ] || { printf '\002%s\0' "$l"; break; }
                 rp_is_special "$x" || continue
                 [ -z "$IGNORED_SINCE" ] || [ "$x" -nt "$IGNORED_SINCE" ] || continue
                 printf '%s\0' "${x#./}"
-            done < <(find -H "$l" -name .git -prune -o -print0 2>/dev/null || printf '\001ERR\0')
+            done < <(find -H "./$l" -name .git -prune -o \( -type p -o -type s -o -type b -o -type c -o -type l \) -print0 2>/dev/null || printf '\001ERR\0')
         done < <(find . -name .git -prune -o -type l -print0 2>/dev/null || printf '\001ERR\0')
     ) >|"$out" 2>/dev/null || { rm -f -- "$out"; die 2 "cannot look for special files at trusted-config paths"; }
     while IFS= read -r -d '' f; do
+        case "$f" in $'\002'*) SPECIAL_HITS+=("${f#$'\002'}"); continue ;; esac
         f="${f#./}"
         rp_trusted_config "$f" || continue
         ! lgit cat-file -e "HEAD:$f" 2>/dev/null || continue
