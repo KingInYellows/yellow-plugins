@@ -843,6 +843,8 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
     grep -qF "printf 'cleanup_marker: %s\\n' \"\$MARKER\"" "$f"
     grep -qF "this PR's number and \`<marker>\`" "$f"
     grep -qF 'rm -f -- "<marker>"' "$f"
+    # an early stop must not leak the marker either
+    tr '\n' ' ' <"$f" | tr -s ' ' | grep -qF 'Whenever the run ends from here on, after the final summary or at any earlier stop'
     # a marker inside the worktree would itself dirty the tree
     grep -qF 'case "$MDIR/" in /|"$TOP"/*) rm -f -- "$MARKER"; MARKER=none ;; esac' "$f"
   done

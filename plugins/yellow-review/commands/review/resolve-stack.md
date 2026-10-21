@@ -85,6 +85,7 @@ fi
 printf 'cleanup_marker: %s\n' "$MARKER"
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner) || {
   printf '[review:resolve-stack] Error: could not determine repo (not a GitHub remote?).\n' >&2
+  [ "$MARKER" = none ] || rm -f -- "$MARKER"
   exit 1
 }
 printf 'repo: %s\n' "$REPO"
@@ -113,8 +114,9 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" --locate >/dev/null
 The tree was clean, so `cleanup_marker:` names a file older than every edit
 this run can make. Capture it as a literal `<marker>` and pass it to the
 dirty-tree cleanup, which uses it to catch a gitignored trusted-config edit.
-`none` (mktemp failed, or `TMPDIR` is inside the worktree) is passed as is. After the final summary, run
-`rm -f -- "<marker>"` unless it is `none`.
+`none` (mktemp failed, or `TMPDIR` is inside the worktree) is passed as is.
+Whenever the run ends from here on, after the final summary or at any
+earlier stop (a failed check, no open PR left, a cancel), run `rm -f -- "<marker>"` unless it is `none`.
 
 Capture the printed `repo:` value — substitute it as a literal `<owner/repo>`
 in every later Bash block (variables do not survive across Bash tool calls).

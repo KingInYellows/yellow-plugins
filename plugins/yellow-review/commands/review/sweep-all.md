@@ -70,8 +70,9 @@ printf 'cleanup_marker: %s\n' "$MARKER"
 The tree was clean, so `cleanup_marker:` names a file older than every edit
 this run can make. Capture it as a literal `<marker>` and pass it to the
 dirty-tree cleanup, which uses it to catch a gitignored trusted-config edit.
-`none` (mktemp failed, or `TMPDIR` is inside the worktree) is passed as is. After the final summary, run
-`rm -f -- "<marker>"` unless it is `none`.
+`none` (mktemp failed, or `TMPDIR` is inside the worktree) is passed as is.
+Whenever the run ends from here on, after the final summary or at any
+earlier stop (a failed check, an empty list, a cancel), run `rm -f -- "<marker>"` unless it is `none`.
 
 `gt` is not checked here — each per-PR sweep invocation runs its own
 pre-flight and will surface a `gt` failure inline.
