@@ -407,14 +407,14 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   run grep -nF 'or when it printed `unignored` and this probe printed `head=ignored`' "$SWEEP"
   [ "$status" -eq 1 ]
   # Step 2a binds the review to the judged head commit; /review:pr may commit on top.
-  [[ "$step2a" == *"git merge-base --is-ancestor '<head-sha>' HEAD"* ]]
-  # gt modify amends the head in place, so a HEAD with the same parents passes.
-  [[ "$step2a" == *"P_HEAD=\$(git rev-parse 'HEAD^@' 2>/dev/null) && P_PR=\$(git rev-parse '<head-sha>^@' 2>/dev/null)"* ]]
-  [[ "$step2a" == *"git cat-file -e '<head-sha>^{commit}'"* ]]
+  # The review must start from the judged head; only /review:pr's commits and amends follow.
+  [[ "$step2a" == *"awk '\$2 !~ /^commit/ { print \$1; exit }'"* ]]
+  [[ "$step2a" == *"[ \"\$START\" = '<head-sha>' ]"* ]]
+  [[ "$step1b" == *'Keep the first line as `<start-head>` and the second as `<reflog-mark>`'* ]]
   [[ "$step2a" == *'ending with `Sweep: skipped (head-mismatch)`'* ]]
   [[ "$step2a" == *'When it prints `tracked` or `unknown`, run no `guard-local-config` call'* ]]
   [[ "$step1b" == *'not an ignored untracked file; not guarded'* ]]
-  [[ "$step2a" == *'Exit 2 means `gh pr view`, `git rev-parse` or `git merge-base` failed or printed nothing, so no mismatch was established'* ]]
+  [[ "$step2a" == *'Exit 2 means `gh pr view`, `git rev-parse` or `git reflog` failed or printed nothing, so no mismatch was established'* ]]
   [[ "$step2a" == *'print no `Sweep:` or `Resolve:` line, so `/review:sweep-all` records `no contract`'* ]]
   # Only a read-and-differ comparison reaches the skip line; a failed read exits 2 first.
   [[ "$step2a" == *'|| EXPECTED=""'* && "$step2a" == *'|| ACTUAL=""'* ]]
@@ -1445,32 +1445,51 @@ sweep_unignored_guard() {
   [ -n "$guard" ] && [ "$guard" -lt "$snap" ]
 }
 
-# Runs sweep Step 2a's head-binding lines (from `git cat-file` to `esac`) with
-# <head-sha> substituted, in the current directory.
+# Runs sweep Step 2a's head-binding lines (from `N=$(git reflog` to the final
+# `}`) with the placeholders substituted, in the current directory.
 sweep_head_binding() {
-  awk '/^git cat-file -e .<head-sha>/ { p = 1 } p { print } p && /^esac$/ { exit }' "$SWEEP" \
-    | sed "s/<head-sha>/$1/g" >"$BATS_TEST_TMPDIR/bind.sh"
+  awk '/^N=\$\(git reflog show/ { p = 1 } p { print } p && /^}$/ { exit }' "$SWEEP" \
+    | sed -e "s/<head-sha>/$1/g" -e "s/<start-head>/$2/g" -e "s/<reflog-mark>/$3/g" >"$BATS_TEST_TMPDIR/bind.sh"
   bash "$BATS_TEST_TMPDIR/bind.sh"
 }
 
-@test "sweep Step 2a: a fix commit on top or an amend of the PR head passes; a stale branch is head-mismatch" {
+# mark: Step 1b's starting-point record, as "<start-head> <reflog-mark>".
+sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --format=%H HEAD | wc -l | tr -d ' ')"; }
+
+@test "sweep Step 2a: a review from the PR head passes with a fix on top or an amend; a stale or unpushed branch is head-mismatch" {
+  export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@e GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@e
   repo="$BATS_TEST_TMPDIR/bind-repo"
-  git init -q "$repo" && cd "$repo"
-  git -c user.name=t -c user.email=t@e commit -q --allow-empty -m base
-  git -c user.name=t -c user.email=t@e commit -q --allow-empty -m pr-head
+  git init -q -b main "$repo" && cd "$repo"
+  git commit -q --allow-empty -m base
+  git checkout -q -b feat && git commit -q --allow-empty -m pr-head
   head=$(git rev-parse HEAD)
-  git -c user.name=t -c user.email=t@e commit -q --allow-empty -m fix
-  run sweep_head_binding "$head"
+  git checkout -q main
+  # Fix commit on top (GitHub provider).
+  read -r start mark <<<"$(sweep_mark)"
+  git checkout -q feat && git commit -q --allow-empty -m fix
+  run sweep_head_binding "$head" "$start" "$mark"
   [ "$status" -eq 0 ]
+  # Amend in place (Graphite).
+  git reset -q --hard "$head" && git checkout -q main
+  read -r start mark <<<"$(sweep_mark)"
+  git checkout -q feat && git commit -q --amend --allow-empty -m amended
+  run sweep_head_binding "$head" "$start" "$mark"
+  [ "$status" -eq 0 ]
+  # Started on the branch already at the head, no checkout.
   git reset -q --hard "$head"
-  git -c user.name=t -c user.email=t@e commit -q --amend --allow-empty -m amended
-  [ "$(git rev-parse HEAD)" != "$head" ]
-  run sweep_head_binding "$head"
+  read -r start mark <<<"$(sweep_mark)"
+  run sweep_head_binding "$head" "$start" "$mark"
   [ "$status" -eq 0 ]
-  git reset -q --hard HEAD~1
-  run sweep_head_binding "$head"
+  # A same-parent local rewrite of the head is stale.
+  git commit -q --amend --allow-empty -m sibling && git checkout -q main
+  read -r start mark <<<"$(sweep_mark)"
+  git checkout -q feat
+  run sweep_head_binding "$head" "$start" "$mark"
   [ "$status" -eq 3 ]
-  run sweep_head_binding 0123456789abcdef0123456789abcdef01234567
+  # An unpushed local commit made before the sweep is not the review's.
+  git reset -q --hard "$head" && git commit -q --allow-empty -m unpushed
+  read -r start mark <<<"$(sweep_mark)"
+  run sweep_head_binding "$head" "$start" "$mark"
   [ "$status" -eq 3 ]
 }
 

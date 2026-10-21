@@ -209,6 +209,18 @@ Never write the digest to a file. On a non-zero exit, report
 `[review:sweep] Error: could not snapshot the local config.` and stop with no
 skip line.
 
+Whatever `<guard-dir>` is, record where the review starts, for Step 2a: the
+commit checked out now and how many entries the `HEAD` reflog holds:
+
+```bash
+git rev-parse HEAD && git reflog show --format=%H HEAD 2>/dev/null | wc -l | tr -d ' '
+```
+
+Keep the first line as `<start-head>` and the second as `<reflog-mark>`. On a
+non-zero exit or a missing line, report
+`[review:sweep] Error: could not read the starting commit.` and stop with no
+skip line.
+
 Every stop after this step, including every Error Handling case below, first
 runs the guard exit check in Step 3a (`check`, then `clear` only on exit `0`
 or `3`).
@@ -222,15 +234,16 @@ the `--non-interactive` flag is fixed text). Wait for it to complete.
 ### Step 2a: Verify branch alignment
 
 After `/review:pr` completes, verify the current checked-out branch still
-matches the PR's head branch, and that it contains the head commit Step 1b
-judged (`<head-sha>`). If `/review:pr` errored mid-way or a tool checked out a
-different branch, `/review:resolve` would commit fixes against the wrong PR;
-a stale or restacked local branch was reviewed, and had its ignore rules
-judged, at a commit other than the PR head. `/review:pr` may have pushed
-fixes, so `HEAD` need not equal `<head-sha>`: it passes when `<head-sha>` is an
-ancestor of `HEAD` (a fix commit on top, the GitHub provider) or when `HEAD`
-has exactly `<head-sha>`'s parents (the head amended in place, which
-`/review:pr`'s Graphite publish does).
+matches the PR's head branch, and that the review started from the head commit
+Step 1b judged (`<head-sha>`). If `/review:pr` errored mid-way or a tool
+checked out a different branch, `/review:resolve` would commit fixes against
+the wrong PR; a stale, restacked or locally rewritten branch was reviewed, and
+had its ignore rules judged, at a commit other than the PR head. `/review:pr`
+may have published fixes as a commit on top or by amending the head in place,
+so `HEAD` need not equal `<head-sha>`. The `HEAD` reflog entries written since
+Step 1b say where the review started: the newest one that is not a commit
+(the checkout), or `<start-head>` when there is none. That commit must be
+`<head-sha>`, so only `/review:pr`'s own commits and amends sit on top of it.
 
 ```bash
 set -u
@@ -244,31 +257,29 @@ fi
   printf '[review:sweep] Error: branch mismatch (expected %s, on %s). Aborting resolve.\n' "$EXPECTED" "$ACTUAL" >&2
   exit 1
 }
-git cat-file -e '<head-sha>^{commit}' 2>/dev/null || {
-  printf '[review:sweep] Error: the checked-out branch does not contain the PR head commit <head-sha>. Aborting resolve.\n' >&2
+N=$(git reflog show --format=%H HEAD 2>/dev/null | wc -l | tr -d ' ')
+case "$N" in
+  '' | *[!0-9]*) N=-1 ;;
+esac
+NEW=$((N - <reflog-mark>))
+if [ "$N" -lt 0 ] || [ "$NEW" -lt 0 ]; then
+  printf '[review:sweep] Error: could not compare the checked-out branch with the PR head commit. Aborting resolve.\n' >&2
+  exit 2
+fi
+START=$(git reflog show --format='%H %gs' HEAD 2>/dev/null | head -n "$NEW" | awk '$2 !~ /^commit/ { print $1; exit }')
+[ -n "$START" ] || START='<start-head>'
+[ "$START" = '<head-sha>' ] || {
+  printf '[review:sweep] Error: the review started at %s, not the PR head commit <head-sha>. Aborting resolve.\n' "$START" >&2
   exit 3
 }
-git merge-base --is-ancestor '<head-sha>' HEAD; rc=$?
-if [ "$rc" -eq 1 ]; then
-  # An amend keeps the parents: accept HEAD when they match <head-sha>'s.
-  P_HEAD=$(git rev-parse 'HEAD^@' 2>/dev/null) && P_PR=$(git rev-parse '<head-sha>^@' 2>/dev/null) || rc=2
-  [ "$rc" -ne 1 ] || [ "$P_HEAD" != "$P_PR" ] || rc=0
-fi
-case "$rc" in
-  0) ;;
-  1) printf '[review:sweep] Error: the checked-out branch does not contain the PR head commit <head-sha>. Aborting resolve.\n' >&2
-     exit 3 ;;
-  *) printf '[review:sweep] Error: could not compare the checked-out branch with the PR head commit. Aborting resolve.\n' >&2
-     exit 2 ;;
-esac
 ```
 
 Exit 1 means both names were read and they differ: stop, do not proceed to
 Step 3, and end the output with the skip line
 `Sweep: skipped (branch-mismatch)` (see "Skip line"). Exit 3 means the branch
-matches but neither contains `<head-sha>` nor amends it (the local branch is
-stale or was restacked): stop the same way, ending with `Sweep: skipped (head-mismatch)`.
-Exit 2 means `gh pr view`, `git rev-parse` or `git merge-base` failed or
+matches but the review did not start from `<head-sha>` (the local branch is
+stale, restacked or rewritten): stop the same way, ending with `Sweep: skipped (head-mismatch)`.
+Exit 2 means `gh pr view`, `git rev-parse` or `git reflog` failed or
 printed nothing, so no mismatch was established (a failed fetch can be a rate
 limit): stop the same way, but print no `Sweep:` or `Resolve:` line, so
 `/review:sweep-all` records `no contract` and stops the batch. Before any of
@@ -538,7 +549,7 @@ cut off, which stays `no contract`. `pr-not-open` is printed only when
 `gh pr view` succeeded and returned a state other than `OPEN`, and
 `branch-mismatch` only when `gh pr view` and `git rev-parse` both succeeded and
 their branch names differ, and `head-mismatch` only when the branch matched and
-`git` confirmed it neither contains nor amends `<head-sha>`. The three Step 1b reasons are
+the reflog showed the review started from another commit than `<head-sha>`. The three Step 1b reasons are
 printed only on `head-ignore-probe`'s exit `4` (`head-ignore-unreadable`), on
 its `head=ignored` result against this branch's tracked or untracked file, or
 (`untracked-here-ignored-on-head`) on Step 2b finding that untracked file
@@ -585,9 +596,9 @@ stop.
   resolve.` and stop. Indicates `/review:pr` errored mid-checkout or
   another tool changed branches during the run — re-run after manually
   checking out the PR head branch.
-- **Local branch behind the PR head** (Step 2a, exit 3): `[review:sweep]
-  Error: the checked-out branch does not contain the PR head commit <sha>.
-  Aborting resolve.` and stop, ending with `Sweep: skipped (head-mismatch)`.
+- **Local branch is not the PR head** (Step 2a, exit 3): `[review:sweep]
+  Error: the review started at <sha>, not the PR head commit <sha>. Aborting
+  resolve.` and stop, ending with `Sweep: skipped (head-mismatch)`.
   Sync the local branch with the PR through the enabled stack provider and rerun.
 - **Branch unreadable after `/review:pr`** (Step 2a, exit 2): `[review:sweep]
   Error: could not read the PR head branch or the current branch. Aborting
