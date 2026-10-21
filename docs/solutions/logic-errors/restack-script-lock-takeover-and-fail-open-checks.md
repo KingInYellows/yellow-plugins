@@ -154,13 +154,16 @@ than the evidence behind it.
   state could not be read, so an unrelated unreadable worktree blocked a
   Graphite run. `gt` rebases only in the run worktree; `gh stack` rebases in
   the worktrees recorded as owners. `unrecorded_keeps_state` now applies to
-  github state only, so an unreadable state is named but never blocks
-  Graphite. For github it counts both readable and unreadable rebases, since
+  `github` state only, so an unreadable state is named but never blocks
+  Graphite. For GitHub it counts both readable and unreadable rebases, since
   either may be gh-stack's own.
-- **Legacy state with no owner lines.** A github state written before owners
+- **Legacy state with no owner lines.** A `github` state written before owners
   were recorded cannot rule any worktree out, yet it cleared the state over an
   unrecorded rebase once the provider abort had run. It now keeps the state
   (exit 31) while such a rebase exists, with or without the provider abort.
+  Legacy is now keyed on a missing `owners N` line, which every `github`
+  start writes: a run that recorded no owners (`owners 0`) is no longer
+  mistaken for a legacy state and refused over an unrelated rebase.
 - **Advice chosen by refusal reason.** A busy or floating run worktree was told
   to `git checkout` the start branch. `release_run_worktree` now sets
   `RELEASE_WHY` (busy, floating, unreadable, checkout) and `release_advice`
@@ -216,7 +219,7 @@ than the evidence behind it.
   `step_graphite`, `step_github` and the interrupt handler classify a
   failure with a hold as a pause, and `release_run_worktree` refuses a
   checkout while it holds.
-- **Found while testing.** A deleted github owner still listed on its branch
+- **Found while testing.** A deleted GitHub owner still listed on its branch
   read as busy in `in_chain_busy`; worktrees git reports prunable or whose
   directory is gone are now skipped there.
 

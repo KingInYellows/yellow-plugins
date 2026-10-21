@@ -190,22 +190,30 @@ After the provider's own abort, `--abort` also aborts a git rebase of a
 recorded stack branch in each worktree the run recorded: the run worktree, the
 worktrees Graphite detached, and, for GitHub, the worktrees that held a
 restacked branch at start (gh-stack rebases in whichever worktree holds a
-branch). Then it restores. Every worktree it stops on is named with a fix line.
+branch). A rebase started in a detached Graphite worktree counts when it began
+at the commit recorded for that worktree. Each rebase it clears prints
+`aborted a stack rebase in <worktree>`. Then it restores. Every worktree it
+stops on is named with a fix line, and a partial abort also lists the
+worktrees it already cleared (`Already aborted: ...`).
 
 - **Unrecorded worktree.** A rebase in a worktree the run never recorded is
   left alone and named (`not recorded: ...`); it may be another session's.
   For GitHub it keeps the state (exit `31`) on `--abort` and `--continue` when
   that rebase, or a rebase state there that cannot be read, may be the run's
-  own: the state has no `owner` lines (written
-  before they were recorded), or the provider has no paused restack or
-  rollback on record.
+  own: the state has no `owners` line (written
+  before owners were recorded; a run that recorded none writes `owners 0`), or
+  the provider has no paused restack or rollback on record.
 - **Replaced worktree.** Start binds each recorded worktree to the run's id.
   When a recorded path now holds a worktree without it (removed and
   registered again, or its `.git` link changed), `--continue`, `--abort` and
   `restore` change nothing and keep the state (exit `31`); `status` lists it
   as `replaced`. Move or remove that worktree, then run again. The check is
   repeated after every provider step, so one replaced while the provider ran
-  is never restored, locked, checked out or submitted from (exit `40`). When start
+  is never restored, locked, checked out or submitted from. The exit code
+  depends on the step that meets it: restoring an entry exits `40`, a pause
+  exits `10` (it skips the lock), returning the run worktree to its start
+  branch exits `31` (`run-worktree-replaced`), and a submit from a replaced run
+  worktree exits `60` after the restore has finished. When start
   cannot bind one (its git directory is not writable, or something sits at the
   binding path), it changes nothing, leaves no state and exits `30` with a fix
   line.
@@ -228,7 +236,8 @@ branch). Then it restores. Every worktree it stops on is named with a fix line.
   or while it holds commits no branch has.
 
 Run `--abort` again once each named worktree is cleared. `--status` lists the
-recorded worktrees, any that is rebasing, busy or unreadable, and any
+recorded worktrees, any that is rebasing (the run worktree too, once the
+provider has lost its record of the paused rebase), busy or unreadable, and any
 unrecorded worktree rebasing a stack branch or holding an unreadable rebase
 state.
 
@@ -265,7 +274,9 @@ branch is no longer at the commit recorded at start (a paused rebase finished
 with `git rebase --continue`). It lists each moved branch and its starting
 commit and restores nothing, printing a fix line per branch: `git reset --hard`
 in the worktree that has it checked out, else `git branch -f` (git refuses to
-force-update a checked-out branch). A `warning:` line before a `reset --hard`
+force-update a checked-out branch). When only a deleted worktree still has the
+branch checked out, a `git worktree prune` fix line comes first, because git
+refuses `git branch -f` until that record is pruned. A `warning:` line before a `reset --hard`
 fix means that worktree has uncommitted changes the reset would discard: do
 not run that fix; show the warning and ask the user to commit or save the
 changes first. Run the fix lines, then `--abort` again, or run `--continue`
@@ -319,11 +330,33 @@ the `git worktree unlock` line to run after restoring it).
 | `10` | Paused on a conflict | List the conflicted files and, for Graphite, the detached, locked worktrees. Do not commit in a detached worktree. Resolve the files, `git add` them, then `/worktree:restack --continue` (or `--abort`) |
 | `20` | Preflight refused | Show the `REFUSE` reasons; nothing was touched |
 | `30` | Restack failed, nothing left detached | Worktrees were restored (or nothing had changed yet); show the provider output |
-| `31` | A step failed and the state is kept | Worktrees may still be detached, or an in-chain rebase is still in progress. Run `--status`, then `--continue`, `--abort` or the Recovery `restore` call |
+| `31` | A step failed and the state is kept | Worktrees may still be detached, or an in-chain rebase is still in progress. The message names each stuck path with a fix line, and the last stderr line, `worktree-restack: kept: <reason>`, names the cause (see the table below). Run the fix lines, or `--status`, then `--continue`, `--abort` or the Recovery `restore` call |
 | `40` | Restore did not finish; state kept | Follow the script's own reason. A GitHub restack still paused means `--continue` or `--abort` (nothing is detached). Otherwise some worktree is still detached: show each per-entry line and its `checkout` fix, then re-run `--continue` or `--abort` |
 | `50` | Restack incomplete | The ancestry check found a branch that was not restacked; worktrees are restored and nothing was submitted |
 | `60` | Submit failed | The restack and restore are done; re-run `/worktree:restack --submit` (the restack is then a no-op and it only submits) |
 | `129`, `130`, `143` | The script was interrupted | Read its "interrupted" line, then run `--status` to see whether it paused or restored |
+
+### Exit `31` reasons
+
+Branch on the `kept:` token, not on the prose above it.
+
+| Reason | Cause |
+| --- | --- |
+| `replaced` | A recorded path holds a worktree this run did not record |
+| `adapter-missing`, `gt-missing` | The provider's adapter or CLI is not installed |
+| `aborted-at-provider` | `--continue` after the provider abort already ran; run `--abort` |
+| `rebase-unreadable` | A recorded worktree's rebase state cannot be read |
+| `rebase-stuck` | `git rebase --abort` did not clear a recorded worktree's rebase |
+| `provider-lost-rebase` | A stack rebase is in progress but the provider has no record of it |
+| `unrecorded-rebase` | A worktree the run did not record rebases a stack branch, and it may be the run's own (GitHub) |
+| `moved-tips` | Stack branches are not at their start commits; run the fix lines |
+| `no-start-tips` | A legacy state with no recorded start tips and nothing to roll back |
+| `phase-unwritable` | The abort could not be recorded before the provider ran; nothing was aborted |
+| `provider-abort-failed` | The provider's abort failed and may have rolled part of the stack back |
+| `marker-unwritable` | The provider abort succeeded but its record could not be written |
+| `worktree-list` | `git worktree list` failed |
+| `busy` | A merge, cherry-pick, revert, sequencer or other rebase runs in a recorded or stack-branch worktree |
+| `run-worktree-busy`, `-floating`, `-unreadable`, `-replaced`, `-checkout` | The run worktree could not return to the start branch: an operation runs there, it holds commits no branch has, it cannot be read, it was replaced, or git refused the checkout (git's first line is shown) |
 
 Give the start, continue and abort Bash calls a long explicit timeout (for
 example 600000 ms): a large restack or `--submit` can outlast the default.
