@@ -230,7 +230,7 @@ judged, at a commit other than the PR head. `/review:pr` may have pushed
 fixes, so `HEAD` need not equal `<head-sha>`: it passes when `<head-sha>` is an
 ancestor of `HEAD` (a fix commit on top, the GitHub provider) or when `HEAD`
 has exactly `<head-sha>`'s parents (the head amended in place, which
-Graphite's `gt modify` does).
+`/review:pr`'s Graphite publish does).
 
 ```bash
 set -u
