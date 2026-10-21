@@ -4763,6 +4763,24 @@ dirlink_setup() {
   [[ "$(printf '%s' "$output" | jq -r .reason)" == *'special file'*'.claude'* ]]
 }
 
+@test "CLAUDE-121: a trusted-config dir link into a large ordinary tree still hits the walk cap" {
+  dirlink_setup
+  rm -f "$EXTDIR/settings.json"
+  mkdir "$EXTDIR/many"
+  (cd "$EXTDIR/many" && seq 1 100 | xargs touch -t 201901010000)
+  printf 'secret\n' >| CLAUDE.md
+  YR_DIR_LINK_WALK_CAP=50 run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(printf '%s' "$output" | jq -c .specialHits)" = '[".claude"]' ]
+  YR_DIR_LINK_WALK_CAP=999999 run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c .specialHits)" = '[]' ]
+  YR_DIR_LINK_WALK_CAP=50 run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c .reverted)" = '["CLAUDE.md"]' ]
+}
+
 @test "CLAUDE-113: a nested link below an alias into agent memory, retargeted after the marker at an old outside tree, counts" {
   OLDT="$BATS_TEST_TMPDIR/old-tree"
   NEWT="$BATS_TEST_TMPDIR/empty-tree"

@@ -1400,8 +1400,9 @@ check_untracked_special() {
             while IFS= read -r -d '' x; do
                 [ "$x" != $'\001ERR' ] || exit 1
                 n=$((n + 1))
-                # Past the cap the link itself is reported (\002 marks it, as
-                # HEAD may track it), so the revert still runs.
+                # Every visited entry counts. Past the cap the link itself is
+                # reported (\002 marks it, as HEAD may track it), so the revert
+                # still runs.
                 [ "$n" -le "$cap" ] || { printf '\002%s\0' "$l"; break; }
                 rp_is_special "$x" || continue
                 [ -z "$IGNORED_SINCE" ] || [ "$x" -nt "$IGNORED_SINCE" ] || continue
