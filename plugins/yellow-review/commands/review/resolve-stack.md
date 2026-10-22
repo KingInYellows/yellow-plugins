@@ -185,8 +185,8 @@ Build the ordered walk list:
   base → tip ordered.
 
 If no open non-draft PRs remain (either provider), report
-`[review:resolve-stack] No open PRs found in current stack.` and exit
-successfully — there is nothing to walk.
+`[review:resolve-stack] No open PRs found in current stack.`, then the Step 4
+outcome line with zeros, and exit `0` — there is nothing to walk.
 
 ### Step 3: Walk the stack
 
@@ -454,11 +454,21 @@ a `not attempted (cluster cap)` or `not attempted (rate limit)` note surfaced by
 `/review:resolve`. If that section is empty, print
 `[review:resolve-stack] All open PRs in the stack are fully resolved.`
 
-**Exit code contract.** Exit `0` only when the "Needs manual attention" section
-is empty; exit `1` when it is not (including any PR whose `Resolve:` line
-reports `b > 0`), so a parent agent can tell a clean stack without parsing the
-table. Step 1 pre-flight failures exit non-zero; "no open PRs found" (Step 2)
-exits `0`.
+**Outcome line and exit code.** Exit `0` only when "Needs manual attention" is
+empty, else `1`. The `Skill` tool gives a parent no exit status, so on every
+path after Step 1 (Step 2's "no open PRs found" too, with zeros) the LAST line
+of output is exactly:
+
+```text
+ResolveStack: blocking=<n> ratelimited=<0|1> aborted=<0|1> not_attempted=<n> exit=<0|1>
+```
+
+`blocking` counts walked PRs a human must answer: `b > 0`, `no contract`,
+`verify skipped` or an inconclusive self-verify. `ratelimited=1` means a
+`Resolve:` line reported it (re-run later). `aborted=1` means item 1b or 3b
+stopped the walk (fix the tree or config first). `not_attempted` counts the
+`not attempted (…)` rows; `exit` is the exit code. Step 1 pre-flight failures
+exit non-zero and print no outcome line.
 
 ## Error Handling
 
@@ -470,12 +480,9 @@ early, the command exits `1`.
   with a named error.
 - **Not in a tracked stack / empty stack** — Step 2 reports "No open PRs found
   in current stack." and exits 0.
-- **`gt checkout` failure mid-walk** — log and skip that PR, continue.
-- **A resolve leaves the tree dirty** — step 3b stops the walk with
-  `aborted at PR #<N>` and the file list; continuing would carry those edits
-  onto the next branch.
-- **A resolve changes the ignored `yellow-plugins.local.md`** (a tracked config
-  is not guarded) — item 3b restores it from the item 1b snapshot and stops with
+- **Checkout failure mid-walk** — log and skip that PR, continue.
+- **A resolve leaves the tree dirty or changes the ignored
+  `yellow-plugins.local.md`** — step 3b reverts or restores it and stops with
   `aborted at PR #<N>`; a failed restore is reported as tampered.
 - **Rate limit, no valid final contract, or inconclusive self-verify** — the
   walk finishes that PR except its restack, never infers a rate limit from
@@ -484,12 +491,8 @@ early, the command exits `1`.
 - **PR merged or closed before the walk reaches it** — `/review:resolve` still
   prints a valid zero `Resolve:` line (`push=skipped`); record it as skipped and
   continue. Only a missing or malformed final line is `no contract`.
-- **Restack conflict** — Graphite: `gt abort`; GitHub: the adapter's
-  `rebase --mode abort`. Continue to the next PR and surface it in the summary;
-  the walk never pauses.
-- **Push failure inside `/review:resolve`** — record it in the summary and
-  continue.
-- **ruvector MCP unavailable** — the Step 1 recall is skipped silently.
+- **Restack conflict or push failure** — abort a conflicted restack (step 4),
+  record either in the summary and continue; the walk never pauses.
 - **Re-run safety** — replies and issues carry idempotency markers, so a second
   pass posts no duplicates.
 

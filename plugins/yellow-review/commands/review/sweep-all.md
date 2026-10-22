@@ -21,12 +21,9 @@ stops in Step 4 end it early. Each PR's
 `/review:pr --non-interactive` stages its learnings for yellow-core's
 compound-staging drain; sweep-all runs no compounding pass of its own.
 
-Use when you want to clear review + resolve backlog across all your open
-PRs in one batch. Each per-PR sweep runs `/review:pr --non-interactive`
-then `/review:resolve --non-interactive` — fully unattended end-to-end
-once you confirm the upfront list. For a single PR, use `/review:sweep`
-directly. For multi-PR pipelines with attended compounding per PR, use
-`/review:all scope=all`.
+Each per-PR sweep runs `/review:pr` then `/review:resolve`, both
+`--non-interactive`. For one PR use `/review:sweep`; for attended compounding
+per PR use `/review:all scope=all`.
 
 ## Workflow
 
@@ -156,8 +153,8 @@ length 0), run both steps below in order, then stop:
    [review:sweep-all] No open non-draft PRs found. Nothing to sweep.
    ```
 
-   and stop. Do NOT show the Step 3 confirmation gate (confirming zero PRs
-   is confusing). Exit 0 — nothing to do is not a failure.
+   then the Step 5 outcome line with zeros, and stop. Do NOT show the Step 3
+   confirmation gate. Exit 0 — nothing to do is not a failure.
 
 ### Step 3: Upfront confirmation gate
 
@@ -207,8 +204,8 @@ print:
 [review:sweep-all] Cancelled. No sweeps run.
 ```
 
-Then stop and exit 0 (Cancel is a clean stop, not an error). Do NOT
-proceed to Step 4 or any later step.
+Then print the Step 5 outcome line (`not_attempted=<N>`, `exit=0`), stop and
+exit 0 (Cancel is a clean stop, not an error). Do NOT proceed to Step 4.
 
 This is the only human prompt in the entire command (apart from the
 prune-only prompt when there is nothing to sweep). After Proceed,
@@ -444,14 +441,25 @@ Findings left pending when a PR merges are stranded, because the ledger
 refuses writes to a closed PR. The line is a report only and never changes
 the exit code.
 
-Truncate long titles at ~30 characters with `…` if needed for table
-readability. Both the table and the totals line are required.
+Truncate titles at ~30 characters with `…`. The table and totals are required.
 
 Learnings staged by each PR's `/review:pr` become eligible to drain at later
 sessions in the main checkout once the count or age threshold is met; the per-PR sweep output carries the staging line.
 
 **Final exit (every path, including zero attempts):** read `pending-exit-1`.
 If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.
+The `Skill` tool gives a parent no exit status, so the LAST line of output,
+here and at the empty-list (zeros) and Cancel exits, is exactly:
+
+```text
+SweepAll: blocking=<n> ratelimited=<0|1> aborted=<0|1> not_attempted=<n> exit=<0|1>
+```
+
+`blocking` counts attempted PRs whose `Blocking` cell is above 0 or `?`.
+`ratelimited=1` means item 1b or 5 stopped on a rate limit (re-run later).
+`aborted=1` means item 4 stopped on a dirty tree. `not_attempted` counts the
+`not attempted (…)` and `working tree dirty after PR` rows (all `<N>` PRs on
+Cancel). `exit` is the exit code. Pre-flight failures print no outcome line.
 
 ## Error Handling
 
@@ -463,7 +471,6 @@ If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.
   ledgers**), then exit 0 with the `No open non-draft PRs found.` message.
   No M3 gate is shown.
 - **User cancels at the M3 gate**: exit 0 with the `Cancelled.` message.
-  No sweeps run.
 - **Per-PR sweep failure mid-loop**: marked `skipped` in the summary
   with a short reason. The loop continues unless Step 4 item 1b, 4, 5, 5b or
   5c stops it. The user can re-run `/review:sweep <PR#>` manually to inspect.
@@ -486,15 +493,8 @@ If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.
   clean-tree check the loop stops, marks every remaining PR `skipped — not
   attempted (no contract)`, prints the summary, and exits `1`. No text in the
   output is read as a rate-limit signal.
-- **Every PR skipped for per-PR reasons** (no Step 4 stop): summary table is
-  still printed; exit 0. sweep-all
-  itself succeeded — the batch completed without hitting a stop condition,
-  and the skipped PRs are counted separately from attempted ones.
-- **Concurrent invocations**: NOT SUPPORTED. The dirty-tree guard at
-  Step 1 does NOT serialize concurrent sweeps — `/review:pr` and
-  `/review:resolve` clean the working tree between PRs (via a commit +
-  push through the resolved stacked-PR provider, or a verify revert; Step 4
-  item 4 stops the loop otherwise), so a second `sweep-all` that starts
-  mid-loop will frequently see a clean tree and proceed, causing branch
-  races (interleaved checkouts, conflicting commits, push races). Do
-  not run two `sweep-all` instances simultaneously.
+- **Every PR skipped for per-PR reasons** (no Step 4 stop): the summary is
+  still printed; exit 0. Skipped PRs are counted apart from attempted ones.
+- **Concurrent invocations**: not supported. The Step 1 dirty-tree guard does
+  not serialize them: the tree is clean between PRs, so a second `sweep-all`
+  proceeds and races the first (interleaved checkouts, commits and pushes).
