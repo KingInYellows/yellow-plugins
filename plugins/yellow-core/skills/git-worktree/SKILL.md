@@ -207,18 +207,17 @@ Safety rules the script holds:
   prunable or mid-operation, when the stack forks, or when a restack is already
   in progress. An untracked `.ruvector` symlink does not count as dirty.
 - Its own git calls never force a checkout, stash, hard-reset or pass
-  `--ignore-other-worktrees`. Graphite's abort (run by `--abort`) rolls the
-  whole restack back, and `--abort` runs `git rebase --abort` in each worktree
-  the run recorded (the run worktree, Graphite's detached ones, GitHub's
-  branch owners) that holds an in-chain rebase, discarding its in-progress
-  state. An unrecorded worktree is left alone; for GitHub, a rebase there that
-  may be the run's own keeps the state (exit `31`). A recorded worktree whose
-  rebase state cannot be read stops the abort (exit `31`, named). A
-  worktree that cannot be restored stays detached and the script prints the
-  `git -C <path> checkout <branch>` line.
-- `--abort` keeps the state (exit `31`) when a stack branch is off its recorded
-  start commit, before or after its cleanup. Each gets a fix line; see
-  `/worktree:restack`.
+  `--ignore-other-worktrees`. `--abort` runs Graphite's abort (which rolls the
+  whole restack back) and `git rebase --abort` in each recorded worktree (run
+  worktree, Graphite's detached ones, GitHub's branch owners) holding an
+  in-chain rebase, discarding its in-progress state. Unrecorded worktrees are
+  left alone. It keeps the state (exit `31`) for a GitHub rebase in an
+  unrecorded worktree that may be the run's own, a recorded worktree whose
+  rebase state cannot be read (named) or that `git rebase --abort` did not
+  clear (`rebase-stuck`), or a stack branch off its recorded start commit
+  before or after cleanup (each gets a fix line; see `/worktree:restack`).
+  A worktree that cannot be restored stays detached and the script prints
+  the `git -C <path> checkout <branch>` line.
 - A conflict pauses the run (exit 10). Graphite: the stack worktrees stay
   detached and `git worktree lock`ed. Do not commit in them: a commit there
   lands on no branch, and the script refuses to restore over it. GitHub:
@@ -361,14 +360,12 @@ When starting feature work:
 If your project uses [mise](https://mise.jdx.dev/) (`.mise.toml`,
 `.tool-versions`) or [direnv](https://direnv.net/) (`.envrc`), the new
 worktree directory starts **untrusted** — the tool refuses to load
-configs until the user explicitly opts in. This breaks the principle of
-least surprise: you create a worktree, `cd` in, and tooling silently
-fails to load.
+configs until the user explicitly opts in, so tooling silently fails to
+load after you `cd` in.
 
-The fix is to auto-trust the new worktree directory at creation time.
-The manager script handles common cases; the patterns below show how to
-do it explicitly when needed (e.g., a CI runner creating a throwaway
-worktree).
+Auto-trust the new worktree directory at creation time. The manager
+script handles common cases; the patterns below do it explicitly (e.g.,
+a CI runner creating a throwaway worktree).
 
 **mise:**
 
@@ -451,12 +448,10 @@ the parent, which lands the new worktree under
 expect. Always run worktree commands from the **superproject root**, or
 explicitly pass `-C <superproject-root>` to `git worktree add`.
 
-**Why this matters for the manager script:** the helper resolves
-`get_repo_root` via `git rev-parse --show-toplevel`, which already
-returns the correct top-level whether `.git` is a file or directory.
-But any caller that pre-checks `[ -d .git ]` before invoking the helper
-will short-circuit incorrectly. Use `git rev-parse --git-dir` (which
-handles both forms) instead.
+**Why this matters for the manager script:** `get_repo_root` uses
+`git rev-parse --show-toplevel`, which handles both forms, but a caller
+that pre-checks `[ -d .git ]` short-circuits before reaching it. Use
+`git rev-parse --git-dir` (which handles both forms) instead.
 
 ## Troubleshooting
 
