@@ -21,6 +21,7 @@ tier3_probe() {
     plugins/yellow-ci/hooks/scripts/lib/validate.sh) printf 'validate_ssh_host' ;;
     plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh) printf 'resolve_runner_targets' ;;
     plugins/yellow-debt/lib/validate.sh) printf 'transition_todo_state' ;;
+    plugins/yellow-goal/lib/sibling-plugin.sh) printf 'sp_sibling_file' ;;
     plugins/yellow-ruvector/hooks/scripts/lib/resolve.sh) printf 'ruvector_hash_selected' ;;
     plugins/yellow-ruvector/lib/install-ruvector.sh) printf 'yellow_ruvector_validate_paths' ;;
     *) return 1 ;;
