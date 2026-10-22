@@ -210,10 +210,43 @@ const BASH_FD_WRAPPER_RE = new RegExp(
 const COMMAND_POSITION_RE =
   /(?:^|[;&|({!]|(?:^|\s)(?:then|do|else|elif|if|while|until|time)|(?:^\s*|;[;&]\s*|\bin\s+)\(?[^\s()|;&]+(?:\|[^\s()|;&]+)*\))$/;
 // `$((…))` / `((…))` spans: `<<` and `>` inside them are arithmetic shifts
-// and comparisons, not heredocs or redirects.
-const ARITHMETIC_RE = /\$?\(\((?:[^()]|\([^()]*\))*\)\)/g;
+// and comparisons, not heredocs or redirects. Found by counting parens on the
+// quote-masked text, so substitutions nest to any depth
+// (`$(( top + $(echo $(printf 1)) ))`). Returns [{ index, end }], end
+// exclusive; a `((` that never closes with `))` is not a span.
+function arithmeticSpans(text) {
+  const mask = maskShell(text);
+  const spans = [];
+  for (let i = 0; i < mask.length - 1; i++) {
+    if (mask[i] !== '(' || mask[i + 1] !== '(') continue;
+    let depth = 0;
+    let end = -1;
+    for (let j = i; j < mask.length; j++) {
+      if (mask[j] === '(') depth++;
+      else if (mask[j] === ')' && --depth === 0) {
+        end = j;
+        break;
+      }
+    }
+    if (end === -1 || mask[end - 1] !== ')') continue;
+    spans.push({ index: mask[i - 1] === '$' ? i - 1 : i, end: end + 1 });
+    i = end;
+  }
+  return spans;
+}
+// Replace each arithmetic span with `fn(span)`, which must keep its length
+// when the caller needs columns to line up.
+function replaceArithmetic(text, fn) {
+  let out = '';
+  let last = 0;
+  for (const { index, end } of arithmeticSpans(text)) {
+    out += text.slice(last, index) + fn(text.slice(index, end));
+    last = end;
+  }
+  return out + text.slice(last);
+}
 function stripArithmetic(code) {
-  return code.replace(ARITHMETIC_RE, '0');
+  return replaceArithmetic(code, () => '0');
 }
 const BASH_DASH_C_RE = /(?:^|[\s;&|(])bash\s+(?:-\w+\s+)*-c\s/;
 
@@ -883,17 +916,25 @@ function commandSubstitutions(span, mask) {
 // Replace each `re` match in the shell-visible text (quotes masked, so a
 // quoted `"]]"` does not end a `[[ … ]]` span) with `placeholder`, keeping
 // the span's command substitutions.
-function blankSpans(code, re, placeholder) {
+// `spans` is a regex or a function returning [{ index, end }] for the mask.
+function blankSpans(code, spans, placeholder) {
   const mask = maskShell(code);
+  const found =
+    typeof spans === 'function'
+      ? spans(code)
+      : [...mask.matchAll(spans)].map((m) => ({
+          index: m.index,
+          end: m.index + m[0].length,
+        }));
   let result = '';
   let last = 0;
-  re.lastIndex = 0;
-  let m;
-  while ((m = re.exec(mask)) !== null) {
-    const end = m.index + m[0].length;
-    const subs = commandSubstitutions(code.slice(m.index, end), m[0]);
+  for (const { index, end } of found) {
+    const subs = commandSubstitutions(
+      code.slice(index, end),
+      mask.slice(index, end)
+    );
     result +=
-      code.slice(last, m.index) +
+      code.slice(last, index) +
       (subs.length ? `${placeholder} ; ${subs.join(' ; ')} ;` : placeholder);
     last = end;
   }
@@ -904,7 +945,7 @@ function blankSpans(code, re, placeholder) {
 // the span but keep its command substitutions so their redirects are scanned.
 function stripComparisons(code) {
   return blankSpans(
-    blankSpans(code, ARITHMETIC_RE, '0'),
+    blankSpans(code, arithmeticSpans, '0'),
     /\[\[(?:[^\]]|\](?!\]))*\]\]/g,
     '[[ ]]'
   );
@@ -986,7 +1027,6 @@ function classifySource(target, rel, ctx) {
   return { unclassified: candidates[0] };
 }
 
-
 // ---------------------------------------------------------------------------
 // SHC-010: alias-prone commands in command position
 
@@ -1001,16 +1041,31 @@ function validAliasGuarded(list) {
     list.every((c) => typeof c === 'string' && COMMAND_NAME_RE.test(c))
   );
 }
-// `LC_ALL=C ls` is still the command `ls`, also after `&&`, `then` or `(`. The
-// run of assignments right before the word is stripped. A wrapper (`timeout`,
-// `sudo`) is not an assignment and stays invisible to this rule.
-// The value stops at `(` or a backtick so `v=$(command ls` is not read as an
-// assignment followed by `ls`.
-const ENV_ASSIGN_RE = /(?:^|(?<=[\s;&|(`]))(?:[A-Za-z_][A-Za-z0-9_]*=[^\s(`]*\s+)+$/;
-// The start of a case arm (`in ps)`, `;; ps|df)`, `(ps|df)`) ending right
-// before the word: group 1 is the anchor, 2 an opening `(`, 3 earlier
-// alternatives.
-const CASE_ARM_HEAD_RE = /(^|;;&?|;&|\bin)\s*(\()?((?:[^\s()|;&]+\|)*)$/;
+// `LC_ALL=C ls` and `2>/dev/null ls` are still the command `ls`, also after
+// `&&`, `then` or `(`: the run of assignments and redirects right before the
+// word is stripped. An assignment value stops at `(` or a backtick so
+// `v=$(command ls` is not read as an assignment followed by `ls`;
+// `stripCommandPrefix` collapses closed substitutions first, so
+// `FOO=$(printf x) ls` still strips.
+const PREFIX_WORDS_RE =
+  /(?:^|(?<=[\s;&|(`]))(?:(?:[A-Za-z_][A-Za-z0-9_]*=[^\s(`]*|\d*(?:[<>]&|&>>?|>>?|>\||<>?)\s*[^\s;&|()<>`]+)\s+)+$/;
+// `sudo` right before the word. `timeout`, `env`, `nice` and the like exec
+// the real binary, so no alias applies after them; `sudo` does too, but the
+// common `alias sudo='sudo '` makes the shell alias-expand the next word.
+const SUDO_TAIL_RE = /(?:^|(?<=[\s;&|(`]))sudo$/;
+
+// The text before a command word with closed `$(…)` and backtick
+// substitutions collapsed to `_`, then the assignments and redirects that end
+// right before the word removed. An unclosed `$(` stays, so the word after it
+// is still read as the first word of the substitution.
+function stripCommandPrefix(prefix) {
+  let out = prefix;
+  for (let prev = ''; prev !== out; ) {
+    prev = out;
+    out = out.replace(/\$\((?!\()[^()`]*\)|`[^`]*`/g, '_');
+  }
+  return out.replace(PREFIX_WORDS_RE, '').trimEnd();
+}
 
 // A `$(…)` command substitution or a `<(…)` / `>(…)` process substitution
 // opens at `i`. The `$((` that opens arithmetic does not count.
@@ -1032,8 +1087,14 @@ function hasCommandSub(span) {
 // `$(…)`, `<(…)` and backtick substitutions, which still run commands. Text
 // inside single quotes is literal, so a `'$(ls)'` there is blanked too.
 // `sub.depth` carries a `$(` or `<(` left open at the end of one line of a
-// multi-line span into the next.
-function keepCommandSubs(span, sub = { depth: 0 }) {
+// multi-line span into the next. With `literalQuotes` (an unquoted heredoc
+// body, or a line inside a multi-line double-quoted string) quote characters
+// outside the substitutions are plain text.
+function keepCommandSubs(
+  span,
+  sub = { depth: 0 },
+  { literalQuotes = false } = {}
+) {
   const out = ' '.repeat(span.length).split('');
   // Parens inside quotes (`$(printf ')'; ls)`) do not close a substitution.
   const masked = maskShell(span);
@@ -1055,6 +1116,7 @@ function keepCommandSubs(span, sub = { depth: 0 }) {
       i++;
       continue;
     }
+    if (literalQuotes && (span[i] === "'" || span[i] === '"')) continue;
     if (span[i] === "'" && !double) single = true;
     else if (span[i] === '"') double = !double;
     else if (span[i] === '`') {
@@ -1067,10 +1129,15 @@ function keepCommandSubs(span, sub = { depth: 0 }) {
         }
       }
     } else if (opensSub(span, i)) {
+      // Text before the substitution may hold a literal quote, so mask from
+      // the opener on.
+      const own = literalQuotes
+        ? ' '.repeat(i) + maskShell(span.slice(i))
+        : masked;
       let depth = 0;
       for (let j = i + 1; j < span.length; j++) {
-        if (masked[j] === '(') depth++;
-        else if (masked[j] === ')' && --depth === 0) {
+        if (own[j] === '(') depth++;
+        else if (own[j] === ')' && --depth === 0) {
           end = j;
           break;
         }
@@ -1103,7 +1170,7 @@ const ARRAY_ASSIGN_RE =
 function maskAliasLine(line) {
   const blank = (span) =>
     hasCommandSub(span) ? keepCommandSubs(span) : ' '.repeat(span.length);
-  let prepared = line.replace(ARITHMETIC_RE, blank);
+  let prepared = replaceArithmetic(line, blank);
   // Find `]]` on the quote-masked text so a quoted `"]]"` does not end it.
   for (const re of [DOUBLE_BRACKET_RE, ARRAY_ASSIGN_RE]) {
     for (const m of maskShell(prepared).matchAll(re)) {
@@ -1122,23 +1189,34 @@ function maskAliasLine(line) {
 // the line with its arithmetic part blanked except for substitutions, and the
 // depth left open after it.
 function blankOpenArithmetic(line, depth, sub) {
-  return blankOpenParens(line, depth, sub, ARITHMETIC_RE, (rest) =>
-    rest.indexOf('((')
+  return blankOpenParens(
+    line,
+    depth,
+    sub,
+    (text, fn) => replaceArithmetic(text, fn),
+    (rest) => rest.indexOf('((')
   );
 }
 
 // Likewise an array assignment (`a=(` then one element per line).
 function blankOpenArray(line, depth, sub) {
-  return blankOpenParens(line, depth, sub, ARRAY_ASSIGN_RE, (rest) => {
-    const m = /(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*\+?=\(/.exec(rest);
-    return m ? m.index + m[0].length - 1 : -1;
-  });
+  return blankOpenParens(
+    line,
+    depth,
+    sub,
+    (text, fn) => text.replace(ARRAY_ASSIGN_RE, fn),
+    (rest) => {
+      const m = /(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*\+?=\(/.exec(rest);
+      return m ? m.index + m[0].length - 1 : -1;
+    }
+  );
 }
 
-// `closedRe` matches the spans that close on the same line; `findOpen` gives
+// `blankClosed(text, fn)` replaces the spans that close on the same line with
+// `fn(span)`; `findOpen` gives
 // the index of the `(` that opens one left open, or -1. `sub` carries an open
 // substitution inside the span (see `keepCommandSubs`).
-function blankOpenParens(line, depth, sub, closedRe, findOpen) {
+function blankOpenParens(line, depth, sub, blankClosed, findOpen) {
   let start = 0;
   let out = line;
   if (depth > 0) {
@@ -1155,7 +1233,7 @@ function blankOpenParens(line, depth, sub, closedRe, findOpen) {
     start = i;
   }
   const rest = maskShell(
-    out.slice(start).replace(closedRe, (span) => ' '.repeat(span.length))
+    blankClosed(out.slice(start), (span) => ' '.repeat(span.length))
   );
   const open = findOpen(rest);
   if (open === -1) return { line: out, depth: 0 };
@@ -1199,13 +1277,116 @@ function blankOpenTest(line, open, sub) {
     if (close === -1) {
       return {
         line:
-          out.slice(0, start + at) + keepCommandSubs(out.slice(start + at), sub),
+          out.slice(0, start + at) +
+          keepCommandSubs(out.slice(start + at), sub),
         open: true,
       };
     }
     testRe.lastIndex = close + 2;
   }
   return { line: out, open: false };
+}
+
+function atCommandPosition(prefix) {
+  return COMMAND_POSITION_RE.test(prefix) || prefix.endsWith('`');
+}
+
+// `\ls`, `'ls'` and `"ls"` skip alias expansion but still call a shell
+// function named `ls`, and Claude Code snapshots the user's functions. Rewrite
+// each as a bare word of the same length so the rule judges its position.
+function unquoteCommandWords(line, names) {
+  const re = new RegExp(
+    `(?<![\\w./=-])(?:\\\\(${names.join('|')})|'(${names.join('|')})'|"(${names.join('|')})")(?=$|[\\s;|&)<>\`])`,
+    'g'
+  );
+  return line.replace(re, (all, a, b, c) => (a ? ` ${a}` : ` ${b || c} `));
+}
+
+// `case … in` tracking. `state.stack` holds one mode per open case: 'subject'
+// until `in`, 'pattern' until the arm's closing `)`, then 'body' until `;;`,
+// `;&` or `;;&` (back to 'pattern') or `esac`. Each pattern is blanked and its
+// closing `)` becomes `;`, so the arm's words are not read as commands and
+// the text after it is a command position (`a) [[ … ]]` on several lines
+// included). Words are read on the line after arithmetic, `[[ … ]]` and
+// array spans are blanked, so `a=(case x)` opens nothing, and in source
+// order, so `(ps|cat); case …` still flags the subshell.
+const CASE_WORD_END_RE = /[\s;&|()<>`]/;
+function blankCasePatterns(line, state) {
+  const scan = maskAliasLine(line).split('');
+  const out = line.split('');
+  const n = scan.length;
+  const top = () => state.stack[state.stack.length - 1];
+  const setTop = (mode) => {
+    state.stack[state.stack.length - 1] = mode;
+  };
+  const wordAt = (i) => {
+    if (i > 0 && !CASE_WORD_END_RE.test(scan[i - 1])) return '';
+    let j = i;
+    while (j < n && !CASE_WORD_END_RE.test(scan[j])) j++;
+    return scan.slice(i, j).join('');
+  };
+  const commandAt = (i) =>
+    COMMAND_POSITION_RE.test(scan.slice(0, i).join('').trimEnd());
+  let patStart = top() === 'pattern' && state.patOpen ? 0 : -1;
+  for (let i = 0; i < n; ) {
+    const ch = scan[i];
+    if (top() === 'pattern') {
+      if (patStart === -1) {
+        if (/\s/.test(ch)) {
+          i++;
+          continue;
+        }
+        if (wordAt(i) === 'esac') {
+          state.stack.pop();
+          i += 4;
+          continue;
+        }
+        patStart = i;
+        state.patDepth = 0;
+        // An arm may open with `(`; it does not nest.
+        if (ch === '(') {
+          i++;
+          continue;
+        }
+      }
+      if (ch === '(') state.patDepth++;
+      else if (ch === ')' && state.patDepth-- === 0) {
+        for (let k = patStart; k < i; k++) out[k] = ' ';
+        for (let k = patStart; k < i; k++) scan[k] = ' ';
+        out[i] = ';';
+        scan[i] = ';';
+        setTop('body');
+        patStart = -1;
+      }
+      i++;
+      continue;
+    }
+    if (
+      top() === 'body' &&
+      ch === ';' &&
+      (scan[i + 1] === ';' || scan[i + 1] === '&')
+    ) {
+      i += scan[i + 1] === ';' && scan[i + 2] === '&' ? 3 : 2;
+      setTop('pattern');
+      continue;
+    }
+    const word = wordAt(i);
+    if (!word) {
+      i++;
+      continue;
+    }
+    if (top() === 'subject' && word === 'in') setTop('pattern');
+    else if (word === 'case' && commandAt(i)) state.stack.push('subject');
+    else if (word === 'esac' && top() === 'body' && commandAt(i)) {
+      state.stack.pop();
+    }
+    i += word.length;
+  }
+  state.patOpen = patStart !== -1;
+  if (state.patOpen) {
+    for (let k = patStart; k < n; k++) out[k] = ' ';
+  }
+  return out.join('');
 }
 
 // One physical line. `classifyLines` has already dropped comments, heredoc
@@ -1218,30 +1399,25 @@ function ruleAliasGuarded(line, commands, continued = false) {
     `(?<![\\w./-])(${names.join('|')})(?=$|[\\s;|&)<>\`])`,
     'g'
   );
-  const mask = maskAliasLine(line);
+  const mask = maskAliasLine(unquoteCommandWords(line, names));
   const found = [];
   let m;
   while ((m = wordRe.exec(mask)) !== null) {
     const rawPrefix = (continued ? '_ ' : '') + mask.slice(0, m.index);
-    const afterWord = mask.slice(m.index + m[1].length);
-    // A case-arm pattern (`ps|df)`, `(ps|df)`, `;; ps)`) names the word, it
-    // does not run it. At line start, `(ps)` is a subshell unless an
-    // alternative follows.
-    const arm = CASE_ARM_HEAD_RE.exec(rawPrefix);
-    if (
-      arm &&
-      /^(?:\|[^\s()|;&]+)*\)/.test(afterWord) &&
-      !(arm[1] === '' && arm[2] && !arm[3] && !afterWord.startsWith('|'))
-    ) {
+    const prefix = stripCommandPrefix(rawPrefix);
+    if (atCommandPosition(prefix)) {
+      found.push(
+        `\`${m[1]}\` is in command position without \`command\`, so a user alias or shell function can change its output`
+      );
       continue;
     }
-    const prefix = rawPrefix.replace(ENV_ASSIGN_RE, '').trimEnd();
-    const atCommand =
-      COMMAND_POSITION_RE.test(prefix) || prefix.endsWith('`');
-    if (!atCommand) continue;
-    found.push(
-      `\`${m[1]}\` is in command position without \`command\`, so a user alias can change its output`
-    );
+    if (!SUDO_TAIL_RE.test(prefix)) continue;
+    const beforeSudo = stripCommandPrefix(prefix.slice(0, -'sudo'.length));
+    if (atCommandPosition(beforeSudo)) {
+      found.push(
+        `\`sudo ${m[1]}\`: with the common \`alias sudo='sudo '\` the shell alias-expands \`${m[1]}\`; write \`sudo -- ${m[1]}\``
+      );
+    }
   }
   return found;
 }
@@ -1294,6 +1470,8 @@ function lintShellText(
   const arithSub = { depth: 0 };
   const arraySub = { depth: 0 };
   const testSub = { depth: 0 };
+  const caseState = { stack: [], patOpen: false, patDepth: 0 };
+  const expandSub = { depth: 0 };
   for (let i = 0; i < lines.length; i++) {
     const { kind, code: line, badWrapper, sourceCode } = classes[i];
     const continued = nextContinued;
@@ -1305,8 +1483,18 @@ function lintShellText(
         add('SHC-003', i, detail);
       }
       for (const detail of literalIndexHits(line)) add('SHC-005', i, detail);
+      // The calling shell runs the `$(…)` and backtick substitutions in an
+      // unquoted heredoc body or a multi-line double-quoted string.
+      const subs = keepCommandSubs(line, expandSub, { literalQuotes: true });
+      for (const detail of ruleAliasGuarded(
+        subs,
+        ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED
+      )) {
+        add('SHC-010', i, detail);
+      }
       continue;
     }
+    expandSub.depth = 0;
 
     if (checkSources) {
       // A `bash -c` script is scanned too, but tier 3 there is fine: only
@@ -1368,7 +1556,8 @@ function lintShellText(
     // elements are words.
     const array = blankOpenArray(arith.line, arrayDepth, arraySub);
     arrayDepth = array.depth;
-    const test = blankOpenTest(array.line, testOpen, testSub);
+    const cased = blankCasePatterns(array.line, caseState);
+    const test = blankOpenTest(cased, testOpen, testSub);
     testOpen = test.open;
     for (const detail of ruleAliasGuarded(
       test.line,
@@ -1385,7 +1574,7 @@ function lintShellText(
     nextContinued =
       tail.endsWith('\\') &&
       !COMMAND_POSITION_RE.test(
-        `${tail.slice(0, -1).trimEnd()} `.replace(ENV_ASSIGN_RE, '').trimEnd()
+        stripCommandPrefix(`${tail.slice(0, -1).trimEnd()} `)
       );
   }
   return findings;

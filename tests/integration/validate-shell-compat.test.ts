@@ -689,7 +689,10 @@ describe('shell-visible text only', () => {
   // 15: a mktemp in a comment or quoted example creates nothing.
   it.each([
     ['a comment', 'rm -f "$f" # f=$(mktemp)\necho hi > "$f"'],
-    ['a single-quoted example', "printf '%s\\n' 'f=$(mktemp)'\necho hi > \"$f\""],
+    [
+      'a single-quoted example',
+      "printf '%s\\n' 'f=$(mktemp)'\necho hi > \"$f\"",
+    ],
     ['a double-quoted example', 'echo "use f=\\$(mktemp)"\necho hi > "$f"'],
   ])('does not treat %s as creating the file', (_name, text) => {
     expect(lint(text)).toEqual([]);
@@ -773,8 +776,14 @@ describe('SHC-010 alias-prone commands', () => {
     ['capture inside arithmetic', 'x=$(( $(du -sk dir | cut -f1) / 1024 ))'],
     ['ls with &> then &&', 'ls plans/*.md &>/dev/null && echo found'],
     ['ls with &> to a file', 'ls x &> f'],
-    ['last command of an if list', 'if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi'],
-    ['last command of a while list', 'while [ -d plans ] && ls plans/*.md >/dev/null 2>&1; do :; done'],
+    [
+      'last command of an if list',
+      'if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi',
+    ],
+    [
+      'last command of a while list',
+      'while [ -d plans ] && ls plans/*.md >/dev/null 2>&1; do :; done',
+    ],
     [
       'indented last command of an if list',
       '  if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi',
@@ -798,6 +807,27 @@ describe('SHC-010 alias-prone commands', () => {
     ['env-prefixed if condition', 'if LC_ALL=C ls x; then :; fi'],
     ['env-prefixed command in a subshell', '( LC_ALL=C ls x )'],
     ['env-prefixed command after indent', '  LC_ALL=C TZ=UTC ls x'],
+    ['substitution-valued env prefix', 'FOO=$(printf x) ls x'],
+    ['nested substitution in an env prefix', 'FOO="$(echo $(printf x))" ls x'],
+    ['backtick-valued env prefix', 'FOO=`printf x` ls x'],
+    ['leading stderr redirect', '2>/dev/null ls -d x'],
+    ['redirect mixed with an assignment', 'FOO=x <input ls'],
+    ['several leading redirects', '>out 2>&1 ls x'],
+    ['redirect after &&', 'true && 2>/dev/null ls x'],
+    ['backslash-escaped word', '\\ls x | head'],
+    ['single-quoted word', "'ls' x | head"],
+    ['double-quoted word', '"ls" x'],
+    ['escaped word after &&', 'true && \\ps -p 1'],
+    ['sudo before the word', 'sudo df | tail'],
+    ['sudo after an env prefix', 'LC_ALL=C sudo ls x'],
+    ['compact piped subshell', '(ps|cat)'],
+    ['a command inside a case arm', 'case "$c" in a) ls x ;; esac'],
+    ['brace group piped after its close', '{ ls x; } | head'],
+    ['loop body piped after done', 'for f in a; do ls "$f"; done | head'],
+    [
+      'nested substitution in arithmetic',
+      'x=$(( 1 + $(echo $(ls x | wc -l)) ))',
+    ],
   ])('flags %s', (_name, text) => {
     expect(flagged(text)).toEqual([1]);
   });
@@ -818,7 +848,7 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('[[ -d x ]] && ls x')).toEqual([1]);
     expect(flagged('[[ "$x" == "]]" ]] && ls x')).toEqual([1]);
     expect(flagged(`[[ "$x" == '$(ls)' ]]`)).toEqual([]);
-    expect(flagged("[[ \"$x\" == '`ls`' ]]")).toEqual([]);
+    expect(flagged('[[ "$x" == \'`ls`\' ]]')).toEqual([]);
     expect(flagged(`x=$(( '$(ls)' ))`)).toEqual([]);
     expect(flagged('[[ "$x" == "$(ls)" ]]')).toEqual([1]);
     expect(flagged('[[ -r <(ls x) ]]')).toEqual([1]);
@@ -856,10 +886,14 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('echo $(date) [[\nls x | cat')).toEqual([2]);
   });
 
-  // A `)` that ends a case-arm pattern or `f()` should allow a multi-line
-  // `[[` after it, but telling it from a substitution's `)` needs case-arm
-  // tracking (CLAUDE-172).
-  it.todo('reads a multi-line [[ after a case-arm `)` as a test');
+  it('reads a multi-line [[ after a case-arm `)` as a test', () => {
+    expect(
+      flagged('case "$c" in\n  a) [[ -n $x &&\n    ps == y ]] ;;\nesac')
+    ).toEqual([]);
+    expect(
+      flagged('case "$c" in\n  a) [[ -n $x &&\n    -n $(ls x) ]] ;;\nesac')
+    ).toEqual([3]);
+  });
 
   it('reads the operands of arithmetic spanning lines as variables', () => {
     expect(flagged('x=$((\n  top + 1\n))')).toEqual([]);
@@ -885,13 +919,30 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('(ps | cat)')).toEqual([1]);
     expect(flagged('ls x | head)')).toEqual([1]);
     expect(flagged('case "$c" in\n  a)\n    (ps)\n    ;;\nesac')).toEqual([3]);
-    expect(flagged('case "$c" in\n  a)\n    (ps | cat)\n    ;;\nesac')).toEqual([3]);
+    expect(flagged('case "$c" in\n  a)\n    (ps | cat)\n    ;;\nesac')).toEqual(
+      [3]
+    );
     expect(flagged('(ps | cat); case "$x" in a) :;; esac')).toEqual([1]);
   });
 
-  // Spaced alternatives (`foo | ps)`) are flagged like `main` does; telling
-  // them from a subshell needs case-arm tracking (CLAUDE-172).
-  it.todo('passes spaced case alternatives: case "$c" in foo | ps) :;; esac');
+  it('tracks case arms across lines and in source order', () => {
+    expect(flagged('case "$c" in foo | ps) :;; esac')).toEqual([]);
+    expect(flagged('case "$c" in ls ) :;; esac')).toEqual([]);
+    expect(flagged('case "$c" in\n  foo |\n  ps) :;;\nesac')).toEqual([]);
+    expect(
+      flagged('case "$c" in\n  a) echo esac here ;;\n  foo | ps) :;;\nesac')
+    ).toEqual([]);
+    expect(flagged('case "$c" in a) :;; esac\n(ps | cat)')).toEqual([2]);
+    expect(flagged('a=(\n  case x\n)\n(ps | cat)')).toEqual([4]);
+    expect(flagged('x=(case x)\n(ps|cat)')).toEqual([2]);
+    expect(
+      flagged(
+        'case "$a" in\n  x)\n    case "$b" in ps) :;; esac\n    ls d\n    ;;\nesac'
+      )
+    ).toEqual([4]);
+    expect(flagged('case "$c" in @(ls|ps)) :;; esac')).toEqual([]);
+    expect(flagged('case "$c" in\n  a) echo x\nesac\nls d')).toEqual([4]);
+  });
 
   it('reads [[ as a reserved word only in command position', () => {
     expect(flagged("printf '%s\\n' [[\nls x | cat")).toEqual([2]);
@@ -914,12 +965,15 @@ describe('SHC-010 alias-prone commands', () => {
   });
 
   it('keeps a capture open across a case arm and judges the command after it', () => {
-    const text = 'v=$(\n  case "$c" in\n    ps) echo a ;;\n  esac\n  ls -t x\n)';
+    const text =
+      'v=$(\n  case "$c" in\n    ps) echo a ;;\n  esac\n  ls -t x\n)';
     expect(flagged(text)).toEqual([5]);
   });
 
   it('does not read a case-arm pattern inside a capture as a command', () => {
-    expect(flagged('v=$(\n  case "$c" in\n    ls|ps) echo a ;;\n  esac\n)')).toEqual([]);
+    expect(
+      flagged('v=$(\n  case "$c" in\n    ls|ps) echo a ;;\n  esac\n)')
+    ).toEqual([]);
   });
 
   it('does not let a trailing comment hide later lines of the command', () => {
@@ -939,15 +993,37 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('while read -r f; do ls -d x; done')).toEqual([1]);
   });
 
-  // A wrapper is not an assignment, so the command word is not in command
-  // position. Todos, not pinned passes.
-  it.todo('flags a wrapper-prefixed command: timeout 5 ls x | head');
-  it.todo('flags a sudo-prefixed command: sudo df | tail');
+  it('names the sudo fix in its detail', () => {
+    const [finding] = lint('sudo df | tail').filter(
+      (f) => f.rule === 'SHC-010'
+    );
+    expect(finding.detail).toContain('sudo -- df');
+  });
+
+  it('lints substitutions the calling shell runs in expanded text', () => {
+    expect(flagged('cat <<EOF\n$(ls x)\nEOF')).toEqual([2]);
+    expect(flagged("cat <<EOF\nit's `ls x`\nEOF")).toEqual([2]);
+    expect(flagged("cat <<EOF\nit's $(ls x) or 'y'\nEOF")).toEqual([2]);
+    expect(flagged('cat <<EOF\n$(\n  ls x\n)\nls\nEOF')).toEqual([3]);
+    expect(flagged('printf "%s" "a\n$(ps -p 1)\nb"')).toEqual([2]);
+    expect(flagged("cat <<'EOF'\n$(ls x)\nEOF")).toEqual([]);
+    expect(flagged('cat <<EOF\n\\$(ls x)\nls x\nEOF')).toEqual([]);
+    expect(flagged('cat <<EOF\n$(command ls x)\nEOF')).toEqual([]);
+    expect(flagged('cat <<EOF\n$(( top + 1 ))\nEOF')).toEqual([]);
+  });
 
   it.each([
     ['command prefix', 'command ls -t x | head'],
-    ['backslash prefix', '\\ls x | head'],
-    ['find -exec ls', "command find -H plans -name '*.md' ! -name '.*' -exec ls -t {} + | head"],
+    ['an escaped word as an argument', 'echo \\ls'],
+    ['a quoted word as an argument', "echo 'ls'"],
+    ['a quoted assignment value', 'x=\'ls\'; y="ps"; z=\\\\df'],
+    ['a quoted word in a test', "[[ $x == 'ls' ]]"],
+    ['a quoted case pattern', 'case "$c" in \'ls\') :;; esac'],
+    ['a quoted word with more text', "printf '%s' 'ls -t' | cat"],
+    [
+      'find -exec ls',
+      "command find -H plans -name '*.md' ! -name '.*' -exec ls -t {} + | head",
+    ],
     [
       'the shipped work.md listing',
       `command find -H plans -maxdepth 1 \\( -type f -o -type l \\) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5`,
@@ -962,19 +1038,47 @@ describe('SHC-010 alias-prone commands', () => {
     ['ls as an argument', 'echo ls | head'],
     ['a longer command name', 'lsof -i | head'],
     ['a case-arm pattern', 'case "$c" in\n  ps|df) echo disk ;;\nesac'],
-    ['a later case-arm alternative', 'case "$c" in\n  ls|ps|du) echo x ;;\nesac'],
+    [
+      'a later case-arm alternative',
+      'case "$c" in\n  ls|ps|du) echo x ;;\nesac',
+    ],
     ['a parenthesised case-arm', 'case "$c" in\n  (ps|df) echo x ;;\nesac'],
     ['an arithmetic comparison', 'if (( top > 0 )); then :; fi'],
     ['an arithmetic expansion', 'x=$(( ps > 3 ? 1 : 0 ))'],
     ['a path ending in ls', './bin/ls x | head'],
     ['arithmetic around a plain variable', 'x=$(( n / 1024 ))'],
-    ['a variable beside a substitution in arithmetic', 'x=$(( top + $(echo 1) ))'],
-    ['a variable beside a substitution in a comparison', 'if (( ps > $(echo 1) )); then :; fi'],
-    ['a later case arm on the same line', 'case "$c" in foo) echo a ;; ps) echo disk ;; esac'],
+    [
+      'a variable beside a substitution in arithmetic',
+      'x=$(( top + $(echo 1) ))',
+    ],
+    [
+      'a variable beside a substitution in a comparison',
+      'if (( ps > $(echo 1) )); then :; fi',
+    ],
+    [
+      'a later case arm on the same line',
+      'case "$c" in foo) echo a ;; ps) echo disk ;; esac',
+    ],
     ['one-line case alternatives', 'case "$c" in ps|df) echo disk ;; esac'],
-    ['a parenthesised later case arm', 'case "$c" in a) :;; (ps|df) echo x ;; esac'],
+    [
+      'a parenthesised later case arm',
+      'case "$c" in a) :;; (ps|df) echo x ;; esac',
+    ],
     ['an assignment argument before ls', 'echo FOO=bar ls'],
     ['an indented capture of command ps', '  v=$(command ps -p 1 -o comm=)'],
+    [
+      'a two-level substitution beside an arithmetic variable',
+      'x=$(( top + $(echo $(printf 1)) ))',
+    ],
+    ['a substitution before the word', 'echo $(date) ls'],
+    ['a redirect target named ls', 'echo x > ls'],
+    ['a redirect before an argument', 'echo x >f ls'],
+    ['timeout, which execs the real binary', 'timeout 5 ls x | head'],
+    ['env, which execs the real binary', 'env LC_ALL=C ls x'],
+    ['nice, which execs the real binary', 'nice -n 5 du -sh x'],
+    ['sudo with an option before the word', 'sudo -u root ls x'],
+    ['sudo with -- before the word', 'sudo -- df'],
+    ['sudo behind command', 'command sudo ls x'],
   ])('passes %s', (_name, text) => {
     expect(flagged(text)).toEqual([]);
   });
@@ -982,7 +1086,7 @@ describe('SHC-010 alias-prone commands', () => {
   it('passes the same ls inside a bash fd wrapper and a quoted heredoc', () => {
     const wrapper = ["bash /dev/fd/3 3<<'__W__'", 'ls -t x | head', '__W__'];
     expect(flagged(wrapper.join('\n'))).toEqual([]);
-    const remote = ['ssh host <<\'REMOTE\'', 'df -h | tail -1', 'REMOTE'];
+    const remote = ["ssh host <<'REMOTE'", 'df -h | tail -1', 'REMOTE'];
     expect(flagged(remote.join('\n'))).toEqual([]);
   });
 
@@ -1011,9 +1115,12 @@ describe('SHC-010 alias-prone commands', () => {
     ['only invalid names', ['', 'l s', '(ls', 'a|b']],
   ])('reports nothing for %s in the context', (_name, aliasGuarded) => {
     const ctx = { ...EMPTY_CTX, aliasGuarded };
-    const hits = lintShellText('ls -t x | head', 'plugins/p/x.md', 1, ctx).filter(
-      (f: Finding) => f.rule === 'SHC-010'
-    );
+    const hits = lintShellText(
+      'ls -t x | head',
+      'plugins/p/x.md',
+      1,
+      ctx
+    ).filter((f: Finding) => f.rule === 'SHC-010');
     expect(hits).toEqual([]);
   });
 
@@ -1037,7 +1144,10 @@ describe('SHC-010 alias-prone commands', () => {
 
   it('uses the configured command list', () => {
     config({ aliasGuardedCommands: ['du'] });
-    write('plugins/demo/commands/mix.md', md('ls -t a | head\ndu -sh a | cut -f1'));
+    write(
+      'plugins/demo/commands/mix.md',
+      md('ls -t a | head\ndu -sh a | cut -f1')
+    );
     const result = run();
     expect(result.stderr).toContain('mix.md:5 [SHC-010]');
     expect(result.stderr).not.toContain('mix.md:4');

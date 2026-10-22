@@ -619,17 +619,21 @@ Inline blocks:
 - Users' aliases (`ls=eza`, `ps=procs`, `du=dust`, `df=duf`) apply to these
   blocks, so never run a bare `ls`, `ps`, `du`, `df` or `top`. Lint rule
   SHC-010 flags those commands in command position, including a display-only
-  call and one behind environment assignments (`LC_ALL=C ls`). It does not see
-  a wrapper prefix (`timeout 5 ls x | head`, `sudo df | tail`), so review those
-  by hand. Fix them one of three ways:
+  call, one behind environment assignments or redirects (`LC_ALL=C ls`,
+  `2>/dev/null ls`), a quoted or escaped word (`\ls`, `'ls'`: a snapshotted
+  shell function still runs), one right after `sudo` (`alias sudo='sudo '`
+  alias-expands it; write `sudo -- ls`), and a `$(…)` in an unquoted heredoc
+  body. Wrappers that exec the binary (`timeout`, `env`, `nice`, `xargs`,
+  `find -exec`) pass: no alias or function applies after them. Fix the rest
+  one of three ways:
   - List files by mtime through `find`, which hands the matches to the real
     `ls` and also avoids zsh's `nomatch` error on an unmatched glob:
     `command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5`
   - Test whether a glob matches with the same `find`:
     `[ -z "$(command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' 2>/dev/null | head -1)" ]`
   - Prefix any other parsed call with `command` (`command ps -p "$PID" -o comm=`).
-    Prefer it to `\ls`: `command` also bypasses shell functions, works the
-    same in bash and zsh, and is POSIX on remote runners.
+    Not `\ls`: only `command` also bypasses shell functions, and it works the
+    same in bash and zsh and is POSIX on remote runners.
   Where flags matter for `cat`, `grep` or `find`, write `command` too; SHC-010
   covers only the commands in `aliasGuardedCommands`
   (`scripts/shell-compat-config.json`).
