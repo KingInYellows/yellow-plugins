@@ -1060,7 +1060,7 @@ function validAliasGuarded(list) {
 // `stripCommandPrefix` collapses closed substitutions first, so
 // `FOO=$(printf x) ls` still strips.
 const PREFIX_WORDS_RE =
-  /(?:^|(?<=[\s;&|(`]))(?:(?:[A-Za-z_][A-Za-z0-9_]*=[^\s(`]*|\d*(?:[<>]&|&>>?|>>?|>\||<>?)\s*[^\s;&|()<>`]+)\s+)+$/;
+  /(?:^|(?<=[\s;&|(`]))(?:(?:[A-Za-z_][A-Za-z0-9_]*=[^\s(`]*|\d*(?:[<>]&|&>>?|>>?|>\||<<<|<<-?|<>?)\s*[^\s;&|()<>`]+)\s+)+$/;
 // `sudo` right before the word. `timeout`, `env`, `nice` and the like exec
 // the real binary, so no alias applies after them; `sudo` does too, but the
 // common `alias sudo='sudo '` makes the shell alias-expand the next word.
@@ -1448,7 +1448,10 @@ function ruleAliasGuarded(line, commands, continued = false) {
       );
       continue;
     }
-    if (!SUDO_TAIL_RE.test(prefix)) continue;
+    // A quoted or escaped word is not alias-expanded, and `sudo` runs the
+    // binary, so `sudo 'ls'` is safe.
+    if (!SUDO_TAIL_RE.test(prefix) || /['"\\]/.test(line[m.index - 1] ?? ''))
+      continue;
     const beforeSudo = stripCommandPrefix(prefix.slice(0, -'sudo'.length));
     if (atCommandPosition(beforeSudo)) {
       found.push(

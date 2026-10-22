@@ -815,6 +815,7 @@ describe('SHC-010 alias-prone commands', () => {
     ['several leading redirects', '>out 2>&1 ls x'],
     ['redirect after &&', 'true && 2>/dev/null ls x'],
     ['process substitution as a leading redirect target', '2> >(cat) ls x'],
+    ['a leading here-string', '<<<input ls x'],
     ['backslash-escaped word', '\\ls x | head'],
     ['single-quoted word', "'ls' x | head"],
     ['double-quoted word', '"ls" x'],
@@ -1090,8 +1091,15 @@ describe('SHC-010 alias-prone commands', () => {
     ['sudo with an option before the word', 'sudo -u root ls x'],
     ['sudo with -- before the word', 'sudo -- df'],
     ['sudo behind command', 'command sudo ls x'],
+    ['sudo before a quoted word', "sudo 'ls' x"],
+    ['sudo before an escaped word', 'sudo \\ls x'],
   ])('passes %s', (_name, text) => {
     expect(flagged(text)).toEqual([]);
+  });
+
+  it('flags a command word after a leading heredoc redirect', () => {
+    expect(flagged('<<EOF ls x\nbody\nEOF')).toEqual([1]);
+    expect(flagged("<<-'EOF' ps\n\tbody\n\tEOF")).toEqual([1]);
   });
 
   it('passes the same ls inside a bash fd wrapper and a quoted heredoc', () => {
