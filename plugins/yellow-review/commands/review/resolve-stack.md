@@ -22,19 +22,15 @@ Graphite before the walk moves up. Anything that needs human attention
 (residual unresolved comments, restack conflicts, submit failures) is collected
 into a final summary instead of pausing the walk.
 
-This command is intentionally gateless. It delegates per-PR resolution to
-`/review:resolve` in `--non-interactive` mode, which suppresses every one of
-that command's gates (spawn-cap, CONFLICT, issue-filing, verify-command,
-push-confirmation) in favour of their unattended rules — including filing at
-most 3 follow-up issues per PR. The per-PR `/review:resolve` keeps its
-gates by default for interactive use — only this stack walk runs them off. Run
-`/review:resolve <PR#>` directly for a single, gated, interactive pass.
+This command is intentionally gateless: it runs `/review:resolve` with
+`--non-interactive`, which replaces every gate (spawn-cap, CONFLICT,
+issue-filing, verify-command, push-confirmation) with its unattended rule,
+including at most 3 follow-up issues per PR. Run `/review:resolve <PR#>`
+directly for a single, gated, interactive pass.
 
-The bottom-up walk below mirrors the `stack-traversal` skill
-(`skills/stack-traversal/SKILL.md`) — Step 0 ↔ skill Step 0 (resolve
-provider), Step 1 ↔ skill Steps 1–3, the per-PR checkout ↔ skill Step 5,
-the restack ↔ skill Step 6. When the traversal logic changes, update the
-skill and every command that mirrors it (this file and `review-all.md`).
+The walk mirrors `skills/stack-traversal/SKILL.md` (Step 0 ↔ skill Step 0,
+Step 1 ↔ skill Steps 1–3, checkout ↔ skill Step 5, restack ↔ skill Step 6);
+change the skill, this file and `review-all.md` together.
 
 ## Workflow
 
@@ -453,68 +449,52 @@ failure), and PRs not attempted (rate limit / no contract / self-verify
 inconclusive / dirty tree / config changed).
 
 Finally, a **Needs manual attention** section listing every PR with:
-blocking items (`b > 0`), residual unresolved threads (`>0` from step 3),
-a self-verify disagreement or inconclusive self-verify, a restack conflict,
-a push failure, a dirty-tree abort or incomplete revert, a rate-limited PR, a
-`no contract` PR, or
-a `not attempted (cluster cap)` or `not attempted (rate limit)` note surfaced
-by `/review:resolve`. If that section is empty, print
+blocking items (`b > 0`), residual unresolved threads (`>0` from step 3), a
+self-verify disagreement or inconclusive self-verify, a restack conflict, a
+push failure, a dirty-tree abort or incomplete revert, a rate-limited PR, a
+`no contract` PR, or a `not attempted (cluster cap)` or
+`not attempted (rate limit)` note surfaced by `/review:resolve`. If that section is empty, print
 `[review:resolve-stack] All open PRs in the stack are fully resolved.`
 
-**Exit code contract.** Exit `0` only when every walked PR is fully resolved —
-the "Needs manual attention" section is empty. Exit `1` when anything blocks
-(that section is non-empty, including any PR whose `Resolve:` line reports
-`b > 0`), so a parent agent or CI step can distinguish a clean stack from one
-that needs follow-up without parsing the prose table. Pre-flight failures
-(Step 1) exit non-zero; "no open PRs found" (Step 2) exits `0` — nothing to do
-is not a failure.
+**Exit code contract.** Exit `0` only when the "Needs manual attention"
+section is empty; exit `1` when it is not (including any PR whose `Resolve:`
+line reports `b > 0`), so a parent agent can tell a clean stack without
+parsing the table. Step 1 pre-flight failures exit non-zero; "no open PRs
+found" (Step 2) exits `0`.
 
 ## Error Handling
 
-- **`gh` not installed/authenticated, dirty working tree, or the resolved
-  provider's own tooling missing (`gt` for Graphite, the github-workflow
-  runtime adapter for GitHub)** — Step 1 pre-flight fails fast with a named
-  error before the walk begins.
+Each stop below is defined in the step that reaches it. When one ends the
+walk early, the command exits `1`.
+
+- **`gh` missing or unauthenticated, a dirty tree, or the provider's tooling
+  missing** (`gt`, or the github-workflow runtime adapter) — Step 1 fails fast
+  with a named error.
 - **Not in a tracked stack / empty stack** — Step 2 reports "No open PRs
   found in current stack." and exits 0.
 - **`gt checkout` failure mid-walk** — log and skip that PR, continue.
-- **A PR's resolve leaves the working tree dirty** (a failed commit, a
-  verify revert that could not clean up, a rejected push) — step 3b stops
-  the walk with `aborted at PR #<N>` and the file list, and the command exits
-  `1`. Continuing would carry those edits onto the next branch.
-- **A PR's resolve changes the ignored `yellow-plugins.local.md`** (guarded only
-  when it is ignored and untracked; a tracked config is not guarded) — item 3b
-  restores it from the item 1b snapshot and stops the walk with
-  `aborted at PR #<N>`; a failed restore is reported as tampered. The command
-  exits `1`.
-- **A PR is rate limited** (`ratelimited=1` on its valid final `Resolve:`
-  line) — the walk finishes that PR except its restack, marks
-  the remaining PRs `not attempted (rate limit)`, and the command exits `1`
-  because the rate-limited PR is under Needs manual attention.
-- **A PR's resolve ends without a valid final contract line** — no rate limit
-  is inferred from any output text; the PR is noted `no contract`, counts
-  blocking, the walk finishes it except its restack, marks the remaining PRs
-  `not attempted (no contract)`, and the command exits `1`.
-- **A PR's self-verify is inconclusive** (the `get-pr-comments` re-fetch exited
-  non-zero, including a truncated list) — no rate limit is inferred; the PR is
-  noted `inconclusive`, counts blocking, the walk finishes it except its
-  restack, marks the remaining PRs `not attempted (self-verify inconclusive)`,
-  and the command exits `1`.
-- **PR merged or closed between stack-build and the walk reaching it** —
-  `/review:resolve` detects the non-open state and still prints a valid
-  zero `Resolve:` line (`push=skipped`); record the PR as skipped and
-  continue. Only a missing or malformed final line is `no contract`.
-- **Restack conflict** — Graphite: run `gt abort`; GitHub: run the adapter's
-  `rebase --mode abort`, to clear the conflicted rebase, continue to the
-  next PR, surface in the summary. The walk never pauses.
-- **Push failure inside `/review:resolve`** — surfaced in that command's
-  output and re-checked by the self-verify count; record in the summary,
+- **A resolve leaves the tree dirty** — step 3b stops the walk with
+  `aborted at PR #<N>` and the file list; continuing would carry those edits
+  onto the next branch.
+- **A resolve changes the ignored `yellow-plugins.local.md`** (a tracked
+  config is not guarded) — item 3b restores it from the item 1b snapshot and
+  stops with `aborted at PR #<N>`; a failed restore is reported as tampered.
+- **Rate limit, no valid final contract, or inconclusive self-verify** — the
+  walk finishes that PR except its restack, never infers a rate limit from
+  output text, and marks the remaining PRs `not attempted (rate limit)`,
+  `not attempted (no contract)` or `not attempted (self-verify inconclusive)`.
+- **PR merged or closed before the walk reaches it** — `/review:resolve`
+  still prints a valid zero `Resolve:` line (`push=skipped`); record it as
+  skipped and continue. Only a missing or malformed final line is
+  `no contract`.
+- **Restack conflict** — Graphite: `gt abort`; GitHub: the adapter's
+  `rebase --mode abort`. Continue to the next PR and surface it in the
+  summary; the walk never pauses.
+- **Push failure inside `/review:resolve`** — record it in the summary and
   continue.
-- **ruvector MCP unavailable** — the Step 1 recall is best-effort and skipped
-  silently.
-- **Re-run safety** — running `/review:resolve-stack` again is safe: replies
-  and issues carry idempotency markers, so a second pass posts no duplicates;
-  threads left open by design are reported again as blocking.
+- **ruvector MCP unavailable** — the Step 1 recall is skipped silently.
+- **Re-run safety** — replies and issues carry idempotency markers, so a
+  second pass posts no duplicates.
 
 See the `pr-review-workflow` and `stack-traversal` skills for the shared
 conventions this command builds on.
