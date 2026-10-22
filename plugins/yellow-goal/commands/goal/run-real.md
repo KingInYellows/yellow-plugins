@@ -80,8 +80,8 @@ requires that ancestor to stay inside `$PWD`. yellow-core is a required
 dependency of this plugin.
 
 ```bash
-HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/validate-fs.sh"
-if [ ! -f "$HELPER" ]; then
+HELPER=$(bash -c '. "$1/lib/sibling-plugin.sh" && sp_sibling_file "$1" yellow-core lib/validate-fs.sh' _ "${CLAUDE_PLUGIN_ROOT:-}") || HELPER=""
+if [ -z "$HELPER" ] || [ ! -f "$HELPER" ]; then
   printf 'ERROR: yellow-core validate-fs.sh not found; install yellow-core\n' >&2
   exit 1
 fi

@@ -66,6 +66,31 @@ two_versions() {
   [ "$output" = "$c/me/1.0.0/../../other/1.9.0/lib/x.sh" ]
 }
 
+@test "sp_sibling_file ranks a local-scoped install above a project-scoped one" {
+  command -v jq >/dev/null || skip "jq is required"
+  two_versions
+  mkdir -p "$BATS_TEST_TMPDIR/proj"
+  installed other@mkt "[{\"scope\":\"project\",\"projectPath\":\"$BATS_TEST_TMPDIR/proj\",\"installPath\":\"$c/other/1.10.0\"},{\"scope\":\"local\",\"projectPath\":\"$BATS_TEST_TMPDIR/proj\",\"installPath\":\"$c/other/1.9.0\"}]"
+  cd "$BATS_TEST_TMPDIR/proj"
+  run sp_sibling_file "$c/me/1.0.0" other lib/x.sh
+  [ "$output" = "$c/me/1.0.0/../../other/1.9.0/lib/x.sh" ]
+}
+
+@test "sp_sibling_file matches a projectPath through a symlink on either side" {
+  command -v jq >/dev/null || skip "jq is required"
+  two_versions
+  mkdir -p "$BATS_TEST_TMPDIR/proj/sub"
+  ln -s "$BATS_TEST_TMPDIR/proj" "$BATS_TEST_TMPDIR/link"
+  installed other@mkt "[{\"scope\":\"project\",\"projectPath\":\"$BATS_TEST_TMPDIR/link\",\"installPath\":\"$c/other/1.9.0\"}]"
+  cd "$BATS_TEST_TMPDIR/proj/sub"
+  run sp_sibling_file "$c/me/1.0.0" other lib/x.sh
+  [ "$output" = "$c/me/1.0.0/../../other/1.9.0/lib/x.sh" ]
+  installed other@mkt "[{\"scope\":\"project\",\"projectPath\":\"$BATS_TEST_TMPDIR/proj\",\"installPath\":\"$c/other/1.9.0\"}]"
+  cd "$BATS_TEST_TMPDIR/link/sub"
+  run sp_sibling_file "$c/me/1.0.0" other lib/x.sh
+  [ "$output" = "$c/me/1.0.0/../../other/1.9.0/lib/x.sh" ]
+}
+
 @test "sp_sibling_file falls back to the newest version when the active entry is unusable" {
   command -v jq >/dev/null || skip "jq is required"
   two_versions

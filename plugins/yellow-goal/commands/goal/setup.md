@@ -31,12 +31,15 @@ fi
 
 `/goal:run-stub` sources yellow-core's canonical path validator, so yellow-core
 is a required dependency (declared in `plugin.json`). Fail closed here rather
-than at first `run-stub` use:
+than at first `run-stub` use. The plugin cache is version-suffixed
+(`<marketplace>/<plugin>/<version>/`), so `lib/sibling-plugin.sh` looks in the
+source-tree sibling, then yellow-core's active install, then its newest cached
+version:
 
 ```bash
-HELPER="${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/validate-fs.sh"
-if [ ! -f "$HELPER" ]; then
-  printf 'ERROR: yellow-core is required by yellow-goal but %s is missing. Install yellow-core@yellow-plugins and rerun /goal:setup.\n' "$HELPER" >&2
+HELPER=$(bash -c '. "$1/lib/sibling-plugin.sh" && sp_sibling_file "$1" yellow-core lib/validate-fs.sh' _ "${CLAUDE_PLUGIN_ROOT:-}") || HELPER=""
+if [ -z "$HELPER" ] || [ ! -f "$HELPER" ]; then
+  printf 'ERROR: yellow-core is required by yellow-goal but its lib/validate-fs.sh was not found next to %s. Install yellow-core@yellow-plugins and rerun /goal:setup.\n' "${CLAUDE_PLUGIN_ROOT:-}" >&2
   exit 1
 fi
 ```

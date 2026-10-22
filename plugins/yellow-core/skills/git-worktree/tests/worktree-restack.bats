@@ -878,6 +878,30 @@ JSEOF
   [[ $output == *$'CHAIN\tfrom_1_10_0\ta'* ]]
 }
 
+@test "github: a local-scoped install beats a project-scoped one for the same projectPath" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  local ver proj
+  mkdir -p "$T/mkt/yellow-core/2.6.2"
+  for ver in 1.9.0 1.10.0; do
+    mkdir -p "$T/mkt/github-workflow/$ver/lib"
+    cat >"$T/mkt/github-workflow/$ver/lib/github-stack-runtime.js" <<JSEOF
+if (process.argv.includes('--timeout-ms') && process.argv[process.argv.indexOf('--timeout-ms') + 1] === '0') { console.error('--timeout-ms must be a positive integer'); process.exit(1); }
+process.stdout.write(JSON.stringify({status:'SUCCESS',stdout:JSON.stringify({trunk:'from_${ver//./_}',branches:[{name:'a',isCurrent:true}]})}));
+JSEOF
+  done
+  # The projectPath goes through a symlink; the cwd is the physical checkout.
+  proj=$(pwd -P)
+  ln -s "$proj" "$T/proj-link"
+  mkdir -p "$HOME/.claude/plugins"
+  printf '{"version":2,"plugins":{"github-workflow@mkt":[{"scope":"project","projectPath":"%s","installPath":"%s"},{"scope":"local","projectPath":"%s","installPath":"%s"}]}}\n' \
+    "$T/proj-link" "$T/mkt/github-workflow/1.10.0" "$T/proj-link" "$T/mkt/github-workflow/1.9.0" \
+    >|"$HOME/.claude/plugins/installed_plugins.json"
+  CLAUDE_PLUGIN_ROOT="$T/mkt/yellow-core/2.6.2" STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 0 ]
+  [[ $output == *$'CHAIN\tfrom_1_9_0\ta'* ]]
+}
+
 # --- failure, signals, mid-stack and resume edge cases -------------------------
 
 @test "a provider restack failure restores every worktree and exits 30" {
