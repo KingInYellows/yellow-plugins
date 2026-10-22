@@ -2156,21 +2156,37 @@ EOF
   rm -rf "${PWD}-keys" "${PWD}2"
 }
 
-@test "harden_git_config refuses when awk cannot split NUL records (BWK awk) instead of skipping keys" {
+@test "harden_git_config parses NUL records in the shell, so BWK awk neither hides a key nor blocks the scan" {
   # BWK awk reads RS = "\0" as RS = "" (paragraph mode) and cuts each line at
-  # its first NUL; a value with blank lines then makes the record count a
-  # multiple of 3 and the refused key is never seen.
-  git config core.sshCommand evil
+  # its first NUL; a value with blank lines then made the record count a
+  # multiple of 3 and hid the refused key. The records are now split by
+  # read -d '', so no awk ever sees the NUL stream.
   git config x.y "$(printf 'a\n\nb\n\nc')"
   # Emulate that awk with the system one, then use the real one when present.
-  yr_awk() { local p="${1//'RS = "\0"'/RS = \"\"}"; shift; sed 's/\x00.*//' | command awk "$p" "$@"; }
+  bwk() { local p="${1//'RS = "\0"'/RS = \"\"}"; shift; sed 's/\x00.*//' | command awk "$p" "$@"; }
+  yr_awk() { bwk "$@"; }
+  ( harden_git_config full )
+  git config core.sshCommand evil
   rc=0; ( harden_git_config full ) || rc=$?
   [ "$rc" -eq 1 ]
+  ( harden_git_config full || [[ "$YR_HARDEN_MSG" == "the repository config sets core.sshcommand,"* ]] )
   if command -v original-awk >/dev/null; then
     yr_awk() { original-awk "$@"; }
     rc=0; ( harden_git_config full ) || rc=$?
     [ "$rc" -eq 1 ]
+    git config --unset core.sshCommand
+    ( harden_git_config full )
   fi
+}
+
+@test "harden_git_config refuses a key split across NUL records it cannot pair (a count not a multiple of 3)" {
+  printf 'local\0file:.git/config\0core.sshcommand\nevil\0local\0' | yr_cfg_null_candidates >| out
+  grep -q '<unparsed>' out
+  printf 'local\0file:.git/config\0core.sshcommand\nevil\0' | yr_cfg_null_candidates >| out
+  [ "$(cat out)" = "$(printf 'local\tfile:.git/config\tcore.sshcommand\tS\tevil')" ]
+  # A tab or newline in any field is percent-encoded, so columns stay put.
+  printf 'global\0file:/a\tb\0alias.x\n!a\n%%b\0command\0-\0core.sshcommand\nx\0' | yr_cfg_null_candidates >| out
+  [ "$(cat out)" = "$(printf 'global\tfile:/a%%09b\talias.x\tM\t!a%%0A%%25b')" ]
 }
 
 @test "harden_git_config refuses a command line that starts with a NAME=value assignment" {
@@ -2391,13 +2407,20 @@ EOF
   [ "$rc" -eq 2 ]
 }
 
-@test "harden_git_config fails closed when awk fails while reading the transport config" {
+@test "harden_git_config reads the transport config without awk and fails closed when git fails listing it" {
   git config --local core.sshCommand x
   mkdir -p "$BATS_TEST_TMPDIR/badawk"
   printf '#!/bin/sh\nexit 2\n' >| "$BATS_TEST_TMPDIR/badawk/awk"
   chmod +x "$BATS_TEST_TMPDIR/badawk/awk"
   rc=0
-  PATH="$BATS_TEST_TMPDIR/badawk:$PATH" harden_git_config full || rc=$?
+  ( PATH="$BATS_TEST_TMPDIR/badawk:$PATH" harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  ( PATH="$BATS_TEST_TMPDIR/badawk:$PATH" harden_git_config full || [[ "$YR_HARDEN_MSG" == "the repository config sets core.sshcommand,"* ]] )
+  git config --local --unset core.sshCommand
+  eval "yr_git_real() $(declare -f yr_git | tail -n +2)"
+  yr_git() { yr_git_real "$@"; local rc=$?; case " $* " in *" --null "*) return 3 ;; esac; return "$rc"; }
+  rc=0
+  harden_git_config full || rc=$?
   [ "$rc" -eq 1 ]
   [[ "$YR_HARDEN_MSG" == *"could not parse the git transport config"* ]]
 }
@@ -2822,17 +2845,34 @@ unprivileged() {
   [[ "$out" != *"$d"* ]]
 }
 
-@test "an executable that cannot be read drops its directory, unless it is setuid or setgid" {
+@test "an executable that cannot be read drops its directory, setuid or setgid included, unless root owns it and it is not writable" {
   [ "$(id -u)" -ne 0 ] || skip "root reads every file"
   d="$BATS_TEST_TMPDIR/xo"
   mkdir -p "$d"
   printf '#!%s/interp\n' "$PWD" >| "$d/tool"
-  chmod 0111 "$d/tool"
-  yr_file_shebang_enters "$d/tool" "$PWD"
+  for mode in 0111 4111 2111 6111; do
+    chmod "$mode" "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell kept mode $mode" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "batched scan kept mode $mode" >&2; return 1; }
+  done
+  chmod 0333 "$d/tool"
   out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
   [[ "$out" != *"$d"* ]]
-  chmod 4111 "$d/tool"
+  chmod 0111 "$d/tool"
+  # A root-owned execute-only file (Fedora's sudo 4111, sudoreplay 0111) is a
+  # file only root could have made: a find that reports root ownership keeps it.
+  printf '#!/bin/sh\nprintf "%%s\\n" "$2"\n' >| "$BATS_TEST_TMPDIR/rootfind"
+  chmod +x "$BATS_TEST_TMPDIR/rootfind"
+  yr_helper() { [ "$1" = find ] && { printf '%s\n' "$BATS_TEST_TMPDIR/rootfind"; return 0; }; return 1; }
   ! yr_file_shebang_enters "$d/tool" "$PWD"
+  # One this user can write could be rewritten with any #! line, root or not.
+  chmod 0333 "$d/tool"
+  yr_file_shebang_enters "$d/tool" "$PWD"
+  chmod 0111 "$d/tool"
+  # Without a find to ask, ownership is unknown: fail closed.
+  yr_helper() { return 1; }
+  yr_file_shebang_enters "$d/tool" "$PWD"
 }
 
 @test "harden_git_config refuses an inherited GIT_CONFIG, which would hide the repository config from its scans" {

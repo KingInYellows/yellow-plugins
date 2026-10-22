@@ -279,11 +279,11 @@ set.
 ## Known Limitations
 
 - GraphQL scripts require `gh` and `jq` to be installed
-- `/review:setup` reports `awk_nul` when the `awk` on `PATH` cannot split NUL
-  records (see the `harden_git_config` limitation below)
-- `harden_git_config` needs an `awk` that splits NUL-separated records (gawk,
-  mawk); with BWK awk (macOS `/usr/bin/awk`) first on `PATH` it refuses, so
-  `commit-resolve-fixes` and `run-verify-command` stop
+- The `PATH` screen (`yr_safe_path`) reads every entry of every `PATH`
+  directory at each script start and is not cached (a resolver runs as the
+  user and could forge a cache). On WSL2 with `appendWindowsPath = true` the
+  `/mnt/c` entries make that take ~90 s; README "Limitations" has the
+  `/etc/wsl.conf` fix
 - Cross-plugin agents require the `yellow-core` plugin to be installed
 - Very large PRs (1000+ lines) may cause agent context overflow — consider
   splitting
