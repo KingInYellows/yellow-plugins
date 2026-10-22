@@ -1535,17 +1535,22 @@ rl_observe_locked() {
 
   # Pass B: exact fingerprint. Occurrence-keyed candidates use it only when
   # line mapping was unavailable: their ordinal shifts when a sibling is
-  # fixed, so the ordinal is not an identity.
-  while IFS=$'\x1f' read -r i rid; do
+  # fixed, so the ordinal is not an identity. An unscoped candidate never
+  # matches a verified finding here: a line-keyed fingerprint it kept from
+  # before its scope was verified names a line, not a site, so Pass D's
+  # scope and occurrence checks decide instead.
+  local cskey rss
+  while IFS=$'\x1f' read -r i rid rss; do
     [ -n "${match[$i]:-}" ] && continue
-    IFS=$'\x1f' read -r _ _ _ _ _ _ _ _ cocc _ <<<"${crows[$i]}"
+    IFS=$'\x1f' read -r _ _ _ cskey _ _ _ _ cocc _ <<<"${crows[$i]}"
     if [ -n "$cocc" ] && [ -z "${unavail[$i]:-}" ]; then continue; fi
+    [ "$cskey" = unscoped ] && [ "$rss" = verified ] && continue
     [[ "$claimed" == *" $rid "* ]] && continue
     match[$i]=$rid via[$i]=exact
     claimed="$claimed$rid "
   done < <(awk -F '\037' '
     NR == FNR { f[$1] = f[$1] " " (FNR - 1); next }
-    { n = split($17, fps, " "); for (j = 1; j <= n; j++) if (fps[j] in f) { m = split(f[fps[j]], a, " "); for (k = 1; k <= m; k++) print a[k] "\037" $1 } }' \
+    { n = split($17, fps, " "); for (j = 1; j <= n; j++) if (fps[j] in f) { m = split(f[fps[j]], a, " "); for (k = 1; k <= m; k++) print a[k] "\037" $1 "\037" $11 } }' \
     "$(rl_tmp)/crows" "$(rl_tmp)/index" | sort -t "$(printf '\037')" -k1,1n -s)
 
   # Pass C: alias — same category, rule and scope, no occurrence key, a
@@ -1595,7 +1600,7 @@ rl_observe_locked() {
   # scope (an occurrence key on either side), stays separate.
   # Off under --anchor-source worktree: spans come from the worktree while
   # existing lines map to HEAD, and uncommitted edits make those disagree.
-  local cskey cocc css cend rskey rss rocc rdisp eid rest sv
+  local cocc css cend rskey rocc rdisp eid rest sv
   local -a quals qbad ccontent
   [ "$RL_O_ASRC" = worktree ] || while IFS= read -r r; do
     i=${r%%$'\x1f'*}

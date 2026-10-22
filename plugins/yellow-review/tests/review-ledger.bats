@@ -259,6 +259,21 @@ setup() {
   [ "$(fold | jq -r --arg id "$h" '.findings[] | select(.finding_id == $id) | .obs.scope')" = handlers_create ]
 }
 
+@test "CLAUDE-88: a promoted finding's old line fingerprint does not claim a new identical line" {
+  source "$RL"
+  require_universal_ctags
+  printf 'f() {\n  eval "$cmd"\n}\n' >|q.sh
+  H=$(commit_all one)
+  observe "$H" "[$(finding q.sh 2)]" >/dev/null
+  out=$(observe "$H" "[$(finding q.sh 2 '{"scope":"f"}')]")
+  [ "$(printf '%s' "$out" | jq '.merged')" -eq 1 ]
+  [ "$(fold | jq -r '.findings[0].obs.scope_status')" = verified ]
+  printf 'f() {\n  eval "$cmd"\n  eval "$cmd"\n}\n' >|q.sh
+  H2=$(commit_all two)
+  out=$(observe "$H2" "[$(finding q.sh 2)]")
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
+}
+
 @test "CLAUDE-88: a scopeless line in two candidate spans, or in none, stays separate" {
   source "$RL"
   require_universal_ctags
