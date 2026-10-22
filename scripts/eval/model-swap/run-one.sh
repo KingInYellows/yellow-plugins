@@ -49,6 +49,8 @@ rc=$?
 wall=$(($(date +%s) - start))
 scan=$(find "$workdir/.debt/scanner-output" -maxdepth 1 -name '*.json' -print -quit 2>/dev/null)
 scan_ok=1
+# A scanner worktree has .debt/scanner-output; its run must write a file there.
+[ -d "$workdir/.debt/scanner-output" ] && [ -z "$scan" ] && scan_ok=0
 if [ -n "$scan" ]; then
   # A truncated or non-object scanner file fails the run so it reruns.
   jq -e 'type == "object"' "$scan" >/dev/null 2>&1 && cp "$scan" "$out_dir/$id.scan.json" || scan_ok=0

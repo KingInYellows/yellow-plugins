@@ -344,8 +344,8 @@ def grade(work):
                 goldens[gkey] = lizard_golden(wt, scans[target]["files"], limits)
             scan_file = os.path.join(out, rid + ".scan.json")
             try:
-                found, unmatched = scan_hits(goldens[gkey], scan_file) if os.path.exists(scan_file) else (set(), [])
-            except (ValueError, AttributeError, TypeError):
+                found, unmatched = scan_hits(goldens[gkey], scan_file)
+            except (OSError, ValueError, AttributeError, TypeError):
                 reject(out, rid, "unreadable scan output")
                 missing.append(rid + " (unreadable scan output)")
                 continue
