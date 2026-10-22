@@ -227,9 +227,11 @@ export const register: Register = (on, options) => {
     const asked = Number.parseInt(e.args.trim(), 10);
     const tail =
       Number.isFinite(asked) && asked > 0 ? Math.min(asked, 100) : 10;
-    await bounded($, () => Promise.all([writes, pruning])).catch(
-      () => undefined
-    );
+    // A pending write may start a prune as it settles, so read pruning after.
+    await bounded($, async () => {
+      await writes;
+      await pruning;
+    }).catch(() => undefined);
     const ownKey = await bounded($, () => sessionLedgerKey($)).catch(() =>
       ledgerKeyFor('unknown')
     );
