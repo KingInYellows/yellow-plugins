@@ -1598,7 +1598,7 @@ rl_observe_locked() {
   # unscoped finding whose line maps unchanged into its scope span. Only a
   # sole qualifier merges, so identical code in two scopes, or twice in one
   # scope (an occurrence key on either side), stays separate.
-  local cskey cocc css cend rskey rss rocc rdisp eid rest
+  local cskey cocc css cend rskey rss rocc rdisp eid rest sv
   local -a quals qbad ccontent
   while IFS= read -r r; do
     i=${r%%$'\x1f'*}
@@ -1613,6 +1613,12 @@ rl_observe_locked() {
       [ "${ccontent[$i]}" != - ] || continue
       rl_scope_still "${ccontent[$i]}" "$cfile" "$cline" "$rskey" "$rdisp" || continue
       [ -z "$rocc" ] || qbad[$i]=1
+      # the stored occ is from the finding's own run: an identical line
+      # added to the scope since then makes the candidate ambiguous too
+      IFS=$'\t' read -r sv _ css cend <<<"$(rl_verify_scope "${ccontent[$i]}" "$cfile" "$cline" "$rdisp")"
+      if [ "$sv" != verified ] || [ -n "$(rl_occurrence "${ccontent[$i]}" "$cline" "$css" "$cend")" ]; then
+        qbad[$i]=1
+      fi
     elif [ "$cskey" != unscoped ] && [ "$rss" = unscoped ] && [ -n "$css" ]; then
       [ -z "$cocc" ] || continue
       IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"

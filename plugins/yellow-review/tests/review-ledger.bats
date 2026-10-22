@@ -289,6 +289,19 @@ setup() {
   [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
 }
 
+@test "CLAUDE-88: an identical line added to the scope later keeps a scopeless line apart" {
+  source "$RL"
+  require_universal_ctags
+  printf 'admin_create() {\n  eval "$cmd"\n}\n' >|p.sh
+  H=$(commit_all once)
+  observe "$H" "[$(finding p.sh 2 '{"scope":"admin_create"}')]" >/dev/null
+  [ "$(fold | jq -r '.findings[0].obs.occ')" = null ]
+  printf 'admin_create() {\n  eval "$cmd"\n  :\n  :\n  :\n  :\n  eval "$cmd"\n}\n' >|p.sh
+  H2=$(commit_all twice)
+  out=$(observe "$H2" "[$(finding p.sh 7)]")
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
+}
+
 @test "CLAUDE-88: a scopeless markdown re-observation merges under its heading" {
   printf '# Doc\n## A\nflag one\n## B\nflag one\n' >|m.md
   H=$(commit_all md)
