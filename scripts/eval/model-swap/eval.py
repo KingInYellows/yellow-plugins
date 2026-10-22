@@ -21,6 +21,7 @@ import argparse
 import collections
 import concurrent.futures
 import csv
+import hashlib
 import json
 import os
 import re
@@ -40,6 +41,24 @@ def git(*args, cwd=REPO):
 def worktree(path, commit):
     if not os.path.isdir(path):
         git("worktree", "add", "--quiet", "--detach", path, commit)
+
+
+def fresh_worktree(path, commit):
+    """Recreate path at commit, so a changed spec never reuses an old tree."""
+    if os.path.isdir(path):
+        git("worktree", "remove", "--force", path)
+    worktree(path, commit)
+
+
+def fingerprint(*parts):
+    """Hash of every run input; run-one.sh only reuses an output that carries it."""
+    h = hashlib.sha256()
+    for part in parts:
+        if isinstance(part, str) and os.path.isfile(part):
+            with open(part, "rb") as handle:
+                part = handle.read().decode("utf-8", "replace")
+        h.update(json.dumps(part, sort_keys=True).encode("utf-8") + b"\0")
+    return h.hexdigest()[:16]
 
 
 def plant(wt, p):
@@ -95,16 +114,14 @@ def prepare(spec_path, work):
     rows = []
     for r in spec["replays"]:
         wt = os.path.join(work, "wt", r["id"])
-        fresh = not os.path.isdir(wt)
-        worktree(wt, r["commit"])
-        if fresh:
-            try:
-                for p in r["plants"]:
-                    plant(wt, p)
-            except BaseException:
-                # A half-planted tree would look prepared to the next run.
-                git("worktree", "remove", "--force", wt)
-                raise
+        fresh_worktree(wt, r["commit"])
+        try:
+            for p in r["plants"]:
+                plant(wt, p)
+        except BaseException:
+            # A half-planted tree would look prepared to the next run.
+            git("worktree", "remove", "--force", wt)
+            raise
         patch = os.path.join(work, "prompts", r["id"] + ".patch")
         with open(patch, "w", encoding="utf-8") as handle:
             handle.write(git("diff", "HEAD^", cwd=wt))
@@ -117,14 +134,17 @@ def prepare(spec_path, work):
             for rep in range(1, c["reps"] + 1):
                 if agent["kind"] == "replay":
                     for r in spec["replays"]:
+                        prompt = os.path.join(work, "prompts", r["id"] + ".txt")
                         rows.append(["%s-%s-%s-%s-r%d" % (aid, r["id"], c["model"], c["effort"], rep),
                                      sys_prompt, os.path.join(work, "wt", r["id"]), c["model"], c["effort"],
-                                     os.path.join(work, "prompts", r["id"] + ".txt"), aid, r["id"]])
+                                     prompt, aid, r["id"],
+                                     fingerprint(agent, r, c["model"], c["effort"], sys_prompt, prompt,
+                                                 os.path.join(work, "prompts", r["id"] + ".patch"))])
                     continue
                 for s in spec["scans"]:
                     rid = "%s-%s-%s-%s-r%d" % (aid, s["id"], c["model"], c["effort"], rep)
                     wt = os.path.join(work, "wt", rid)  # scanners write, so one tree per run
-                    worktree(wt, s["commit"])
+                    fresh_worktree(wt, s["commit"])
                     os.makedirs(os.path.join(wt, ".debt", "scanner-output"), exist_ok=True)
                     with open(os.path.join(wt, ".debt", "file-list.txt"), "w", encoding="utf-8") as handle:
                         handle.write("\n".join(s["files"]) + "\n")
@@ -132,7 +152,8 @@ def prepare(spec_path, work):
                     prompt = os.path.join(work, "prompts", "scan-%s.txt" % name)
                     with open(prompt, "w", encoding="utf-8") as handle:
                         handle.write(SCAN_PROMPT.format(name=name))
-                    rows.append([rid, sys_prompt, wt, c["model"], c["effort"], prompt, aid, s["id"]])
+                    rows.append([rid, sys_prompt, wt, c["model"], c["effort"], prompt, aid, s["id"],
+                                 fingerprint(agent, s, c["model"], c["effort"], sys_prompt, prompt)])
     with open(os.path.join(work, "matrix.tsv"), "w", encoding="utf-8") as handle:
         handle.writelines("\t".join(row) + "\n" for row in rows)
     with open(os.path.join(work, "spec.json"), "w", encoding="utf-8") as handle:
@@ -152,7 +173,8 @@ def run(work, jobs, dry_run):
     def one(row):
         rid, sys_prompt, wt, model, effort, prompt = row[:6]
         rc = subprocess.run([os.path.join(HERE, "run-one.sh"), out, rid, sys_prompt, wt,
-                             model, effort, prompt]).returncode
+                             model, effort, prompt],
+                            env=dict(os.environ, EVAL_FINGERPRINT=row[8])).returncode
         return rid, rc
 
     failed = 0
@@ -165,7 +187,7 @@ def run(work, jobs, dry_run):
 
 
 def read_matrix(work):
-    """Rows: id, system prompt, workdir, model, effort, prompt file, agent id, target id."""
+    """Rows: id, system prompt, workdir, model, effort, prompt file, agent id, target id, fingerprint."""
     with open(os.path.join(work, "matrix.tsv"), encoding="utf-8") as handle:
         return [line.rstrip("\n").split("\t") for line in handle if line.strip()]
 
@@ -226,12 +248,15 @@ def grade(work):
     missing = []
     out = os.path.join(work, "out")
     for row in read_matrix(work):
-        rid, model, effort, aid, target = row[0], row[3], row[4], row[6], row[7]
+        rid, model, effort, aid, target, fp = row[0], row[3], row[4], row[6], row[7], row[8]
         agent = spec["agents"][aid]
         try:
             with open(os.path.join(out, rid + ".json"), encoding="utf-8") as handle:
                 d = json.load(handle)
         except (OSError, ValueError):
+            d = {}
+        if d.get("eval_fingerprint") != fp:
+            # Missing, unreadable, or made from inputs this spec no longer has.
             missing.append(rid)
             continue
         key = (aid, model, effort)
@@ -252,7 +277,7 @@ def grade(work):
             limits = agent["golden"]
             gkey = (target, limits["ccn_over"], limits["length_over"])
             if gkey not in goldens:
-                wt = os.path.join(work, "wt", "golden-" + target)
+                wt = os.path.join(work, "wt", "golden-%s-%s" % (target, scans[target]["commit"]))
                 worktree(wt, scans[target]["commit"])
                 goldens[gkey] = lizard_golden(wt, scans[target]["files"], limits)
             scan_file = os.path.join(out, rid + ".scan.json")
@@ -274,7 +299,7 @@ def grade(work):
         len(other), os.path.join(work, "unmatched-findings.txt")))
     if missing:
         # Recall above leaves these runs out of its denominators.
-        sys.exit("grade: %d matrix runs have no readable result (%s); rerun `run` before trusting recall"
+        sys.exit("grade: %d matrix runs have no current result (%s); rerun `run` before trusting recall"
                  % (len(missing), ", ".join(missing)))
 
 

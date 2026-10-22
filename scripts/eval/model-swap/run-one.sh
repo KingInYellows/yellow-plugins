@@ -7,15 +7,24 @@
 # nested `claude -p` in <workdir>, with no settings, MCP servers, slash
 # commands or memory, so the model and effort are the only variables. Tools
 # default to the agent's `tools:` list. Writes <out-dir>/<run-id>.json (the
-# CLI's JSON result plus eval_rc and eval_wall_s) and skips a run whose
-# output already exists, so a stopped matrix resumes. A file written to
-# <workdir>/.debt/scanner-output/ is copied to <out-dir>/<run-id>.scan.json.
+# CLI's JSON result plus eval_rc, eval_wall_s and eval_fingerprint) and skips
+# a run whose output already exists with the same $EVAL_FINGERPRINT (eval.py
+# sets it from every run input), so a stopped matrix resumes. A file the run
+# writes to <workdir>/.debt/scanner-output/ is copied to
+# <out-dir>/<run-id>.scan.json.
 set -u
 [ $# -ge 7 ] || { printf 'usage: %s <out-dir> <run-id> <agent.md> <workdir> <model> <effort> <prompt-file> [tools]\n' "$0" >&2; exit 2; }
 out_dir=$1 id=$2 agent=$3 workdir=$4 model=$5 effort=$6 prompt_file=$7 tools=${8:-}
 out=$out_dir/$id.json
-[ -s "$out" ] && exit 0
+fp=${EVAL_FINGERPRINT:-}
+if [ -s "$out" ]; then
+  jq -e --arg fp "$fp" '(.eval_fingerprint // "") == $fp' "$out" >/dev/null 2>&1 && exit 0
+  printf 'run-one: %s was made from other inputs; rerunning\n' "$id" >&2
+fi
 mkdir -p "$out_dir"
+# Scanner output from an earlier attempt must not be graded as this one's.
+rm -f "$out" "$out_dir/$id.scan.json"
+find "$workdir/.debt/scanner-output" -maxdepth 1 -name '*.json' -delete 2>/dev/null
 sys=$(mktemp) || exit 1
 trap 'rm -f "$sys"' EXIT
 # Body after the second `---` line.
@@ -44,10 +53,11 @@ scan=$(find "$workdir/.debt/scanner-output" -maxdepth 1 -name '*.json' -print -q
 # is_error: a rate limit or max-turns still prints JSON; fail it so it reruns.
 if [ -s "$out.tmp" ] && jq -e '(.is_error // false) | not' "$out.tmp" >/dev/null 2>&1 &&
   jq -e --arg rc "$rc" --argjson wall "$wall" \
-    '. + {eval_rc: ($rc | tonumber), eval_wall_s: $wall}' "$out.tmp" >"$out" 2>/dev/null; then
+    --arg fp "$fp" '. + {eval_rc: ($rc | tonumber), eval_wall_s: $wall, eval_fingerprint: $fp}' \
+    "$out.tmp" >"$out" 2>/dev/null; then
   rm -f "$out.tmp"
 else
-  rm -f "$out"
+  rm -f "$out" "$out_dir/$id.scan.json"
   mv "$out.tmp" "$out_dir/$id.bad"
   printf 'run-one: %s failed or produced no JSON (rc %s); see %s.err and .bad\n' "$id" "$rc" "$out_dir/$id" >&2
   exit 1

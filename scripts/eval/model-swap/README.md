@@ -19,8 +19,11 @@ python3 scripts/eval/model-swap/eval.py grade /tmp/swap-eval
 
 Keep the work directory outside the repo; `prepare` adds detached worktrees
 under it. Remove them afterwards with `git worktree remove --force <path>` and
-`git worktree prune`. `run` skips rows that already have output, so a stopped
-run resumes.
+`git worktree prune`. `prepare` rebuilds every worktree, and each matrix row
+carries a fingerprint of its inputs (agent body, preloaded skills, prompt, diff,
+spec entry, model, effort). `run` skips a row only when its output has the same
+fingerprint, so a stopped run resumes and a changed spec reruns; `grade` treats
+an output with another fingerprint as missing.
 
 ## How it grades
 
