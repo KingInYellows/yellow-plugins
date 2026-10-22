@@ -40,8 +40,9 @@ rc=$?
 wall=$(($(date +%s) - start))
 scan=$(find "$workdir/.debt/scanner-output" -maxdepth 1 -name '*.json' -print -quit 2>/dev/null)
 [ -n "$scan" ] && cp "$scan" "$out_dir/$id.scan.json"
-if jq --arg rc "$rc" --argjson wall "$wall" '. + {eval_rc: ($rc | tonumber), eval_wall_s: $wall}' \
-  "$out.tmp" >"$out" 2>/dev/null; then
+# -s: jq exits 0 with no output on an empty file (a timeout or a crash).
+if [ -s "$out.tmp" ] && jq -e --arg rc "$rc" --argjson wall "$wall" \
+  '. + {eval_rc: ($rc | tonumber), eval_wall_s: $wall}' "$out.tmp" >"$out" 2>/dev/null; then
   rm -f "$out.tmp"
 else
   rm -f "$out"

@@ -216,8 +216,12 @@ def grade(work):
         rid = name[:-5]
         aid, target, model, effort, _rep = rid.split("-")
         agent = spec["agents"][aid]
-        with open(os.path.join(out, name), encoding="utf-8") as handle:
-            d = json.load(handle)
+        try:
+            with open(os.path.join(out, name), encoding="utf-8") as handle:
+                d = json.load(handle)
+        except ValueError:
+            print("grade: skipping %s (not JSON; rerun it)" % name, file=sys.stderr)
+            continue
         key = (aid, model, effort)
         mu = d.get("modelUsage", {}).values()
         usage[key].update(runs=1, cost=d.get("total_cost_usd") or 0, wall=d.get("eval_wall_s") or 0,
