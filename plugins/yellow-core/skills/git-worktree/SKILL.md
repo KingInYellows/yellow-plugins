@@ -213,10 +213,11 @@ Safety rules the script holds:
   in-chain rebase, discarding its in-progress state. Unrecorded worktrees are
   left alone. It keeps the state (exit `31`) for a GitHub rebase in an
   unrecorded worktree that may be the run's own, a recorded worktree whose
-  rebase state cannot be read (named), or a stack branch off its recorded
-  start commit before or after cleanup (each gets a fix line; see
-  `/worktree:restack`). A worktree that cannot be restored stays detached and
-  the script prints the `git -C <path> checkout <branch>` line.
+  rebase state cannot be read (named) or that `git rebase --abort` did not
+  clear (`rebase-stuck`), or a stack branch off its recorded start commit
+  before or after cleanup (each gets a fix line; see `/worktree:restack`).
+  A worktree that cannot be restored stays detached and the script prints
+  the `git -C <path> checkout <branch>` line.
 - A conflict pauses the run (exit 10). Graphite: the stack worktrees stay
   detached and `git worktree lock`ed. Do not commit in them: a commit there
   lands on no branch, and the script refuses to restore over it. GitHub:
