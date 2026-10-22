@@ -1374,8 +1374,12 @@ rl_build_candidate() {
     root=$(rl_repo_root) || { printf 'REJECT no-repo'; return 0; }
     vres=$(rl_validate_path anchor "$H" "$file") || { printf 'REJECT path:%s' "$vres"; return 0; }
     rl_worktree_entry_ok "$root" "$file" || { printf 'REJECT path:worktree-entry'; return 0; }
-    content=$(mktemp "$(rl_tmp)/wt.XXXXXX") || { printf 'REJECT path:unreadable'; return 0; }
-    cp -- "$root/$file" "$content" || { printf 'REJECT path:unreadable'; return 0; }
+    # one snapshot per path, so candidates on one file see the same text
+    content="$(rl_tmp)/wt-$(printf '%s' "$file" | rl_sha256)"
+    if [ ! -f "$content" ]; then
+      cp -- "$root/$file" "$content.part" && mv -f -- "$content.part" "$content" ||
+        { printf 'REJECT path:unreadable'; return 0; }
+    fi
     where='head'
   else
     vres=$(rl_validate_path anchor "$H" "$file" "$B") || { printf 'REJECT path:%s' "$vres"; return 0; }
@@ -1423,7 +1427,7 @@ rl_build_candidate() {
     --arg text "$text" --argjson withheld "$withheld" --arg src "$src" --arg title "$title" \
     --arg fix "$fix" --arg bcc "$bcc" --arg mig "$mig" --argjson ro "$report_only" \
     --argjson defaulted "$defaulted" --argjson unmapped "$((1 - mapped))" --argjson ord "${RL_ORDINAL:-0}" \
-    --arg rev_red "$rev_red" '
+    --arg rev_red "$rev_red" --arg sstart "${sstart:-}" --arg send "${send:-}" '
     def nn: if . == "" then null else . end;
     {fingerprint: $fp,
      reviewers: ((if ($f.reviewers | type) == "array" then $f.reviewers
@@ -1443,13 +1447,14 @@ rl_build_candidate() {
      requires_verification: $f.requires_verification, pre_existing: $f.pre_existing,
      title: $title, suggested_fix: ($fix | nn), breaking_change_class: ($bcc | nn),
      migration_path: ($mig | nn), report_only: $ro, _defaulted: $defaulted, _unmapped: $unmapped,
-     _ordinals: [$ord]}'
+     _ordinals: [$ord], _span: (if $sstart == "" then null else [($sstart | tonumber), ($send | tonumber)] end)}'
 }
 
 # Candidate rows for the matching passes, \x1f-separated like the index:
 #   1 fingerprint  2 category  3 rule  4 scope key  5 anchor_hash  6 deletion
 #   7 file  8 line  9 occ  10 anchor text (normalized, or empty)
 #   11 report_only  12 input ordinals (space-joined)
+#   13 verified scope span start  14 span end (0 = EOF; both empty when unscoped)
 RL_CAND_ROW_JQ='
   def f: (. // "") | tostring | gsub("[\u0000-\u001f]"; " ");
   def norm: gsub("\r"; "") | gsub("\t"; " ") | gsub(" +"; " ") | sub("^ "; "") | sub(" $"; "");
@@ -1457,18 +1462,27 @@ RL_CAND_ROW_JQ='
     (.file | f), (.line | tostring), (.occ | f),
     (if .anchor_lines == null then "" else (.anchor_lines | join(" ") | norm)
        | (if test("[\u0000-\u001f\u007f]") then "" else . end) end),
-    (.report_only | tostring), (._ordinals | map(tostring) | join(" ")) ] | join("\u001f")'
+    (.report_only | tostring), (._ordinals | map(tostring) | join(" ")),
+    (._span[0]? // "" | tostring), (._span[1]? // "" | tostring) ] | join("\u001f")'
 
 # --- observe: matching and append (under the lock) --------------------------
 
+# The HEAD blob of a candidate's anchor file, for Pass D's scope checks.
+rl_candidate_content() {
+  local vres oid
+  vres=$(rl_validate_path anchor "$RL_O_HEAD" "$1") || return 1
+  read -r _ oid _ <<<"$vres"
+  rl_blob_file "$oid"
+}
+
 # Globals set by cmd_observe: RL_O_DIR RL_O_PR RL_O_HEAD RL_O_BASE RL_O_RUN
-# RL_O_STEP RL_O_SOURCE RL_O_CANDS (JSONL, one grouped candidate per line)
+# RL_O_STEP RL_O_SOURCE RL_O_ASRC RL_O_CANDS (JSONL, one grouped candidate per line)
 # RL_O_REJECTED (JSON array) RL_O_DEFAULTED RL_O_UNMAPPED.
 rl_observe_locked() {
   local f fold n i c r eid res ln np dist claimed=' ' pairs='' at id state row status results='' o
   local cfp cdel cfile cline cocc ctext cro cords
   local rid _rstate rfile rline rhead rbase ranchor
-  local -a cands crows match via unavail
+  local -a cands crows match via unavail inherit
   rl_writer_gate "$RL_O_DIR" "$RL_O_PR" || return $?
   f="$RL_O_DIR/$RL_O_PR.jsonl"
   rl_repair_tail "$f" || return 1
@@ -1521,17 +1535,22 @@ rl_observe_locked() {
 
   # Pass B: exact fingerprint. Occurrence-keyed candidates use it only when
   # line mapping was unavailable: their ordinal shifts when a sibling is
-  # fixed, so the ordinal is not an identity.
-  while IFS=$'\x1f' read -r i rid; do
+  # fixed, so the ordinal is not an identity. An unscoped candidate never
+  # matches a verified finding here: a line-keyed fingerprint it kept from
+  # before its scope was verified names a line, not a site, so Pass D's
+  # scope and occurrence checks decide instead.
+  local cskey rss
+  while IFS=$'\x1f' read -r i rid rss; do
     [ -n "${match[$i]:-}" ] && continue
-    IFS=$'\x1f' read -r _ _ _ _ _ _ _ _ cocc _ <<<"${crows[$i]}"
+    IFS=$'\x1f' read -r _ _ _ cskey _ _ _ _ cocc _ <<<"${crows[$i]}"
     if [ -n "$cocc" ] && [ -z "${unavail[$i]:-}" ]; then continue; fi
+    [ "$cskey" = unscoped ] && [ "$rss" = verified ] && continue
     [[ "$claimed" == *" $rid "* ]] && continue
     match[$i]=$rid via[$i]=exact
     claimed="$claimed$rid "
   done < <(awk -F '\037' '
     NR == FNR { f[$1] = f[$1] " " (FNR - 1); next }
-    { n = split($17, fps, " "); for (j = 1; j <= n; j++) if (fps[j] in f) { m = split(f[fps[j]], a, " "); for (k = 1; k <= m; k++) print a[k] "\037" $1 } }' \
+    { n = split($17, fps, " "); for (j = 1; j <= n; j++) if (fps[j] in f) { m = split(f[fps[j]], a, " "); for (k = 1; k <= m; k++) print a[k] "\037" $1 "\037" $11 } }' \
     "$(rl_tmp)/crows" "$(rl_tmp)/index" | sort -t "$(printf '\037')" -k1,1n -s)
 
   # Pass C: alias — same category, rule and scope, no occurrence key, a
@@ -1571,14 +1590,97 @@ rl_observe_locked() {
     claimed="$claimed$eid "
   done < <(printf '%s' "$pairs_c" | sort -n -k1,1)
 
+  # Pass D: a scope seen on one side only. Some personas never claim a
+  # scope and some claims fail to verify, so one issue can arrive with and
+  # without a verified scope. Same file, category, rule and anchor hash,
+  # and then: an unscoped candidate joins a verified finding whose scope
+  # still holds at the candidate's line; a verified candidate absorbs an
+  # unscoped finding whose line maps unchanged into its scope span. Only a
+  # sole qualifier merges, so identical code in two scopes, or twice in one
+  # scope (an occurrence key on either side), stays separate.
+  # Off under --anchor-source worktree, and for findings recorded that way:
+  # their spans or lines are worktree coordinates while lines map by HEAD,
+  # and uncommitted edits make those disagree.
+  local cocc css cend rskey rocc rsrc rdisp eid rest sv
+  local -a quals qbad ccontent
+  [ "$RL_O_ASRC" = worktree ] || while IFS= read -r r; do
+    i=${r%%$'\x1f'*}
+    r=${r#*$'\x1f'}
+    [ -n "${match[$i]:-}" ] && continue
+    IFS=$'\x1f' read -r _ _ _ cskey _ _ cfile cline cocc _ _ _ css cend <<<"${crows[$i]}"
+    IFS=$'\x1f' read -r rid _rstate rfile rline rhead _rbase _ _ _ rskey rss rocc _ rsrc _ _ _ _ rdisp <<<"$r"
+    # a worktree-anchored finding's line is not a coordinate in its head
+    [ "$rsrc" = worktree ] && continue
+    if [ "$cskey" = unscoped ] && [ "$rss" = verified ]; then
+      if [ -z "${ccontent[$i]:-}" ]; then
+        ccontent[$i]=$(rl_candidate_content "$cfile") || ccontent[$i]=-
+      fi
+      [ "${ccontent[$i]}" != - ] || continue
+      rl_scope_still "${ccontent[$i]}" "$cfile" "$cline" "$rskey" "$rdisp" || continue
+      # the span: markdown re-derives it (the display copy may be cut or
+      # redacted); code re-verifies the display copy, which the hash check
+      # above has just shown to be the exact scope
+      case "$cfile" in
+        *.md | *.mdx | *.MD | *.markdown)
+          IFS=$'\t' read -r sv _ css cend _ <<<"$(rl_md_heading_path "${ccontent[$i]}" "$cline")"
+          [ -n "$sv" ] && sv=verified
+          ;;
+        *) IFS=$'\t' read -r sv _ css cend <<<"$(rl_verify_scope "${ccontent[$i]}" "$cfile" "$cline" "$rdisp")" ;;
+      esac
+      [ "$sv" = verified ] || continue
+      # the finding's own line must map unchanged into the same span: a
+      # heading path can repeat, and the hash alone names no site
+      IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"
+      case "$res" in exact | shifted) ;; *) continue ;; esac
+      [ "$np" = "$cfile" ] && [ "$ln" -ge "$css" ] || continue
+      [ "$cend" -eq 0 ] || [ "$ln" -le "$cend" ] || continue
+      # the stored occ is from the finding's own run: an identical line
+      # added to the scope since then makes the candidate ambiguous too
+      if [ -n "$rocc" ] || [ -n "$(rl_occurrence "${ccontent[$i]}" "$cline" "$css" "$cend")" ]; then
+        qbad[$i]=1
+      fi
+    elif [ "$cskey" != unscoped ] && [ "$rss" = unscoped ] && [ -n "$css" ]; then
+      [ -z "$cocc" ] || continue
+      IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"
+      case "$res" in exact | shifted) ;; *) continue ;; esac
+      [ "$np" = "$cfile" ] && [ "$ln" -ge "$css" ] || continue
+      [ "$cend" -eq 0 ] || [ "$ln" -le "$cend" ] || continue
+    else
+      continue
+    fi
+    quals[$i]="${quals[$i]:-} $rid"
+  done < <(awk -F '\037' '
+    NR == FNR { if ($6 != "true") { k = $7 FS $2 FS $3 FS $5; c[k] = c[k] " " (FNR - 1) } next }
+    $13 != "true" { k = $3 FS $8 FS $9 FS $7; if (k in c) { n = split(c[k], a, " "); for (j = 1; j <= n; j++) print a[j] "\037" $0 } }' \
+    "$(rl_tmp)/crows" "$(rl_tmp)/index")
+  for i in "${!quals[@]}"; do
+    [ -z "${match[$i]:-}" ] && [ -z "${qbad[$i]:-}" ] || continue
+    read -r eid rest <<<"${quals[$i]}"
+    [ -n "$eid" ] && [ -z "$rest" ] || continue
+    [[ "$claimed" == *" $eid "* ]] && continue
+    match[$i]=$eid via[$i]=scope
+    claimed="$claimed$eid "
+    # an unscoped observation keeps the finding's verified scope, which
+    # was just re-checked at its line, and its scoped fingerprint: a
+    # line-keyed one would let Pass B skip that check next time
+    if [ -n "${ccontent[$i]:-}" ]; then
+      inherit[$i]=$(jq -ce --arg id "$eid" '.findings[] | select(.finding_id == $id)
+        | .obs | {fingerprint, scope, scope_key, scope_status, occ}' "$(rl_tmp)/fold.json") || {
+        rl_err "observe: could not read the scope of $eid; nothing was written"
+        return 1
+      }
+    fi
+  done
+
   # Actions.
   local new=0 merged=0 reopened=0 suppressed=0 app
   at=$(rl_now)
   RL_AT=$at
   for ((i = 0; i < n; i++)); do
     c="${cands[$i]}"
-    IFS=$'\x1f' read -r cfp _ _ _ _ _ _ _ _ _ cro cords <<<"${crows[$i]}"
+    IFS=$'\x1f' read -r cfp _ _ _ _ _ _ _ _ _ cro cords _ <<<"${crows[$i]}"
     id="${match[$i]:-}"
+    [ -n "${inherit[$i]:-}" ] && c=$(jq -c --argjson s "${inherit[$i]}" '. + $s' <<<"$c")
     if [ -z "$id" ]; then
       id=$cfp
       if rl_index_row "$id" >/dev/null; then
@@ -1642,7 +1744,7 @@ rl_observe_locked() {
 rl_observation_record() {
   jq -c --arg id "$2" --argjson pr "$RL_O_PR" --arg H "$RL_O_HEAD" --arg B "$RL_O_BASE" --arg at "$3" \
     --arg run "$RL_O_RUN" --arg src "$RL_O_SOURCE" --arg step "$RL_O_STEP" --arg state "${4:-}" '
-    ({v: 1, type: "observation", finding_id: $id} + del(.report_only, ._ordinals, ._defaulted, ._unmapped)
+    ({v: 1, type: "observation", finding_id: $id} + del(.report_only, ._ordinals, ._defaulted, ._unmapped, ._span)
      + {pr: $pr, head_sha: $H, base_sha: (if $B == "" then null else $B end), at: $at, run_id: $run, source: $src, step: $step}),
     (if $state == "" then empty else
       {v: 1, type: "transition", finding_id: $id, state: $state, reason: null, head_sha: $H, at: $at,
@@ -1751,6 +1853,18 @@ cmd_observe() {
     "$(rl_tmp)/cands.jsonl" >|"$(rl_tmp)/cands.checked.jsonl" || rl_die 1 "observe: anchor check failed"
   mv -f -- "$(rl_tmp)/cands.checked.jsonl" "$(rl_tmp)/cands.jsonl"
   RL_O_REJECTED=$(jq -Rsc 'split("\n") | map(select(length > 0) | split("\t") | {ordinal: (.[0] | tonumber), reason: .[1]})' "$(rl_tmp)/rejected.tsv")
+  # Within the batch, an unscoped copy joins a verified copy of the same
+  # site (Pass D's rule for one input array): same file, category, rule,
+  # anchor hash and line, the verified copy without an occurrence key, and
+  # exactly one verified fingerprint qualifying. It takes that identity.
+  jq -sc 'map(select(.scope_status == "verified" and .occ == null and (.deletion | not))) as $sc
+    | .[] | . as $c
+    | if $c.scope_status == "unscoped" and ($c.deletion | not) then
+        ([ $sc[] | select(.file == $c.file and .category == $c.category and .rule == $c.rule
+             and .anchor_hash == $c.anchor_hash and .line == $c.line) ] | unique_by(.fingerprint)) as $m
+        | if ($m | length) == 1 then $c + ($m[0] | {fingerprint, scope, scope_key, scope_status, occ, _span}) else $c end
+      else $c end' "$(rl_tmp)/cands.jsonl" >|"$(rl_tmp)/cands.coalesced.jsonl" || rl_die 1 "observe: batch scope merge failed"
+  mv -f -- "$(rl_tmp)/cands.coalesced.jsonl" "$(rl_tmp)/cands.jsonl"
   # One candidate per fingerprint per run: merge two reviewers' copies.
   jq -sc 'group_by(.fingerprint) | map(
       .[0] + {_ordinals: (map(._ordinals[]) | sort), _defaulted: 0, _unmapped: 0, reviewers: (map(.reviewers[]) | unique), severity: (map(.severity) | min),
@@ -1758,7 +1872,7 @@ cmd_observe() {
     "$(rl_tmp)/cands.jsonl" >|"$(rl_tmp)/grouped.jsonl" || rl_die 1 "observe: grouping failed"
   read -r RL_O_DEFAULTED RL_O_UNMAPPED < <(jq -rs '"\(map(._defaulted) | add // 0) \(map(._unmapped) | add // 0)"' "$(rl_tmp)/cands.jsonl")
   RL_O_DIR=$(rl_ensure_dir) || rl_die 1 "cannot create ledger directory"
-  RL_O_PR=$pr RL_O_HEAD=$head RL_O_BASE=$base RL_O_RUN=$run RL_O_STEP=$step RL_O_SOURCE=$source
+  RL_O_PR=$pr RL_O_HEAD=$head RL_O_BASE=$base RL_O_RUN=$run RL_O_STEP=$step RL_O_SOURCE=$source RL_O_ASRC=$src
   RL_O_CANDS="$(rl_tmp)/grouped.jsonl"
   rl_locked "$pr" rl_observe_locked
 }
