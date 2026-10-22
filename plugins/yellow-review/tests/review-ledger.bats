@@ -245,6 +245,17 @@ setup() {
   [ "$(printf '%s' "$out" | jq '.merged')" -eq 1 ]
 }
 
+@test "CLAUDE-88: scoped and unscoped copies in one batch become one finding" {
+  source "$RL"
+  require_universal_ctags
+  printf 'admin_create() {\n  eval "$cmd"\n}\nhandlers_create() {\n  eval "$cmd"\n}\n' >|h.sh
+  H=$(commit_all handlers)
+  out=$(observe "$H" "[$(finding h.sh 2 '{"scope":"admin_create"}'), $(finding h.sh 2), $(finding h.sh 5)]")
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 2 ]
+  [ "$(printf '%s' "$out" | jq -r '[.findings[0,1].finding_id] | unique | length')" -eq 1 ]
+  [ "$(fold | jq -r '[.findings[] | "\(.obs.line):\(.obs.scope_status)"] | sort | join(",")')" = "2:verified,5:unscoped" ]
+}
+
 @test "CLAUDE-88: a scoped re-observation absorbs its unscoped finding" {
   source "$RL"
   require_universal_ctags

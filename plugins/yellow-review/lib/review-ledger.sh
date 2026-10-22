@@ -1841,6 +1841,18 @@ cmd_observe() {
     "$(rl_tmp)/cands.jsonl" >|"$(rl_tmp)/cands.checked.jsonl" || rl_die 1 "observe: anchor check failed"
   mv -f -- "$(rl_tmp)/cands.checked.jsonl" "$(rl_tmp)/cands.jsonl"
   RL_O_REJECTED=$(jq -Rsc 'split("\n") | map(select(length > 0) | split("\t") | {ordinal: (.[0] | tonumber), reason: .[1]})' "$(rl_tmp)/rejected.tsv")
+  # Within the batch, an unscoped copy joins a verified copy of the same
+  # site (Pass D's rule for one input array): same file, category, rule,
+  # anchor hash and line, the verified copy without an occurrence key, and
+  # exactly one verified fingerprint qualifying. It takes that identity.
+  jq -sc 'map(select(.scope_status == "verified" and .occ == null and (.deletion | not))) as $sc
+    | .[] | . as $c
+    | if $c.scope_status == "unscoped" and ($c.deletion | not) then
+        ([ $sc[] | select(.file == $c.file and .category == $c.category and .rule == $c.rule
+             and .anchor_hash == $c.anchor_hash and .line == $c.line) ] | unique_by(.fingerprint)) as $m
+        | if ($m | length) == 1 then $c + ($m[0] | {fingerprint, scope, scope_key, scope_status, occ, _span}) else $c end
+      else $c end' "$(rl_tmp)/cands.jsonl" >|"$(rl_tmp)/cands.coalesced.jsonl" || rl_die 1 "observe: batch scope merge failed"
+  mv -f -- "$(rl_tmp)/cands.coalesced.jsonl" "$(rl_tmp)/cands.jsonl"
   # One candidate per fingerprint per run: merge two reviewers' copies.
   jq -sc 'group_by(.fingerprint) | map(
       .[0] + {_ordinals: (map(._ordinals[]) | sort), _defaulted: 0, _unmapped: 0, reviewers: (map(.reviewers[]) | unique), severity: (map(.severity) | min),
