@@ -5010,4 +5010,10 @@ SH
   run --separate-stderr env "PATH=$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" GIT_TERMINAL_PROMPT=0 "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
   [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
   [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ! helper did not run: $stderr" >&2; return 1; }
+  # So does a bare program behind an absolute launcher.
+  rm -f "$BATS_TEST_TMPDIR/good-ran"
+  git config -f "$BATS_TEST_TMPDIR/user-gitconfig" credential.helper "$(type -P env) git-credential-foo"
+  run --separate-stderr env "PATH=$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" GIT_TERMINAL_PROMPT=0 "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
+  [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside absolute-launcher helper did not run: $stderr" >&2; return 1; }
 }

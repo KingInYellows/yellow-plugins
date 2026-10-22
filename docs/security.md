@@ -510,6 +510,7 @@ the verify command.
   ssh command line runs as `PATH=<screened> ...`. Bare `GIT_SSH`,
   `GIT_ASKPASS`, `SSH_ASKPASS` and `GIT_PROXY_COMMAND` values, and bare
   credential helpers, are pinned to absolute programs from the screened PATH.
+  Shell and absolute credential helpers run as `PATH=<screened> ...`.
 - **Residual.** Other programs an absolute git finds by name on the caller's
   PATH, such as `git-remote-<scheme>` or a `git-<alias>`, are not pinned. A
   worktree file planted there must still predate the `--ignored-since`

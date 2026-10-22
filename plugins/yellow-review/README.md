@@ -253,7 +253,7 @@ force `protocol.ext.allow=never`, so an `ext::` remote cannot run its command.
 In the verify command's environment the ssh command line runs on the screened
 `PATH`, and a bare `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS` or
 `GIT_PROXY_COMMAND`, and a bare credential helper, is pinned to an absolute
-program there, so a git the command
+program there. Other credential helpers run on the screened `PATH`, so a git the command
 starts by absolute path (`/usr/bin/git`) still skips worktree helpers.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,

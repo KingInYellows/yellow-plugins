@@ -2025,7 +2025,9 @@ run_verify() {
             val=${rec#*$'\n'}
             keys+=("$key")
             case "$val" in
-                ''|/*) ;;
+                '') ;;
+                # An absolute helper is a shell command line too: /usr/bin/env foo still looks up foo.
+                /*) val="!PATH=$(vr_shq "$YR_GIT_PATH") $val" ;;
                 '!'*) val="!PATH=$(vr_shq "$YR_GIT_PATH") ${val#!}" ;;
                 *)
                     w=${val%%[[:space:]]*}
