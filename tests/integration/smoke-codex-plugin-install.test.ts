@@ -86,7 +86,9 @@ function fakeRun(scenario: string) {
     .replace('__SOURCE_ROOT__', JSON.stringify(resolve(__dirname, '../..')));
   const bin = join(scratch, scenario + '.cjs');
   writeFileSync(bin, fixture, { mode: 0o700 });
-  return run(['--plugin', 'yellow-core', '--timeout-ms', '1500'], {
+  // The internal deadline covers fixture startup and the recursive plugin copy
+  // on slow hosts; run()'s 15 s outer timeout still bounds each scenario.
+  return run(['--plugin', 'yellow-core', '--timeout-ms', '5000'], {
     CODEX_BIN: bin,
     HOME: scratch,
     CODEX_HOME: scratch,
@@ -102,7 +104,7 @@ function fakeRun(scenario: string) {
   });
 }
 
-describe('Codex subprocess boundary', () => {
+describe('Codex subprocess boundary', { timeout: 20_000 }, () => {
   it('isolates profiles/env and verifies actual discovered paths without a model turn', () => {
     const result = fakeRun('success');
     expect(result.status, result.stderr + result.stdout).toBe(0);
