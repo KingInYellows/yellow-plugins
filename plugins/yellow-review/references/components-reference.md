@@ -177,6 +177,13 @@ flags, exit codes, trust-boundary rules and library behavior.
   timeout apply, enforced when `timeout(1)` or `gtimeout(1)` is installed
   (without either `gh` runs unbounded, so unattended calls can hang; see
   `references/resolve/dispositions.md`)
+- `apply-thread-actions [--issue-cap <n>] <owner/repo> <pr> <plan.jsonl>
+  <results.jsonl>` — Run `/review:resolve` Step 7 for one PR from a JSONL plan:
+  per thread `file-followup-issue`, `reply-pr-thread`, `resolve-pr-thread`
+  with the contract's fallbacks, one result row per thread. Exit 4 stops every
+  write and marks the rest `not-attempted`; exit 5 means the 540 s
+  `YELLOW_REVIEW_APPLY_BUDGET` ran out and a re-run with the same files
+  resumes (contract "Batch apply")
 - `resolve-pr-thread <PRRT_id>` — Resolve a single review thread via GitHub
   GraphQL mutation; exit 3 (`reason=permission|not-found`) and 4 (rate limit, or
   a timed-out `gh` call, which may have changed state; same for
@@ -658,6 +665,8 @@ in the transcript (Ctrl-O) on a second `/review:pr` run within the hour.
 
 `bats tests/` from the plugin directory:
 
+- `apply-thread-actions.bats` — stub stage scripts beside a copy of the
+  script: order, fallbacks, exit 4 stop and budget resume
 - `get-pr-comments.bats`, `get-pr-blockers.bats`, `reply-pr-thread.bats`,
   `resolve-pr-thread.bats`, `file-followup-issue.bats`,
   `check-resolve-text.bats`, `pr-changed-ranges.bats`, `poll-new-threads.bats`,

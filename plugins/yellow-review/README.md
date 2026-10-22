@@ -182,8 +182,8 @@ manifest change or plugin-authoring path still does.
 Helpers under `skills/pr-review-workflow/scripts/` that implement the
 mechanical parts of the resolve contract in
 `references/resolve/dispositions.md`. `/review:resolve` invokes
-`get-pr-blockers`, `reply-pr-thread`, `resolve-pr-thread` and
-`file-followup-issue` per that contract; the other helpers below serve the
+`get-pr-blockers` and `apply-thread-actions` (which runs `reply-pr-thread`,
+`resolve-pr-thread` and `file-followup-issue`) per that contract; the other helpers below serve the
 fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 `file-line-counts` need `gh` and `jq`; those two read only local files.
 
@@ -193,6 +193,7 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `get-pr-blockers` | `CHANGES_REQUESTED` reviewers and conversation-resolution enforcement |
 | `pr-changed-ranges` | Changed line ranges per file in the PR, for the in-diff check |
 | `file-line-counts` | Before/after line counts per changed file, for the thermonuclear-reviewer's size rule |
+| `apply-thread-actions` | Run the resolve write phase for one PR from a JSONL plan (issue, reply, resolve per thread), resumable after its time budget |
 | `reply-pr-thread` | Reply to a thread with an idempotency marker |
 | `resolve-pr-thread` | Resolve one thread |
 | `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |

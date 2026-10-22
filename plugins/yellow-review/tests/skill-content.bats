@@ -536,7 +536,7 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   grep -q -- '--allow-credential-shaped' "$RESOLVE_PR"
   grep -qF -- '--ranges-from "<ranges-file>"' "$RESOLVE_PR"
   grep -q 'scripts/file-followup-issue"' "$RESOLVE_PR"
-  grep -q 'scripts/reply-pr-thread"' "$RESOLVE_PR"
+  grep -qF 'scripts/apply-thread-actions" --issue-cap "<n>"' "$RESOLVE_PR"
   grep -q 'scripts/resolve-pr-thread"' "$RESOLVE_PR"
   grep -q 'scripts/poll-new-threads"' "$RESOLVE_PR"
 }

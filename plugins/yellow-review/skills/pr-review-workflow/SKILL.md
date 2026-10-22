@@ -441,6 +441,8 @@ Located at `skills/pr-review-workflow/scripts/`:
   (else 60 s) and retries once; a required wait over 90 s exits 4. After exit
   4, stop mutating. The contract's "Script exit codes" and "Pacing and rate
   limits" sections in `references/resolve/dispositions.md` are authoritative.
+- **apply-thread-actions** — Runs the resolve write phase from a JSONL plan
+  (contract "Batch apply")
 - **file-followup-issue** `<owner/repo> <pr> <PRRT_id> <title-file>
   <body-file>` — Files or finds (by marker) the follow-up issue for an
   out-of-scope thread; `--find <owner/repo> <PRRT_id>` only looks and never

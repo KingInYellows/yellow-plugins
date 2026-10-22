@@ -670,51 +670,70 @@ PR_STATE=$(gh pr view "<PR#>" --json state -q .state) || PR_STATE="unreadable"
 If `PR_STATE` is not `OPEN` (including `unreadable`), print
 `PR #<N> is <PR_STATE>; write phase stopped` and go to Step 9.
 
-Process threads serially, sorted by path, line, threadId — including Step
-3c's dropped threads — per the contract's write order and lanes. Write each
-text with the Write tool to a `mktemp` path, never on a command line. Run each
-script below as its own Bash call with a `timeout` of 420000 ms (the
-contract's "Bash timeouts" derives it from the 60 s per-call `gh` cap), and
-start a thread's next stage only after the previous one exits 0:
+Write one action plan for every thread, including Step 3c's dropped threads,
+sorted by path, line, threadId, per the contract's write order, lanes and
+"Batch apply". Use the Write tool to put it at a `mktemp` path as JSONL, one
+object per thread, so no text reaches a command line:
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/file-followup-issue" "<owner/repo>" "<PR#>" "<threadId>" "<title-file>" "<body-file>"
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/reply-pr-thread" "<threadId>" "<disposition>" "<body-file>"
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/resolve-pr-thread" "<threadId>"
+```json
+{"threadId":"PRRT_…","disposition":"oos","issue":{"title":"…","body":"…"},"reply":{"body":"Out of scope for this PR; tracked in {{issue}}.","plain":"Out of scope for this PR; tracked in {{issue}}."},"resolve":true}
 ```
 
+- `issue` only for an `oos` thread filed on GitHub (title and body per the
+  contract's "Issue filing"); `{{issue}}` in the reply becomes `#N`.
+- `reply` when the lane posts one; `plain` is the plain outcome sentence
+  (the contract's "Reply hygiene"), posted once if the body is refused.
+- `resolve: true` only when the lane resolves the thread. A dropped
+  non-actionable thread has `resolve` and no `reply`.
 - `fixed` replies cite the short SHA kept from Step 6's `PUSHED` result. With
   no stored SHA the thread is `unclear`; never substitute `git rev-parse`.
+- For an `oos` → `fixed`/`addressed` upgrade, find the old follow-up number
+  first (Reply hygiene), with
+  `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/file-followup-issue" --find "<owner/repo>" "<threadId>"`
+  only when the old reply does not name it.
 - **Linear:** when ToolSearch finds
   `mcp__plugin_yellow-linear_linear__save_issue` and the branch matches
-  `[A-Z]{2,5}-[0-9]{1,6}`, file through Linear by the contract's "Linear
-  procedure" (team resolution, dedupe, text check) and its "Linear response
-  checks", which every reused `list_issues` hit and the `save_issue` response
-  must pass, with one fallback to `file-followup-issue`.
-- `reply-pr-thread` is safe to re-run (the contract's Recovery rule). After an
-  `already-replied` skip, go on to `resolve-pr-thread` only when the reported
-  `disposition` equals the one you asked for.
-- Exit 3 from `reply-pr-thread` or `resolve-pr-thread` prints a stderr line
-  `reason=permission` or `reason=not-found`. Report `needs permission` only
-  for the first and `not found` for the second.
-- Exit 6 from `reply-pr-thread` or `file-followup-issue` means the text was
-  refused (a credential shape, an image, an `@` mention or a foreign URL). Post
-  the plain outcome sentence for the disposition once, with no resolver text
-  (the contract's "Reply hygiene"); if that is refused too, leave the thread
-  open and blocking.
-- Exit 7 is permanent (stderr `reason=auth`, `reason=permission` or
-  `reason=issues-disabled`): do not retry. Stop that thread's later stages and
-  report it blocking. For `file-followup-issue`, post the contract's fixed
-  `Not filed` reply as `unclear` and count no issue.
-- Exit 4 from any of the three scripts prints a stderr line
-  `reason=rate-limit` or `reason=timeout`. A failed stage stops that thread's
-  later stages; record the per-stage outcome. After any exit 4, stop mutating
-  (a timed-out call may have posted; re-run once in a later run). For
+  `[A-Z]{2,5}-[0-9]{1,6}`, file through Linear before writing the plan, by the
+  contract's "Linear procedure" (team resolution, dedupe, text check) and its
+  "Linear response checks", which every reused `list_issues` hit and the
+  `save_issue` response must pass. That thread then has no `issue` key; a
+  Linear failure falls back to GitHub once by giving it one. Unattended, a
+  Linear issue created here counts toward the cap: once the cap is reached,
+  give the remaining `oos` threads an `issue` key instead, so the script's
+  dedupe check and over-cap reply apply to them.
+
+Then apply the plan with a Bash `timeout` of 600000 ms. Unattended runs pass
+`--issue-cap` with the issues this PR may still create this run: 3 minus every
+issue created this run, in earlier passes and on Linear for this plan.
+Interactive runs omit it:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/apply-thread-actions" --issue-cap "<n>" "<owner/repo>" "<PR#>" "<plan-file>" "<results-file>"
+```
+
+It runs `file-followup-issue`, `reply-pr-thread` and `resolve-pr-thread` per
+thread with the contract's fallbacks, and appends one row per thread to
+`<results-file>` (a fresh `mktemp` path per pass). Then:
+
+- Exit 5 means its time budget ran out. Run the same command again, same
+  plan and results file, until it exits 0 or 4.
+- Exit 2 means the plan was rejected before any write. Fix the plan and
+  re-run.
+- Exit 4 prints a stderr line `reason=rate-limit` or `reason=timeout`, and
+  the rows after the failed stage are `not-attempted`. For
   `reason=rate-limit` mark the rest `not attempted (rate limit)` and set
   `ratelimited=1`. For `reason=timeout` mark the rest `not attempted (gh
   timeout)`, count them blocking, and keep `ratelimited=0`, but also record
   `write_stopped=timeout` so Step 8 does not run. Treat a missing or
-  unrecognized reason as `rate-limit`.
+  unrecognized reason as `rate-limit`. Never re-run the plan in this run (a
+  timed-out call may have posted).
+
+Read each thread's outcome from its last row, per the contract's
+"Batch apply": a `withheld` resolve after an `already-replied` skip is
+`reply posted as <d> (open)`; a stage exit 3 is `needs permission` for
+`reason=permission` and `not found` for `reason=not-found`; `over-cap`,
+`not-permitted` and refused issues are `unclear` and blocking, and
+`not-permitted` counts no issue.
 
 ### Step 8: Re-pass Until Quiet
 
@@ -750,10 +769,11 @@ empty when none). `<refetch-file>` is a third `mktemp` path. Then loop:
    same_anchor=<n>`. `fetched=0` means no fetch succeeded: end
    `inconclusive` and leave the threads as they are.
 2. **Retries.** A thread in `<refetch-file>` this run attempted to resolve →
-   retry `resolve-pr-thread` up to 3 times on exit 1 only (exit 3 → `needs
-   permission` or `not found` per its `reason=` line; exit 4 → Step 7's exit 4
-   rule, ending `rate limited` or `timeout`); one we resolved that is open
-   again is `reopened by bot`, not retried.
+   retry `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/resolve-pr-thread" "<threadId>"`,
+   each try its own Bash call with a `timeout` of 420000 ms, up to 3 times on
+   exit 1 only (exit 3 → `needs permission` or `not found` per its `reason=`
+   line; exit 4 → Step 7's exit 4 rule, ending `rate limited` or `timeout`);
+   one we resolved that is open again is `reopened by bot`, not retried.
 3. **Stop checks.** The last pass did not end `push=ok` (nothing fixed, a
    refusal or a failed push) → end `no push`. `found=0` → end `quiet`.
 4. **Re-pass.** The new threads are those in `<refetch-file>` whose ID is not

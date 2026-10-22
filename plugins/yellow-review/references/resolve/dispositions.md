@@ -298,7 +298,8 @@ phase failed.
    downgrades every `fixed` thread to `unclear`; the other lanes still run.
 3. **Phase C, per thread, serial.** Issue (only `oos`), then reply
    (`reply-pr-thread`), then resolve (`resolve-pr-thread`), where the lane
-   allows it.
+   allows it. `/review:resolve` runs the whole phase through
+   `apply-thread-actions` (Batch apply below).
 
 Before Phase C and before each re-pass poll, re-check
 `gh pr view --json state`. If the PR is no longer `OPEN`, stop with
@@ -315,6 +316,73 @@ oos: issue #12 filed, reply failed
 disagree: reply posted (open)
 addressed: reply posted, resolve failed
 ```
+
+## Batch apply
+
+`apply-thread-actions [--issue-cap <n>] <owner/repo> <pr> <plan.jsonl> <results.jsonl>`
+runs Phase C for one PR in one Bash call. The orchestrator decides every
+disposition, lane and text first and writes them as a JSONL plan, one object
+per thread in write order:
+
+| Key           | Meaning                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------- |
+| `threadId`    | `^PRRT_[A-Za-z0-9_-]+$`, at most once per plan                                                          |
+| `disposition` | the validated disposition                                                                               |
+| `issue`       | `{title, body}`; `oos` only, for a GitHub follow-up. A Linear issue is filed before the plan is written |
+| `reply`       | `{body, plain?}`; omitted when the lane posts nothing. `plain` is the Reply hygiene fallback            |
+| `resolve`     | `true` when the lane resolves the thread                                                                |
+
+`{{issue}}` in `reply.body` or `reply.plain` becomes `#N` from the issue stage,
+so it is allowed only beside `issue`. Any other key, a bad value or a repeated
+thread rejects the whole plan with exit 2 before anything is written.
+
+Per thread the script runs the three stages in order and starts a stage only
+after the previous one exited 0, with these fallbacks:
+
+- Issue exit 6: file once more with the plain title
+  `Follow-up from PR #<N>: review` and body `Out of scope for PR #<N>.`; a
+  second refusal leaves the thread `unclear`, open, with no reply.
+- Issue exit 7: post the fixed `Not filed` reply (Issue filing) as `unclear`,
+  never resolve, count no issue.
+- `--issue-cap` reached: `file-followup-issue --find` first, since a dedupe
+  hit does not count; with no hit, post the over-cap reply as `unclear`. A
+  `--find` that fails is a failed issue stage: the thread stops, `unclear`.
+- Reply exit 6: post `reply.plain` once when given; otherwise, or when that is
+  refused too, leave the thread open.
+- `already-replied` skip: resolve only when the reported disposition equals
+  the planned one; otherwise the resolve is `withheld` (`reply posted as <d>
+  (open)`).
+- Exit 1, 2 or 3 from any stage stops that thread's later stages and the
+  script goes on to the next thread. Exit 4 stops every write: the
+  current thread's row records the failed stage, every remaining thread gets
+  a row with `outcome` `not-attempted` and `reason`, and the script exits 4
+  with `reason=rate-limit` or `reason=timeout` on stderr (a missing or
+  unknown child reason counts as `rate-limit`). Pacing and rate limits below
+  then applies as for a single script.
+
+Each row is
+`{threadId, disposition, finalDisposition, issue, reply, resolve, outcome}`.
+A stage record is `null` when the plan did not ask for that stage, else has a
+`status` (`filed`, `found`, `over-cap`, `not-permitted`, `posted`, `skipped`,
+`resolved`, `withheld`, `refused`, `failed` or `not-attempted`) and, after a
+non-zero exit, `exit` and the child's `reason`. `outcome` is `complete`,
+`stopped` (a stage did not succeed), `partial` or `not-attempted`.
+`finalDisposition` is `unclear` after any issue fallback. The last stdout line
+is `apply threads=<n> done=<n> skipped=<n> issues_created=<n>
+stopped=<none|rate-limit|timeout|budget>`.
+
+**Time budget.** Stage worst cases (Bash timeouts below, plus 60 s each) are
+420 s for an issue, 340 s for a reply and 280 s for a resolve. A stage starts
+only when the run's elapsed time plus that worst case fits
+`YELLOW_REVIEW_APPLY_BUDGET` (default and maximum 540 s); the first stage of a
+run always starts. A plain retry after exit 6 belongs to the refused stage and
+never waits on the budget: both scripts screen text before any `gh` call, so a
+refusal costs seconds. When the budget runs out the script writes a `partial` row
+for a thread stopped between stages and exits 5. Running the same command
+again skips threads with a final row, resumes a `partial` thread after its
+last finished stage, and counts issues those rows created toward
+`--issue-cap`. With real `gh` latency of a few seconds per stage, one run
+covers dozens of threads.
 
 ## Verify
 
@@ -658,7 +726,10 @@ and the budget is derived from that cap:
 | `file-followup-issue` | viewer lookup, issue list, thread link, create, post-create list and duplicate close (6 calls, never waits or retries) = 360 s |
 
 The largest is 360 s; 420 s adds 60 s for `jq`, the credential scan and startup,
-and stays under the Bash tool's 600 s maximum. Change the cap and this budget
+and stays under the Bash tool's 600 s maximum. `apply-thread-actions` runs
+these scripts in one Bash call with a `timeout` of 600000 ms: it starts a
+stage only when its worst case still fits a 540 s budget (Batch apply), and
+its first stage, 420 s at most, always fits. Change the cap and this budget
 together. With `timeout(1)` or `gtimeout(1)` installed, `poll-new-threads` ends
 within `--wait` + 60 s, inside its `(wait + 120) × 1000` ms budget. It bounds
 each `get-pr-comments` run with that script's own deadline
@@ -861,6 +932,7 @@ exception: it exits 1 on any failure, usage included.
 | `file-followup-issue`  | created or found                                         | usage / unreadable title or body file / thread belongs to a different pull request                         | thread not found (`reason=not-found`)                                                              | rate limited (no retry; `reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; a create may have filed) | —                          | text refused or scan failed                               | not authenticated, not permitted to file, or Issues disabled (`reason=auth`, `permission` or `issues-disabled`) |
 | `commit-resolve-fixes` | `PUSHED` or `NOOP`; with `--check-ranges`, the check ran | usage (with `--check-ranges`: unreadable or malformed ranges file, non-canonical path)                     | staged mismatch, refused path or PR file list unavailable (with `--check-ranges`: the diff failed) | commit failed, or undone (a hook changed or left files)                                                            | submit failed or timed out | head not verified, or a verify call timed out             | rate limited listing the PR's changed files (`reason=rate-limit`; nothing staged)                               |
 | `run-verify-command`   | ran (`result`: pass, fail, timeout, skipped, reverted)   | usage / not trusted / refused path / change outside the list / setup failure / recovery patch unscreenable | —                                                                                                  | —                                                                                                                  | —                          | —                                                         | —                                                                                                               |
+| `apply-thread-actions` | every thread has a final row                             | usage / unreadable or invalid plan / symlinked or unparseable results file; nothing written                | —                                                                                                  | a stage exited 4; rest `not-attempted` (`reason=rate-limit` or `reason=timeout`)                                   | time budget reached; re-run | —                                                         | —                                                                                                               |
 | `check-resolve-text`   | clean                                                    | usage / unreadable file                                                                                    | —                                                                                                  | —                                                                                                                  | —                          | text refused or scan failed (wins over 2 when both occur) | —                                                                                                               |
 
 Report exit 3 as `needs permission` only for `reason=permission`, and as
@@ -1084,8 +1156,9 @@ skip or downgrade a thread. A thread without a Bot-authored badge counts as P1.
   `http.*` options) are not neutralised; the file bound and the dirty-set checks are the controls there.
   The `PATH` check judges the directory of each tool as found on `PATH`,
   not a symlink inside a directory outside the repository that points into it.
-- Step 7 costs about three tool calls per thread; very large PRs (hundreds of
-  threads) are slow. A batch apply script would help and is not written.
+- `apply-thread-actions` cuts Step 7 to one Write and one Bash call per
+  budget-sized slice, but the stages still run serially with pacing, so a PR
+  with hundreds of threads takes several runs of a few minutes each.
 - The reply pre-check sees only a thread's last 10 comments. If more than ten
   comments follow our marker, a re-run posts a second reply.
 - Two accounts resolving the same PR concurrently can each post a reply; markers

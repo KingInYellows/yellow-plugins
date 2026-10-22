@@ -1,0 +1,390 @@
+#!/bin/sh
+# Run the /review:resolve write phase (Step 7) for one PR from a JSONL plan.
+# Usage: apply-thread-actions [--issue-cap <n>] <owner/repo> <pr-number> <plan.jsonl> <results.jsonl>
+#   plan.jsonl: one JSON object per thread, in write order (path, line,
+#     threadId), no thread twice, no other keys:
+#       {"threadId":"PRRT_...","disposition":"fixed|addressed|oos|disagree|unclear",
+#        "issue":{"title":"...","body":"..."},   (oos only; GitHub follow-up)
+#        "reply":{"body":"...","plain":"..."},  (plain: optional refusal fallback)
+#        "resolve":true}
+#     "{{issue}}" in a reply body or plain text becomes "#N" from the issue
+#     stage, so it is allowed only when "issue" is present.
+#   results.jsonl: one row is appended per thread (see the contract's
+#     "Batch apply"). Rows already there from an earlier run of the same plan
+#     are read first: threads with a final row are skipped, a partial row
+#     resumes its thread, and issues they created count toward --issue-cap.
+#   --issue-cap <n>: issues this PR may still create this run (created=false
+#     dedupe hits do not count). Over the cap the thread gets the contract's
+#     over-cap reply as unclear. Default: no cap (interactive runs).
+# Per thread it runs file-followup-issue, then reply-pr-thread, then
+# resolve-pr-thread, each only after the previous stage exited 0, with the
+# fallbacks the contract gives for exit 6, exit 7 and an already-replied skip.
+# Stdout: one final line
+#   apply threads=<n> done=<n> skipped=<n> issues_created=<n> stopped=<none|rate-limit|timeout|budget>
+# Exit codes: 0 every thread has a final row (stage failures are in the rows),
+#             1 other failure (mktemp, unwritable results file),
+#             2 usage: bad arguments, unreadable or invalid plan, a symlinked
+#               or unparseable results file; nothing was written to GitHub,
+#             4 a stage exited 4: the current thread's row records it, the
+#               rest are rows with outcome not-attempted, and stderr carries
+#               reason=rate-limit|timeout (missing or unknown counts as
+#               rate-limit). Stop mutating, as after any exit 4,
+#             5 time budget reached: re-run the same command to continue. A
+#               thread stopped between stages gets a partial row, and the
+#               re-run resumes it after its last finished stage.
+# Env: YELLOW_REVIEW_APPLY_BUDGET (default 540, clamped to 0..540) — seconds
+#      of stage time per run. A stage starts only when the elapsed time plus
+#      its worst case (issue 420 s, reply 340 s, resolve 280 s, from the
+#      contract's "Bash timeouts") fits; the first stage of a run always
+#      starts, so each run makes progress and ends inside the caller's
+#      600000 ms Bash timeout. The child scripts read their own env as usual.
+# Contract: references/resolve/dispositions.md
+
+set -eu
+
+COST_ISSUE=420
+COST_REPLY=340
+COST_RESOLVE=280
+OVER_CAP_TEXT='Out of scope for this PR. The automatic follow-up issue limit for this run was reached, so no issue was filed. Leaving open.'
+NOT_FILED_TEXT='Not filed: follow-up issues cannot be created in this repository. Leaving open for a human.'
+
+usage() {
+    printf 'Usage: apply-thread-actions [--issue-cap <n>] <owner/repo> <pr-number> <plan.jsonl> <results.jsonl>\n' >&2
+    exit 2
+}
+
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
+
+ISSUE_CAP=-1
+if [ "${1:-}" = "--issue-cap" ]; then
+    [ $# -ge 2 ] || usage
+    case "$2" in
+        ''|*[!0-9]*) printf 'Error: --issue-cap needs a whole number, got: %s\n' "$2" >&2; exit 2 ;;
+    esac
+    [ ${#2} -le 4 ] || { printf 'Error: --issue-cap is too large: %s\n' "$2" >&2; exit 2; }
+    ISSUE_CAP=$2
+    shift 2
+fi
+[ $# -eq 4 ] || usage
+REPO="$1"
+PR="$2"
+PLAN="$3"
+RESULTS="$4"
+
+case "$REPO" in
+    */*/*|/*|*/|*[!A-Za-z0-9_./-]*) printf 'Error: Invalid owner/repo: %s\n' "$REPO" >&2; exit 2 ;;
+    */*) ;;
+    *) printf 'Error: Invalid owner/repo: %s\n' "$REPO" >&2; exit 2 ;;
+esac
+case "$PR" in
+    ''|0*|*[!0-9]*) printf 'Error: Invalid PR number: %s\n' "$PR" >&2; exit 2 ;;
+esac
+[ -f "$PLAN" ] && [ -r "$PLAN" ] || { printf 'Error: Plan file not readable: %s\n' "$PLAN" >&2; exit 2; }
+if [ -L "$RESULTS" ] || { [ -e "$RESULTS" ] && [ ! -f "$RESULTS" ]; }; then
+    printf 'Error: Results path is a symlink or not a regular file: %s\n' "$RESULTS" >&2
+    exit 2
+fi
+
+BUDGET=${YELLOW_REVIEW_APPLY_BUDGET:-540}
+case "$BUDGET" in
+    ''|*[!0-9]*) BUDGET=540 ;;
+esac
+[ ${#BUDGET} -le 4 ] || BUDGET=540
+[ "$BUDGET" -le 540 ] || BUDGET=540
+
+SCRIPTS=$(cd -- "$(dirname -- "$0")" && pwd) || { printf 'Error: cannot locate the script directory.\n' >&2; exit 1; }
+WORK=$(mktemp -d) || { printf 'Error: mktemp failed.\n' >&2; exit 1; }
+trap 'rm -rf "$WORK"' EXIT
+
+# --- Validate the whole plan before any write ---
+# shellcheck disable=SC2016
+PLAN_CHECK='
+def nonempty: type == "string" and length > 0;
+def textok: type == "object" and (.body | nonempty)
+  and ((has("plain") | not) or (.plain | nonempty))
+  and ((keys - ["body", "plain"]) == []);
+def uses_issue: [(.reply.body // ""), (.reply.plain // "")] | any(contains("{{issue}}"));
+type == "array"
+and all(.[];
+  type == "object"
+  and ((keys - ["threadId", "disposition", "issue", "reply", "resolve"]) == [])
+  and (.threadId | type == "string" and test("^PRRT_[A-Za-z0-9_-]+$"))
+  and (.disposition | IN("fixed", "addressed", "oos", "disagree", "unclear"))
+  and ((has("issue") | not) or (.disposition == "oos" and (.issue | type == "object"
+        and (.title | nonempty) and (.body | nonempty)
+        and ((keys - ["title", "body"]) == []))))
+  and ((has("reply") | not) or (.reply | textok))
+  and ((has("resolve") | not) or (.resolve | type == "boolean"))
+  and ((uses_issue | not) or has("issue")))
+and ((map(.threadId) | length) == (map(.threadId) | unique | length))'
+if ! jq -s -e "$PLAN_CHECK" "$PLAN" >/dev/null 2>"$WORK/jq-err"; then
+    printf 'Error: Invalid plan %s (see the usage header for its shape).\n' "$PLAN" >&2
+    exit 2
+fi
+jq -c . "$PLAN" >"$WORK/lines" || { printf 'Error: could not read the plan.\n' >&2; exit 2; }
+
+# --- Earlier rows from a budget-stopped run of the same plan ---
+: >"$WORK/done-ids"
+CREATED=0
+if [ -s "$RESULTS" ]; then
+    if ! jq -s -e 'all(.[]; type == "object" and (.threadId | type == "string"))' "$RESULTS" >/dev/null 2>&1; then
+        printf 'Error: Results file is not valid JSONL: %s\n' "$RESULTS" >&2
+        exit 2
+    fi
+    jq -r 'select(.outcome == "complete" or .outcome == "stopped") | .threadId' "$RESULTS" >"$WORK/done-ids"
+    CREATED=$(jq -s '[.[] | select(.issue.created == true) | .threadId] | unique | length' "$RESULTS")
+fi
+: >>"$RESULTS" || { printf 'Error: cannot write the results file: %s\n' "$RESULTS" >&2; exit 1; }
+
+START=$(date +%s)
+STAGES_RUN=0
+TOTAL=0
+DONE=0
+SKIPPED=0
+STOPPED=none
+
+# budget_allows <cost>: the first stage of a run always starts.
+budget_allows() {
+    [ "$STAGES_RUN" -eq 0 ] && return 0
+    _now=$(date +%s) || _now=$START
+    [ $((_now - START + $1)) -le "$BUDGET" ]
+}
+
+# run_stage <script> <args...>: sets RC, REASON; the child's stderr passes through.
+run_stage() {
+    _script="$1"; shift
+    STAGES_RUN=$((STAGES_RUN + 1))
+    set +e
+    "$SCRIPTS/$_script" "$@" >"$WORK/out" 2>"$WORK/err" </dev/null
+    RC=$?
+    set -e
+    cat "$WORK/err" >&2
+    REASON=$(sed -n 's/^reason=\([a-z-]*\)$/\1/p' "$WORK/err" | tail -n 1)
+}
+
+# stage_fail_json: the failed stage's record from RC and REASON.
+stage_fail_json() {
+    jq -cn --arg status "$1" --argjson exit "$RC" --arg reason "$REASON" \
+        '{status: $status, exit: $exit} + (if $reason == "" then {} else {reason: $reason} end)'
+}
+
+summary() {
+    printf 'apply threads=%s done=%s skipped=%s issues_created=%s stopped=%s\n' \
+        "$TOTAL" "$DONE" "$SKIPPED" "$CREATED" "$STOPPED"
+}
+
+# write_row <outcome>: append this thread's row from the stage records.
+write_row() {
+    jq -cn --arg id "$TID" --arg d "$DISP" --arg fd "$FINAL" --arg outcome "$1" \
+        --argjson issue "$ISSUE_J" --argjson reply "$REPLY_J" --argjson resolve "$RESOLVE_J" \
+        '{threadId: $id, disposition: $d, finalDisposition: $fd, issue: $issue,
+          reply: $reply, resolve: $resolve, outcome: $outcome}' >>"$RESULTS"
+}
+
+# stop_rate <reason>: exit 4 handling for the current thread and the rest.
+stop_rate() {
+    case "$1" in
+        timeout) STOPPED=timeout ;;
+        *) STOPPED=rate-limit ;;
+    esac
+    write_row stopped
+    DONE=$((DONE + 1))
+    jq -c --arg r "$STOPPED" --rawfile done "$WORK/done-ids" \
+        'select(.threadId as $t | ($done | split("\n") | index($t)) | not)
+         | {threadId: .threadId, disposition: .disposition, outcome: "not-attempted", reason: $r}' \
+        "$WORK/rest" >>"$RESULTS"
+    summary
+    printf 'reason=%s\n' "$STOPPED" >&2
+    exit 4
+}
+
+stop_budget() {
+    STOPPED=budget
+    # A partial row lets the re-run resume this thread after its last
+    # finished stage, and keeps an issue it created counted.
+    if [ "$ISSUE_J" != null ] || [ "$REPLY_DONE" -eq 1 ]; then
+        write_row partial
+    fi
+    summary
+    exit 5
+}
+
+# post_reply <disposition> <text-file>: one reply stage; 0 posted or skipped.
+post_reply() {
+    run_stage reply-pr-thread "$TID" "$1" "$2"
+    case "$RC" in
+        0)
+            if [ "$(jq -r '.skipped // empty' "$WORK/out")" = "already-replied" ]; then
+                _got=$(jq -r '.disposition // empty' "$WORK/out")
+                REPLY_J=$(jq -cn --arg d "$_got" '{status: "skipped", disposition: $d}')
+                POSTED_AS=$_got
+            else
+                REPLY_J=$(jq -cn --arg d "$1" --argjson plain "$PLAIN_USED" '{status: "posted", disposition: $d, plain: $plain}')
+                POSTED_AS=$1
+            fi
+            REPLY_DONE=1
+            return 0 ;;
+        4) REPLY_J=$(stage_fail_json failed); stop_rate "$REASON" ;;
+        6) REPLY_J=$(stage_fail_json refused) ;;
+        *) REPLY_J=$(stage_fail_json failed) ;;
+    esac
+    return 1
+}
+
+# text_file <jq-path> <name>: write a plan text to a file, {{issue}} filled in.
+text_file() {
+    printf '%s' "$LINE" | jq -j --arg ref "$ISSUE_REF" "$1 | gsub(\"\\\\{\\\\{issue\\\\}\\\\}\"; \$ref)" >"$WORK/$2"
+}
+
+TOTAL=$(wc -l <"$WORK/lines" | tr -d ' ')
+N=0
+while IFS= read -r LINE; do
+    N=$((N + 1))
+    TID=$(printf '%s' "$LINE" | jq -r .threadId)
+    DISP=$(printf '%s' "$LINE" | jq -r .disposition)
+    if grep -qxF "$TID" "$WORK/done-ids"; then
+        SKIPPED=$((SKIPPED + 1))
+        continue
+    fi
+    sed -n "$((N + 1)),\$p" "$WORK/lines" >"$WORK/rest"
+    FINAL=$DISP
+    ISSUE_J=null
+    REPLY_J=null
+    RESOLVE_J=null
+    ISSUE_REF=""
+    PLAIN_USED=false
+    POSTED_AS=""
+    HAS_ISSUE=$(printf '%s' "$LINE" | jq -r 'has("issue")')
+    HAS_REPLY=$(printf '%s' "$LINE" | jq -r 'has("reply")')
+    WANT_RESOLVE=$(printf '%s' "$LINE" | jq -r '.resolve // false')
+    OK=1
+    FIXED_REPLY=""
+    REPLY_DONE=0
+
+    # --- Resume after a budget stop: keep the stages that finished ---
+    PREV=$(jq -c --arg t "$TID" 'select(.threadId == $t and .outcome == "partial")' "$RESULTS" | tail -n 1)
+    if [ -n "$PREV" ]; then
+        FINAL=$(printf '%s' "$PREV" | jq -r '.finalDisposition')
+        case "$(printf '%s' "$PREV" | jq -r '.issue.status // empty')" in
+            filed|found) ISSUE_REF="#$(printf '%s' "$PREV" | jq -r '.issue.number')" ;;
+            over-cap) FIXED_REPLY=$OVER_CAP_TEXT ;;
+            not-permitted) FIXED_REPLY=$NOT_FILED_TEXT ;;
+        esac
+        ISSUE_J=$(printf '%s' "$PREV" | jq -c '.issue')
+        case "$(printf '%s' "$PREV" | jq -r '.reply.status // empty')" in
+            posted|skipped)
+                REPLY_J=$(printf '%s' "$PREV" | jq -c '.reply')
+                POSTED_AS=$(printf '%s' "$PREV" | jq -r '.reply.disposition')
+                REPLY_DONE=1 ;;
+        esac
+    fi
+
+    # --- Stage 1: follow-up issue ---
+    if [ "$HAS_ISSUE" = "true" ] && [ "$ISSUE_J" = null ]; then
+        if [ "$ISSUE_CAP" -ge 0 ] && [ "$CREATED" -ge "$ISSUE_CAP" ]; then
+            # Ask first whether the issue already exists: a dedupe hit is
+            # not capped.
+            budget_allows "$COST_ISSUE" || stop_budget
+            run_stage file-followup-issue --find "$REPO" "$TID"
+            case "$RC" in
+                0) ;;
+                4) ISSUE_J=$(stage_fail_json failed); FINAL=unclear; stop_rate "$REASON" ;;
+                # An unanswered dedupe check is a failed stage, not a no-hit.
+                *) ISSUE_J=$(stage_fail_json failed); FINAL=unclear; OK=0 ;;
+            esac
+            if [ "$OK" -eq 0 ]; then
+                :
+            elif [ "$(jq -r '.exists' "$WORK/out")" = "true" ]; then
+                _num=$(jq -r '.number' "$WORK/out")
+                _url=$(jq -r '.url' "$WORK/out")
+                ISSUE_J=$(jq -cn --argjson n "$_num" --arg u "$_url" '{status: "found", number: $n, url: $u, created: false}')
+                ISSUE_REF="#$_num"
+            else
+                ISSUE_J='{"status":"over-cap"}'
+                FINAL=unclear
+                FIXED_REPLY=$OVER_CAP_TEXT
+            fi
+        else
+            printf '%s' "$LINE" | jq -j '.issue.title' >"$WORK/title"
+            printf '%s' "$LINE" | jq -j '.issue.body' >"$WORK/body"
+            # The text screen runs before any gh call, so a refusal (exit 6)
+            # takes seconds: the plain retry belongs to the same stage and is
+            # never split from it by the budget, or a resume would repeat the
+            # refused text forever.
+            for _try in main plain; do
+                [ "$_try" = plain ] || budget_allows "$COST_ISSUE" || stop_budget
+                run_stage file-followup-issue "$REPO" "$PR" "$TID" "$WORK/title" "$WORK/body"
+                [ "$RC" -eq 6 ] && [ "$_try" = main ] || break
+                # Refused: file once more with the plain title and body.
+                printf 'Follow-up from PR #%s: review' "$PR" >"$WORK/title"
+                printf 'Out of scope for PR #%s.' "$PR" >"$WORK/body"
+            done
+            case "$RC" in
+                0)
+                    _num=$(jq -r '.number' "$WORK/out")
+                    _url=$(jq -r '.url' "$WORK/out")
+                    _created=$(jq -r '.created' "$WORK/out")
+                    if [ "$_created" = "true" ]; then
+                        _status=filed
+                        CREATED=$((CREATED + 1))
+                    else
+                        _status=found
+                    fi
+                    ISSUE_J=$(jq -cn --arg s "$_status" --argjson n "$_num" --arg u "$_url" \
+                        --argjson c "$_created" --argjson plain "$([ "$_try" = plain ] && echo true || echo false)" \
+                        '{status: $s, number: $n, url: $u, created: $c, plain: $plain}')
+                    ISSUE_REF="#$_num"
+                    ;;
+                4) ISSUE_J=$(stage_fail_json failed); FINAL=unclear; stop_rate "$REASON" ;;
+                6) ISSUE_J=$(stage_fail_json refused); FINAL=unclear; OK=0 ;;
+                7) ISSUE_J=$(stage_fail_json not-permitted); FINAL=unclear; FIXED_REPLY=$NOT_FILED_TEXT ;;
+                *) ISSUE_J=$(stage_fail_json failed); FINAL=unclear; OK=0 ;;
+            esac
+        fi
+    fi
+
+    # --- Stage 2: reply ---
+    if [ "$OK" -eq 1 ] && [ "$HAS_REPLY" = "true" ] && [ "$REPLY_DONE" -eq 0 ]; then
+        if [ -n "$FIXED_REPLY" ]; then
+            printf '%s' "$FIXED_REPLY" >"$WORK/reply"
+        else
+            text_file .reply.body reply
+        fi
+        budget_allows "$COST_REPLY" || stop_budget
+        if ! post_reply "$FINAL" "$WORK/reply"; then
+            OK=0
+            if [ "$RC" -eq 6 ] && [ -z "$FIXED_REPLY" ] && \
+                [ "$(printf '%s' "$LINE" | jq -r '.reply | has("plain")')" = "true" ]; then
+                text_file .reply.plain reply
+                PLAIN_USED=true
+                # Same stage as the refused reply (see the issue retry above).
+                post_reply "$FINAL" "$WORK/reply" && OK=1
+            fi
+        fi
+    fi
+
+    # --- Stage 3: resolve ---
+    if [ "$WANT_RESOLVE" = "true" ]; then
+        if [ "$OK" -ne 1 ]; then
+            RESOLVE_J='{"status":"not-attempted"}'
+        elif [ -n "$FIXED_REPLY" ]; then
+            RESOLVE_J='{"status":"withheld","postedAs":"unclear"}'
+        elif [ -n "$POSTED_AS" ] && [ "$POSTED_AS" != "$FINAL" ]; then
+            # An earlier reply of another disposition stands: stay open.
+            RESOLVE_J=$(jq -cn --arg d "$POSTED_AS" '{status: "withheld", postedAs: $d}')
+        else
+            budget_allows "$COST_RESOLVE" || stop_budget
+            run_stage resolve-pr-thread "$TID"
+            case "$RC" in
+                0) RESOLVE_J='{"status":"resolved"}' ;;
+                4) RESOLVE_J=$(stage_fail_json failed); stop_rate "$REASON" ;;
+                *) RESOLVE_J=$(stage_fail_json failed); OK=0 ;;
+            esac
+        fi
+    fi
+
+    if [ "$OK" -eq 1 ]; then write_row complete; else write_row stopped; fi
+    DONE=$((DONE + 1))
+done <"$WORK/lines"
+
+summary
