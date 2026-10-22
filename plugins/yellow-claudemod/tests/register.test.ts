@@ -328,6 +328,37 @@ describe('ledger write failures', () => {
     expect(await shown).toContain('an earlier ledger write is still pending');
   });
 
+  test("an older write landing keeps a newer spawn's failure", async ($, on) => {
+    const clock = mock.clock(on);
+    const held: Record<string, unknown> = {};
+    let sets = 0;
+    on('session.id', () => ({ value: 's1' }));
+    on('store.get', ($, e) => ({ value: held[e.key] }));
+    // The first write lands after 5 s; the second never does.
+    on('store.set', async ($, e) => {
+      sets += 1;
+      if (sets === 1) await clock.sleep(5000);
+      else await new Promise<never>(() => {});
+      held[e.key] = e.value;
+      return { value: undefined };
+    });
+    on('store.keys', () => ({ value: Object.keys(held) }));
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    const first = spawn($, REVIEWER);
+    await clock.settle();
+    await clock.advance(2000);
+    await first;
+    await spawn($, SECURITY);
+    await clock.advance(3000);
+    const shown = status($);
+    await clock.settle();
+    await clock.advance(2000);
+    const text = await shown;
+    expect(text).toContain('Ledger: 1 spawn(s) recorded');
+    expect(text).toContain('an earlier ledger write is still pending');
+  });
+
   test('reports a failure only to the session it belongs to', async ($, on) => {
     mock.clock(on);
     let sessionId = 's1';

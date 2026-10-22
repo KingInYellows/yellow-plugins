@@ -81,9 +81,19 @@ export const register: Register = (on, options) => {
   let isChainStalled = false;
   // The last failed write per ledger key: /clear changes the session id
   // mid-module, and each session reports only its own.
-  const writeFailures = new Map<string, WriteFailure>();
-  const recordFailure = (key: string, ts: string, err: unknown): void => {
+  // Each entry remembers the spawn that recorded it, so a success clears only
+  // its own failure, never a newer queued spawn's.
+  const writeFailures = new Map<string, WriteFailure & { spawn: number }>();
+  let spawnCount = 0;
+  const recordFailure = (
+    key: string,
+    spawn: number,
+    ts: string,
+    err: unknown
+  ): void => {
+    if ((writeFailures.get(key)?.spawn ?? -1) > spawn) return;
     writeFailures.set(key, {
+      spawn,
       ts,
       reason: err instanceof Error ? err.message : String(err),
     });
@@ -157,6 +167,7 @@ export const register: Register = (on, options) => {
       workflow: e.workflow !== undefined,
       denied: result.deny !== undefined,
     };
+    const spawn = (spawnCount += 1);
     const key = await bounded($, () => sessionLedgerKey($)).catch(() =>
       ledgerKeyFor('unknown')
     );
@@ -164,9 +175,11 @@ export const register: Register = (on, options) => {
       try {
         const ledger = readLedger(await $.store.get(key));
         await $.store.set(key, appendRow(ledger, row));
-        writeFailures.delete(key);
+        if ((writeFailures.get(key)?.spawn ?? -1) <= spawn) {
+          writeFailures.delete(key);
+        }
       } catch (err) {
-        recordFailure(key, ts, err);
+        recordFailure(key, spawn, ts, err);
       }
       // The row is stored by now; a failed prune is retried on the next
       // write, so it is not a missing row.
@@ -182,13 +195,13 @@ export const register: Register = (on, options) => {
     writes = step;
     if (isChainStalled) {
       // Queued behind a stalled write; cleared if the row lands later.
-      recordFailure(key, ts, 'an earlier ledger write is still pending');
+      recordFailure(key, spawn, ts, 'an earlier ledger write is still pending');
     } else {
       try {
         await bounded($, () => step);
       } catch (err) {
         isChainStalled = true;
-        recordFailure(key, ts, err);
+        recordFailure(key, spawn, ts, err);
       }
     }
 

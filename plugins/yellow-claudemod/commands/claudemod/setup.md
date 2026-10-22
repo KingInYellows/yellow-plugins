@@ -37,15 +37,25 @@ fi
 printf '\n=== Plugin ===\n'
 if command -v claude >/dev/null 2>&1; then
   # Installed is not enough: a disabled plugin's hooks module never loads.
-  state=$(claude plugin list --json 2>/dev/null | node -e '
+  # Project and local rows count only for this repository, and the most
+  # specific applicable scope decides (as /setup:all reads the same list).
+  repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  state=$(claude plugin list --json 2>/dev/null | PROJECT_PATH="$repo_top" node -e '
     let raw = "";
     process.stdin.on("data", (c) => (raw += c));
     process.stdin.on("end", () => {
       let rows;
       try { rows = JSON.parse(raw); } catch { rows = null; }
       if (!Array.isArray(rows)) { process.stdout.write("unknown"); return; }
-      const mine = rows.filter((r) => r?.id === "yellow-claudemod@yellow-plugins");
-      process.stdout.write(mine.length === 0 ? "absent" : mine.some((r) => r.enabled === true) ? "enabled" : "disabled");
+      const projectPath = process.env.PROJECT_PATH || "";
+      const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
+      const mine = rows
+        .filter((r) =>
+          r?.id === "yellow-claudemod@yellow-plugins" &&
+          ((r.scope !== "project" && r.scope !== "local") ||
+            (projectPath.length > 0 && r.projectPath === projectPath)))
+        .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
+      process.stdout.write(mine.length === 0 ? "absent" : mine[0].enabled === true ? "enabled" : "disabled");
     });
   ' 2>/dev/null)
   case "$state" in
