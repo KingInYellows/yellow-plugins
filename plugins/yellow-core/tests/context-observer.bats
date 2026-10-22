@@ -779,11 +779,18 @@ import importlib.util, signal, sys
 spec = importlib.util.spec_from_file_location("obs", sys.argv[1])
 obs = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(obs)
+record = obs.record_observation
+armed = []
+def observed(raw):
+    armed.append(signal.getitimer(signal.ITIMER_REAL)[0])
+    return record(raw)
+obs.record_observation = observed
 sys.argv = [sys.argv[1]]
 try:
     obs.main()
 except SystemExit as exc:
     assert exc.code == 0, exc.code
+assert armed and armed[0] > 0, "the deadline was not armed during recording: %r" % armed
 pending = signal.alarm(0)
 assert pending == 0, "alarm still armed: %d s left" % pending
 assert signal.getsignal(signal.SIGALRM) == signal.SIG_IGN
@@ -794,14 +801,17 @@ PY
   [ "$stderr" = "disarmed" ]
 }
 
-@test "R19: recording that ends just before the deadline exits 0 with nothing on stderr" {
-  local delay
-  payload edge 61 > "$TEST_HOME/in"
-  for delay in 1.9 1.95 1.99; do
+@test "R19: recording that completes just before the deadline exits 0 with nothing on stderr" {
+  local delay remaining=61
+  for delay in 1.8 1.85 1.9; do
+    remaining=$((remaining + 1))
+    payload edge "$remaining" > "$TEST_HOME/in"
     run --separate-stderr env CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME="$delay" \
       python3 "$OBS" < "$TEST_HOME/in"
     [ "$status" -eq 0 ]
     [ -z "$stderr" ]
+    # the rename happened, so the deadline fell after recording, not inside it
+    jq -e --argjson r "$remaining" '.context_window.remaining_percentage == $r' "$(record_for edge)" >/dev/null
   done
 }
 

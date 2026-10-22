@@ -376,8 +376,10 @@ def numbered_backup(path, suffix, raw):
         if os.path.islink(candidate) or aliases(candidate, path):
             continue  # a link is not a backup, even one whose target matches
         try:
-            with open(candidate, "r", encoding="utf-8", newline="") as handle:
-                if handle.read() == raw:
+            # O_NOFOLLOW: a link swapped in after the islink check fails here
+            fd = os.open(candidate, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            with os.fdopen(fd, "r", encoding="utf-8", newline="") as handle:
+                if stat.S_ISREG(os.fstat(fd).st_mode) and handle.read() == raw:
                     return candidate
         except (OSError, UnicodeDecodeError):
             pass
