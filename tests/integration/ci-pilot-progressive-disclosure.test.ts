@@ -5,6 +5,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -15,14 +16,12 @@ const health = 'plugins/yellow-ci/skills/ci-runner-health';
 const diagnose = 'plugins/yellow-ci/skills/ci-diagnose';
 const setup = 'plugins/gt-workflow/skills/gt-setup';
 const fence = String.fromCharCode(96).repeat(3);
-// zsh rows skip where zsh is absent, except where it is required (CI set to
-// anything but '', 'false' or '0', or SHELL_COMPAT_REQUIRE_ZSH=1), matching
-// check-shell-parse.test.ts.
+// zsh rows skip where zsh is absent, except where the shell-parse checker
+// requires it (CI truthy or SHELL_COMPAT_REQUIRE_ZSH=1).
 const HAS_ZSH = spawnSync('zsh', ['-c', 'exit 0']).status === 0;
-const CI_VALUE = (process.env.CI ?? '').trim().toLowerCase();
-const ZSH_REQUIRED =
-  process.env.SHELL_COMPAT_REQUIRE_ZSH === '1' ||
-  !['', 'false', '0'].includes(CI_VALUE);
+const ZSH_REQUIRED: boolean = createRequire(import.meta.url)(
+  resolve(ROOT, 'scripts/check-shell-parse.js')
+).zshRequired(process.env);
 const SHELLS = HAS_ZSH || ZSH_REQUIRED ? ['bash', 'zsh'] : ['bash'];
 
 function read(path: string): string {
