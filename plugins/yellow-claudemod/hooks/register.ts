@@ -147,17 +147,24 @@ export const register: Register = (on, options) => {
       denied: result.deny !== undefined,
     };
     writes = writes.then(async () => {
+      // A timed-out step's work keeps running (store calls cannot be
+      // cancelled); once the chain has moved on it must not write a stale
+      // row list over a later step's.
+      let isAbandoned = false;
       try {
         await bounded($, async () => {
           const key = await sessionLedgerKey($);
           const ledger = readLedger(await $.store.get(key));
+          if (isAbandoned) return;
           await $.store.set(key, appendRow(ledger, row));
           for (const old of ledgerKeysToPrune(await $.store.keys(), key)) {
+            if (isAbandoned) return;
             await $.store.delete(old);
           }
         });
         writeFailure = undefined;
       } catch (err) {
+        isAbandoned = true;
         writeFailure = {
           ts,
           reason: err instanceof Error ? err.message : String(err),

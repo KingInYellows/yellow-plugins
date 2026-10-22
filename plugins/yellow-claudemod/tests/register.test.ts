@@ -12,10 +12,7 @@ const SECURITY = 'yellow-core:review:security-sentinel';
 
 // Stands in for the engine beneath the plugin: each spawn runs on the model
 // asked for, else on the agent's own frontmatter model (opus here).
-function engine(
-  on: On,
-  entries: Readonly<Record<string, unknown>> = {}
-): void {
+function engine(on: On, entries: Readonly<Record<string, unknown>> = {}): void {
   mock.store(on, entries);
   mock.clock(on);
   on('session.id', () => ({ value: 's1' }));
@@ -245,5 +242,38 @@ describe('ledger write failures', () => {
     const text = await status($);
     expect(text).not.toContain('Ledger write failed');
     expect(text).toContain('Ledger: 1 spawn(s) recorded');
+  });
+
+  test('a timed-out write never lands over a later one', async ($, on) => {
+    const clock = mock.clock(on);
+    const held: Record<string, unknown> = {};
+    let isFirstGet = true;
+    on('session.id', () => ({ value: 's1' }));
+    // The first read takes its snapshot now and answers late, as a slow
+    // store would: by then a later spawn has written its row.
+    on('store.get', async ($, e) => {
+      const snapshot = held[e.key];
+      if (isFirstGet) {
+        isFirstGet = false;
+        await clock.sleep(5000);
+      }
+      return { value: snapshot };
+    });
+    on('store.set', ($, e) => {
+      held[e.key] = e.value;
+      return { value: undefined };
+    });
+    on('store.keys', () => ({ value: Object.keys(held) }));
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    const first = spawn($, REVIEWER);
+    await clock.settle();
+    await clock.advance(2000);
+    await first;
+    await spawn($, SECURITY);
+    await clock.advance(3000);
+    const text = await status($);
+    expect(text).toContain('Ledger: 1 spawn(s) recorded');
+    expect(text).toContain(`${SECURITY}: ran opus`);
   });
 });
