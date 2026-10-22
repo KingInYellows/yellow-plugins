@@ -108,7 +108,7 @@ all scripts), `stack-traversal` (shared by `/review:all` and
 `thermonuclear-reviewer`; the only Codex/Cursor-distributed skill). None is
 user-invocable.
 
-### Scripts (14)
+### Scripts (15)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
@@ -117,6 +117,8 @@ the resolve scripts: `references/resolve/dispositions.md`.
 - `get-pr-comments`, `get-pr-blockers`, `pr-changed-ranges`, `poll-new-threads`
   — read PR threads, blockers, changed ranges, and new threads for the Step 8
   re-pass
+- `apply-thread-actions` — the Step 7 write phase in one call: runs the three
+  scripts below per thread from a JSONL plan; exit 4 stops, exit 5 resumes
 - `reply-pr-thread`, `resolve-pr-thread`, `file-followup-issue` — write to
   GitHub with idempotency markers; exit 3/4 are distinct from 1; text-screened
   scripts exit 6 on refusal and 7 on a permanent GitHub refusal
