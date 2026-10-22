@@ -1598,16 +1598,19 @@ rl_observe_locked() {
   # unscoped finding whose line maps unchanged into its scope span. Only a
   # sole qualifier merges, so identical code in two scopes, or twice in one
   # scope (an occurrence key on either side), stays separate.
-  # Off under --anchor-source worktree: spans come from the worktree while
-  # existing lines map to HEAD, and uncommitted edits make those disagree.
-  local cocc css cend rskey rocc rdisp eid rest sv
+  # Off under --anchor-source worktree, and for findings recorded that way:
+  # their spans or lines are worktree coordinates while lines map by HEAD,
+  # and uncommitted edits make those disagree.
+  local cocc css cend rskey rocc rsrc rdisp eid rest sv
   local -a quals qbad ccontent
   [ "$RL_O_ASRC" = worktree ] || while IFS= read -r r; do
     i=${r%%$'\x1f'*}
     r=${r#*$'\x1f'}
     [ -n "${match[$i]:-}" ] && continue
     IFS=$'\x1f' read -r _ _ _ cskey _ _ cfile cline cocc _ _ _ css cend <<<"${crows[$i]}"
-    IFS=$'\x1f' read -r rid _rstate rfile rline rhead _rbase _ _ _ rskey rss rocc _ _ _ _ _ _ rdisp <<<"$r"
+    IFS=$'\x1f' read -r rid _rstate rfile rline rhead _rbase _ _ _ rskey rss rocc _ rsrc _ _ _ _ rdisp <<<"$r"
+    # a worktree-anchored finding's line is not a coordinate in its head
+    [ "$rsrc" = worktree ] && continue
     if [ "$cskey" = unscoped ] && [ "$rss" = verified ]; then
       if [ -z "${ccontent[$i]:-}" ]; then
         ccontent[$i]=$(rl_candidate_content "$cfile") || ccontent[$i]=-
