@@ -50,8 +50,8 @@ currently enables all seven exa tools, including these heavier ones:
 ### ceramic — OAuth 2.1 (auto-managed by Claude Code; first use opens browser)
 
 - `ceramic_search` — Lexical web search (~$0.05 per 1,000 queries on
-  pay-as-you-go; 20 QPS). English only, keyword queries; optional
-  `maxResults` (1–20) and `maxDescriptionLength` (1,000–8,000 characters).
+  pay-as-you-go; 20 QPS). English only, keyword queries; optional `maxResults`
+  (1–20) and `maxDescriptionLength` (1,000–8,000 characters).
 
 The Ceramic MCP at `https://mcp.ceramic.ai/mcp` authenticates via OAuth 2.1 —
 **no API key in plugin.json**, same shape as `parallel`. Browser pops on first
@@ -66,11 +66,12 @@ paste the callback URL (a one-time code) only into that terminal.
 
 Ceramic is **lexical**, not semantic — Perplexity/Tavily/EXA-neural still handle
 conversational queries and synthesis. The research-conductor, code-researcher
-and yellow-core best-practices-researcher agents send 2–3 short keyword
-variants per lookup with `maxDescriptionLength: 1000`, and fall through to the
-other providers when Ceramic is unavailable or fewer than 3 results contain the
-query's main entity plus at least one other distinctive term. `result.totalResults` is not a relevance signal:
-Ceramic returns up to 10 results for almost any query. See
+and yellow-core best-practices-researcher agents send 2–3 short keyword variants
+per lookup with `maxDescriptionLength: 1000`, and fall through to the other
+providers when Ceramic is unavailable or fewer than 3 results contain the
+query's main entity plus at least one other distinctive term.
+`result.totalResults` is not a relevance signal: Ceramic returns up to 10
+results for almost any query. See
 `https://docs.ceramic.ai/api/search/best-practices.md`.
 
 ### deepwiki — No API key (public repos only)
@@ -143,24 +144,25 @@ yellow-research — DeepWiki's canonical home is here.
 the `ast-grep` CLI through Bash for structural code search when
 `command -v ast-grep` succeeds, and fall back to Grep otherwise. It is a plain
 binary, not an MCP server: no uv, Python, or restart is involved.
-`/research:setup` offers `scripts/install-ast-grep.sh` (npm
-`@ast-grep/cli`); alternatives are `brew install ast-grep`,
-`cargo install ast-grep --locked`, or `pip install ast-grep-cli`. Agents check
-for `ast-grep` only, since `sg` collides with shadow-utils on Linux.
-`research-conductor` has no Bash, so it routes repo-local AST questions to
-`/research:code`.
+`/research:setup` offers `scripts/install-ast-grep.sh` (npm `@ast-grep/cli`);
+alternatives are `brew install ast-grep`, `cargo install ast-grep --locked`, or
+`pip install ast-grep-cli`. Agents check for `ast-grep` only, since `sg`
+collides with shadow-utils on Linux. `research-conductor` has no Bash, so it
+routes repo-local AST questions to `/research:code`.
 
 **Write permission and temp files.** `code-researcher` holds `Write` solely to
 save ast-grep values (`pattern`, `lang`, `target` or `rule`). A tool grant
 cannot be path-scoped, so the limit is an instruction in the agent: write only
-into the directory the first recipe block prints, and never save research
-output (results stay inline). The first block takes a per-user lock in a 0700
-directory (`$XDG_RUNTIME_DIR` or `~/.cache`, under `yellow-ast-grep`) and
-creates a `mktemp -d` values directory under TMPDIR. The second block reads
+into the directory the first recipe block prints, and never save research output
+(results stay inline). The first block creates a `mktemp -d` values directory
+under TMPDIR, records it under a per-search token in a 0700 directory
+(`$XDG_RUNTIME_DIR` or `~/.cache`, under `yellow-ast-grep`), and prints the
+directory and token. The agent puts that token, and nothing else, into the
+second block, which finds the values directory through the token's record, reads
 the values as data, runs ast-grep with a trusted `-c` config, deletes only its
-own files plus the empty directory (never `rm -rf`) and releases the lock. A
-lock older than 15 minutes counts as abandoned. See `docs/security.md`
-"ast-grep value files".
+own files plus the empty directory (never `rm -rf`) and drops the record.
+Concurrent searches never share state; a record older than 15 minutes counts as
+abandoned. See `docs/security.md` "ast-grep value files".
 
 ## Required Credentials
 
@@ -225,9 +227,9 @@ These external tools improve research quality but are not required:
   (select yellow-core)
 - **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search via
   grep.app (web-based GitHub search). This is distinct from the optional
-  ast-grep CLI, which does local AST-based code search. Used by `/research:code` and
-  `/research:deep`. No API key required. Configure globally in Claude Code MCP
-  settings.
+  ast-grep CLI, which does local AST-based code search. Used by `/research:code`
+  and `/research:deep`. No API key required. Configure globally in Claude Code
+  MCP settings.
 - **yellow-morph plugin** (preferred) — provides WarpGrep
   (`mcp__plugin_yellow-morph_morph__codebase_search`) for agentic codebase
   search. Replaces the global `filesystem-with-morph` MCP. When both are
@@ -261,6 +263,6 @@ do not apply.
   `/flow:deepen-plan` — do not call directly
 - `code-researcher` auto-triggers via `/research:code` — do not call directly
 
-Installed Codex acceptance passed for the selected skill, including safe
-failure and unrelated controls. Other plugin components remain excluded.
-See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).
+Installed Codex acceptance passed for the selected skill, including safe failure
+and unrelated controls. Other plugin components remain excluded. See
+[integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).

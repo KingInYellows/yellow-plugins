@@ -193,9 +193,9 @@ from v1.0 `suggested_remediation`).]
 ```
 
 **Schema mapping:** the on-disk `affected_files` array key is intentionally
-retained for backward compatibility with `debt-fixer.md` Step 3; see the
-"v2.0 → todo frontmatter mapping" table in `audit-synthesizer.md` Step 7
-for the full v2.0 (in-memory) → frontmatter (on-disk) mapping.
+retained for backward compatibility with `debt-fixer.md` Step 3; see the "v2.0 →
+todo frontmatter mapping" table in `audit-synthesizer.md` Step 7 for the full
+v2.0 (in-memory) → frontmatter (on-disk) mapping.
 
 ## State Machine
 
@@ -210,12 +210,12 @@ wont-fix → pending
 
 `wont-fix` closes a valid finding you are deliberately not fixing and keeps its
 file, as `deleted` does; the difference is meaning (`deleted` says the finding
-was wrong). Triage offers it
-for pending findings. To close one that is already `ready`, `in-progress` or
-`deferred`, use the wrapped recipe in the `debt-conventions` skill or in
-`/debt:triage` "Triage Decisions" (`transition_todo_state` run from the git root
-in a bash child that sources `lib/validate.sh`).
-Closing a todo does not touch its Linear issue: close that by hand.
+was wrong). Triage offers it for pending findings. To close one that is already
+`ready`, `in-progress` or `deferred`, use the wrapped recipe in the
+`debt-conventions` skill or in `/debt:triage` "Triage Decisions"
+(`transition_todo_state` run from the git root in a bash child that sources
+`lib/validate.sh`). Closing a todo does not touch its Linear issue: close that
+by hand.
 
 A re-audit skips a new finding that matches a kept todo (every status except
 `pending` and `deferred`) by `fingerprint`, a hash of the category, path and
@@ -223,14 +223,16 @@ flagged code (blanks folded), so a closed finding does not come back. When
 nothing matches exactly, a unique todo with the same category and path whose
 `anchor_hash` is the hash of the first substantive line of the new range also
 suppresses it, so an edit elsewhere in the range can still be skipped; that
-fallback never applies to `security-debt`, nor to `complete` or `deleted`
-todos. A todo without a stored fingerprint is rehashed from its recorded
-range at match time (except `complete`), so it can still suppress an unchanged
-finding; a finding without a usable line range gets none, and a tie
-resurfaces. A `deferred` finding is not skipped: it comes back as a new
-pending todo while the code still has the problem.
+fallback never applies to `security-debt`, nor to `complete` or `deleted` todos.
+A todo without a stored fingerprint is rehashed from its recorded range at match
+time (except `complete`), so it can still suppress an unchanged finding; a
+finding without a usable line range gets none, and a tie resurfaces. A
+`deferred` finding is not skipped: it comes back as a new pending todo while the
+code still has the problem.
 
-All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock, write through `mktemp`, and refuse symlinked `.debt/`, `todos/debt/` and todo paths.
+All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock,
+write through `mktemp`, and refuse symlinked `.debt/`, `todos/debt/` and todo
+paths.
 
 ## Dependencies
 
@@ -238,7 +240,14 @@ All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock, writ
   tooling for `/debt:fix`: Graphite CLI `gt` with gt-workflow
   (`READY_GRAPHITE`), or the github-workflow plugin (`READY_GITHUB`)
 - **Optional**: yellow-linear plugin (for `/debt:sync`)
-- **Optional**: github-workflow plugin (optional): under `READY_GITHUB`, stack operations run its `lib/github-stack-runtime.js` through this plugin's `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the active installed version (the newest cached one when that is unknown). Without it they report `RUNTIME_NOT_FOUND` and tell you to install it or run `/stack:select`.
+- **Optional**: the `ast-grep` CLI. When it is on PATH, the complexity and
+  duplication scanners use it for structural matches; otherwise they use Grep.
+- **Optional**: github-workflow plugin (optional): under `READY_GITHUB`, stack
+  operations run its `lib/github-stack-runtime.js` through this plugin's
+  `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the
+  active installed version (the newest cached one when that is unknown). Without
+  it they report `RUNTIME_NOT_FOUND` and tell you to install it or run
+  `/stack:select`.
 
 **Note on yq**: This plugin is compatible with kislyuk/yq (Python-based YAML
 processor). Todo files are markdown with YAML frontmatter, which requires
@@ -265,6 +274,15 @@ No configuration required. Optional Linear sync settings stored in
 - Fix agent requires human approval before commits
 - State transitions are atomic with file locks
 - Scanner outputs excluded from version control
+- ast-grep values go through temporary files, never shell text. The complexity
+  and duplication scanners hold the `Write` tool only to save each search's
+  `pattern`, `lang`, `target` or `rule` into a private `mktemp -d` directory
+  under `TMPDIR`. A per-search record lives in a 0700 directory
+  (`$XDG_RUNTIME_DIR` or `~/.cache`, under `yellow-ast-grep`), so parallel
+  scanners do not block each other. After each search the scanner deletes only
+  its own files and the empty directory (never `rm -rf`). The `Write` grant is
+  not path-scoped: the limit is an agent instruction, not an enforced boundary.
+  See `docs/security.md` "ast-grep value files".
 
 ## Performance
 
@@ -309,19 +327,20 @@ returning scanner schema 2.0 inline. Its packaged flat reference contains a
 self-contained Python 3 snapshot program with executable path validation,
 no-follow source reads and stdin-only JSON inputs. A process tool with separate
 stdin and Python directory-descriptor support is required; there is no new
-dependency installation. It needs no Graphite, jq/yq, MCP or sibling plugin.
-It performs no fixes, todo transitions, report writes or Linear synchronization.
+dependency installation. It needs no Graphite, jq/yq, MCP or sibling plugin. It
+performs no fixes, todo transitions, report writes or Linear synchronization.
 Codex support is limited to this skill after the installed-runtime gate passes;
 the full Claude scanner fleet and SessionStart hook are outside that scope.
 Missing snapshot facilities return an explicit error instead of findings.
 
-Installed Codex acceptance passed for the selected skill, including safe
-failure and unrelated controls. Other plugin components remain excluded.
-See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).
+Installed Codex acceptance passed for the selected skill, including safe failure
+and unrelated controls. Other plugin components remain excluded. See
+[integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).
 
 Credential markers make the bounded snapshot return `partial` and redact the
 rest of that source file, including for token-only or empty-username URL
-userinfo and C/C++ credential-array declarators. It retains line numbers but sacrifices later benign
-code rather than guessing expression endings across languages. Other source
-files are scanned independently. Marker detection is not a comprehensive secret
-scanner; exclude sources known to contain unmarked credentials.
+userinfo and C/C++ credential-array declarators. It retains line numbers but
+sacrifices later benign code rather than guessing expression endings across
+languages. Other source files are scanned independently. Marker detection is not
+a comprehensive secret scanner; exclude sources known to contain unmarked
+credentials.
