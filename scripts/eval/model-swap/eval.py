@@ -114,7 +114,7 @@ def prepare(spec_path, work):
                     for r in spec["replays"]:
                         rows.append(["%s-%s-%s-%s-r%d" % (aid, r["id"], c["model"], c["effort"], rep),
                                      sys_prompt, os.path.join(work, "wt", r["id"]), c["model"], c["effort"],
-                                     os.path.join(work, "prompts", r["id"] + ".txt")])
+                                     os.path.join(work, "prompts", r["id"] + ".txt"), aid, r["id"]])
                     continue
                 for s in spec["scans"]:
                     rid = "%s-%s-%s-%s-r%d" % (aid, s["id"], c["model"], c["effort"], rep)
@@ -127,7 +127,7 @@ def prepare(spec_path, work):
                     prompt = os.path.join(work, "prompts", "scan-%s.txt" % name)
                     with open(prompt, "w", encoding="utf-8") as handle:
                         handle.write(SCAN_PROMPT.format(name=name))
-                    rows.append([rid, sys_prompt, wt, c["model"], c["effort"], prompt])
+                    rows.append([rid, sys_prompt, wt, c["model"], c["effort"], prompt, aid, s["id"]])
     with open(os.path.join(work, "matrix.tsv"), "w", encoding="utf-8") as handle:
         handle.writelines("\t".join(row) + "\n" for row in rows)
     with open(os.path.join(work, "spec.json"), "w", encoding="utf-8") as handle:
@@ -136,8 +136,7 @@ def prepare(spec_path, work):
 
 
 def run(work, jobs, dry_run):
-    with open(os.path.join(work, "matrix.tsv"), encoding="utf-8") as handle:
-        rows = [line.rstrip("\n").split("\t") for line in handle if line.strip()]
+    rows = read_matrix(work)
     if dry_run:
         for row in rows:
             print(row[0])
@@ -146,14 +145,24 @@ def run(work, jobs, dry_run):
     out = os.path.join(work, "out")
 
     def one(row):
-        rid, sys_prompt, wt, model, effort, prompt = row
+        rid, sys_prompt, wt, model, effort, prompt = row[:6]
         rc = subprocess.run([os.path.join(HERE, "run-one.sh"), out, rid, sys_prompt, wt,
                              model, effort, prompt]).returncode
         return rid, rc
 
+    failed = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
         for rid, rc in pool.map(one, rows):
+            failed += rc != 0
             print("%s %s" % ("ok  " if rc == 0 else "FAIL", rid), flush=True)
+    if failed:
+        sys.exit("run: %d of %d runs failed; rerun to retry only those" % (failed, len(rows)))
+
+
+def read_matrix(work):
+    """Rows: id, system prompt, workdir, model, effort, prompt file, agent id, target id."""
+    with open(os.path.join(work, "matrix.tsv"), encoding="utf-8") as handle:
+        return [line.rstrip("\n").split("\t") for line in handle if line.strip()]
 
 
 def split_findings(text, as_json):
@@ -185,19 +194,19 @@ def lizard_golden(wt, files, limits):
 
 
 def scan_hits(golden, scan_file):
-    found, flagged = set(), 0
+    found, unmatched = set(), []
     with open(scan_file, encoding="utf-8") as handle:
         scan = json.load(handle)
     for f in scan.get("findings", []):
-        flagged += 1
         loc = f.get("file") or {}
         path = loc.get("path", "") if isinstance(loc, dict) else str(loc)
         m = re.match(r"(\d+)", str(loc.get("lines", "") if isinstance(loc, dict) else ""))
         line = int(m.group(1)) if m else -1
-        for g in golden:
-            if path.endswith(g[0]) and abs(line - g[1]) <= 3:
-                found.add(g)
-    return found, flagged
+        matched = {g for g in golden if path.endswith(g[0]) and abs(line - g[1]) <= 3}
+        found |= matched
+        if not matched:
+            unmatched.append(json.dumps(f))
+    return found, unmatched
 
 
 def grade(work):
@@ -209,18 +218,16 @@ def grade(work):
     recall = collections.defaultdict(lambda: [0, 0])
     usage = collections.defaultdict(lambda: collections.Counter())
     other = []
+    missing = []
     out = os.path.join(work, "out")
-    for name in sorted(os.listdir(out)):
-        if not name.endswith(".json") or name.endswith(".scan.json"):
-            continue
-        rid = name[:-5]
-        aid, target, model, effort, _rep = rid.split("-")
+    for row in read_matrix(work):
+        rid, model, effort, aid, target = row[0], row[3], row[4], row[6], row[7]
         agent = spec["agents"][aid]
         try:
-            with open(os.path.join(out, name), encoding="utf-8") as handle:
+            with open(os.path.join(out, rid + ".json"), encoding="utf-8") as handle:
                 d = json.load(handle)
-        except ValueError:
-            print("grade: skipping %s (not JSON; rerun it)" % name, file=sys.stderr)
+        except (OSError, ValueError):
+            missing.append(rid)
             continue
         key = (aid, model, effort)
         mu = d.get("modelUsage", {}).values()
@@ -235,30 +242,35 @@ def grade(work):
                 if p["lane"] == agent["lane"]:
                     recall[key][0] += any(hits(p, f) for f in findings)
                     recall[key][1] += 1
-            for f in findings:
-                if not any(hits(p, f) for p in plants):
-                    other.append((rid, " ".join(f.split())[:300]))
+            unmatched = [f for f in findings if not any(hits(p, f) for p in plants)]
         else:
-            if target not in goldens:
+            limits = agent["golden"]
+            gkey = (target, limits["ccn_over"], limits["length_over"])
+            if gkey not in goldens:
                 wt = os.path.join(work, "wt", "golden-" + target)
                 worktree(wt, scans[target]["commit"])
-                goldens[target] = lizard_golden(wt, scans[target]["files"], agent["golden"])
+                goldens[gkey] = lizard_golden(wt, scans[target]["files"], limits)
             scan_file = os.path.join(out, rid + ".scan.json")
-            found, flagged = scan_hits(goldens[target], scan_file) if os.path.exists(scan_file) else (set(), 0)
+            found, unmatched = scan_hits(goldens[gkey], scan_file) if os.path.exists(scan_file) else (set(), [])
             recall[key][0] += len(found)
-            recall[key][1] += len(goldens[target])
-            usage[key].update(flagged_not_golden=flagged - len(found))
-    print("| agent | model | effort | recall | runs | mean cost (USD, API-equiv.) | mean wall s | mean turns | mean input tok |")
-    print("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+            recall[key][1] += len(goldens[gkey])
+        other.extend((rid, " ".join(f.split())[:300]) for f in unmatched)
+        usage[key].update(extra=len(unmatched))
+    print("| agent | model | effort | recall | non-golden findings | runs | mean cost (USD, API-equiv.) | mean wall s | mean turns | mean input tok |")
+    print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for key in sorted(usage):
         u, (hit, total) = usage[key], recall[key]
         n = u["runs"]
-        print("| %s | %s | %s | %d/%d | %d | %.4f | %.0f | %.1f | %.0fk |" % (
-            *key, hit, total, n, u["cost"] / n, u["wall"] / n, u["turns"] / n, u["tok_in"] / n / 1000))
+        print("| %s | %s | %s | %d/%d | %d | %d | %.4f | %.0f | %.1f | %.0fk |" % (
+            *key, hit, total, u["extra"], n, u["cost"] / n, u["wall"] / n, u["turns"] / n, u["tok_in"] / n / 1000))
     with open(os.path.join(work, "unmatched-findings.txt"), "w", encoding="utf-8") as handle:
         handle.writelines("%s: %s\n\n" % row for row in other)
     print("\n%d non-golden findings to adjudicate by hand: %s" % (
         len(other), os.path.join(work, "unmatched-findings.txt")))
+    if missing:
+        # Recall above leaves these runs out of its denominators.
+        sys.exit("grade: %d matrix runs have no readable result (%s); rerun `run` before trusting recall"
+                 % (len(missing), ", ".join(missing)))
 
 
 def main():
