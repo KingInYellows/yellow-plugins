@@ -4989,3 +4989,25 @@ SH
   [ -f src/blob ]
   grep -q '/src/blob -xdev -printf' "$FIND_LOG"
 }
+
+@test "CLAUDE-100: a bare credential helper from the user's config resolves on the screened PATH under an absolute git" {
+  vr_ssh_fixture
+  printf '#!/bin/sh\ntouch "%s/bad-ran"\n' "$BATS_TEST_TMPDIR" >| node_modules/.bin/git-credential-foo
+  chmod +x node_modules/.bin/git-credential-foo
+  touch -t 201901010000 node_modules/.bin/git-credential-foo
+  git config -f "$BATS_TEST_TMPDIR/user-gitconfig" credential.helper foo
+  real_git=$(type -P git)
+  printf '%s\n' "printf 'protocol=https\\nhost=example.invalid\\n\\n' | '$real_git' credential fill >/dev/null 2>&1 || true" >| "$CMD"
+  printf '#!/bin/sh\ntouch "%s/good-ran"\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/goodbin/git-credential-foo"
+  chmod +x "$BATS_TEST_TMPDIR/goodbin/git-credential-foo"
+  run --separate-stderr env "PATH=$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" GIT_TERMINAL_PROMPT=0 "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
+  [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside helper did not run: $stderr" >&2; return 1; }
+  # A ! helper runs on the screened PATH too.
+  rm -f "$BATS_TEST_TMPDIR/good-ran"
+  git config -f "$BATS_TEST_TMPDIR/user-gitconfig" credential.helper '!git-credential-foo'
+  run --separate-stderr env "PATH=$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" GIT_TERMINAL_PROMPT=0 "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
+  [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ! helper did not run: $stderr" >&2; return 1; }
+}
