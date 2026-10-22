@@ -29,7 +29,11 @@ command hooks belong in `catalog/plugins/yellow-claudemod.json#hooks`.
   cancelled, so a skipped-past step could land a stale row list late. Hooks
   wait on the chain through `bounded` (2 s) instead, and once a wait times
   out, spawns stop waiting until the chain settles. Write failures are kept
-  per ledger key and shown only to that session.
+  per ledger key and shown only to that session. Pruning old ledger keys runs
+  after the row is stored but outside the chain, one prune at a time, so a
+  store call that hangs there never blocks later rows. Because it is outside
+  the chain, it skips a key with a queued write or one written while it runs, and a
+  write to a key it is deleting waits for that delete (bounded).
 - Rows go under `ledger:<session id>`; `$.store` is machine-wide and the chain
   only serializes one session. `$.session.id()` is read per write because
   `/clear` changes it without a new `session.start`. Read the legacy `ledger`

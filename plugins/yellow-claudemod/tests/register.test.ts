@@ -205,6 +205,104 @@ describe('ledger across sessions', () => {
   });
 });
 
+describe('ledger pruning', () => {
+  test('never deletes a key written while the prune runs', async ($, on) => {
+    const clock = mock.clock(on);
+    const held: Record<string, unknown> = {
+      'ledger:a': [row('earlier-agent', '1970-01-01T00:00:00.000Z')],
+    };
+    for (let i = 0; i < 7; i += 1) {
+      held[`ledger:old${i}`] = [row(`agent-${i}`, '1970-01-01T00:00:00.000Z')];
+    }
+    let sessionId = 'b';
+    let isFirstKeys = true;
+    on('session.id', () => ({ value: sessionId }));
+    on('store.get', ($, e) => ({ value: held[e.key] }));
+    on('store.set', ($, e) => {
+      held[e.key] = e.value;
+      return { value: undefined };
+    });
+    // The first prune's listing is taken now and answers late.
+    on('store.keys', async () => {
+      const snapshot = Object.keys(held);
+      if (isFirstKeys) {
+        isFirstKeys = false;
+        await clock.sleep(500);
+      }
+      return { value: snapshot };
+    });
+    on('store.delete', ($, e) => {
+      delete held[e.key];
+      return { value: undefined };
+    });
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    await spawn($, REVIEWER);
+    // Session a is seen again while the prune that listed its key runs.
+    sessionId = 'a';
+    await spawn($, SECURITY);
+    await clock.advance(500);
+    const text = await status($);
+    expect(text).toContain('across 8 session(s)');
+    expect(text).toContain('earlier-agent: ran opus');
+    expect(text).toContain(`${SECURITY}: ran opus`);
+    expect(text).not.toContain('agent-0:');
+  });
+
+  test('a write waits for a delete of its key in flight', async ($, on) => {
+    const clock = mock.clock(on);
+    const held: Record<string, unknown> = {
+      'ledger:a': [row('earlier-agent', '1970-01-01T00:00:00.000Z')],
+    };
+    for (let i = 0; i < 7; i += 1) {
+      held[`ledger:old${i}`] = [row(`agent-${i}`, '1970-01-01T00:00:00.000Z')];
+    }
+    let sessionId = 'b';
+    on('session.id', () => ({ value: sessionId }));
+    on('store.get', ($, e) => ({ value: held[e.key] }));
+    on('store.set', ($, e) => {
+      held[e.key] = e.value;
+      return { value: undefined };
+    });
+    on('store.keys', () => ({ value: Object.keys(held) }));
+    // The prune's delete answers late.
+    on('store.delete', async ($, e) => {
+      await clock.sleep(500);
+      delete held[e.key];
+      return { value: undefined };
+    });
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    await spawn($, REVIEWER);
+    // Session a is seen again while its key is being deleted.
+    sessionId = 'a';
+    const second = spawn($, SECURITY);
+    await clock.settle();
+    await clock.advance(500);
+    await clock.settle();
+    await second;
+    // That write starts the next prune, whose delete answers late too.
+    await clock.advance(500);
+    const text = await status($);
+    expect(text).toContain(`${SECURITY}: ran opus`);
+    expect(text).toContain('across 8 session(s)');
+  });
+
+  test('keeps the cap across many sessions in one module', async ($, on) => {
+    let sessionId = 's0';
+    mock.store(on);
+    mock.clock(on);
+    on('session.id', () => ({ value: sessionId }));
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    for (let i = 0; i < 10; i += 1) {
+      sessionId = `s${i}`;
+      await spawn($, REVIEWER);
+    }
+    expect(await status($)).toContain('across 8 session(s)');
+  });
+});
+
 describe('ledger write failures', () => {
   test('a store that never answers does not stall the spawn', async ($, on) => {
     const clock = mock.clock(on);
@@ -305,6 +403,77 @@ describe('ledger write failures', () => {
     const text = await status($);
     expect(text).toContain('Ledger: 1 spawn(s) recorded');
     expect(text).not.toContain('Ledger write failed');
+  });
+
+  test('a prune that never answers does not hold up later rows', async ($, on) => {
+    const clock = mock.clock(on);
+    const held: Record<string, unknown> = {};
+    let keysCalls = 0;
+    on('session.id', () => ({ value: 's1' }));
+    on('store.get', ($, e) => ({ value: held[e.key] }));
+    on('store.set', ($, e) => {
+      held[e.key] = e.value;
+      return { value: undefined };
+    });
+    // The first prune's key listing never answers.
+    on('store.keys', () => {
+      keysCalls += 1;
+      if (keysCalls === 1) return new Promise<never>(() => {});
+      return { value: Object.keys(held) };
+    });
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    await spawn($, REVIEWER);
+    await spawn($, SECURITY);
+    const shown = status($);
+    await clock.settle();
+    await clock.advance(2000);
+    const text = await shown;
+    expect(text).toContain('Ledger: 2 spawn(s) recorded');
+    expect(text).toContain(`${SECURITY}: ran opus`);
+    expect(text).not.toContain('Ledger write failed');
+    // The second spawn skipped its prune while the first was pending.
+    expect(keysCalls).toBe(2);
+  });
+
+  test('status waits on a prune started by a pending write', async ($, on) => {
+    const clock = mock.clock(on);
+    const held: Record<string, unknown> = {};
+    for (let i = 0; i < 8; i += 1) {
+      held[`ledger:old${i}`] = [row(`agent-${i}`, '1970-01-01T00:00:00.000Z')];
+    }
+    let isFirstGet = true;
+    on('session.id', () => ({ value: 's1' }));
+    on('store.get', async ($, e) => {
+      if (isFirstGet) {
+        isFirstGet = false;
+        await clock.sleep(1000);
+      }
+      return { value: held[e.key] };
+    });
+    on('store.set', ($, e) => {
+      held[e.key] = e.value;
+      return { value: undefined };
+    });
+    on('store.keys', () => ({ value: Object.keys(held) }));
+    // The prune's delete answers late too.
+    on('store.delete', async ($, e) => {
+      await clock.sleep(500);
+      delete held[e.key];
+      return { value: undefined };
+    });
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    const running = spawn($, REVIEWER);
+    await clock.settle();
+    const shown = status($);
+    await clock.settle();
+    await clock.advance(1000);
+    await running;
+    await clock.advance(500);
+    const text = await shown;
+    expect(text).toContain('across 8 session(s)');
+    expect(text).not.toContain('agent-0:');
   });
 
   test('a spawn queued behind a stalled write reports it', async ($, on) => {

@@ -43,6 +43,39 @@ async function bounded<T>(
   }
 }
 
+// Drops the oldest session keys past the cap. Not part of the ledger's
+// read-modify-write; a failure is retried after the next write. Runs beside
+// the chain, so it skips a key isBusy names (a write to it could land between
+// the listing and the delete) and lists each delete in flight in deleting,
+// for a later write to that key to wait on.
+async function pruneLedgerKeys(
+  $: EngineInterface,
+  ownKey: string,
+  isBusy: (key: string) => boolean,
+  deleting: Map<string, Promise<void>>
+): Promise<void> {
+  try {
+    const keys = await $.store.keys();
+    // Count every key toward the cap, but take the oldest from the others.
+    const ordered = [
+      ...keys.filter((k) => !isBusy(k)),
+      ...keys.filter((k) => isBusy(k)),
+    ];
+    for (const old of ledgerKeysToPrune(ordered, ownKey)) {
+      if (isBusy(old)) continue;
+      const done = $.store.delete(old).then(
+        () => undefined,
+        () => undefined
+      );
+      deleting.set(old, done);
+      await done;
+      deleting.delete(old);
+    }
+  } catch {
+    // Retried after the next write.
+  }
+}
+
 // The id changes on /clear without a new session.start, so ask each time.
 async function sessionLedgerKey($: EngineInterface): Promise<string> {
   try {
@@ -79,6 +112,14 @@ export const register: Register = (on, options) => {
   // instead, and while the chain is stalled spawns stop waiting on it.
   let writes: Promise<void> = Promise.resolve();
   let isChainStalled = false;
+  // The pending prune, if any. A key is busy, and kept from it, while a write
+  // to it is queued or once one lands during the prune.
+  let pruning: Promise<void> | undefined;
+  const queuedWrites = new Map<string, number>();
+  let writtenDuringPrune = new Set<string>();
+  const deleting = new Map<string, Promise<void>>();
+  const isBusy = (k: string): boolean =>
+    (queuedWrites.get(k) ?? 0) > 0 || writtenDuringPrune.has(k);
   // The last failed write per ledger key: /clear changes the session id
   // mid-module, and each session reports only its own.
   // Each entry remembers the spawn that recorded it, so a success clears only
@@ -171,8 +212,15 @@ export const register: Register = (on, options) => {
     const key = await bounded($, () => sessionLedgerKey($)).catch(() =>
       ledgerKeyFor('unknown')
     );
+    queuedWrites.set(key, (queuedWrites.get(key) ?? 0) + 1);
     const step = writes.then(async () => {
       try {
+        // A prune that picked this key before the write was queued may still
+        // be deleting it; land the row after that delete, not under it.
+        const pendingDelete = deleting.get(key);
+        if (pendingDelete !== undefined) {
+          await bounded($, () => pendingDelete).catch(() => undefined);
+        }
         const ledger = readLedger(await $.store.get(key));
         await $.store.set(key, appendRow(ledger, row));
         if ((writeFailures.get(key)?.spawn ?? -1) <= spawn) {
@@ -181,14 +229,18 @@ export const register: Register = (on, options) => {
       } catch (err) {
         recordFailure(key, spawn, ts, err);
       }
-      // The row is stored by now; a failed prune is retried on the next
-      // write, so it is not a missing row.
-      try {
-        for (const old of ledgerKeysToPrune(await $.store.keys(), key)) {
-          await $.store.delete(old);
-        }
-      } catch {
-        // Retried on the next write.
+      const left = (queuedWrites.get(key) ?? 1) - 1;
+      if (left > 0) queuedWrites.set(key, left);
+      else queuedWrites.delete(key);
+      // Pruning runs beside the chain, one at a time: a store call that
+      // never answers there must not hold up later rows.
+      if (pruning !== undefined) {
+        writtenDuringPrune.add(key);
+      } else {
+        writtenDuringPrune = new Set();
+        pruning = pruneLedgerKeys($, key, isBusy, deleting).finally(() => {
+          pruning = undefined;
+        });
       }
       if (writes === step) isChainStalled = false;
     });
@@ -212,7 +264,11 @@ export const register: Register = (on, options) => {
     const asked = Number.parseInt(e.args.trim(), 10);
     const tail =
       Number.isFinite(asked) && asked > 0 ? Math.min(asked, 100) : 10;
-    await bounded($, () => writes).catch(() => undefined);
+    // A pending write may start a prune as it settles, so read pruning after.
+    await bounded($, async () => {
+      await writes;
+      await pruning;
+    }).catch(() => undefined);
     const ownKey = await bounded($, () => sessionLedgerKey($)).catch(() =>
       ledgerKeyFor('unknown')
     );
