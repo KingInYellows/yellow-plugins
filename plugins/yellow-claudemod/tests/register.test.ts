@@ -12,9 +12,13 @@ const SECURITY = 'yellow-core:review:security-sentinel';
 
 // Stands in for the engine beneath the plugin: each spawn runs on the model
 // asked for, else on the agent's own frontmatter model (opus here).
-function engine(on: On): void {
-  mock.store(on);
+function engine(
+  on: On,
+  entries: Readonly<Record<string, unknown>> = {}
+): void {
+  mock.store(on, entries);
   mock.clock(on);
+  on('session.id', () => ({ value: 's1' }));
   on('session.measure', ($, e) => ({ changed: e.changed }));
   on('agent.spawn', ($, e) => ({
     model: e.model ?? 'opus',
@@ -156,5 +160,90 @@ describe('ledger', () => {
     on('command.run', () => ({ text: 'engine' }));
     await expect(spawn($, REVIEWER)).rejects.toThrow();
     expect(calls).toBe(1);
+  });
+});
+
+function row(subagentType: string, ts: string) {
+  return {
+    ts,
+    subagentType,
+    plugin: 'yellow-core',
+    requested: null,
+    resolved: 'opus',
+    parentModel: 'opus',
+    downshifted: false,
+    windowPercent: null,
+    workflow: false,
+    denied: false,
+  };
+}
+
+describe('ledger across sessions', () => {
+  test("never overwrites another session's rows", async ($, on) => {
+    engine(on, {
+      ledger: [row('legacy-agent', '1970-01-01T00:00:00.000Z')],
+      'ledger:s0': [row('other-session-agent', '1970-01-01T00:00:00.000Z')],
+    });
+    await spawn($, REVIEWER);
+    const text = await status($);
+    expect(text).toContain('Ledger: 3 spawn(s) recorded across 3 session(s)');
+    expect(text).toContain('legacy-agent: ran opus');
+    expect(text).toContain('other-session-agent: ran opus');
+    expect(text).toContain(`${REVIEWER}: ran opus`);
+  });
+
+  test('keeps the newest eight session keys', async ($, on) => {
+    const entries: Record<string, unknown> = {};
+    for (let i = 0; i < 8; i += 1) {
+      entries[`ledger:old${i}`] = [
+        row(`agent-${i}`, '1970-01-01T00:00:00.000Z'),
+      ];
+    }
+    engine(on, entries);
+    await spawn($, REVIEWER);
+    const text = await status($);
+    expect(text).toContain('across 8 session(s)');
+    expect(text).not.toContain('agent-0:');
+    expect(text).toContain('agent-1:');
+  });
+});
+
+describe('ledger write failures', () => {
+  test('a store that never answers does not stall the spawn', async ($, on) => {
+    const clock = mock.clock(on);
+    on('session.id', () => ({ value: 's1' }));
+    on('store.get', () => ({ value: undefined }));
+    on('store.set', () => new Promise<never>(() => {}));
+    on('store.keys', () => ({ value: [] }));
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    const running = spawn($, REVIEWER);
+    await clock.settle();
+    await clock.advance(2000);
+    expect((await running).model).toBe('opus');
+    expect(await status($)).toContain('Ledger write failed at');
+  });
+
+  test('reports a rejected write until one succeeds', async ($, on) => {
+    mock.clock(on);
+    let isBroken = true;
+    const held: Record<string, unknown> = {};
+    on('session.id', () => ({ value: 's1' }));
+    on('store.get', ($, e) => ({ value: held[e.key] }));
+    on('store.set', ($, e) => {
+      if (isBroken) throw new Error('disk full');
+      held[e.key] = e.value;
+      return { value: undefined };
+    });
+    on('store.keys', () => ({ value: Object.keys(held) }));
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    await spawn($, REVIEWER);
+    expect(await status($)).toContain('Ledger write failed at');
+    isBroken = false;
+    await spawn($, REVIEWER);
+    const text = await status($);
+    expect(text).not.toContain('Ledger write failed');
+    expect(text).toContain('Ledger: 1 spawn(s) recorded');
   });
 });

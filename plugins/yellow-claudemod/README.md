@@ -19,8 +19,9 @@ Then run `/claudemod:setup` to check the Claude Code version.
 
 - **Spawn ledger (always on).** Each Agent-tool or workflow subagent spawn is
   recorded: agent, plugin, the model the caller asked for, the model it ran on,
-  the parent's model and the fullest usage window at that moment. The last 500
-  rows are kept in the mod's own store.
+  the parent's model and the fullest usage window at that moment. Each session
+  keeps its last 500 rows under its own key in the mod's store, so concurrent
+  sessions never overwrite each other; the eight most recent sessions are kept.
 - **Usage downshift (off by default).** With `downshift_enabled` on, these
   agents run on Sonnet once the fullest rate-limit window (`five_hour` or
   `seven_day`) reaches `downshift_threshold` percent (default 80):
@@ -35,7 +36,8 @@ Then run `/claudemod:setup` to check the Claude Code version.
   value. The first downshift in a session shows a toast.
 
 - **`/claudemod-status [rows]`** prints the usage windows, the downshift
-  setting, model counts across the ledger and its last rows (default 10).
+  setting, model counts across the ledger and its last rows (default 10). It
+  also says when the session's last ledger write failed or timed out.
 
 Change the two settings with `/plugin` (select yellow-claudemod).
 

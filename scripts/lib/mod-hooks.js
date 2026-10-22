@@ -80,7 +80,13 @@ function classifyHooksJson(hooksJsonPath) {
     };
   }
   const modulePath = parsed.modules[0];
-  if (!modulePath.startsWith('./') || modulePath.split('/').includes('..')) {
+  // A backslash is a separator on Windows, where `.\..\x.ts` would leave
+  // hooks/ unseen by the `/` split; no module path needs one.
+  if (
+    !modulePath.startsWith('./') ||
+    modulePath.includes('\\') ||
+    modulePath.split('/').includes('..')
+  ) {
     return {
       kind: 'forbidden',
       reason: `module path "${modulePath}" must start with ./ and stay inside hooks/`,

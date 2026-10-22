@@ -36,11 +36,24 @@ fi
 
 printf '\n=== Plugin ===\n'
 if command -v claude >/dev/null 2>&1; then
-  if claude plugin list --json 2>/dev/null | grep -q '"yellow-claudemod@'; then
-    printf 'installed: yes\n'
-  else
-    printf 'installed: not listed by claude plugin list\n'
-  fi
+  # Installed is not enough: a disabled plugin's hooks module never loads.
+  state=$(claude plugin list --json 2>/dev/null | node -e '
+    let raw = "";
+    process.stdin.on("data", (c) => (raw += c));
+    process.stdin.on("end", () => {
+      let rows;
+      try { rows = JSON.parse(raw); } catch { rows = null; }
+      if (!Array.isArray(rows)) { process.stdout.write("unknown"); return; }
+      const mine = rows.filter((r) => typeof r?.id === "string" && r.id.startsWith("yellow-claudemod@"));
+      process.stdout.write(mine.length === 0 ? "absent" : mine.some((r) => r.enabled === true) ? "enabled" : "disabled");
+    });
+  ' 2>/dev/null)
+  case "$state" in
+    enabled)  printf 'installed: yes (enabled)\n' ;;
+    disabled) printf 'installed: yes, but DISABLED\n' ;;
+    absent)   printf 'installed: not listed by claude plugin list\n' ;;
+    *)        printf 'installed: UNKNOWN (could not read claude plugin list --json)\n' ;;
+  esac
 fi
 ```
 
@@ -50,7 +63,11 @@ fi
    Claude Code 2.1.301 or later; update with `claude update`."
 2. **Not listed:** say the plugin is not installed for this scope and give
    `/plugin install yellow-claudemod@yellow-plugins`.
-3. **Ready:** report these facts:
+3. **Disabled:** say the hooks module does not load while the plugin is
+   disabled and give `claude plugin enable yellow-claudemod@yellow-plugins`.
+4. **Unknown:** say the plugin state could not be read (`node` missing or
+   `claude plugin list --json` failed) and continue with the Ready facts.
+5. **Ready:** report these facts:
    - Run `/claudemod-status` in a session to see the usage windows, the
      downshift setting and recent subagent spawns. If that command is missing,
      the hooks module did not load: check `claude --debug` for a

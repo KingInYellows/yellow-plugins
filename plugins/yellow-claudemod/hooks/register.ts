@@ -1,20 +1,56 @@
-import type { Register } from 'claude-code';
+import type { EngineInterface, Register } from 'claude-code';
 
 import {
   appendRow,
   downshiftModel,
   formatStatus,
   fullestWindow,
+  isLedgerKey,
+  ledgerKeyFor,
+  ledgerKeysToPrune,
+  mergeLedgers,
   pluginOf,
   readLedger,
   type DownshiftConfig,
   type LedgerRow,
   type Window,
+  type WriteFailure,
 } from './policy.ts';
 
-const LEDGER_KEY = 'ledger';
 const STATUS_COMMAND = 'claudemod-status';
 const DOWNSHIFT_TARGET = 'sonnet';
+// How long one ledger step may wait on the store before it counts as failed.
+const STORE_TIMEOUT_MS = 2000;
+
+// Runs work against the store, rejecting once STORE_TIMEOUT_MS passes so a
+// store call that never settles cannot stall the spawn hook or the chain.
+async function bounded<T>(
+  $: EngineInterface,
+  work: () => Promise<T>
+): Promise<T> {
+  const timer = new AbortController();
+  try {
+    return await Promise.race([
+      work(),
+      $.clock
+        .sleep(STORE_TIMEOUT_MS, { signal: timer.signal })
+        .then((): never => {
+          throw new Error(`store did not answer in ${STORE_TIMEOUT_MS} ms`);
+        }),
+    ]);
+  } finally {
+    timer.abort();
+  }
+}
+
+// The id changes on /clear without a new session.start, so ask each time.
+async function sessionLedgerKey($: EngineInterface): Promise<string> {
+  try {
+    return ledgerKeyFor(await $.session.id());
+  } catch {
+    return ledgerKeyFor('unknown');
+  }
+}
 
 function readConfig(
   options: Readonly<Record<string, unknown>>
@@ -37,8 +73,10 @@ export const register: Register = (on, options) => {
   let windows: Window[] = [];
   let hasToasted = false;
   // Spawns in a review fan-out land together; chain the store's
-  // read-modify-write so no row is lost.
+  // read-modify-write so no row is lost. Each step is bounded, so the chain
+  // always moves on.
   let writes: Promise<void> = Promise.resolve();
+  let writeFailure: WriteFailure | undefined;
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -108,12 +146,24 @@ export const register: Register = (on, options) => {
       workflow: e.workflow !== undefined,
       denied: result.deny !== undefined,
     };
-    writes = writes
-      .then(async () => {
-        const ledger = readLedger(await $.store.get(LEDGER_KEY));
-        await $.store.set(LEDGER_KEY, appendRow(ledger, row));
-      })
-      .catch(() => undefined);
+    writes = writes.then(async () => {
+      try {
+        await bounded($, async () => {
+          const key = await sessionLedgerKey($);
+          const ledger = readLedger(await $.store.get(key));
+          await $.store.set(key, appendRow(ledger, row));
+          for (const old of ledgerKeysToPrune(await $.store.keys(), key)) {
+            await $.store.delete(old);
+          }
+        });
+        writeFailure = undefined;
+      } catch (err) {
+        writeFailure = {
+          ts,
+          reason: err instanceof Error ? err.message : String(err),
+        };
+      }
+    });
     await writes;
 
     return result;
@@ -124,8 +174,20 @@ export const register: Register = (on, options) => {
     const tail =
       Number.isFinite(asked) && asked > 0 ? Math.min(asked, 100) : 10;
     await writes;
-    const ledger = readLedger(await $.store.get(LEDGER_KEY));
-    return { text: formatStatus(windows, config, ledger, tail) };
+    const keys = (await bounded($, () => $.store.keys())).filter(isLedgerKey);
+    const ledgers = await bounded($, () =>
+      Promise.all(keys.map(async (k) => readLedger(await $.store.get(k))))
+    );
+    return {
+      text: formatStatus(
+        windows,
+        config,
+        mergeLedgers(ledgers),
+        tail,
+        keys.length,
+        writeFailure
+      ),
+    };
   }).catch(() => ({
     text: 'yellow-claudemod: the status command failed; see claude --debug.',
   }));

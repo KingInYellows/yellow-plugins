@@ -547,6 +547,13 @@ printf 'plain text\\n'
     expect(stderr).toMatch(/must start with \.\/ and stay inside hooks\//);
   });
 
+  it('rejects a module path that uses backslash separators', () => {
+    writeModHooks({ modules: ['./sub\\..\\..\\register.ts'] });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/must start with \.\/ and stay inside hooks\//);
+  });
+
   it('rejects a modules declaration whose module file is missing', () => {
     writeModHooks({ modules: ['./missing.ts'] });
     const { status, stderr } = runValidator(pluginDir);
