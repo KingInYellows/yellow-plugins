@@ -1374,7 +1374,7 @@ rl_build_candidate() {
     root=$(rl_repo_root) || { printf 'REJECT no-repo'; return 0; }
     vres=$(rl_validate_path anchor "$H" "$file") || { printf 'REJECT path:%s' "$vres"; return 0; }
     rl_worktree_entry_ok "$root" "$file" || { printf 'REJECT path:worktree-entry'; return 0; }
-    # one snapshot per path, reused by observe's scope pass
+    # one snapshot per path, so candidates on one file see the same text
     content="$(rl_tmp)/wt-$(printf '%s' "$file" | rl_sha256)"
     if [ ! -f "$content" ]; then
       cp -- "$root/$file" "$content.part" && mv -f -- "$content.part" "$content" ||
@@ -1467,17 +1467,9 @@ RL_CAND_ROW_JQ='
 
 # --- observe: matching and append (under the lock) --------------------------
 
-# Current content of a candidate's anchor file for scope checks: the HEAD
-# blob, or under --anchor-source worktree the snapshot rl_build_candidate
-# took, so the scope is checked against the text the anchor came from.
+# The HEAD blob of a candidate's anchor file, for Pass D's scope checks.
 rl_candidate_content() {
-  local vres oid f
-  if [ "$RL_O_ASRC" = worktree ]; then
-    f="$(rl_tmp)/wt-$(printf '%s' "$1" | rl_sha256)"
-    [ -f "$f" ] || return 1
-    printf '%s' "$f"
-    return 0
-  fi
+  local vres oid
   vres=$(rl_validate_path anchor "$RL_O_HEAD" "$1") || return 1
   read -r _ oid _ <<<"$vres"
   rl_blob_file "$oid"
@@ -1601,9 +1593,11 @@ rl_observe_locked() {
   # unscoped finding whose line maps unchanged into its scope span. Only a
   # sole qualifier merges, so identical code in two scopes, or twice in one
   # scope (an occurrence key on either side), stays separate.
+  # Off under --anchor-source worktree: spans come from the worktree while
+  # existing lines map to HEAD, and uncommitted edits make those disagree.
   local cskey cocc css cend rskey rss rocc rdisp eid rest sv
   local -a quals qbad ccontent
-  while IFS= read -r r; do
+  [ "$RL_O_ASRC" = worktree ] || while IFS= read -r r; do
     i=${r%%$'\x1f'*}
     r=${r#*$'\x1f'}
     [ -n "${match[$i]:-}" ] && continue

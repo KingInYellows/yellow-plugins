@@ -302,6 +302,14 @@ setup() {
   [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
 }
 
+@test "CLAUDE-88: worktree-anchored observations skip the scope pass" {
+  printf '# Doc\n## A\nflag one\n' >|w.md
+  H=$(commit_all wt)
+  observe "$H" "[$(finding w.md 3 '{"scope":"A","category":"docs","rule":"wrong-doc"}')]" >/dev/null
+  out=$(observe "$H" "[$(finding w.md 3 '{"category":"docs","rule":"wrong-doc"}')]" --step 8 --anchor-source worktree)
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
+}
+
 @test "CLAUDE-88: a repeated heading path does not merge two sections" {
   printf '# Doc\n## A\nflag one\n## A\nflag one\n' >|r.md
   H=$(commit_all repeated)
