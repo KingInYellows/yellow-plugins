@@ -284,6 +284,29 @@ describe('ledger write failures', () => {
     expect(text).not.toContain('Ledger write failed');
   });
 
+  test('a failed prune is not reported as a missing row', async ($, on) => {
+    mock.clock(on);
+    const held: Record<string, unknown> = {};
+    on('session.id', () => ({ value: 's1' }));
+    on('store.get', ($, e) => ({ value: held[e.key] }));
+    on('store.set', ($, e) => {
+      held[e.key] = e.value;
+      return { value: undefined };
+    });
+    let isKeysBroken = true;
+    on('store.keys', () => {
+      if (isKeysBroken) throw new Error('keys unavailable');
+      return { value: Object.keys(held) };
+    });
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    await spawn($, REVIEWER);
+    isKeysBroken = false;
+    const text = await status($);
+    expect(text).toContain('Ledger: 1 spawn(s) recorded');
+    expect(text).not.toContain('Ledger write failed');
+  });
+
   test('reports a failure only to the session it belongs to', async ($, on) => {
     mock.clock(on);
     let sessionId = 's1';

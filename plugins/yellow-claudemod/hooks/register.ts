@@ -157,9 +157,6 @@ export const register: Register = (on, options) => {
       try {
         const ledger = readLedger(await $.store.get(key));
         await $.store.set(key, appendRow(ledger, row));
-        for (const old of ledgerKeysToPrune(await $.store.keys(), key)) {
-          await $.store.delete(old);
-        }
         if (writeFailure?.key === key) writeFailure = undefined;
       } catch (err) {
         writeFailure = {
@@ -167,9 +164,17 @@ export const register: Register = (on, options) => {
           ts,
           reason: err instanceof Error ? err.message : String(err),
         };
-      } finally {
-        if (writes === step) isChainStalled = false;
       }
+      // The row is stored by now; a failed prune is retried on the next
+      // write, so it is not a missing row.
+      try {
+        for (const old of ledgerKeysToPrune(await $.store.keys(), key)) {
+          await $.store.delete(old);
+        }
+      } catch {
+        // Retried on the next write.
+      }
+      if (writes === step) isChainStalled = false;
     });
     writes = step;
     if (!isChainStalled) {
