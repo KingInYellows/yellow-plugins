@@ -1039,6 +1039,18 @@ assert_finishes_under_all() {
   assert_survives_under_all "$input" "Verdict: REJECT"
 }
 
+@test "a digit-free slice beside a shorter digit-bearing label is still key material" {
+  # Ranking cells by a proxy (digit plus non-hex letter) picked the 5-char
+  # "row1z" label over the digit-free slice the width chain accepts, so the
+  # rows counted as stray and the window released. Every cell now runs the
+  # window's own body test.
+  local strict="Ab1dEfGhIjKl" free="AbCdEfGhIjKl" input
+  input="$(printf '| n | value |\n|---|---|\n| row0z | %s |\n| row0z | %s |\n| row1z | %s |\n| row2z | %s |\n| row3z | %s |\n| row4z | %s |\n| | %s |\n\nVerdict: REJECT' \
+    "$BEGIN_PK" "$strict" "$free" "$free" "$free" "$free" "$END_PK")"
+  assert_redacted_under_all "$input" "$free"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+}
+
 @test "a key wrapped as an escaped newline-joined string is fully redacted" {
   # A JSON or YAML string with literal \n escapes, wrapped across lines by
   # the reviewer: every body line carries backslash escapes that are not

@@ -502,28 +502,33 @@ function is_base64_line(s, minlen) {
 # a quoted MENTION is still a mention (normalising the marker line itself
 # promoted `- "<marker>"` bullets to real keys and swallowed the report).
 # A table row is split into cells, since its other columns stay populated
-# ("| key.pem | <slice> |"): an END marker in any cell is returned as the
-# END, otherwise the base64-only cell that looks most like key material --
-# a digit or +/= together with a non-hex letter, then a non-hex letter
-# alone, then any -- and the longest within that rank. Length alone let a
-# longer hex checksum column beat a narrow key slice, fail the non-hex test
-# and release the window. A slice never contains "|", so a body line is
-# never split, and the chosen cell still has to pass the same width and
-# character-class tests as any other body line.
-function key_text(s,   n, i, c, best, rank, r, cell) {
+# ("| key.pem | <slice> |"). An END marker in any cell is returned as the
+# END. Otherwise every cell is tested with is_key_body(), the same test the
+# bounded window applies to a whole line (width chain included), and the
+# longest cell that passes is returned. Only when none passes does a proxy
+# pick one: the base64-only cell with a digit or +/= and a non-hex letter,
+# then a non-hex letter alone, then any, longest within a rank, so a real
+# block still learns its body width. Choosing by proxy alone let a longer hex
+# checksum, or a shorter digit-bearing label beside a digit-free slice, stand
+# in for the slice and release the window. A slice never contains "|", so a
+# body line is never split.
+function key_text(s,   n, i, c, best, rank, r, hit, cell) {
   s = strip_deco(s)
   gsub(/\\[nr]/, "", s)
   if (index(s, "|") > 0) {
     n = split(s, cell, "|")
     best = ""
+    hit = ""
     rank = -1
     for (i = 1; i <= n; i++) {
       c = unwrap_cell(cell[i])
       if (c ~ /^-----END [A-Z ]*PRIVATE KEY-----$/) return c
       if (c !~ /^[A-Za-z0-9+\/=]+$/) continue
+      if (is_key_body(c) && length(c) > length(hit)) hit = c
       r = (c ~ /[G-Zg-z+\/=]/) + (c ~ /[G-Zg-z+\/=]/ && c ~ /[0-9+\/=]/)
       if (r > rank || (r == rank && length(c) > length(best))) { best = c; rank = r }
     }
+    if (hit != "") return hit
     if (best != "") return best
   }
   return unwrap_cell(s)
@@ -569,6 +574,12 @@ function is_narrow_key_run(s) {
   # a genuine END no longer extends the window toward the verdict.
   return pem_key_len > 0 && is_base64_line(s, 12) &&
     length(s) == pem_key_len && s !~ /^[A-Z]?[a-z]+$/
+}
+# The body test of the bounded window: a wide base64 slice with a non-hex
+# character, or a narrow one by the rules above. key_text applies it to each
+# table cell, so the two can never disagree about what a body line is.
+function is_key_body(s) {
+  return (is_base64_line(s, 20) && s ~ /[G-Zg-z+\/=]/) || is_narrow_key_run(s)
 }
 {
   line = $0
@@ -791,8 +802,7 @@ function is_narrow_key_run(s) {
           # a new BEGIN. Prose never earns it: the chain starts only from a
           # line that passed one of the strict tests, so equal-length words
           # after a mention stay stray.
-          if ((is_base64_line(pem_body, 20) && pem_body ~ /[G-Zg-z+\/=]/) ||
-              is_narrow_key_run(pem_body)) {
+          if (is_key_body(pem_body)) {
             pem_stray = 0
             # Only a base64 body line establishes the width: a Proc-Type or
             # DEK-Info header, or a repeated BEGIN, resets the stray counter
