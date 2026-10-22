@@ -814,6 +814,7 @@ describe('SHC-010 alias-prone commands', () => {
     ['redirect mixed with an assignment', 'FOO=x <input ls'],
     ['several leading redirects', '>out 2>&1 ls x'],
     ['redirect after &&', 'true && 2>/dev/null ls x'],
+    ['process substitution as a leading redirect target', '2> >(cat) ls x'],
     ['backslash-escaped word', '\\ls x | head'],
     ['single-quoted word', "'ls' x | head"],
     ['double-quoted word', '"ls" x'],
@@ -941,6 +942,8 @@ describe('SHC-010 alias-prone commands', () => {
       )
     ).toEqual([4]);
     expect(flagged('case "$c" in @(ls|ps)) :;; esac')).toEqual([]);
+    expect(flagged('case "$(printf in)" in\n  ls) :;;\nesac')).toEqual([]);
+    expect(flagged('case `printf in` in\n  ls) :;;\nesac')).toEqual([]);
     expect(flagged('case "$c" in\n  a) echo x\nesac\nls d')).toEqual([4]);
   });
 
@@ -1007,6 +1010,8 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('cat <<EOF\n$(\n  ls x\n)\nls\nEOF')).toEqual([3]);
     expect(flagged('printf "%s" "a\n$(ps -p 1)\nb"')).toEqual([2]);
     expect(flagged('v="start\n$(ls x)"')).toEqual([2]);
+    expect(flagged('v="$(\n  ls x\n)"')).toEqual([2]);
+    expect(flagged('v="a $(printf x)\n  ls x\n"')).toEqual([]);
     expect(flagged('v="start\nit\'s $(ls x)" && echo')).toEqual([2]);
     expect(flagged('v="start\n$(command ls x)" && ls y')).toEqual([2]);
     expect(flagged("cat <<'EOF'\n$(ls x)\nEOF")).toEqual([]);

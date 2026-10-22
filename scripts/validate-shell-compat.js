@@ -498,6 +498,7 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
   // wrapper split as `bash /dev/fd/3 \` + `3<<'TAG'` is still recognised.
   let continued = '';
   const expandHeads = [];
+  const opensDouble = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const carried = continued;
@@ -544,6 +545,7 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
       // expanded text.
       if (wasOpen === '"') expandHeads[i] = line.slice(0, scan.resume);
       if (!wasOpen && scan.open) openedAt = i;
+      if (scan.open === '"') opensDouble[i] = true;
       open = scan.open;
     }
     if (/^\s*#/.test(code)) {
@@ -612,6 +614,9 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
     return classifyLines(lines, { trackQuotes: false });
   expandHeads.forEach((head, i) => {
     out[i].expandHead = head;
+  });
+  opensDouble.forEach((open, i) => {
+    out[i].opensDouble = open;
   });
   return out;
 }
@@ -1061,7 +1066,7 @@ const PREFIX_WORDS_RE =
 // common `alias sudo='sudo '` makes the shell alias-expand the next word.
 const SUDO_TAIL_RE = /(?:^|(?<=[\s;&|(`]))sudo$/;
 
-// The text before a command word with closed `$(…)` and backtick
+// The text before a command word with closed `$(…)`, `<(…)`, `>(…)` and backtick
 // substitutions collapsed to `_`, then the assignments and redirects that end
 // right before the word removed. An unclosed `$(` stays, so the word after it
 // is still read as the first word of the substitution.
@@ -1069,7 +1074,7 @@ function stripCommandPrefix(prefix) {
   let out = prefix;
   for (let prev = ''; prev !== out; ) {
     prev = out;
-    out = out.replace(/\$\((?!\()[^()`]*\)|`[^`]*`/g, '_');
+    out = out.replace(/[$<>]\((?!\()[^()`]*\)|`[^`]*`/g, '_');
   }
   return out.replace(PREFIX_WORDS_RE, '').trimEnd();
 }
@@ -1337,6 +1342,13 @@ function blankCasePatterns(line, state) {
   let patStart = top() === 'pattern' && state.patOpen ? 0 : -1;
   for (let i = 0; i < n; ) {
     const ch = scan[i];
+    // An `in` inside a substitution in the subject (`case "$(printf in)"`)
+    // is not the keyword.
+    if (top() === 'subject') {
+      if (ch === '(') state.subjectDepth++;
+      else if (ch === ')') state.subjectDepth--;
+      else if (ch === '`') state.subjectTick = !state.subjectTick;
+    }
     if (top() === 'pattern') {
       if (patStart === -1) {
         if (/\s/.test(ch)) {
@@ -1382,9 +1394,18 @@ function blankCasePatterns(line, state) {
       i++;
       continue;
     }
-    if (top() === 'subject' && word === 'in') setTop('pattern');
-    else if (word === 'case' && commandAt(i)) state.stack.push('subject');
-    else if (word === 'esac' && top() === 'body' && commandAt(i)) {
+    if (
+      top() === 'subject' &&
+      word === 'in' &&
+      state.subjectDepth === 0 &&
+      !state.subjectTick
+    ) {
+      setTop('pattern');
+    } else if (word === 'case' && commandAt(i)) {
+      state.stack.push('subject');
+      state.subjectDepth = 0;
+      state.subjectTick = false;
+    } else if (word === 'esac' && top() === 'body' && commandAt(i)) {
       state.stack.pop();
     }
     i += word.length;
@@ -1477,7 +1498,13 @@ function lintShellText(
   const arithSub = { depth: 0 };
   const arraySub = { depth: 0 };
   const testSub = { depth: 0 };
-  const caseState = { stack: [], patOpen: false, patDepth: 0 };
+  const caseState = {
+    stack: [],
+    patOpen: false,
+    patDepth: 0,
+    subjectDepth: 0,
+    subjectTick: false,
+  };
   const expandSub = { depth: 0 };
   // The calling shell runs the `$(…)` and backtick substitutions in an
   // unquoted heredoc body or a multi-line double-quoted string.
@@ -1491,7 +1518,14 @@ function lintShellText(
     }
   };
   for (let i = 0; i < lines.length; i++) {
-    const { kind, code: line, badWrapper, sourceCode, expandHead } = classes[i];
+    const {
+      kind,
+      code: line,
+      badWrapper,
+      sourceCode,
+      expandHead,
+      opensDouble,
+    } = classes[i];
     const continued = nextContinued;
     nextContinued = false;
     if (kind === 'comment' || kind === 'data') continue;
@@ -1506,6 +1540,9 @@ function lintShellText(
     }
     if (expandHead !== undefined) expandAliasHits(expandHead, i);
     expandSub.depth = 0;
+    // A `$(` opened inside the string on this line carries into the next
+    // lines of the string; the line itself is linted as code below.
+    if (opensDouble) keepCommandSubs(line, expandSub);
 
     if (checkSources) {
       // A `bash -c` script is scanned too, but tier 3 there is fine: only
