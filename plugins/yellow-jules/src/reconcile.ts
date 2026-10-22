@@ -856,13 +856,14 @@ export async function reconcile(
       );
     } else if (nowMs - ageStartMs(r) < RESERVATION_SETTLE_MS) {
       early.push(
-        notReached(r, 'the reservation may still be in flight; try again shortly')
+        notReached(
+          r,
+          'the reservation may still be in flight; try again shortly'
+        )
       );
     }
   }
-  const settled = targets.filter(
-    (r) => !early.some((e) => e.record === r)
-  );
+  const settled = targets.filter((r) => !early.some((e) => e.record === r));
   const creates = settled.filter((r) => r.kind === 'create');
   const others = settled.filter(
     (r) => r.kind === 'reply' || r.kind === 'approve'

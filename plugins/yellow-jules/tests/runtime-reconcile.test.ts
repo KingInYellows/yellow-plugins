@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadGrants } from '../src/authority.js';
 import { authorizeTakeOver } from '../src/authorize.js';
 import { resolveGrantsPath } from '../src/config.js';
-import { controllerFilePath } from '../src/controller.js';
+import {
+  controllerFilePath,
+  takeOverController,
+  takeOverEpoch,
+} from '../src/controller.js';
 import { AdapterError, AppErrorException } from '../src/errors.js';
 import { approve, delegate, reply } from '../src/mutations.js';
 import { approvedPlanVerdict } from '../src/reconcile.js';
@@ -507,6 +511,22 @@ describe('the take-over marker', () => {
     expect((await readJournal(h.dataDir)).controllerTakeover?.epoch).toBe(
       epoch
     );
+  });
+
+  it('refuses to write a stale epoch when the authority advanced mid take-over', () => {
+    const ctx = { controllerDir: h.controllerDir, controllerId: 'testhost' };
+    const grants = loadGrants(h.dataDir);
+    const epoch = takeOverEpoch(ctx, grants);
+    // Another data directory's take-over advances the shared authority file.
+    const file = controllerFilePath(h.controllerDir, 'testhost');
+    const authority = JSON.parse(fs.readFileSync(file, 'utf8'));
+    fs.writeFileSync(file, JSON.stringify({ ...authority, epoch: epoch + 3 }), {
+      mode: 0o600,
+    });
+    expect(() => takeOverController(ctx, h.dataDir, grants, epoch)).toThrow(
+      /changed during the take-over/
+    );
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).epoch).toBe(epoch + 3);
   });
 
   it('a grant rebound without a marker leaves its reservations unaged', async () => {
@@ -1453,7 +1473,7 @@ describe('active-session slots follow the vendor state', () => {
     expect(result.reconciled?.[0]).toMatchObject({
       localRequestId: 'lost-done',
       outcome: 'not-reached',
-      reason: expect.stringContaining('not the grant\'s controller'),
+      reason: expect.stringContaining("not the grant's controller"),
     });
     expect((await readJournal(h.dataDir)).operations['lost-done']).toEqual(
       before

@@ -1275,7 +1275,10 @@ export async function clearDeviation(
       { recoveryAction: 'Nothing to clear.' }
     );
   }
-  const newest = open.reduce((a, d) => (d.observedAt > a ? d.observedAt : a), '');
+  const newest = open.reduce(
+    (a, d) => (d.observedAt > a ? d.observedAt : a),
+    ''
+  );
   if (
     owner.lastCompleteWalkAt === undefined ||
     owner.lastCompleteWalkAt <= newest

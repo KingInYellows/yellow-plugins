@@ -357,7 +357,8 @@ async function dispatch(operation, rest, deps) {
                 strict: true,
                 allowPositionals: false,
             });
-            if (values['clear-pause'] === true && values['clear-deviation'] === true) {
+            if (values['clear-pause'] === true &&
+                values['clear-deviation'] === true) {
                 throw new UsageError('--clear-pause and --clear-deviation are separate confirmations; run one at a time');
             }
             if (values['clear-deviation'] === true) {

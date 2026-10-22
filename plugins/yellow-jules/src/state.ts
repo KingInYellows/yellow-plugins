@@ -1478,7 +1478,10 @@ export async function upsertReadState(
           // watermark at the plan's own time (another activity) proves nothing
           // about the plan; it is kept, flagged unknown.
           const order = compareStamp(
-            { createTime: update.pendingPlan.activityCreateTime, activityId: '' },
+            {
+              createTime: update.pendingPlan.activityCreateTime,
+              activityId: '',
+            },
             { createTime: current.lastActivityCreateTime, activityId: '' }
           );
           if (

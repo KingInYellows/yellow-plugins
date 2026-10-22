@@ -1280,9 +1280,9 @@ describe('--clear-deviation', () => {
       },
     };
     expect(await codeOf(() => clear(racing))).toBe('JULES_INVALID_STATE');
-    expect(
-      (await ownerRecord())?.deviations.every((d) => !d.reconciled)
-    ).toBe(true);
+    expect((await ownerRecord())?.deviations.every((d) => !d.reconciled)).toBe(
+      true
+    );
     expect(loadGrants(h.dataDir).grants[grantId]?.revokedAt).toBeUndefined();
   });
 
@@ -1304,12 +1304,13 @@ describe('--clear-deviation', () => {
     await clear();
     await recordDeviation(h.dataDir, session.localRequestId, {
       kind: 'policy-deviation',
-      reason: 'vendor pull request observed on a session created with autoPr: false',
+      reason:
+        'vendor pull request observed on a session created with autoPr: false',
       prUrl: 'https://github.com/acme/widgets/pull/1',
     });
-    expect(
-      (await ownerRecord())?.deviations.every((d) => d.reconciled)
-    ).toBe(true);
+    expect((await ownerRecord())?.deviations.every((d) => d.reconciled)).toBe(
+      true
+    );
     await recordDeviation(h.dataDir, session.localRequestId, {
       kind: 'policy-deviation',
       reason: PLAN_DEVIATION,

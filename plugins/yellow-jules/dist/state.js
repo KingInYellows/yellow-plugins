@@ -1122,7 +1122,10 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
                 // Only time orders the two: ids at one createTime are opaque, so a
                 // watermark at the plan's own time (another activity) proves nothing
                 // about the plan; it is kept, flagged unknown.
-                const order = (0, activity_walk_js_1.compareStamp)({ createTime: update.pendingPlan.activityCreateTime, activityId: '' }, { createTime: current.lastActivityCreateTime, activityId: '' });
+                const order = (0, activity_walk_js_1.compareStamp)({
+                    createTime: update.pendingPlan.activityCreateTime,
+                    activityId: '',
+                }, { createTime: current.lastActivityCreateTime, activityId: '' });
                 if (order < 0 ||
                     (order === 0 &&
                         update.pendingPlan.activityId === current.lastActivityId)) {
