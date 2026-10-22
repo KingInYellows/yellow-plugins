@@ -348,8 +348,9 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   [ "$resolve" -lt "$triage" ] && [ "$triage" -lt "$summary" ]
   grep -q '`<PR#> --non-interactive`' "$SWEEP"
   grep -q 'skill: "review:triage"' "$SWEEP"
-  grep -q 'longer `OPEN`, record that state' "$SWEEP"
-  grep -q 'then skip the rest of this step and report `Ledger: skipped (PR <state>)`' "$SWEEP"
+  sweep_flat=$(flat "$SWEEP")
+  grep -qF 'longer `OPEN`, record that state' <<<"$sweep_flat"
+  grep -qF 'then skip the rest of this step and report `Ledger: skipped (PR <state>)`' <<<"$sweep_flat"
   grep -q '^  Ledger:  <pending> pending, <attention> need attention' "$SWEEP"
 }
 
@@ -1574,7 +1575,7 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
 @test "sweep: the summary flags pending P0-P2 ledger findings as not merge-ready" {
   grep -q '"merge_blocking": K' "$SWEEP"
   grep -q '^  Merge:   not ready — <merge_blocking> pending P0-P2 findings' "$SWEEP"
-  grep -q 'it never changes the exit code or the contract line' "$SWEEP"
+  grep -qF 'it never changes the exit code or the contract line' <<<"$(flat "$SWEEP")"
 }
 
 @test "sweep-all: prints a not-merge-ready line from merge_blocking" {
@@ -1582,8 +1583,9 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
 }
 
 @test "sweep: a missing ledger is never reported merge-ready" {
-  grep -q 'pending P0-P2 findings)` only when an existing ledger was read and' "$SWEEP"
-  grep -q 'empty array), so it reads `unknown (no ledger)` when `summary` returned `{}`:' "$SWEEP"
+  sweep_flat=$(flat "$SWEEP")
+  grep -qF 'pending P0-P2 findings)` only when an existing ledger was read and' <<<"$sweep_flat"
+  grep -qF 'empty array), so it reads `unknown (no ledger)` when `summary` returned `{}`:' <<<"$sweep_flat"
 }
 
 @test "sweep-all: PRs without a readable ledger are listed as merge readiness unknown" {
