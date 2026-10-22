@@ -1006,6 +1006,9 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged("cat <<EOF\nit's $(ls x) or 'y'\nEOF")).toEqual([2]);
     expect(flagged('cat <<EOF\n$(\n  ls x\n)\nls\nEOF')).toEqual([3]);
     expect(flagged('printf "%s" "a\n$(ps -p 1)\nb"')).toEqual([2]);
+    expect(flagged('v="start\n$(ls x)"')).toEqual([2]);
+    expect(flagged('v="start\nit\'s $(ls x)" && echo')).toEqual([2]);
+    expect(flagged('v="start\n$(command ls x)" && ls y')).toEqual([2]);
     expect(flagged("cat <<'EOF'\n$(ls x)\nEOF")).toEqual([]);
     expect(flagged('cat <<EOF\n\\$(ls x)\nls x\nEOF')).toEqual([]);
     expect(flagged('cat <<EOF\n$(command ls x)\nEOF')).toEqual([]);

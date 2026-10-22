@@ -497,6 +497,7 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
   // Text of earlier physical lines that end in a `\` continuation, so a
   // wrapper split as `bash /dev/fd/3 \` + `3<<'TAG'` is still recognised.
   let continued = '';
+  const expandHeads = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const carried = continued;
@@ -539,6 +540,9 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
         continue;
       }
       if (wasOpen) code = line.slice(scan.resume);
+      // The part of the line that closes a double-quoted string is still
+      // expanded text.
+      if (wasOpen === '"') expandHeads[i] = line.slice(0, scan.resume);
       if (!wasOpen && scan.open) openedAt = i;
       open = scan.open;
     }
@@ -606,6 +610,9 @@ function classifyLines(lines, { trackQuotes = true } = {}) {
   // everything after it.
   if (trackQuotes && open && openedAt !== -1)
     return classifyLines(lines, { trackQuotes: false });
+  expandHeads.forEach((head, i) => {
+    out[i].expandHead = head;
+  });
   return out;
 }
 
@@ -1472,8 +1479,19 @@ function lintShellText(
   const testSub = { depth: 0 };
   const caseState = { stack: [], patOpen: false, patDepth: 0 };
   const expandSub = { depth: 0 };
+  // The calling shell runs the `$(…)` and backtick substitutions in an
+  // unquoted heredoc body or a multi-line double-quoted string.
+  const expandAliasHits = (text, i) => {
+    const subs = keepCommandSubs(text, expandSub, { literalQuotes: true });
+    for (const detail of ruleAliasGuarded(
+      subs,
+      ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED
+    )) {
+      add('SHC-010', i, detail);
+    }
+  };
   for (let i = 0; i < lines.length; i++) {
-    const { kind, code: line, badWrapper, sourceCode } = classes[i];
+    const { kind, code: line, badWrapper, sourceCode, expandHead } = classes[i];
     const continued = nextContinued;
     nextContinued = false;
     if (kind === 'comment' || kind === 'data') continue;
@@ -1483,17 +1501,10 @@ function lintShellText(
         add('SHC-003', i, detail);
       }
       for (const detail of literalIndexHits(line)) add('SHC-005', i, detail);
-      // The calling shell runs the `$(…)` and backtick substitutions in an
-      // unquoted heredoc body or a multi-line double-quoted string.
-      const subs = keepCommandSubs(line, expandSub, { literalQuotes: true });
-      for (const detail of ruleAliasGuarded(
-        subs,
-        ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED
-      )) {
-        add('SHC-010', i, detail);
-      }
+      expandAliasHits(line, i);
       continue;
     }
+    if (expandHead !== undefined) expandAliasHits(expandHead, i);
     expandSub.depth = 0;
 
     if (checkSources) {
