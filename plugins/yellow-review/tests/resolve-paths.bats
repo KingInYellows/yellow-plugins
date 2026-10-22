@@ -2845,7 +2845,7 @@ unprivileged() {
   [[ "$out" != *"$d"* ]]
 }
 
-@test "an executable that cannot be read drops its directory, setuid or setgid included, unless root owns it" {
+@test "an executable that cannot be read drops its directory, setuid or setgid included, unless root owns it and it is not writable" {
   [ "$(id -u)" -ne 0 ] || skip "root reads every file"
   d="$BATS_TEST_TMPDIR/xo"
   mkdir -p "$d"
@@ -2856,12 +2856,20 @@ unprivileged() {
     out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
     [[ "$out" != *"$d"* ]] || { echo "batched scan kept mode $mode" >&2; return 1; }
   done
+  chmod 0333 "$d/tool"
+  out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *"$d"* ]]
+  chmod 0111 "$d/tool"
   # A root-owned execute-only file (Fedora's sudo 4111, sudoreplay 0111) is a
   # file only root could have made: a find that reports root ownership keeps it.
   printf '#!/bin/sh\nprintf "%%s\\n" "$2"\n' >| "$BATS_TEST_TMPDIR/rootfind"
   chmod +x "$BATS_TEST_TMPDIR/rootfind"
   yr_helper() { [ "$1" = find ] && { printf '%s\n' "$BATS_TEST_TMPDIR/rootfind"; return 0; }; return 1; }
   ! yr_file_shebang_enters "$d/tool" "$PWD"
+  # One this user can write could be rewritten with any #! line, root or not.
+  chmod 0333 "$d/tool"
+  yr_file_shebang_enters "$d/tool" "$PWD"
+  chmod 0111 "$d/tool"
   # Without a find to ask, ownership is unknown: fail closed.
   yr_helper() { return 1; }
   yr_file_shebang_enters "$d/tool" "$PWD"

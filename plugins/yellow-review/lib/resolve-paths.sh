@@ -217,12 +217,14 @@ yr_file_shebang_enters() {
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
     # An executable that cannot be read hides its #! line from this check,
-    # but the kernel still reads it: fail closed unless root owns it. Only root
-    # can make a root-owned file, and distributions ship execute-only binaries
-    # that way (Fedora's sudo is 4111, sudoreplay 0111). The setuid and setgid
-    # bits prove nothing: any user can chmod 4111 a script of their own.
+    # but the kernel still reads it: fail closed unless root owns it and this
+    # user cannot write it. Only root can make a root-owned file, and
+    # distributions ship execute-only binaries that way (Fedora's sudo is 4111,
+    # sudoreplay 0111); a writable one could be rewritten with any #! line. The
+    # setuid and setgid bits prove nothing: any user can chmod 4111 a script.
     if [ ! -r "$f" ]; then
         [ -x "$f" ] || return 1
+        [ ! -w "$f" ] || return 0
         x=$(yr_helper find) || return 0
         x=$("$x" -L "$f" -maxdepth 0 -user 0 -print 2>/dev/null) || return 0
         [ -n "$x" ] && return 1
@@ -516,17 +518,18 @@ yr_shebang_inside() {
     local root="$1" find="$2" rp="$3" awk="$4" out dirs prog depth=1 d f
     shift 4
     # An executable the scan cannot read hides its #! line, but the kernel
-    # still reads it: fail closed unless root owns it, as yr_file_shebang_enters
-    # does. GNU find tests readability in one pass; without -readable the shell
-    # tests each entry.
+    # still reads it: fail closed unless root owns it and this user cannot
+    # write it, as yr_file_shebang_enters does. GNU find tests readability in
+    # one pass; without -readable the shell tests each entry.
     if "$find" / -maxdepth 0 -readable >/dev/null 2>&1; then
         out=$("$find" -L "$@" -maxdepth 1 -type f \( -perm -100 -o -perm -010 -o -perm -001 \) \
-            ! -readable ! -user 0 -print -quit 2>/dev/null) || true
+            ! -readable \( ! -user 0 -o -writable \) -print -quit 2>/dev/null) || true
         [ -z "$out" ] || return 0
     else
         for d in "$@"; do
             for f in "$d"/* "$d"/.[!.]* "$d"/..?*; do
                 [ -f "$f" ] && [ -x "$f" ] && [ ! -r "$f" ] || continue
+                [ ! -w "$f" ] || return 0
                 [ -n "$("$find" -L "$f" -maxdepth 0 -user 0 -print 2>/dev/null)" ] || return 0
             done
         done

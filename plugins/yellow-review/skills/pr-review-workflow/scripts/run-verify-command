@@ -464,12 +464,14 @@ yr_file_shebang_enters() {
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
     # An executable that cannot be read hides its #! line from this check,
-    # but the kernel still reads it: fail closed unless root owns it. Only root
-    # can make a root-owned file, and distributions ship execute-only binaries
-    # that way (Fedora's sudo is 4111, sudoreplay 0111). The setuid and setgid
-    # bits prove nothing: any user can chmod 4111 a script of their own.
+    # but the kernel still reads it: fail closed unless root owns it and this
+    # user cannot write it. Only root can make a root-owned file, and
+    # distributions ship execute-only binaries that way (Fedora's sudo is 4111,
+    # sudoreplay 0111); a writable one could be rewritten with any #! line. The
+    # setuid and setgid bits prove nothing: any user can chmod 4111 a script.
     if [ ! -r "$f" ]; then
         [ -x "$f" ] || return 1
+        [ ! -w "$f" ] || return 0
         x=$(yr_helper find) || return 0
         x=$("$x" -L "$f" -maxdepth 0 -user 0 -print 2>/dev/null) || return 0
         [ -n "$x" ] && return 1
