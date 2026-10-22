@@ -93,12 +93,11 @@ These plugins use browser-based OAuth managed entirely by Claude Code:
 
 yellow-linear's Graphite merge-queue setup adds a GitHub push webhook that
 delivers commits from the repository to Linear, signed with a secret Linear
-generates. The user creates it in the GitHub repository settings and the
-secret stays between GitHub and Linear: no plugin reads, stores or sends it.
-Anyone with push access can then close a Linear issue through a `Closes
-<ISSUE-ID>` commit line, so the plugins write that line only after the user
-confirms it or the stack plan places it (`linear-workflows` skill, "Graphite
-Merge Queue").
+generates. The user creates it in the GitHub repository settings and the secret
+stays between GitHub and Linear: no plugin reads, stores or sends it. Anyone
+with push access can then close a Linear issue through a `Closes <ISSUE-ID>`
+commit line, so the plugins write that line only after the user confirms it or
+the stack plan places it (`linear-workflows` skill, "Graphite Merge Queue").
 
 No API keys in the plugin manifest. Will not work in headless SSH sessions
 (browser required for OAuth flow). A headless Composio host can instead register
@@ -423,10 +422,10 @@ interactive run asks before filing an issue. The controls
   command line.
 - **Deduplication.** Each post carries a hidden marker keyed to the thread ID. A
   reply is skipped when the viewer's newest marked comment among the last 10
-  carries the marker and only Bot authors have commented since. The exception
-  is an upgrade: a prior `disagree` or `unclear` reply is followed by `fixed`,
-  `addressed`, or `oos`, and a prior `oos` by `fixed` or `addressed`. An issue is
-  skipped when a viewer-authored issue already carries the marker; that scan
+  carries the marker and only Bot authors have commented since. The exception is
+  an upgrade: a prior `disagree` or `unclear` reply is followed by `fixed`,
+  `addressed`, or `oos`, and a prior `oos` by `fixed` or `addressed`. An issue
+  is skipped when a viewer-authored issue already carries the marker; that scan
   reads every page of the viewer's issues. Markers by other authors are ignored.
 - **Scope.** The scripts file GitHub issues only in the PR's repository and
   refuse a thread that does not belong to the PR; their only network destination
@@ -459,48 +458,48 @@ interactive run asks before filing an issue. The controls
   timeout applies.
 
 - **Local config guard.** `yellow-plugins.local.md` is gitignored per-user
-  config that `guard-local-config` protects. `/review:sweep` snapshots it
-  before `/review:pr` and classifies the PR head with `head-ignore-probe`,
-  which never fetches or checks out the head: it reads the head commit's root
-  listing and root `.gitignore` and `.gitattributes` blobs through `gh api`
-  at `headRefOid`, on the host and repository the PR's URL names. Those API
-  answers are untrusted data: they are written as plain files into a
-  temporary work tree and judged with this clone's git dir, `info/exclude`,
-  `core.excludesFile` and an empty index (`check-ignore -q --no-index`);
-  nothing from the head runs. The sweep aborts when the file is tracked here
-  but ignored on the head, and also when an untracked, unignored
-  `yellow-plugins.local.md` exists here (as a file or symlink, including a
-  dangling link) but the head ignores it, so those existing bytes never
-  become trusted unattended config (exit 1, before the checkout). Both
-  failure paths fail closed, before any snapshot or checkout. A head the
+  config that `guard-local-config` protects. `/review:sweep` snapshots it before
+  `/review:pr` and classifies the PR head with `head-ignore-probe`, which never
+  fetches or checks out the head: it reads the head commit's root listing and
+  root `.gitignore` and `.gitattributes` blobs through `gh api` at `headRefOid`,
+  on the host and repository the PR's URL names. Those API answers are untrusted
+  data: they are written as plain files into a temporary work tree and judged
+  with this clone's git dir, `info/exclude`, `core.excludesFile` and an empty
+  index (`check-ignore -q --no-index`); nothing from the head runs. The sweep
+  aborts when the file is tracked here but ignored on the head, and also when an
+  untracked, unignored `yellow-plugins.local.md` exists here (as a file or
+  symlink, including a dangling link) but the head ignores it, so those existing
+  bytes never become trusted unattended config (exit 1, before the checkout).
+  Both failure paths fail closed, before any snapshot or checkout. A head the
   probe cannot judge for that PR (its exit 4: the PR not found, a malformed or
-  truncated answer, a `.gitignore` or `.gitattributes` that is a symlink or
-  not a regular file, a root name that may case-fold onto one of the three
-  files, or a content-transforming attribute on `.gitignore`) skips only that
-  PR with `Sweep: skipped (head-ignore-unreadable)`, and `/review:sweep-all`
-  continues. A systemic failure (exit 3: rate limit, auth, an HTTP 403 or a
-  404 from the tree or blob read, network or timeout, or a local git failure) prints no skip line, so
-  `/review:sweep-all` stops the batch. Step 2b re-checks after checkout.
+  truncated answer, a `.gitignore` or `.gitattributes` that is a symlink or not
+  a regular file, a root name that may case-fold onto one of the three files, or
+  a content-transforming attribute on `.gitignore`) skips only that PR with
+  `Sweep: skipped (head-ignore-unreadable)`, and `/review:sweep-all` continues.
+  A systemic failure (exit 3: rate limit, auth, an HTTP 403 or a 404 from the
+  tree or blob read, network or timeout, or a local git failure) prints no skip
+  line, so `/review:sweep-all` stops the batch. Step 2b re-checks after
+  checkout.
 
 ### Unattended Review Learning Staging (yellow-review / yellow-core)
 
 Unattended reviews write a short model-authored narrative into an empty
-owner-only temporary file created by `stage-learning.sh tmpfile`. The
-command reads it before using the Write tool; narrative text never becomes
-shell source. `stage` accepts only regular, non-symlink `yr-stage.*` files
-directly under the canonical temporary directory and deletes the accepted
-file after the attempt, including failed staging attempts.
+owner-only temporary file created by `stage-learning.sh tmpfile`. The command
+reads it before using the Write tool; narrative text never becomes shell source.
+`stage` accepts only regular, non-symlink `yr-stage.*` files directly under the
+canonical temporary directory and deletes the accepted file after the attempt,
+including failed staging attempts.
 
 Before persistence, `cs_stage_entry` caps input at an 8 KiB line boundary,
-strips invisible/control characters, redacts recognized credential forms,
-and quotes fence and role-prefix lines. Failed redaction suppresses the
-write. The pending JSONL file is owner-only inside a private directory under
-`~/.claude/projects/<main-checkout-slug>/compound-staging/`; repeat reviews
-of the same repository/PR replace its pending entry. IDs outside the
-promoter's 64-character alphanumeric/underscore/hyphen contract are hashed
-with SHA-256 before writing. The existing drain
-still treats the narrative as untrusted reference data when scoring it.
-This store is separate from the review-findings ledger and is never pushed.
+strips invisible/control characters, redacts recognized credential forms, and
+quotes fence and role-prefix lines. Failed redaction suppresses the write. The
+pending JSONL file is owner-only inside a private directory under
+`~/.claude/projects/<main-checkout-slug>/compound-staging/`; repeat reviews of
+the same repository/PR replace its pending entry. IDs outside the promoter's
+64-character alphanumeric/underscore/hyphen contract are hashed with SHA-256
+before writing. The existing drain still treats the narrative as untrusted
+reference data when scoring it. This store is separate from the review-findings
+ledger and is never pushed.
 
 ### Jev Shadow Pre-Filter (yellow-core)
 
@@ -511,144 +510,142 @@ third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
 
 - **What leaves the machine.** The transcript tail that is staged locally,
   projected to user and assistant text only (tool calls and tool results are
-  dropped), passed through `cs_redact_secrets` (no call if it is unavailable
-  or fails) and capped at its newest 24,000 bytes, plus two fixed
-  classification questions. Redaction is `cs_redact_secrets`'s pattern
-  list, so an unrecognized secret typed into the chat can still be sent. Tool
-  calls, tool results and file contents Claude reads are not sent, but text a
-  user or assistant message itself contains (a pasted diff, quoted command
-  output) is.
-- **When.** The Stop hook fires at the end of every assistant turn, so a
-  session makes one call per turn (5 s timeout, `COMPOUND_JEV_TIMEOUT_S`).
-- **Credential handling.** The key is passed to curl as a config on fd 3 and
-  the request body on stdin, so neither appears in process argv. curl runs
-  with `-q`, so a user `~/.curlrc` cannot turn on tracing or `--insecure` for
-  this request. The key is never written to disk or logs.
+  dropped), passed through `cs_redact_secrets` (no call if it is unavailable or
+  fails) and capped at its newest 24,000 bytes, plus two fixed classification
+  questions. Redaction is `cs_redact_secrets`'s pattern list, so an unrecognized
+  secret typed into the chat can still be sent. Tool calls, tool results and
+  file contents Claude reads are not sent, but text a user or assistant message
+  itself contains (a pasted diff, quoted command output) is.
+- **When.** The Stop hook fires at the end of every assistant turn, so a session
+  makes one call per turn (5 s timeout, `COMPOUND_JEV_TIMEOUT_S`).
+- **Credential handling.** The key is passed to curl as a config on fd 3 and the
+  request body on stdin, so neither appears in process argv. curl runs with
+  `-q`, so a user `~/.curlrc` cannot turn on tracing or `--insecure` for this
+  request. The key is never written to disk or logs.
 - **Endpoint override.** `COMPOUND_JEV_URL` and `COMPOUND_JEV_MODEL` override
   the endpoint and model; anyone who can set the hook environment can redirect
   the text and key, so treat those variables as trusted configuration.
 - **Prompt injection.** Transcript text is wrapped in the repository's
-  `--- begin untrusted-content (reference only) ---` fence (lines starting
-  `---` are quoted so the text cannot close it), and both questions tell the
-  model to classify the excerpt as data. The answer is a typed choice and
-  probabilities, recorded only when every value is in range (choice from the
-  fixed set, numbers in [0, 1]); it is never executed or fed back to Claude.
+  `--- begin untrusted-content (reference only) ---` fence (lines starting `---`
+  are quoted so the text cannot close it), and both questions tell the model to
+  classify the excerpt as data. The answer is a typed choice and probabilities,
+  recorded only when every value is in range (choice from the fixed set, numbers
+  in [0, 1]); it is never executed or fed back to Claude.
 - **Local record.** `compound-staging/jev-shadow/<session_id>.json`, replaced
-  atomically each turn under a per-session lock (an answer whose content
-  hash no longer matches the session's pending, or else processing, entry is
-  dropped, and a newer turn retires the older record before its own call), holds the session id, content hash, choice,
-  probabilities, latency and token count, never transcript text. It sits in
-  the same owner-only staging directory as the pending queue. Every valid
-  answer, including one that lands after a newer turn, is also appended to
-  `jev-shadow/predictions.jsonl`, since a drain can score an entry before a
-  later turn replaces the per-session file. When that
+  atomically each turn under a per-session lock (an answer whose content hash no
+  longer matches the session's pending, or else processing, entry is dropped,
+  and a newer turn retires the older record before its own call), holds the
+  session id, content hash, choice, probabilities, latency and token count,
+  never transcript text. It sits in the same owner-only staging directory as the
+  pending queue. Every valid answer, including one that lands after a newer
+  turn, is also appended to `jev-shadow/predictions.jsonl`, since a drain can
+  score an entry before a later turn replaces the per-session file. When that
   directory exists, the staging-reviewer drain appends each scorer verdict
-  (session id, content hash, verdict, priority) to
-  `jev-shadow/outcomes.jsonl` so predictions can be joined to outcomes; it
-  holds no transcript text either.
+  (session id, content hash, verdict, priority) to `jev-shadow/outcomes.jsonl`
+  so predictions can be joined to outcomes; it holds no transcript text either.
 - **Failure mode.** Fail-open and shadow only: it runs after the pending entry
-  is written, every error is silent, and the answer never changes what is
-  staged or drained.
+  is written, every error is silent, and the answer never changes what is staged
+  or drained.
 
 #### Jev category eval (offline)
 
-`lib/jev-category-eval.py run` is a manual tool; no hook, agent or command
-runs it, and it changes no staging behaviour.
+`lib/jev-category-eval.py run` is a manual tool; no hook, agent or command runs
+it, and it changes no staging behaviour.
 
-- **What leaves the machine.** For each `docs/solutions/<category>/*.md` in
-  the git index (staged content, not the working tree; `archived/` and
-  unknown folders excluded), the frontmatter `title`, `problem` and `tags`
-  only, plus the fixed criteria from `lib/jev-category-criteria.json`. Doc
-  bodies are never read into a request. The docs come from whichever
-  repository `--repo` names, which may be private; run `--dry-run` first to
-  see what would be sent. Unlike the shadow pre-filter, the frontmatter is
-  sent unfenced: it is the repository's own docs, and the answer is only
-  compared with the doc's folder, never executed or fed back to Claude.
-  `--dry-run` prints the doc count and request size and sends nothing.
+- **What leaves the machine.** For each `docs/solutions/<category>/*.md` in the
+  git index (staged content, not the working tree; `archived/` and unknown
+  folders excluded), the frontmatter `title`, `problem` and `tags` only, plus
+  the fixed criteria from `lib/jev-category-criteria.json`. Doc bodies are never
+  read into a request. The docs come from whichever repository `--repo` names,
+  which may be private; run `--dry-run` first to see what would be sent. Unlike
+  the shadow pre-filter, the frontmatter is sent unfenced: it is the
+  repository's own docs, and the answer is only compared with the doc's folder,
+  never executed or fed back to Claude. `--dry-run` prints the doc count and
+  request size and sends nothing.
 - **When.** Only when a person runs `run`, one request per doc. `report` is
   offline.
 - **Credential handling.** The key comes from `TYPESAFE_API_KEY` (printable
   ASCII only) and is sent only in an unredirected `Authorization` header:
-  redirects are refused (not followed), proxy environment variables are
-  ignored, and TLS verification keeps urllib's defaults. The key never
-  appears in argv, output, error messages or result files; error rows carry
-  fixed status tokens, not response bodies. The git subprocesses that list
-  and read the docs run with the key removed from their environment and with
-  the repository's `core.fsmonitor` and hooks disabled.
+  redirects are refused (not followed), proxy environment variables are ignored,
+  and TLS verification keeps urllib's defaults. The key never appears in argv,
+  output, error messages or result files; error rows carry fixed status tokens,
+  not response bodies. The git subprocesses that list and read the docs run with
+  the key removed from their environment and with the repository's
+  `core.fsmonitor` and hooks disabled.
 - **Endpoint override.** `--url` and `--model` choose the endpoint and model.
   `--url` must be `https`, or plain `http` to a loopback IP address (for the
   test stub; the key then crosses loopback unencrypted), and must not carry
   credentials.
-- **Output.** `run` writes `results-<utc>.jsonl` (mode 600, created
-  exclusively, never overwritten) to `--out`. It refuses an `--out` under
-  the repository's top level (compared by resolved path, so another worktree
-  or a case-insensitive spelling is not caught) and an existing `--out` that
-  other users can write. Rows hold paths, folders, the answer, probabilities
-  and token counts, plus a sha256 of the frontmatter sent (`lesson_sha`), no
-  doc text. `report` writes `disagreements.tsv` (mode
-  600, paths only, through an exclusive temp file) beside the results file,
-  with no repository check of its own. It reads an existing
-  `disagreements.tsv` only when that is a regular file you own that others
-  cannot write; otherwise it exits 2 rather than replace it, unless the file
-  is passed with `--review`. It validates every results row (whole-string
-  matches, no repeated paths) and every judged review row before printing or
-  writing anything.
+- **Output.** `run` writes `results-<utc>.jsonl` (mode 600, created exclusively,
+  never overwritten) to `--out`. It refuses an `--out` under the repository's
+  top level (compared by resolved path, so another worktree or a
+  case-insensitive spelling is not caught) and an existing `--out` that other
+  users can write. Rows hold paths, folders, the answer, probabilities and token
+  counts, plus a sha256 of the frontmatter sent (`lesson_sha`), no doc text.
+  `report` writes `disagreements.tsv` (mode 600, paths only, through an
+  exclusive temp file) beside the results file, with no repository check of its
+  own. It reads an existing `disagreements.tsv` only when that is a regular file
+  you own that others cannot write; otherwise it exits 2 rather than replace it,
+  unless the file is passed with `--review`. It validates every results row
+  (whole-string matches, no repeated paths) and every judged review row before
+  printing or writing anything.
 
 ### Persona Selection Shadow Log (yellow-review)
 
-Off by default. When `yellow-plugins.local.md` sets `reviewer_selection:
-shadow` (or `jev`, which behaves the same for now), `/review:pr` Step 4 runs
+Off by default. When `yellow-plugins.local.md` sets `reviewer_selection: shadow`
+(or `jev`, which behaves the same for now), `/review:pr` Step 4 runs
 `lib/persona-shadow.sh shadow` once per review, after reviewer selection and
 before dispatch. It never changes which reviewers run.
 
-- **What leaves the machine.** Only when `TYPESAFE_API_KEY` is set and curl,
-  jq and yellow-core's `cs_redact_secrets` are available: the PR title (first
-  300 bytes, control characters stripped), the changed paths with per-file
-  line counts, and the diff hunks of every file that is not a test, generated
-  file or lockfile. All three pass through `cs_redact_secrets` (no call if it
-  is missing or reports a failure) and are each wrapped in the
-  untrusted-content fence; the diff is capped near 24,000 characters with the
-  largest files dropped first. The request also carries the nine fixed questions in
+- **What leaves the machine.** Only when `TYPESAFE_API_KEY` is set and curl, jq
+  and yellow-core's `cs_redact_secrets` are available: the PR title (first 300
+  bytes, control characters stripped), the changed paths with per-file line
+  counts, and the diff hunks of every file that is not a test, generated file or
+  lockfile. All three pass through `cs_redact_secrets` (no call if it is missing
+  or reports a failure) and are each wrapped in the untrusted-content fence; the
+  diff is capped near 24,000 characters with the largest files dropped first.
+  The request also carries the nine fixed questions in
   `lib/jev-persona-criteria.json`. It goes to TypeSafe AI
   (`https://api.typesafe.ai/v1/systemone`, model `jev-1.13.0` unless
   `REVIEW_JEV_MODEL` is set). Redaction is a pattern list, so a secret it does
   not recognize in the diff can still be sent.
-- **Repository gate.** The request is made only when `gh api
-  repos/<owner>/<repo>`, with the owner, repository and host parsed from the
-  `origin` remote that `/review:pr` diffs (never gh's default repository,
-  `GH_REPO` or `gh repo set-default`), reports the repository `public`, or the repository is
-  listed in `reviewer_selection_private_repos` by name or by an `owner/*`
-  entry (case-insensitive; it covers every repository of that owner,
+- **Repository gate.** The request is made only when
+  `gh api repos/<owner>/<repo>`, with the owner, repository and host parsed from
+  the `origin` remote that `/review:pr` diffs (never gh's default repository,
+  `GH_REPO` or `gh repo set-default`), reports the repository `public`, or the
+  repository is listed in `reviewer_selection_private_repos` by name or by an
+  `owner/*` entry (case-insensitive; it covers every repository of that owner,
   including ones created later). A failed or unparseable lookup counts as
-  private, so diffs from private repositories never leave without an
-  explicit entry. `reviewer_selection_private_repos` is read only from the
-  user-level `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`, never from the repository's file:
-  `/review:pr` reads config from the checked-out PR head, so a contributor
-  could otherwise opt a private repository in. `reviewer_selection` itself
-  may come from either file; it alone sends nothing from a private
-  repository.
+  private, so diffs from private repositories never leave without an explicit
+  entry. `reviewer_selection_private_repos` is read only from the user-level
+  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`, never from the
+  repository's file: `/review:pr` reads config from the checked-out PR head, so
+  a contributor could otherwise opt a private repository in.
+  `reviewer_selection` itself may come from either file; it alone sends nothing
+  from a private repository.
 - **When.** Once per `/review:pr` run with the key set (5 s timeout,
   `REVIEW_JEV_TIMEOUT_S`). `/review:all` does not call it.
-- **Credential handling.** The key reaches curl as a config on fd 3, fed by
-  a process substitution (a pipe, not a here-document, which bash before 5.1
+- **Credential handling.** The key reaches curl as a config on fd 3, fed by a
+  process substitution (a pipe, not a here-document, which bash before 5.1
   writes to a temp file), and the body on stdin, never argv; curl runs with
   `-q`. The key is never written to disk or logs. `REVIEW_JEV_URL` and
   `REVIEW_JEV_MODEL` redirect the request and are trusted configuration.
 - **Prompt injection.** The diff is wrapped in the
-  `--- begin untrusted-content (reference only) ---` fence (lines starting
-  `---` are quoted), and every question tells the model to read it as data.
-  Answers are accepted only when all nine are probabilities in [0, 1]; they
-  are logged, never executed or fed back to Claude, and no reviewer is
-  skipped on their account in this phase.
-- **Local record.** `<git-common-dir>/yellow-review/jev-persona/<pr>-<head>.json`
-  (directory 0700, file 0600, replaced atomically) holds the criteria file's
-  sha256, the model, the exact-rule, orchestrator, Jev and dispatched persona
-  sets, probabilities, line counts, the trim flag and latency. It holds no
-  diff or title text and is never pushed. The diff exists on disk only as a
-  private temp file between `git diff` and redaction.
+  `--- begin untrusted-content (reference only) ---` fence (lines starting `---`
+  are quoted), and every question tells the model to read it as data. Answers
+  are accepted only when all nine are probabilities in [0, 1]; they are logged,
+  never executed or fed back to Claude, and no reviewer is skipped on their
+  account in this phase.
+- **Local record.**
+  `<git-common-dir>/yellow-review/jev-persona/<pr>-<head>.json` (directory 0700,
+  file 0600, replaced atomically) holds the criteria file's sha256, the model,
+  the exact-rule, orchestrator, Jev and dispatched persona sets, probabilities,
+  line counts, the trim flag and latency. It holds no diff or title text and is
+  never pushed. The diff exists on disk only as a private temp file between
+  `git diff` and redaction.
 - **Failure mode.** Fail-open and shadow only: every error ends in one
-  `persona-shadow:` line, exit 0, and the review continues with the
-  selection it already made.
+  `persona-shadow:` line, exit 0, and the review continues with the selection it
+  already made.
 
 ### Context Observer Persistence (yellow-core)
 
@@ -738,11 +735,11 @@ boundary:
   paths, duplicate entries, non-commit-id SHAs, and a recorded remote that is
   not a configured remote (or any remote for Graphite). `owner` lines (the
   worktrees that held a restacked branch when a GitHub run started) pass the
-  same path checks, may not name the run worktree or repeat, and are rejected
-  in Graphite state. `--abort` runs `git rebase --abort` only in recorded
-  worktrees (the run worktree, entries and owners), and only after git confirms
-  the path is still a worktree of this clone whose top level is that path. A
-  rejected file runs nothing (exit 4).
+  same path checks, may not name the run worktree or repeat, and are rejected in
+  Graphite state. `--abort` runs `git rebase --abort` only in recorded worktrees
+  (the run worktree, entries and owners), and only after git confirms the path
+  is still a worktree of this clone whose top level is that path. A rejected
+  file runs nothing (exit 4).
 - **Provider output is untrusted.** Stack branch names parsed from
   `gt log short` or the github-workflow adapter's JSON must pass the same
   branch-name check before they reach a command line. A failed provider call
@@ -751,9 +748,9 @@ boundary:
   kept (exit 10 or 31) for `status`, `--continue`, `--abort` or `restore`; on a
   plain provider failure the worktrees are restored and the state is cleared
   (exit 30), so nothing is left to recover. A stack that forks or a dirty,
-  locked, prunable or mid-operation stack worktree is refused before any
-  change. Its own git calls
-  never force a checkout, stash, hard-reset or pass `--ignore-other-worktrees`.
+  locked, prunable or mid-operation stack worktree is refused before any change.
+  Its own git calls never force a checkout, stash, hard-reset or pass
+  `--ignore-other-worktrees`.
 - **Documented residuals.** The dirty check ignores gitignored files, and a
   restore checkout overwrites an ignored file when the restacked branch now
   tracks that path. A model with a file-write tool that writes a self-consistent
@@ -819,9 +816,9 @@ child process and never imports it. Containment assumptions:
   `GOAL_GEN_BIN` override); every operation first probes `version --json` and
   `capabilities --json --protocol v2` and refuses an engine whose identity,
   version or capabilities disagree with the pin. **The locally installed
-  executable is a trusted boundary**: the operator installs the verified
-  release asset and controls `PATH`; the runtime probes validate an already
-  trusted binary and do not claim to authenticate an arbitrary replacement.
+  executable is a trusted boundary**: the operator installs the verified release
+  asset and controls `PATH`; the runtime probes validate an already trusted
+  binary and do not claim to authenticate an arbitrary replacement.
   Release-asset provenance is enforced by the SHA-256 check in the blocking CI
   gate, not at every spawn.
 - **Authority**: `/goal:setup` and `/goal:request` are read-only;
@@ -829,9 +826,8 @@ child process and never imports it. Containment assumptions:
   `run --executor stub --protocol v2 --stub-scenario <scenario> [--timeout-ms n] [--yes] -- <request>`.
   Callers cannot select an executor, protocol, target, provider, or raw argv.
   The stub executor is zero-spend and never touches the request's target
-  repository, and the consumer rejects a nonzero reported cost.
-  `/goal:run-real` is user-only. It displays the engine `run manifest` body,
-  then spawns
+  repository, and the consumer rejects a nonzero reported cost. `/goal:run-real`
+  is user-only. It displays the engine `run manifest` body, then spawns
   `run --protocol v2 --executor agx-claude-code` with the operator's approval
   path. It never passes `--yes`, never runs `run approve`, and never lets the
   caller choose `claude-code` or a protocol.
@@ -1006,18 +1002,17 @@ boundary from the pack and fenced-output files above:
   `/tmp/council-claude-fenced-*.txt` plus identity with the minted literal;
   converting it to a state file is a follow-up.
 - **Verification files**: 5b also writes `citations.jsonl` (each finding's id,
-  file, line and quoted `Evidence:` text) and `verification.tsv` (its
-  result). The evidence check reads cited files only after a strict citation
-  parse (ASCII allowlist path, no leading `/`, `~` or `-`, no `..` or `.git`
-  segment, a numeric line within the file, yellow-core's `validate_file_path`,
-  and a file git does not ignore), so a reviewer cannot make it read outside
-  the repository or turn an ignored `.env` into a yes/no oracle. The
-  `rapidfuzz` probe runs from `/`, because `python3 -c` would otherwise import
-  a `rapidfuzz.py` planted in the checkout under review. `verification.tsv`
-  shows file tokens with non-allowlist characters as `?`. Window lines reach the
-  Tier 2 scorer in memory and through pipes only, redacted by
-  `cs_redact_secrets`; lines inside a private-key block are replaced before
-  redaction.
+  file, line and quoted `Evidence:` text) and `verification.tsv` (its result).
+  The evidence check reads cited files only after a strict citation parse (ASCII
+  allowlist path, no leading `/`, `~` or `-`, no `..` or `.git` segment, a
+  numeric line within the file, yellow-core's `validate_file_path`, and a file
+  git does not ignore), so a reviewer cannot make it read outside the repository
+  or turn an ignored `.env` into a yes/no oracle. The `rapidfuzz` probe runs
+  from `/`, because `python3 -c` would otherwise import a `rapidfuzz.py` planted
+  in the checkout under review. `verification.tsv` shows file tokens with
+  non-allowlist characters as `?`. Window lines reach the Tier 2 scorer in
+  memory and through pipes only, redacted by `cs_redact_secrets`; lines inside a
+  private-key block are replaced before redaction.
 
 #### Report staging (yellow-council Step 7)
 
@@ -1025,10 +1020,10 @@ Step 7 used to carry the synthesis markdown into Bash in a quoted heredoc. A
 reviewer quote equal to the delimiter would have ended it and run the rest as
 shell input, so the markdown now reaches the shell through a file:
 
-- **7a** mints `/tmp/council-synth-XXXXXX` (0700) and a 32-hex token in
-  `.token` (written with `>|`), and prints `COUNCIL_REPORT_FILE=<dir>/synthesis.md`
-  and `COUNCIL_REPORT_TOKEN=<hex>`. It arms no trap: the `Write` in 7b is a
-  later tool call, after 7a's shell has exited.
+- **7a** mints `/tmp/council-synth-XXXXXX` (0700) and a 32-hex token in `.token`
+  (written with `>|`), and prints `COUNCIL_REPORT_FILE=<dir>/synthesis.md` and
+  `COUNCIL_REPORT_TOKEN=<hex>`. It arms no trap: the `Write` in 7b is a later
+  tool call, after 7a's shell has exited.
 - **7b** `Write`s the synthesis to that exact path.
 - **7c** carries both values as literals and never re-reads the expected token
   from the directory. It refuses (and deletes nothing) unless the directory is
@@ -1045,28 +1040,28 @@ shell input, so the markdown now reaches the shell through a file:
   real mitigation.
 - **7c hands off a file, not a variable.** After assembling the report
   (including the redaction pass and fence rebuild over the claude leg), 7c
-  writes it to `<dir>/report.md` (refusing one that already exists), disarms
-  its trap, and prints `COUNCIL_ASSEMBLED_REPORT=<path>`.
-- **Step 9** re-runs the same directory check against the 7a literals,
-  requires `report.md` to be a regular non-symlink file the user owns, and
-  copies it with `cp` to a `mktemp` file beside the Step 6 target. Only the
-  repo-relative `docs/council/<name>.md` path is relayed, in single quotes, and
-  `<name>` must use only `[a-z0-9-]`; Step 9 re-anchors it at the checkout
-  itself, so a checkout directory holding shell syntax is never pasted into a
-  command. The target must not exist yet. `cmp` confirms the copy, and `ln` publishes it, failing if the
-  target appeared meanwhile, so a concurrent run's report is never
-  overwritten. The temp file is always removed. The saved report
-  is therefore byte-identical to what 7c assembled, so the claude leg's
-  redaction is mechanical rather than dependent on the model retyping the
-  report. A saved report removes the directory; the Step 8 Cancel block
-  removes it after the same check.
-- **Residual (interrupted run)**: a run cancelled or aborted between 7a and
-  Step 9 leaves the 0700 directory, holding the staged synthesis and (after
-  7c) the assembled report, until a later `/council` reaches 5a and its sweep
-  removes directories over 24 hours old. So does a Step 9 copy that fails, so
-  the report can be copied by hand. A failed `Write` is still cleaned up: 7c
-  validates the directory, finds no `synthesis.md`, exits 1, and its trap
-  removes the directory.
+  writes it to `<dir>/report.md` (refusing one that already exists), disarms its
+  trap, and prints `COUNCIL_ASSEMBLED_REPORT=<path>`.
+- **Step 9** re-runs the same directory check against the 7a literals, requires
+  `report.md` to be a regular non-symlink file the user owns, and copies it with
+  `cp` to a `mktemp` file beside the Step 6 target. Only the repo-relative
+  `docs/council/<name>.md` path is relayed, in single quotes, and `<name>` must
+  use only `[a-z0-9-]`; Step 9 re-anchors it at the checkout itself, so a
+  checkout directory holding shell syntax is never pasted into a command. The
+  target must not exist yet. `cmp` confirms the copy, and `ln` publishes it,
+  failing if the target appeared meanwhile, so a concurrent run's report is
+  never overwritten. The temp file is always removed. The saved report is
+  therefore byte-identical to what 7c assembled, so the claude leg's redaction
+  is mechanical rather than dependent on the model retyping the report. A saved
+  report removes the directory; the Step 8 Cancel block removes it after the
+  same check.
+- **Residual (interrupted run)**: a run cancelled or aborted between 7a and Step
+  9 leaves the 0700 directory, holding the staged synthesis and (after 7c) the
+  assembled report, until a later `/council` reaches 5a and its sweep removes
+  directories over 24 hours old. So does a Step 9 copy that fails, so the report
+  can be copied by hand. A failed `Write` is still cleaned up: 7c validates the
+  directory, finds no `synthesis.md`, exits 1, and its trap removes the
+  directory.
 
 ### OpenCode default route and quota stubs (yellow-council)
 
@@ -1136,15 +1131,15 @@ the agent's own "Tool Surface — Documented Exception" section.
 
 Plugins that execute shell commands:
 
-| Plugin              | Commands Used                                | Purpose                                                    |
-| ------------------- | -------------------------------------------- | ---------------------------------------------------------- |
-| yellow-linear       | `git`, `gh`                                  | Branch detection, PR context                               |
-| yellow-devin        | `curl`, `jq`, `git`, `gh`                    | Devin API calls, JSON construction                         |
-| yellow-review       | `gt`, `gh`, `git`, `jq`                      | PR management, GraphQL queries                             |
-| yellow-ruvector     | `node`, `npm`, `jq`, `git`, `pgrep`, `grep`  | ruvector CLI, install, hook scripts, seed-solutions guards |
-| yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh`         | Browser automation, setup                                  |
-| yellow-debt         | `git`, `gt`, `jq`, `yq`                      | Codebase analysis, commit generation                       |
-| gt-workflow         | `gt`, `git`                                  | Branch and PR management                                   |
+| Plugin              | Commands Used                                                                                                    | Purpose                                                    |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| yellow-linear       | `git`, `gh`                                                                                                      | Branch detection, PR context                               |
+| yellow-devin        | `curl`, `jq`, `git`, `gh`                                                                                        | Devin API calls, JSON construction                         |
+| yellow-review       | `gt`, `gh`, `git`, `jq`                                                                                          | PR management, GraphQL queries                             |
+| yellow-ruvector     | `node`, `npm`, `jq`, `git`, `pgrep`, `grep`                                                                      | ruvector CLI, install, hook scripts, seed-solutions guards |
+| yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh`                                                                             | Browser automation, setup                                  |
+| yellow-debt         | `git`, `gt`, `jq`, `yq`                                                                                          | Codebase analysis, commit generation                       |
+| gt-workflow         | `gt`, `git`                                                                                                      | Branch and PR management                                   |
 | yellow-council      | `agy`, `opencode`, `timeout`, `jq`, `mktemp`, `od`, `sort`, `iconv`, `python3` (optional), yellow-core libraries | Cross-lineage CLI code review                              |
 
 ### Prompt Injection Boundaries
@@ -1279,15 +1274,19 @@ through files, never through shell text. This adds a filesystem write surface:
 
 - **Permission.** Each agent holds the `Write` tool (`code-researcher` gained
   it). The grant is not path-scoped; the agent instruction limits it to the
-  values directory the recipe prints. Treat it as an instruction-level
-  boundary, not an enforced one.
-- **Locations.** A 0700 state directory (`$XDG_RUNTIME_DIR` or `~/.cache`,
-  under `yellow-ast-grep`) holds a `lock` directory and a pointer file naming
-  the values directory. The values directory is created by `mktemp -d` under
-  the resolved TMPDIR and carries a marker directory.
-- **Locking.** One search at a time per user. A concurrent search is told to
-  retry or fall back to Grep. A lock older than 15 minutes is treated as
-  abandoned. Ownership is not tokenized (tracked in issue 1116).
+  values directory the recipe prints. Treat it as an instruction-level boundary,
+  not an enforced one.
+- **Locations.** A 0700 state directory (`$XDG_RUNTIME_DIR` or `~/.cache`, under
+  `yellow-ast-grep`) holds one `search.<token>` record per pending search, each
+  with a pointer file naming its values directory. The values directory is
+  created by `mktemp -d` under the resolved TMPDIR, ends in the same token, and
+  carries a marker directory.
+- **Handoff.** Each search gets its own token (the `mktemp` suffix), so parallel
+  scanners and `code-researcher` run concurrently without a shared lock. The
+  token is the only text the agent puts into the second block; the block refuses
+  anything but exactly eight letters or digits naming an existing record, and
+  still reads the values directory from that record's pointer file. A record
+  older than 15 minutes is treated as abandoned.
 - **Cleanup.** The recipe deletes only its own value and config files and then
   the empty directories, never `rm -rf`. It leaves any directory that lacks the
   marker or the pointer match untouched.

@@ -2,9 +2,10 @@
 # FU-1 regression tests for the ast-grep CLI recipe (yellow-plugins #1090,
 # finding 4213663527, and the #1112 review). Values (pattern, lang, target,
 # rule) reach the recipe only as files the agent writes with the Write tool,
-# read back with "$(cat -- file)". Both blocks run exactly as written: the
-# values directory is found through step 1's lock/pointer file in a private
-# 0700 state directory, so nothing the agent types becomes shell source. The
+# read back with "$(cat -- file)". The only text the agent puts into a block
+# is step 1's eight-character token (CLAUDE-91), which selects step 1's record
+# in a private 0700 state directory; the values directory comes from that
+# record's pointer file, so no value or path becomes shell source. The
 # recipe only accepts a values directory under the resolved TMPDIR that holds
 # step 1's marker, and cleans up by deleting its own files and rmdir, never
 # rm -rf. Each doc's blocks run end to end against a stub ast-grep that
@@ -24,7 +25,7 @@ setup() {
   mkdir "$WORK/tmp-real"
   ln -s "$WORK/tmp-real" "$WORK/tmp-link"
   export TMPDIR="$WORK/tmp-link"
-  # Private per-test state directory for the lock and pointer file.
+  # Private per-test state directory for the per-search records.
   mkdir -m 700 "$WORK/run" "$WORK/home"
   export XDG_RUNTIME_DIR="$WORK/run" HOME="$WORK/home"
   STATE="$WORK/run/yellow-ast-grep"
@@ -73,22 +74,36 @@ extract_block() {
 }
 step1_of() { extract_block "$1" 'mktemp -d'; }
 recipe_of() { extract_block "$1" 'ast-grep run'; }
+# The recipe block with TOKEN replaced by $2, the one edit the agent makes.
+recipe_for() { recipe_of "$1" | sed "1s|^k='TOKEN'\$|k='$2'|"; }
+# Run step 1 of doc $1 under shell $2; set STEP1_DIR and STEP1_TOKEN.
+run_step1() {
+  local out
+  out="$(env PATH="$STUB:$PATH" ${2:-bash} -c "$(step1_of "$1")")"
+  STEP1_DIR="$(printf '%s\n' "$out" | sed -n 's/^dir: //p')"
+  STEP1_TOKEN="$(printf '%s\n' "$out" | sed -n 's/^token: //p')"
+}
+# No per-search record is left in the state directory.
+expect_no_records() {
+  if [ -n "$(ls -A "$STATE" 2>/dev/null)" ]; then echo "$1: records left: $(ls -A "$STATE")"; return 1; fi
+}
 
 # Run step 1 of doc $1 under shell $2, then write the name=value pairs the
 # way the Write tool would (verbatim plus a trailing newline), then run the
 # recipe block unchanged. Sets RECIPE_DIR.
 run_recipe() {
   local doc="$1" sh="$2"; shift 2
-  local step1 recipe kv
-  step1="$(step1_of "$doc")"
-  recipe="$(recipe_of "$doc")"
-  if [ -z "$step1" ] || [ -z "$recipe" ]; then
+  local recipe kv
+  if [ -z "$(step1_of "$doc")" ] || [ -z "$(recipe_of "$doc")" ]; then
     echo "recipe blocks not found in $doc"; return 1
   fi
-  RECIPE_DIR="$(env PATH="$STUB:$PATH" $sh -c "$step1")"
+  run_step1 "$doc" "$sh"
+  RECIPE_DIR="$STEP1_DIR"
   if [ -z "$RECIPE_DIR" ] || [ ! -d "$RECIPE_DIR" ]; then
     echo "step 1 printed no directory: '$RECIPE_DIR'"; return 1
   fi
+  [ "$RECIPE_DIR" = "${RECIPE_DIR%.*}.$STEP1_TOKEN" ]
+  recipe="$(recipe_for "$doc" "$STEP1_TOKEN")"
   for kv in "$@"; do
     printf '%s\n' "${kv#*=}" > "$RECIPE_DIR/${kv%%=*}"
   done
@@ -123,7 +138,7 @@ check_breakout() {
   [ "$(argv_n 4)" = --pattern ]
   [[ "$output" == *"console.log(1)"* ]]
   [ ! -e "$RECIPE_DIR" ]
-  [ ! -e "$STATE/lock" ]
+  expect_no_records "$doc/$sh"
 }
 
 @test "ast-grep recipe passes values through files, never through a heredoc" {
@@ -133,16 +148,17 @@ check_breakout() {
     [ -n "$block" ]
     if printf '%s' "$block" | grep -q '<<'; then echo "heredoc in $doc recipe"; return 1; fi
     if printf '%s' "$block" | grep -q 'rm -rf'; then echo "rm -rf in $doc recipe"; return 1; fi
-    # Nothing to fill in: no placeholder anywhere in either block.
-    if printf '%s\n%s' "$block" "$(step1_of "$PLUGIN_ROOT/$doc")" |
-      grep -nE "VALUES_DIR|^(PATTERN|LANG|PATH|RULE)$|='[A-Z_]+'|<[A-Za-z_]+>"; then
+    # The token line is the recipe's first line and its only placeholder.
+    [ "$(printf '%s\n' "$block" | head -n 1)" = "k='TOKEN'" ]
+    if printf '%s\n%s' "$(printf '%s\n' "$block" | tail -n +2)" "$(step1_of "$PLUGIN_ROOT/$doc")" |
+      grep -nE "TOKEN|VALUES_DIR|^(PATTERN|LANG|PATH|RULE)$|='[A-Z_]+'|<[A-Za-z_]+>"; then
       echo "placeholder in $doc ast-grep blocks"; return 1
     fi
     for want in 'pattern=$(cat -- "$d/pattern")' 'lang=$(cat -- "$d/lang")' \
       'target=$(cat -- "$d/target")' 'rule=$(cat -- "$d/rule")' \
       'ast-grep run -c "$cfg" --pattern "$pattern" --lang "$lang" -- "$target"' \
       'ast-grep scan -c "$cfg" --inline-rules "$rule" --json=stream -- "$target"' \
-      'rmdir -- "$d"' 'd=$(cat -- "$b/lock/dir")'; do
+      'rmdir -- "$d"' 'd=$(cat -- "$s/dir")'; do
       if ! printf '%s' "$block" | grep -qF -- "$want"; then echo "$doc missing: $want"; return 1; fi
     done
     if grep -q 'AST_GREP_[A-Z]*_NONCE' "$PLUGIN_ROOT/$doc"; then echo "stale NONCE in $doc"; return 1; fi
@@ -173,7 +189,8 @@ check_breakout() {
   for doc in "${DOCS[@]}"; do
     rm -f "$ARGV_FILE" "$CFG_COPY"
     printf 'sentinel\n' > "$WORK/outside"
-    RECIPE_DIR="$(env PATH="$STUB:$PATH" bash -c "$(step1_of "$PLUGIN_ROOT/$doc")")"
+    run_step1 "$PLUGIN_ROOT/$doc"
+    RECIPE_DIR="$STEP1_DIR"
     printf 'console.log($A)\n' > "$RECIPE_DIR/pattern"
     printf 'js\n' > "$RECIPE_DIR/lang"
     printf 'src\n' > "$RECIPE_DIR/target"
@@ -181,7 +198,7 @@ check_breakout() {
     for f in trusted-sgconfig.yml trusted-sgconfig.XXXXXXXX sgconfig.yml; do
       ln -s "$WORK/outside" "$RECIPE_DIR/$f"
     done
-    recipe="$(recipe_of "$PLUGIN_ROOT/$doc")"
+    recipe="$(recipe_for "$PLUGIN_ROOT/$doc" "$STEP1_TOKEN")"
     run env PATH="$STUB:$PATH" bash -c "$recipe"
     [ "$(cat "$WORK/outside")" = sentinel ]
     [ "$(cat "$CFG_COPY")" = 'ruleDirs: []' ]
@@ -218,15 +235,16 @@ check_breakout() {
   done
 }
 
-# Take the lock with step 1, then make the pointer file name $2 instead of
+# Record a search with step 1, then make its pointer file name $2 instead of
 # step 1's directory (what a stale or tampered pointer would hold), and run
-# the recipe block unchanged.
+# the recipe block with step 1's token.
 run_with_pointer() {
   local doc="$1" target_dir="$2" own
-  own="$(env PATH="$STUB:$PATH" bash -c "$(step1_of "$doc")")"
+  run_step1 "$doc"
+  own="$STEP1_DIR"
   [ -d "$own" ]
-  printf '%s\n' "$target_dir" > "$STATE/lock/dir"
-  run env PATH="$STUB:$PATH" bash -c "$(recipe_of "$doc")"
+  printf '%s\n' "$target_dir" > "$STATE/search.$STEP1_TOKEN/dir"
+  run env PATH="$STUB:$PATH" bash -c "$(recipe_for "$doc" "$STEP1_TOKEN")"
   rmdir "$own/.ast-grep-values" "$own"
 }
 
@@ -250,8 +268,8 @@ run_with_pointer() {
       expect_refused_untouched "$doc: $d"
       [ "$(cat "$d/precious.txt")" = keep ]
       [ -f "$d/pattern" ]
-      # The lock is released even when the pointed-to directory is refused.
-      [ ! -e "$STATE/lock" ]
+      # The record is dropped even when the pointed-to directory is refused.
+      expect_no_records "$doc: $d"
     done
     for d in "$WORK" VALUES_DIR '/tmp/ast-grep-values.$(touch markers/D)' \
       "$real/ast-grep-values.12345678/../x" ''; do
@@ -259,7 +277,7 @@ run_with_pointer() {
       run_with_pointer "$PLUGIN_ROOT/$doc" "$d"
       expect_refused_untouched "$doc: $d"
       expect_no_markers "$doc: $d"
-      [ ! -e "$STATE/lock" ]
+      expect_no_records "$doc: $d"
     done
     [ -f src/a.js ]
   done
@@ -274,62 +292,114 @@ run_with_pointer() {
     run_with_pointer "$PLUGIN_ROOT/$doc" "$payload"
     expect_no_markers "$doc"
     expect_refused_untouched "$doc"
-    [ ! -e "$STATE/lock" ]
+    expect_no_records "$doc"
   done
 }
 
-@test "the recipe without a pending step 1 refuses and touches nothing" {
-  local doc
+@test "the recipe without a matching step 1 record refuses and touches nothing" {
+  local doc tok
   for doc in "${DOCS[@]}"; do
-    rm -f "$ARGV_FILE"
-    run env PATH="$STUB:$PATH" bash -c "$(recipe_of "$PLUGIN_ROOT/$doc")"
-    expect_refused_untouched "$doc"
-    [[ "$output" == *"no pending search"* ]]
+    # TOKEN left in place, a well-formed token step 1 never issued, and
+    # malformed tokens, with and without another search pending.
+    for tok in TOKEN AbCd1234 AbCd123 AbCd12345 'AbCd/../' '../../xx'; do
+      rm -f "$ARGV_FILE"
+      run env PATH="$STUB:$PATH" bash -c "$(recipe_for "$PLUGIN_ROOT/$doc" "$tok")"
+      expect_refused_untouched "$doc: $tok"
+      [[ "$output" == *"no pending search"* ]]
+    done
+    run_step1 "$PLUGIN_ROOT/$doc"
+    printf 'console.log($A)\n' > "$STEP1_DIR/pattern"
+    for tok in TOKEN AbCd1234; do
+      rm -f "$ARGV_FILE"
+      run env PATH="$STUB:$PATH" bash -c "$(recipe_for "$PLUGIN_ROOT/$doc" "$tok")"
+      expect_refused_untouched "$doc: $tok with a search pending"
+      # The other search's record and values are untouched.
+      [ -f "$STATE/search.$STEP1_TOKEN/dir" ]
+      [ -f "$STEP1_DIR/pattern" ]
+    done
+    rm -f "$STEP1_DIR/pattern" "$STATE/search.$STEP1_TOKEN/dir"
+    rmdir "$STEP1_DIR/.ast-grep-values" "$STEP1_DIR" "$STATE/search.$STEP1_TOKEN"
   done
 }
 
-@test "one search at a time: a second step 1 is busy, concurrent ones get one winner" {
-  local doc step1 first i winners
+@test "CLAUDE-91: concurrent searches get their own directory and token" {
+  local doc step1 i n dirs toks
   for doc in "${DOCS[@]}"; do
     step1="$(step1_of "$PLUGIN_ROOT/$doc")"
-    first="$(bash -c "$step1")"
-    [ -d "$first" ]
-    run bash -c "$step1"
-    [[ "$output" == *"ast-grep: busy"* ]]
-    [ "$(cat "$STATE/lock/dir")" = "$first" ]
-    rmdir "$first/.ast-grep-values" "$first"
-    rm -f "$STATE/lock/dir"
-    rmdir "$STATE/lock"
-    # Eight step 1 runs at once: exactly one takes the lock.
+    # Eight step 1 runs at once: every one succeeds with a distinct search.
     for i in 1 2 3 4 5 6 7 8; do
       bash -c "$step1" > "$WORK/race.$i" 2>&1 &
     done
     wait
-    winners="$(cat "$WORK"/race.* | grep -c '/ast-grep-values\.')"
-    [ "$winners" -eq 1 ]
-    [ "$(cat "$WORK"/race.* | grep -c 'ast-grep: busy')" -eq 7 ]
-    first="$(cat "$STATE/lock/dir")"
-    rmdir "$first/.ast-grep-values" "$first"
-    rm -f "$STATE/lock/dir" "$WORK"/race.*
-    rmdir "$STATE/lock"
+    if grep -h 'ast-grep:' "$WORK"/race.*; then echo "$doc: a step 1 was refused"; return 1; fi
+    dirs="$(sed -n 's/^dir: //p' "$WORK"/race.* | sort -u)"
+    toks="$(sed -n 's/^token: //p' "$WORK"/race.* | sort -u)"
+    [ "$(printf '%s\n' "$dirs" | grep -c .)" -eq 8 ]
+    [ "$(printf '%s\n' "$toks" | grep -c .)" -eq 8 ]
+    [ "$(ls -A "$STATE" | grep -c '^search\.')" -eq 8 ]
+    for n in $toks; do
+      [ "$(cat "$STATE/search.$n/dir")" = "$(sed -n "s/^dir: \(.*\.$n\)\$/\1/p" "$WORK"/race.*)" ]
+      d="$(cat "$STATE/search.$n/dir")"
+      rm -f "$STATE/search.$n/dir"
+      rmdir "$d/.ast-grep-values" "$d" "$STATE/search.$n"
+    done
+    rm -f "$WORK"/race.*
   done
 }
 
-@test "a lock older than 15 minutes is treated as stale" {
-  local doc step1 old new
+@test "CLAUDE-91: interleaved searches each read only their own values" {
+  local doc sh a_dir a_tok b_dir b_tok
+  for sh in bash 'zsh -f -o noclobber'; do
+    if [ "$sh" != bash ]; then require_zsh; fi
+    for doc in "${DOCS[@]}"; do
+      # Scanner A and scanner B both run step 1 before either runs the recipe.
+      run_step1 "$PLUGIN_ROOT/$doc" "$sh"
+      a_dir="$STEP1_DIR" a_tok="$STEP1_TOKEN"
+      run_step1 "$PLUGIN_ROOT/$doc" "$sh"
+      b_dir="$STEP1_DIR" b_tok="$STEP1_TOKEN"
+      [ "$a_dir" != "$b_dir" ]
+      printf 'aaa($A)\n' > "$a_dir/pattern"
+      printf 'js\n' > "$a_dir/lang"
+      printf 'src\n' > "$a_dir/target"
+      printf 'bbb($B)\n' > "$b_dir/pattern"
+      printf 'ts\n' > "$b_dir/lang"
+      printf 'src\n' > "$b_dir/target"
+      # B finishes first; A's directory and record are left alone.
+      rm -f "$ARGV_FILE"
+      run env PATH="$STUB:$PATH" $sh -c "$(recipe_for "$PLUGIN_ROOT/$doc" "$b_tok")"
+      [ "$status" -eq 0 ]
+      [ "$(argv_n 5)" = 'bbb($B)' ]
+      [ "$(argv_n 7)" = ts ]
+      [ ! -e "$b_dir" ]
+      [ ! -e "$STATE/search.$b_tok" ]
+      [ -f "$a_dir/pattern" ]
+      [ -f "$STATE/search.$a_tok/dir" ]
+      rm -f "$ARGV_FILE"
+      run env PATH="$STUB:$PATH" $sh -c "$(recipe_for "$PLUGIN_ROOT/$doc" "$a_tok")"
+      [ "$status" -eq 0 ]
+      [ "$(argv_n 5)" = 'aaa($A)' ]
+      [ "$(argv_n 7)" = js ]
+      [ ! -e "$a_dir" ]
+      expect_no_records "$doc/$sh"
+    done
+  done
+}
+
+@test "a search record older than 15 minutes is treated as abandoned" {
+  local doc old old_tok
   for doc in "${DOCS[@]}"; do
-    step1="$(step1_of "$PLUGIN_ROOT/$doc")"
-    old="$(bash -c "$step1")"
-    touch -t 200001010000 "$STATE/lock"
-    new="$(bash -c "$step1")"
-    [ -d "$new" ]
-    [ "$new" != "$old" ]
-    [ "$(cat "$STATE/lock/dir")" = "$new" ]
+    run_step1 "$PLUGIN_ROOT/$doc"
+    old="$STEP1_DIR" old_tok="$STEP1_TOKEN"
+    touch -t 200001010000 "$STATE/search.$old_tok"
+    run_step1 "$PLUGIN_ROOT/$doc"
+    [ -d "$STEP1_DIR" ]
+    [ "$STEP1_DIR" != "$old" ]
+    [ ! -e "$STATE/search.$old_tok" ]
+    [ "$(cat "$STATE/search.$STEP1_TOKEN/dir")" = "$STEP1_DIR" ]
     # The abandoned values directory is not deleted by step 1.
     [ -d "$old" ]
-    rmdir "$old/.ast-grep-values" "$old" "$new/.ast-grep-values" "$new"
-    rm -f "$STATE/lock/dir"
-    rmdir "$STATE/lock"
+    rm -f "$STATE/search.$STEP1_TOKEN/dir"
+    rmdir "$old/.ast-grep-values" "$old" "$STEP1_DIR/.ast-grep-values" "$STEP1_DIR" "$STATE/search.$STEP1_TOKEN"
   done
 }
 
@@ -341,7 +411,7 @@ run_with_pointer() {
     mkdir -m 755 "$STATE"
     run bash -c "$step1"
     [[ "$output" == *"ast-grep: refused"* ]]
-    [ ! -e "$STATE/lock" ]
+    [ -z "$(ls -A "$STATE")" ]
     rmdir "$STATE"
     # A symlink to a directory someone else could control.
     mkdir -m 700 "$WORK/elsewhere"
@@ -363,18 +433,21 @@ run_with_pointer() {
   local doc
   for doc in "${DOCS[@]}"; do
     rm -f "$ARGV_FILE"
-    RECIPE_DIR="$(env -u XDG_RUNTIME_DIR PATH="$STUB:$PATH" bash -c "$(step1_of "$PLUGIN_ROOT/$doc")")"
+    STEP1_DIR='' STEP1_TOKEN=''
+    eval "$(env -u XDG_RUNTIME_DIR PATH="$STUB:$PATH" bash -c "$(step1_of "$PLUGIN_ROOT/$doc")" |
+      sed -n "s/^dir: \(.*\)/STEP1_DIR='\1'/p; s/^token: \(.*\)/STEP1_TOKEN='\1'/p")"
+    RECIPE_DIR="$STEP1_DIR"
     [ -d "$RECIPE_DIR" ]
-    [ -d "$HOME/.cache/yellow-ast-grep/lock" ]
+    [ -d "$HOME/.cache/yellow-ast-grep/search.$STEP1_TOKEN" ]
     case "$(ls -ld "$HOME/.cache/yellow-ast-grep")" in drwx------*) ;; *) return 1 ;; esac
     printf 'console.log($A)\n' > "$RECIPE_DIR/pattern"
     printf 'js\n' > "$RECIPE_DIR/lang"
     printf 'src\n' > "$RECIPE_DIR/target"
-    run env -u XDG_RUNTIME_DIR PATH="$STUB:$PATH" bash -c "$(recipe_of "$PLUGIN_ROOT/$doc")"
+    run env -u XDG_RUNTIME_DIR PATH="$STUB:$PATH" bash -c "$(recipe_for "$PLUGIN_ROOT/$doc" "$STEP1_TOKEN")"
     [ "$status" -eq 0 ]
     [[ "$output" == *"console.log(1)"* ]]
     [ ! -e "$RECIPE_DIR" ]
-    [ ! -e "$HOME/.cache/yellow-ast-grep/lock" ]
+    [ -z "$(ls -A "$HOME/.cache/yellow-ast-grep")" ]
   done
 }
 
@@ -386,7 +459,7 @@ run_with_pointer() {
     [ "$status" -eq 0 ]
     [ -f "$RECIPE_DIR/extra" ]
     [ "$(ls -A "$RECIPE_DIR")" = extra ]
-    [ ! -e "$STATE/lock" ]
+    expect_no_records "$doc"
     rm -rf "$RECIPE_DIR"
   done
 }
@@ -398,9 +471,9 @@ run_with_pointer() {
     for t in rel "$WORK/sp ace" "$WORK/missing"; do
       before="$(find "$WORK" -name 'ast-grep-values.*' | sort)"
       run env TMPDIR="$t" PATH="$STUB:$PATH" bash -c "$(step1_of "$PLUGIN_ROOT/$doc")"
-      if [ -n "$output" ] && [ -d "$output" ]; then echo "$doc: TMPDIR=$t accepted: $output"; return 1; fi
+      if [[ "$output" == *"dir: "* ]]; then echo "$doc: TMPDIR=$t accepted: $output"; return 1; fi
       [ "$(find "$WORK" -name 'ast-grep-values.*' | sort)" = "$before" ]
-      [ ! -e "$STATE/lock" ]
+      expect_no_records "$doc: $t"
     done
   done
 }
