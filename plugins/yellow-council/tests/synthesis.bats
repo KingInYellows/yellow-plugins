@@ -479,6 +479,35 @@ EOF
   rm -rf "$REPO"
 }
 
+@test "5e lists every staged citation as verifier-error when verification.tsv vanished after 5b" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5b="${BATS_TEST_TMPDIR}/5b.sh" s5e="${BATS_TEST_TMPDIR}/5e.sh"
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" '#### 5b ' "$s5b"
+  extract_fence_after "$COUNCIL_MD" '#### 5e ' "$s5e"
+  setup_council_run
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+  [ "$status" -eq 0 ]
+  SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
+  stub_library 'council_verify_findings() { return 7; }'
+  run_fence bash "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+  unset FENCE_PLUGIN_ROOT
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  local ids
+  ids=$(jq -r '.id' "$SD/citations.jsonl")
+  [ -n "$ids" ]
+  rm -f "$SD/verification.tsv"
+  local want
+  want=$(printf '%s\n' "$ids" | awk '{ print "BUCKET " $0 " | Unverified Claims | correctness=unverified | reason=verifier-error" }')
+  # 5e removes the staging directory on its way out, so this runs once.
+  run_fence bash "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  [[ "$stderr" == *"verification.tsv is missing — every finding is listed under Unverified Claims"* ]]
+  [ "$(printf '%s\n' "$output" | grep '^BUCKET ')" = "$want" ] || { echo "$output"; return 1; }
+  [[ "$output" == *"BUCKET_TOTALS verified=0 fuzzy-verified=0 unverified=$(printf '%s\n' "$ids" | wc -l | tr -d ' ') reasons=verifier-error:"* ]]
+  rm -rf "$REPO"
+}
+
 @test "the report template lists the five bucket headings in precedence order" {
   run awk '/^### (Agreement|Disagreement|Single-Reviewer|Unverified)/ { print }' "$COUNCIL_MD"
   [ "$output" = "$(printf '%s\n' '### Agreement (verified)' '### Agreement (unverified)' '### Disagreement' \

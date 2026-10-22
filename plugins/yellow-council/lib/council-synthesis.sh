@@ -1191,6 +1191,17 @@ council_bucket_fallback() {
     | _council_bucket_totals
 }
 
+# council_bucket_from_citations <citations.jsonl> — what 5e prints when
+# verification.tsv is gone or replaced by the time it runs (5b always writes
+# one, so only a removal between the two steps reaches this): one Unverified
+# Claims line per staged citation with reason verifier-error, built from the
+# same table 5b's verifier-error fallback writes, then the BUCKET_TOTALS line.
+council_bucket_from_citations() {
+  council_verifier_error_table "$1" \
+    | awk -F'\t' '!/^#/ && NF >= 6 { print "BUCKET " $1 " | Unverified Claims | correctness=" $4 " | reason=" $6 }' \
+    | _council_bucket_totals
+}
+
 # _council_bucket_totals — copy BUCKET lines from stdin, then print the one
 # BUCKET_TOTALS line (result counts, then reason counts in first-seen order).
 _council_bucket_totals() {

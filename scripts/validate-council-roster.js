@@ -71,6 +71,7 @@
 
 'use strict';
 
+const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -994,6 +995,50 @@ function walk(dir, out, errors, isExcluded, extSet) {
 }
 
 /**
+ * The repository's file set: tracked files plus untracked ones git does not
+ * ignore, so the result is the same locally and in CI. A raw directory walk
+ * picked up gitignored local state (a tool cache, a worktree directory,
+ * editor state) that quotes the roster and failed validate:schemas only on
+ * the machine that had it. Falls back to walk() when ROOT is not the top of
+ * a git work tree, which is the case for the integration fixtures; see
+ * gitIgnoredEntries() in validate-flow-namespace.js for the same pattern.
+ */
+function repoFiles(errors, isExcluded, extSet) {
+  let listed;
+  try {
+    const top = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (fs.realpathSync(top) !== fs.realpathSync(ROOT)) {
+      return walk(ROOT, [], errors, isExcluded, extSet);
+    }
+    listed = execFileSync(
+      'git',
+      ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
+      { cwd: ROOT, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }
+    );
+  } catch {
+    return walk(ROOT, [], errors, isExcluded, extSet);
+  }
+  const out = [];
+  for (const rel of new Set(listed.split('\0').filter(Boolean))) {
+    if (isExcluded(rel) || !extSet.has(path.extname(rel))) continue;
+    // --cached still lists a tracked file deleted from the working tree, and
+    // a submodule appears as a directory entry; neither is a file to read.
+    let st;
+    try {
+      st = fs.statSync(path.join(ROOT, rel));
+    } catch {
+      continue;
+    }
+    if (st.isFile()) out.push(rel);
+  }
+  return out;
+}
+
+/**
  * A file "restates the roster" if it discusses council AND names two or more
  * reviewers. Anchoring on `council` is what keeps the ubiquitous bare word
  * "Claude" from matching most of the repo.
@@ -1064,11 +1109,11 @@ function main() {
   const roster = loadRoster(errors);
   const counts = derive(roster);
 
-  // One walk, one read of each file — shared by Rule R and Rule S.
-  // One walk over the wider redaction scope; the ledger set is a filtered
-  // view of it, so Rule R is never narrowed by the ledger's exclusions.
+  // One file listing, one read of each file — shared by Rule R and Rule S.
+  // It covers the wider redaction scope; the ledger set is a filtered view
+  // of it, so Rule R is never narrowed by the ledger's exclusions.
   const walkErrors = [];
-  const scanned = walk(ROOT, [], walkErrors, redactionExcluded, REDACTION_EXT);
+  const scanned = repoFiles(walkErrors, redactionExcluded, REDACTION_EXT);
   const fileCache = new Map();
   for (const rel of scanned) {
     const body = readOrReport(rel, walkErrors);
