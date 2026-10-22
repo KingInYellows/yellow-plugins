@@ -1011,6 +1011,21 @@ assert_finishes_under_all() {
   assert_survives_under_all "$input" "Verdict: REJECT"
 }
 
+@test "a key in a table whose other columns stay populated is fully redacted" {
+  # Each body row keeps its first column filled, so stripping only the outer
+  # bars left "key.pem | <slice>", which is not base64; key_text now splits
+  # the row into cells. A row of ordinary cells after a mention still
+  # releases: none of them passes the body tests.
+  local input
+  input="$(printf '| file | value |\n|---|---|\n| key.pem | %s |\n| key.pem | %s |\n| key.pem | %s |\n| key.pem | %s |\n| key.pem | %s |\n| key.pem | %s |\n\nVerdict: REJECT' \
+    "$BEGIN_RSA" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$END_RSA")"
+  assert_redacted_under_all "$input" "$WIDE_BODY"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+  input="$(printf '| note | value |\n|---|---|\n| header | %s |\n| a.js | recommendation |\n| b.js | abc1234 |\n| c.js | considerations |\n| d.js | fine |\nVerdict: APPROVE' \
+    "$BEGIN_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+}
+
 @test "a key wrapped as an escaped newline-joined string is fully redacted" {
   # A JSON or YAML string with literal \n escapes, wrapped across lines by
   # the reviewer: every body line carries backslash escapes that are not

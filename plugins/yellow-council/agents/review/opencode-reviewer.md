@@ -501,10 +501,28 @@ function is_base64_line(s, minlen) {
 # real-versus-prose decision at BEGIN time still sees strip_deco alone, so
 # a quoted MENTION is still a mention (normalising the marker line itself
 # promoted `- "<marker>"` bullets to real keys and swallowed the report).
-function key_text(s) {
+# A table row is split into cells, since its other columns stay populated
+# ("| key.pem | <slice> |"): an END marker in any cell is returned as the
+# END, otherwise the longest base64-only cell. A slice never contains "|",
+# so a body line is never split, and the cell still has to pass the same
+# width and character-class tests as any other body line.
+function key_text(s,   n, i, c, best, cell) {
   s = strip_deco(s)
   gsub(/\\[nr]/, "", s)
-  sub(/^["`]+/, "", s)
+  if (index(s, "|") > 0) {
+    n = split(s, cell, "|")
+    best = ""
+    for (i = 1; i <= n; i++) {
+      c = unwrap_cell(cell[i])
+      if (c ~ /^-----END [A-Z ]*PRIVATE KEY-----$/) return c
+      if (c ~ /^[A-Za-z0-9+\/=]+$/ && length(c) > length(best)) best = c
+    }
+    if (best != "") return best
+  }
+  return unwrap_cell(s)
+}
+function unwrap_cell(s) {
+  sub(/^[[:space:]"`]+/, "", s)
   sub(/[",;|`[:space:]]+$/, "", s)
   return s
 }
