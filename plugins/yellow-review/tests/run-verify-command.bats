@@ -4857,3 +4857,99 @@ dirlink_setup() {
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
 }
+
+# --- CLAUDE-174: an unreadable directory in the worktree ---
+# The PATH screen's hard-link walk and the special-file walk skip a sealed
+# directory (another user's, mode 700) instead of failing every mode; an
+# unreadable directory the user owns still fails closed, and is named.
+
+@test "CLAUDE-174: a sealed directory owned by another user does not stop --revert-dirty" {
+  if [ "$(id -u)" = 0 ]; then skip "root ignores directory permissions"; fi
+  sudo -n true 2>/dev/null || skip "needs passwordless sudo to make a root-owned directory"
+  sudo -n mkdir vol && sudo -n chmod 700 vol || skip "cannot make a root-owned directory here"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  sudo -n rmdir vol
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ ! -e src/new.txt ]
+}
+
+@test "CLAUDE-174: an unreadable directory the user owns fails closed and is named" {
+  if [ "$(id -u)" = 0 ]; then skip "root ignores directory permissions"; fi
+  mkdir own && chmod 000 own
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  chmod 700 own
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot walk the worktree: $(pwd -P)/own is not readable"* ]]
+  grep -q 'resolver edit' src/a.txt
+}
+
+# --- CLAUDE-128: a staged path replaced by a special file before the revert ---
+
+@test "CLAUDE-128: the recovery patch keeps staged content of files replaced by FIFOs" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  printf 'staged new\n' >| src/staged.txt
+  printf 'staged edit\n' >| src/a.txt
+  git add src/staged.txt src/a.txt
+  rm -f src/staged.txt src/a.txt
+  mkfifo src/staged.txt src/a.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  grep -q '^+staged new$' "$patch"
+  grep -q '^+staged edit$' "$patch"
+  ! grep -q '^deleted file mode' "$patch" || false
+  [ -f src/a.txt ] && [ ! -e src/staged.txt ]
+  git apply "$patch"
+  [ "$(cat src/staged.txt)" = "staged new" ]
+  [ "$(cat src/a.txt)" = "staged edit" ]
+}
+
+@test "CLAUDE-128: a FIFO over an unstaged tracked file still records the deletion" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  grep -q '^deleted file mode' "$patch"
+}
+
+# --- CLAUDE-109: the mount table is read before the replacement directory is walked ---
+
+find_logger() {
+  SHIMS="$BATS_TEST_TMPDIR/logbin"
+  FIND_LOG="$BATS_TEST_TMPDIR/find.log"
+  mkdir -p "$SHIMS"
+  : >| "$FIND_LOG"
+  cat >| "$SHIMS/find" <<SH
+#!/bin/sh
+printf '%s\n' "\$*" >>"$FIND_LOG"
+exec "$(command -v find)" "\$@"
+SH
+  chmod +x "$SHIMS/find"
+  export PATH="$SHIMS:$PATH"
+}
+
+@test "CLAUDE-109: a mount listed under the replacement directory keeps it without walking it" {
+  mount_setup
+  find_logger
+  mi="$BATS_TEST_TMPDIR/mountinfo"
+  printf '36 35 8:1 / %s/.cursor/mnt rw - ext4 /dev/sda1 rw\n' "$(pwd -P)" >| "$mi"
+  YR_MOUNTINFO="$mi" run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -f .cursor/mnt/f ]
+  ! grep -q '/\.cursor .*%D' "$FIND_LOG" || false
+}
+
+@test "CLAUDE-109: the device walk of an unmounted replacement directory does not cross devices" {
+  find_logger
+  printf 'tracked\n' >| src/blob
+  git add src/blob && git commit -q -m "add blob"
+  rm -f src/blob && mkdir src/blob && printf 'x\n' >| src/blob/f
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ -f src/blob ]
+  grep -q '/src/blob -xdev -printf' "$FIND_LOG"
+}

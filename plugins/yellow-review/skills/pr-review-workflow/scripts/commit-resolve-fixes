@@ -656,6 +656,9 @@ check_lib_integrity || exit 3
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$CRF_DIR/../../../lib/resolve-paths.sh"
 # Resolve git and the worktree-free PATH once, here, so later subshells reuse them.
+# The PATH is primed first with stderr open, so the note naming a worktree
+# directory the screen could not walk (yr_walk_failed_note) is shown.
+yr_prime_path || true
 yr_git --version >/dev/null 2>&1 || true
 # shellcheck source=../../../lib/resolve-text.sh
 . "$CRF_DIR/../../../lib/resolve-text.sh"

@@ -678,12 +678,47 @@ yr_hardlink_inside() {
     [ -n "$cands" ] || return 1
     # A walk that fails part way (an unreadable directory hides links) is not
     # cached and not trusted: every directory holding a multi-link file is
-    # dropped, as in yr_hardlink_stat.
+    # dropped, as in yr_hardlink_stat. A sealed directory (yr_sealed_skip) is
+    # skipped, not a failure.
     if [ -z "${YR_HL_TREE+x}" ]; then
-        YR_HL_TREE=$("$find" "$root" -xdev -type f -links +1 -printf '%D:%i\n' 2>/dev/null) || { unset YR_HL_TREE; return 0; }
+        yr_sealed_skip "$find"
+        YR_HL_TREE=$("$find" "$root" -xdev ${YR_SEALED[@]+"${YR_SEALED[@]}"} -type f -links +1 -printf '%D:%i\n' 2>/dev/null) || {
+            unset YR_HL_TREE
+            yr_walk_failed_note "$find" "$root"
+            return 0
+        }
     fi
     [ -n "$YR_HL_TREE" ] || return 1
     printf '%s\n' "$YR_HL_TREE" | YR_HL_C="$cands" "$awk" 'BEGIN { n = split(ENVIRON["YR_HL_C"], a, "\n"); for (i = 1; i <= n; i++) s[a[i]] = 1 } ($0 in s) { f = 1; exit } END { exit !f }'
+}
+
+# yr_sealed_skip <find>: set YR_SEALED to the find(1) expression, ending in
+# -o, that prunes a sealed directory: one this user does not own and can
+# neither read, write nor search (a root-owned docker volume or cache, mode
+# 700). Nothing in it can be reached, written or linked to by this user, and
+# the user cannot chmod it back after a walk, so a walk skips it instead of
+# failing (CLAUDE-174). An unreadable directory the user owns, or one that is
+# only partly closed, still fails the walk. Empty when <find> has no
+# -readable (not GNU find): every unreadable directory then fails the walk.
+yr_sealed_skip() {
+    YR_SEALED=()
+    "$1" / -maxdepth 0 \( -type d ! -readable ! -writable ! -executable ! -user 0 -prune \) -o -print >/dev/null 2>&1 || return 0
+    YR_SEALED=(\( -type d ! -readable ! -writable ! -executable ! -user "$EUID" -prune \) -o)
+}
+
+# yr_walk_failed_note <find> <root>: say once per yr_safe_path call, on
+# stderr, which worktree directory stopped the hard-link walk, so the error
+# that follows (a tool missing from the screened PATH) is not the only clue.
+yr_walk_failed_note() {
+    local bad
+    [ -z "${YR_WALK_NOTED-}" ] || return 0
+    YR_WALK_NOTED=1
+    bad=$("$1" "$2" -xdev ${YR_SEALED[@]+"${YR_SEALED[@]}"} -type d \( ! -readable -o ! -executable \) -print -quit 2>/dev/null) || true
+    if [ -n "$bad" ]; then
+        printf '[yellow-review] cannot walk the worktree: %s is not readable and searchable by this user; PATH directories holding a multi-link file are dropped\n' "$bad" >&2
+    else
+        printf '[yellow-review] cannot walk the worktree for hard links; PATH directories holding a multi-link file are dropped\n' >&2
+    fi
 }
 
 # yr_hardlink_stat <dir> <root>: the fallback of yr_hardlink_inside for a
@@ -848,7 +883,7 @@ yr_safe_path() {
         [ "${verdict[i]}" != k ] || cand+=("$i")
     done
     if [ "${#cand[@]}" -gt 0 ] && [ -n "$root" ]; then
-        unset YR_HL_TREE YR_HL_SDEVS
+        unset YR_HL_TREE YR_HL_SDEVS YR_WALK_NOTED
         if [ -n "$rp" ] && [ -n "$find" ] && [ -n "$awk" ]; then
             dirs=()
             for i in "${cand[@]}"; do dirs+=("${ents[i]}"); done

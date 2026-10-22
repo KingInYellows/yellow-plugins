@@ -208,7 +208,8 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 In revert modes `run-verify-command` never opens a FIFO, socket, or device
 standing in for a tracked file. It renames the entry aside in its own
 directory (`.yellow-review-hold-*/node`) so the recovery patch records the
-tracked deletion, then renames it back. The hold path is recorded before
+tracked deletion, then renames it back. When the index holds staged content
+for that path, the patch records the staged content instead. The hold path is recorded before
 that rename. If the ledger write fails, the file is put back when it can
 and nothing is reverted; if it cannot, stderr names the remaining path. If
 the rename back fails, the parent retries it. If the entry is still held,
@@ -217,7 +218,14 @@ The special file is unlinked only after both snapshots succeed. An `rm`
 that cannot unlink one special file is recorded and the revert continues,
 so one already removed is still restored. Checkout does not open a special
 file that is still present. `--revert-denied` leaves a special file in place
-and reports `deniedClean: false`.
+and reports `deniedClean: false`. A directory that replaced a tracked file
+is checked against the mount table before its device walk, and that walk
+does not cross into another filesystem.
+
+The worktree walks (the PATH screen's hard-link check and the special-file
+search) skip a directory that another user owns and this user can neither
+read, write nor search, such as a root-owned docker volume. An unreadable
+directory the user owns still stops the run, and stderr names it.
 
 `commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
 `jq` whose canonical file is inside the worktree, and they exec only the
