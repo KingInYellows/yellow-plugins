@@ -1649,3 +1649,32 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   grep -qF '| `pr-review-delta` |' "$BATS_TEST_DIRNAME/../README.md"
   grep -qF '**pr-review-delta**' "$BATS_TEST_DIRNAME/../skills/pr-review-workflow/SKILL.md"
 }
+
+@test "resolve-stack and sweep-all end with a machine-readable outcome line" {
+  stack_line='ResolveStack: blocking=<n> ratelimited=<0|1> aborted=<0|1> not_attempted=<n> exit=<0|1>'
+  sweep_line='SweepAll: blocking=<n> ratelimited=<0|1> aborted=<0|1> not_attempted=<n> exit=<0|1>'
+  # The line is a fenced block of its own, so a parent can anchor on it.
+  grep -qxF "$stack_line" "$RESOLVE_STACK"
+  grep -qxF "$sweep_line" "$SWEEP_ALL"
+  stack=$(flat "$RESOLVE_STACK")
+  sweep=$(flat "$SWEEP_ALL")
+  for text in "$stack" "$sweep"; do
+    [[ "$text" == *'gives a parent no exit status'* ]]
+    [[ "$text" == *'LAST line'* ]]
+    [[ "$text" == *'`exit` is the exit code.'* ]]
+    # Any other stop (pre-flight, a failed reference Read) prints no line.
+    [[ "$text" == *'A run without this last line (a pre-flight failure, a failed Read, a crash) failed: treat it as `exit=1`.'* ]]
+  done
+  # Each field names the stop it reports.
+  [[ "$stack" == *'`ratelimited=1` means a `Resolve:` line reported it'* ]]
+  [[ "$stack" == *'`aborted=1` means item 1b or 3b stopped the walk'* ]]
+  [[ "$stack" == *'`blocking` counts walked PRs a human must answer: `b > 0`, `no contract`, `verify skipped` or an inconclusive self-verify.'* ]]
+  [[ "$sweep" == *'`ratelimited=1` means item 1b or 5 stopped on a rate limit'* ]]
+  [[ "$sweep" == *'`aborted=1` means item 4 stopped on a dirty tree.'* ]]
+  [[ "$sweep" == *'`blocking` counts attempted PRs whose `Blocking` cell is above 0 or `?`.'* ]]
+  # The early clean exits print the line too, so a missing line means failure.
+  [[ "$stack" == *'No open PRs found in current stack.`, then the Step 4 outcome line with zeros'* ]]
+  empty=$(awk '/^\*\*Empty-list early exit\.\*\*/ { p = 1 } /^### Step 3: Upfront confirmation gate/ { p = 0 } p' "$SWEEP_ALL" | tr '\n' ' ' | tr -s ' ')
+  [[ "$empty" == *'then the Step 5 outcome line with zeros'* ]]
+  [[ "$sweep" == *'print the Step 5 outcome line (`not_attempted=<N>`, `exit=0`)'* ]]
+}
