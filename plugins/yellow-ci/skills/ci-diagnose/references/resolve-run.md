@@ -146,7 +146,7 @@ else
   exit 1
 fi
 
-# Redact secrets in run metadata BEFORE fence-escaping — same 13+-pattern
+# Redact secrets in run metadata BEFORE fence-escaping — same 30+-pattern
 # pipeline 4a applies to log content (see 4a's comment for the
 # PROTECT/RESTORE provenance rationale; mirrors hooks/scripts/lib/redact.sh).
 # displayTitle, headBranch, and job/step names are user-authored strings that
@@ -161,7 +161,7 @@ SAFE_DETAILS=$(
     -e 's/ghr_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/ghu_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/\x01REDACTED:github-pat]/g' \
-    -e 's/AKIA[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
+    -e 's/\(AKIA\|ASIA\|ABIA\|ACCA\)[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
     -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=\x01REDACTED:aws-secret]/gI' \
     -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*[A-Za-z][A-Za-z0-9_-]*\)[[:space:]]\+[^\x01[:space:]]\+\([[:space:]]\+[A-Za-z0-9_-]\+=[^\x01[:space:]]\+\)*/\1 \x01REDACTED]/gI' \
     -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*\)[^\x01[:space:]]\+[[:space:]]*$/\1\x01REDACTED]/gI' \
@@ -170,12 +170,24 @@ SAFE_DETAILS=$(
     -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
     -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
     -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
+    -e 's/sk-ant-api[A-Za-z0-9_-]\{20,\}/\x01REDACTED:anthropic-key]/g' \
+    -e 's/sk-\(admin\|proj\|svcacct\)-[A-Za-z0-9_-]\{20,\}/\x01REDACTED:openai-key]/g' \
+    -e 's/sk-[A-Za-z0-9]\{48\}/\x01REDACTED:openai-key]/g' \
+    -e 's/xox[baprsu]-[A-Za-z0-9-]\{10,\}/\x01REDACTED:slack-token]/g' \
+    -e 's/sk_live_[A-Za-z0-9]\{24,\}/\x01REDACTED:stripe-key]/g' \
+    -e 's/rk_live_[A-Za-z0-9]\{24,\}/\x01REDACTED:stripe-key]/g' \
+    -e 's/hf_[A-Za-z0-9]\{20,\}/\x01REDACTED:huggingface-token]/g' \
+    -e 's/tvly-[A-Za-z0-9_-]\{20,\}/\x01REDACTED:tavily-key]/g' \
+    -e 's/pplx-[A-Za-z0-9_-]\{40,\}/\x01REDACTED:perplexity-key]/g' \
+    -e 's/sgp_[A-Za-z0-9]\{20,\}/\x01REDACTED:semgrep-token]/g' \
+    -e 's/\(^\|[^[:alnum:]_]\)\([Bb][Aa][Ss][Ii][Cc]\)[[:space:]]\+\([A-Za-z0-9+/]\{2,\}=\{1,2\}\|[A-Za-z]*[0-9+/][A-Za-z0-9+/]\{6,\}\|[A-Za-z0-9+/]\{7,\}[0-9+/][A-Za-z0-9+/]*\|[A-Za-z]\{6,\}[a-z][A-Z][A-Za-z]*\|[A-Za-z]*[a-z][A-Z][A-Za-z]\{6,\}\)/\1\2 \x01REDACTED]/g' \
     -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"\(\\.\|[^"\\]\)*"/\1=\x01REDACTED:quoted]/gI' \
     -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'\(\\\\.\\|[^'\\\\]\)*'/\1=\x01REDACTED:quoted]/gI" \
     -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1\2=\x01REDACTED:quoted]/gI' \
     -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1\2=\x01REDACTED:quoted]/gI" \
     -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1-p \x01REDACTED:quoted]/gI' \
     -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1-p \x01REDACTED:quoted]/gI" \
+    -e 's,\(https\?\)://[^:[:space:]]\+:[^@[:space:]]\+@,\1://\x01REDACTED:basic-auth]@,g' \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
@@ -243,7 +255,7 @@ else
   exit 1
 fi
 
-# Redact secrets in run metadata BEFORE fence-escaping — same 13+-pattern
+# Redact secrets in run metadata BEFORE fence-escaping — same 30+-pattern
 # pipeline 4a applies to log content (see 4a's comment for the
 # PROTECT/RESTORE provenance rationale; mirrors hooks/scripts/lib/redact.sh).
 # displayTitle, headBranch, and job/step names are user-authored strings that
@@ -258,7 +270,7 @@ SAFE_DETAILS=$(
     -e 's/ghr_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/ghu_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/\x01REDACTED:github-pat]/g' \
-    -e 's/AKIA[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
+    -e 's/\(AKIA\|ASIA\|ABIA\|ACCA\)[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
     -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=\x01REDACTED:aws-secret]/gI' \
     -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*[A-Za-z][A-Za-z0-9_-]*\)[[:space:]]\+[^\x01[:space:]]\+\([[:space:]]\+[A-Za-z0-9_-]\+=[^\x01[:space:]]\+\)*/\1 \x01REDACTED]/gI' \
     -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*\)[^\x01[:space:]]\+[[:space:]]*$/\1\x01REDACTED]/gI' \
@@ -267,12 +279,24 @@ SAFE_DETAILS=$(
     -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
     -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
     -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
+    -e 's/sk-ant-api[A-Za-z0-9_-]\{20,\}/\x01REDACTED:anthropic-key]/g' \
+    -e 's/sk-\(admin\|proj\|svcacct\)-[A-Za-z0-9_-]\{20,\}/\x01REDACTED:openai-key]/g' \
+    -e 's/sk-[A-Za-z0-9]\{48\}/\x01REDACTED:openai-key]/g' \
+    -e 's/xox[baprsu]-[A-Za-z0-9-]\{10,\}/\x01REDACTED:slack-token]/g' \
+    -e 's/sk_live_[A-Za-z0-9]\{24,\}/\x01REDACTED:stripe-key]/g' \
+    -e 's/rk_live_[A-Za-z0-9]\{24,\}/\x01REDACTED:stripe-key]/g' \
+    -e 's/hf_[A-Za-z0-9]\{20,\}/\x01REDACTED:huggingface-token]/g' \
+    -e 's/tvly-[A-Za-z0-9_-]\{20,\}/\x01REDACTED:tavily-key]/g' \
+    -e 's/pplx-[A-Za-z0-9_-]\{40,\}/\x01REDACTED:perplexity-key]/g' \
+    -e 's/sgp_[A-Za-z0-9]\{20,\}/\x01REDACTED:semgrep-token]/g' \
+    -e 's/\(^\|[^[:alnum:]_]\)\([Bb][Aa][Ss][Ii][Cc]\)[[:space:]]\+\([A-Za-z0-9+/]\{2,\}=\{1,2\}\|[A-Za-z]*[0-9+/][A-Za-z0-9+/]\{6,\}\|[A-Za-z0-9+/]\{7,\}[0-9+/][A-Za-z0-9+/]*\|[A-Za-z]\{6,\}[a-z][A-Z][A-Za-z]*\|[A-Za-z]*[a-z][A-Z][A-Za-z]\{6,\}\)/\1\2 \x01REDACTED]/g' \
     -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"\(\\.\|[^"\\]\)*"/\1=\x01REDACTED:quoted]/gI' \
     -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'\(\\\\.\\|[^'\\\\]\)*'/\1=\x01REDACTED:quoted]/gI" \
     -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1\2=\x01REDACTED:quoted]/gI' \
     -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1\2=\x01REDACTED:quoted]/gI" \
     -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1-p \x01REDACTED:quoted]/gI' \
     -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1-p \x01REDACTED:quoted]/gI" \
+    -e 's,\(https\?\)://[^:[:space:]]\+:[^@[:space:]]\+@,\1://\x01REDACTED:basic-auth]@,g' \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
@@ -303,7 +327,7 @@ validated exactly like the explicitly-passed one.
 they are user-authored strings (branch names, PR/commit-derived titles, job and
 step names) that can carry an accidentally-committed credential just as easily
 as a line of log content can. So the fetch above (folded into both Step 2 paths)
-checks `$DETAILS_STATUS`, then runs `$RUN_DETAILS` through the SAME 13+-pattern
+checks `$DETAILS_STATUS`, then runs `$RUN_DETAILS` through the SAME 30+-pattern
 secret redaction `4a` applies to log content, then escapes any embedded fence
 marker, and only then prints `$SAFE_DETAILS` inside a
 `--- begin run-details/end ---` fence — a bare command would emit those fields

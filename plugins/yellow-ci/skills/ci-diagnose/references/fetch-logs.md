@@ -106,7 +106,7 @@ REDACTED_LOG=$(
     -e 's/ghr_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/ghu_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/\x01REDACTED:github-pat]/g' \
-    -e 's/AKIA[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
+    -e 's/\(AKIA\|ASIA\|ABIA\|ACCA\)[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
     -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=\x01REDACTED:aws-secret]/gI' \
     -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*[A-Za-z][A-Za-z0-9_-]*\)[[:space:]]\+[^\x01[:space:]]\+\([[:space:]]\+[A-Za-z0-9_-]\+=[^\x01[:space:]]\+\)*/\1 \x01REDACTED]/gI' \
     -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*\)[^\x01[:space:]]\+[[:space:]]*$/\1\x01REDACTED]/gI' \
@@ -115,12 +115,24 @@ REDACTED_LOG=$(
     -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
     -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
     -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
+    -e 's/sk-ant-api[A-Za-z0-9_-]\{20,\}/\x01REDACTED:anthropic-key]/g' \
+    -e 's/sk-\(admin\|proj\|svcacct\)-[A-Za-z0-9_-]\{20,\}/\x01REDACTED:openai-key]/g' \
+    -e 's/sk-[A-Za-z0-9]\{48\}/\x01REDACTED:openai-key]/g' \
+    -e 's/xox[baprsu]-[A-Za-z0-9-]\{10,\}/\x01REDACTED:slack-token]/g' \
+    -e 's/sk_live_[A-Za-z0-9]\{24,\}/\x01REDACTED:stripe-key]/g' \
+    -e 's/rk_live_[A-Za-z0-9]\{24,\}/\x01REDACTED:stripe-key]/g' \
+    -e 's/hf_[A-Za-z0-9]\{20,\}/\x01REDACTED:huggingface-token]/g' \
+    -e 's/tvly-[A-Za-z0-9_-]\{20,\}/\x01REDACTED:tavily-key]/g' \
+    -e 's/pplx-[A-Za-z0-9_-]\{40,\}/\x01REDACTED:perplexity-key]/g' \
+    -e 's/sgp_[A-Za-z0-9]\{20,\}/\x01REDACTED:semgrep-token]/g' \
+    -e 's/\(^\|[^[:alnum:]_]\)\([Bb][Aa][Ss][Ii][Cc]\)[[:space:]]\+\([A-Za-z0-9+/]\{2,\}=\{1,2\}\|[A-Za-z]*[0-9+/][A-Za-z0-9+/]\{6,\}\|[A-Za-z0-9+/]\{7,\}[0-9+/][A-Za-z0-9+/]*\|[A-Za-z]\{6,\}[a-z][A-Z][A-Za-z]*\|[A-Za-z]*[a-z][A-Z][A-Za-z]\{6,\}\)/\1\2 \x01REDACTED]/g' \
     -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"\(\\.\|[^"\\]\)*"/\1=\x01REDACTED:quoted]/gI' \
     -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'\(\\\\.\\|[^'\\\\]\)*'/\1=\x01REDACTED:quoted]/gI" \
     -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1\2=\x01REDACTED:quoted]/gI' \
     -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1\2=\x01REDACTED:quoted]/gI" \
     -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1-p \x01REDACTED:quoted]/gI' \
     -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1-p \x01REDACTED:quoted]/gI" \
+    -e 's,\(https\?\)://[^:[:space:]]\+:[^@[:space:]]\+@,\1://\x01REDACTED:basic-auth]@,g' \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
@@ -156,18 +168,20 @@ a log longer than the bound. With `pipefail` set, `$FETCH_STATUS` therefore
 reflects a genuine fetch failure (124 from `timeout`, or `gh`'s own non-zero
 exit) — not truncation.
 
-This masks (13+ patterns): GitHub tokens (`ghp_`, `ghs_`, `gho_`, `ghr_`,
-`ghu_`, `github_pat_`), AWS access keys (`AKIA…`) and secret keys,
-bearer/authorization headers, private key blocks
-(`-----BEGIN … PRIVATE KEY-----`), JWTs, npm/pypi/docker tokens, URL
-query-string credentials, and any `SECRET`/`TOKEN`/`PASSWORD`/`KEY`/`CREDENTIAL`
-assignments — then escapes any embedded `--- begin`/`--- end` fence marker so it
-can't break the delimiter emitted by the final `printf` above. (This mirrors
-`redact_secrets` + `escape_fence_markers` in `hooks/scripts/lib/redact.sh` as of
-this writing; if that file changes, this inlined copy needs a matching update.
-`redact.sh` documents itself as GNU-sed-only and in scope for Linux; this
-inlined copy carries the same GNU-only regex but, because it is Codex-exposed
-and host-neutral, adds the detection gate above so a non-GNU host fails closed
+This masks (30+ patterns): GitHub tokens (`ghp_`, `ghs_`, `gho_`, `ghr_`,
+`ghu_`, `github_pat_`), AWS access keys (`AKIA…`, `ASIA…`) and secret keys,
+bearer/authorization headers and bare Basic payloads, private key blocks
+(`-----BEGIN … PRIVATE KEY-----`), JWTs, npm/pypi/docker tokens,
+Anthropic/OpenAI/Slack/Stripe/Hugging Face/Tavily/Perplexity/Semgrep keys, URL
+userinfo and query-string credentials, and any
+`SECRET`/`TOKEN`/`PASSWORD`/`KEY`/`CREDENTIAL` assignments — then escapes any
+embedded `--- begin`/`--- end` fence marker so it can't break the delimiter
+emitted by the final `printf` above. (This mirrors `redact_secrets` +
+`escape_fence_markers` in `hooks/scripts/lib/redact.sh` as of this writing; if
+that file changes, this inlined copy needs a matching update. `redact.sh`
+documents itself as GNU-sed-only and in scope for Linux; this inlined copy
+carries the same GNU-only regex but, because it is Codex-exposed and
+host-neutral, adds the detection gate above so a non-GNU host fails closed
 instead of silently degrading.)
 
 **4b/4c already happened above.** The single invocation in 4a performs the
