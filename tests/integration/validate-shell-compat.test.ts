@@ -943,6 +943,8 @@ describe('SHC-010 alias-prone commands', () => {
     ).toEqual([4]);
     expect(flagged('case "$c" in @(ls|ps)) :;; esac')).toEqual([]);
     expect(flagged('case "$(printf in)" in\n  ls) :;;\nesac')).toEqual([]);
+    expect(flagged('case "$x" in $(ls x)) :;; esac')).toEqual([1]);
+    expect(flagged('case "$x" in a | `ps`) :;; esac')).toEqual([1]);
     expect(flagged('case `printf in` in\n  ls) :;;\nesac')).toEqual([]);
     expect(flagged('case "$c" in\n  a) echo x\nesac\nls d')).toEqual([4]);
   });
@@ -1011,6 +1013,7 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('printf "%s" "a\n$(ps -p 1)\nb"')).toEqual([2]);
     expect(flagged('v="start\n$(ls x)"')).toEqual([2]);
     expect(flagged('v="$(\n  ls x\n)"')).toEqual([2]);
+    expect(flagged('cat <<EOF\nsee <(ls x) and >(ps)\nEOF')).toEqual([]);
     expect(flagged('v="a $(printf x)\n  ls x\n"')).toEqual([]);
     expect(flagged('v="start\nit\'s $(ls x)" && echo')).toEqual([2]);
     expect(flagged('v="start\n$(command ls x)" && ls y')).toEqual([2]);

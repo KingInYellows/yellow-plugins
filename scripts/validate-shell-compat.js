@@ -1140,7 +1140,11 @@ function keepCommandSubs(
           break;
         }
       }
-    } else if (opensSub(span, i)) {
+    } else if (
+      opensSub(span, i) &&
+      // Heredoc bodies and strings expand `$(…)` only, never `<(…)`.
+      !(literalQuotes && span[i] !== '$')
+    ) {
       // Text before the substitution may hold a literal quote, so mask from
       // the opener on.
       const own = literalQuotes
@@ -1339,6 +1343,11 @@ function blankCasePatterns(line, state) {
   };
   const commandAt = (i) =>
     COMMAND_POSITION_RE.test(scan.slice(0, i).join('').trimEnd());
+  // A pattern is words, but a `$(…)` in it still runs.
+  const blankPattern = (from, to) => {
+    const kept = keepCommandSubs(line.slice(from, to));
+    for (let k = from; k < to; k++) out[k] = kept[k - from];
+  };
   let patStart = top() === 'pattern' && state.patOpen ? 0 : -1;
   for (let i = 0; i < n; ) {
     const ch = scan[i];
@@ -1370,7 +1379,7 @@ function blankCasePatterns(line, state) {
       }
       if (ch === '(') state.patDepth++;
       else if (ch === ')' && state.patDepth-- === 0) {
-        for (let k = patStart; k < i; k++) out[k] = ' ';
+        blankPattern(patStart, i);
         for (let k = patStart; k < i; k++) scan[k] = ' ';
         out[i] = ';';
         scan[i] = ';';
@@ -1412,7 +1421,7 @@ function blankCasePatterns(line, state) {
   }
   state.patOpen = patStart !== -1;
   if (state.patOpen) {
-    for (let k = patStart; k < n; k++) out[k] = ' ';
+    blankPattern(patStart, n);
   }
   return out.join('');
 }
