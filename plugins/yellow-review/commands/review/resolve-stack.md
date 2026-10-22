@@ -455,9 +455,9 @@ a `not attempted (cluster cap)` or `not attempted (rate limit)` note surfaced by
 `[review:resolve-stack] All open PRs in the stack are fully resolved.`
 
 **Outcome line and exit code.** Exit `0` only when "Needs manual attention" is
-empty, else `1`. The `Skill` tool gives a parent no exit status, so on every
-path after Step 1 (Step 2's "no open PRs found" too, with zeros) the LAST line
-of output is exactly:
+empty, else `1`. The `Skill` tool gives a parent no exit status, so the LAST
+line of a finished run (Step 2's "no open PRs found" too, with zeros) is
+exactly:
 
 ```text
 ResolveStack: blocking=<n> ratelimited=<0|1> aborted=<0|1> not_attempted=<n> exit=<0|1>
@@ -467,8 +467,8 @@ ResolveStack: blocking=<n> ratelimited=<0|1> aborted=<0|1> not_attempted=<n> exi
 `verify skipped` or an inconclusive self-verify. `ratelimited=1` means a
 `Resolve:` line reported it (re-run later). `aborted=1` means item 1b or 3b
 stopped the walk (fix the tree or config first). `not_attempted` counts the
-`not attempted (…)` rows; `exit` is the exit code. Step 1 pre-flight failures
-exit non-zero and print no outcome line.
+`not attempted (…)` rows; `exit` is the exit code. A run without this last line
+(a pre-flight failure, a failed Read, a crash) failed: treat it as `exit=1`.
 
 ## Error Handling
 

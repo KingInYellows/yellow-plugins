@@ -38,7 +38,10 @@ flags, exit codes, trust-boundary rules and library behavior.
   prompts), pushing and restacking as it goes. It ends the walk, and exits 1, on
   a dirty tree or a changed ignored `yellow-plugins.local.md` after a PR, a rate
   limit, or a PR whose output has no valid `Resolve:` contract line
-  (`no contract`); the summary table has a `blocking` column
+  (`no contract`); the summary table has a `blocking` column. Its last line,
+  `ResolveStack: blocking=<n> ratelimited=<0|1> aborted=<0|1> not_attempted=<n> exit=<0|1>`,
+  tells a parent agent a rate limit, blocking threads and a dirty-tree abort
+  apart; a run without it failed
 - `/review:all` — Sequential review of multiple PRs (Graphite stack, all open,
   or single PR)
 - `/review:sweep` — Wrapper that runs `/review:pr --non-interactive` then
@@ -62,7 +65,9 @@ flags, exit codes, trust-boundary rules and library behavior.
   columns, and a `Not merge-ready` line from the ledger's `merge_blocking`).
   Each PR stages its learnings for the compound-staging drain; there is no
   end-of-loop compounding pass. A rate limit, an unreadable PR state, a dirty
-  tree or a missing `Resolve:` contract line ends the batch and exits 1; a
+  tree or a missing `Resolve:` contract line ends the batch and exits 1; the
+  last line is a `SweepAll:` outcome line with the same fields as
+  `ResolveStack:` (a run without it failed); a
   PR-specific stop (`Sweep: skipped`) is skipped and the batch continues. It
   lists the ledgers of PRs missing from an all-authors open-PR query and deletes
   them via `/review:triage --prune` only after the confirmation (a prune-only

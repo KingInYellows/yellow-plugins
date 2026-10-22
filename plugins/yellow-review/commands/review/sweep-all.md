@@ -459,7 +459,8 @@ SweepAll: blocking=<n> ratelimited=<0|1> aborted=<0|1> not_attempted=<n> exit=<0
 `ratelimited=1` means item 1b or 5 stopped on a rate limit (re-run later).
 `aborted=1` means item 4 stopped on a dirty tree. `not_attempted` counts the
 `not attempted (…)` and `working tree dirty after PR` rows (all `<N>` PRs on
-Cancel). `exit` is the exit code. Pre-flight failures print no outcome line.
+Cancel). `exit` is the exit code. A run without this last line (a pre-flight
+failure, a failed Read, a crash) failed: treat it as `exit=1`.
 
 ## Error Handling
 
@@ -493,8 +494,7 @@ Cancel). `exit` is the exit code. Pre-flight failures print no outcome line.
   clean-tree check the loop stops, marks every remaining PR `skipped — not
   attempted (no contract)`, prints the summary, and exits `1`. No text in the
   output is read as a rate-limit signal.
-- **Every PR skipped for per-PR reasons** (no Step 4 stop): the summary is
-  still printed; exit 0. Skipped PRs are counted apart from attempted ones.
+- **Every PR skipped for per-PR reasons** (no Step 4 stop): summary; exit 0.
 - **Concurrent invocations**: not supported. The Step 1 dirty-tree guard does
   not serialize them: the tree is clean between PRs, so a second `sweep-all`
   proceeds and races the first (interleaved checkouts, commits and pushes).

@@ -1660,9 +1660,10 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   sweep=$(flat "$SWEEP_ALL")
   for text in "$stack" "$sweep"; do
     [[ "$text" == *'gives a parent no exit status'* ]]
-    [[ "$text" == *'the LAST line of output'* ]]
+    [[ "$text" == *'LAST line'* ]]
     [[ "$text" == *'`exit` is the exit code.'* ]]
-    [[ "$text" == *'pre-flight failures'*'print no outcome line.'* || "$text" == *'Pre-flight failures print no outcome line.'* ]]
+    # Any other stop (pre-flight, a failed reference Read) prints no line.
+    [[ "$text" == *'A run without this last line (a pre-flight failure, a failed Read, a crash) failed: treat it as `exit=1`.'* ]]
   done
   # Each field names the stop it reports.
   [[ "$stack" == *'`ratelimited=1` means a `Resolve:` line reported it'* ]]
