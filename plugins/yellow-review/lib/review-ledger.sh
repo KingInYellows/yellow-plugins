@@ -1374,8 +1374,12 @@ rl_build_candidate() {
     root=$(rl_repo_root) || { printf 'REJECT no-repo'; return 0; }
     vres=$(rl_validate_path anchor "$H" "$file") || { printf 'REJECT path:%s' "$vres"; return 0; }
     rl_worktree_entry_ok "$root" "$file" || { printf 'REJECT path:worktree-entry'; return 0; }
-    content=$(mktemp "$(rl_tmp)/wt.XXXXXX") || { printf 'REJECT path:unreadable'; return 0; }
-    cp -- "$root/$file" "$content" || { printf 'REJECT path:unreadable'; return 0; }
+    # one snapshot per path, reused by observe's scope pass
+    content="$(rl_tmp)/wt-$(printf '%s' "$file" | rl_sha256)"
+    if [ ! -f "$content" ]; then
+      cp -- "$root/$file" "$content.part" && mv -f -- "$content.part" "$content" ||
+        { printf 'REJECT path:unreadable'; return 0; }
+    fi
     where='head'
   else
     vres=$(rl_validate_path anchor "$H" "$file" "$B") || { printf 'REJECT path:%s' "$vres"; return 0; }
@@ -1464,14 +1468,13 @@ RL_CAND_ROW_JQ='
 # --- observe: matching and append (under the lock) --------------------------
 
 # Current content of a candidate's anchor file for scope checks: the HEAD
-# blob, or a copy of the worktree file under --anchor-source worktree.
+# blob, or under --anchor-source worktree the snapshot rl_build_candidate
+# took, so the scope is checked against the text the anchor came from.
 rl_candidate_content() {
-  local vres oid root f
+  local vres oid f
   if [ "$RL_O_ASRC" = worktree ]; then
-    root=$(rl_repo_root) || return 1
-    rl_worktree_entry_ok "$root" "$1" || return 1
-    f=$(mktemp "$(rl_tmp)/wt.XXXXXX") || return 1
-    cp -- "$root/$1" "$f" || return 1
+    f="$(rl_tmp)/wt-$(printf '%s' "$1" | rl_sha256)"
+    [ -f "$f" ] || return 1
     printf '%s' "$f"
     return 0
   fi
@@ -1612,11 +1615,17 @@ rl_observe_locked() {
       fi
       [ "${ccontent[$i]}" != - ] || continue
       rl_scope_still "${ccontent[$i]}" "$cfile" "$cline" "$rskey" "$rdisp" || continue
-      [ -z "$rocc" ] || qbad[$i]=1
+      IFS=$'\t' read -r sv _ css cend <<<"$(rl_verify_scope "${ccontent[$i]}" "$cfile" "$cline" "$rdisp")"
+      [ "$sv" = verified ] || continue
+      # the finding's own line must map unchanged into the same span: a
+      # heading path can repeat, and the hash alone names no site
+      IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"
+      case "$res" in exact | shifted) ;; *) continue ;; esac
+      [ "$np" = "$cfile" ] && [ "$ln" -ge "$css" ] || continue
+      [ "$cend" -eq 0 ] || [ "$ln" -le "$cend" ] || continue
       # the stored occ is from the finding's own run: an identical line
       # added to the scope since then makes the candidate ambiguous too
-      IFS=$'\t' read -r sv _ css cend <<<"$(rl_verify_scope "${ccontent[$i]}" "$cfile" "$cline" "$rdisp")"
-      if [ "$sv" != verified ] || [ -n "$(rl_occurrence "${ccontent[$i]}" "$cline" "$css" "$cend")" ]; then
+      if [ -n "$rocc" ] || [ -n "$(rl_occurrence "${ccontent[$i]}" "$cline" "$css" "$cend")" ]; then
         qbad[$i]=1
       fi
     elif [ "$cskey" != unscoped ] && [ "$rss" = unscoped ] && [ -n "$css" ]; then
@@ -1641,10 +1650,14 @@ rl_observe_locked() {
     match[$i]=$eid via[$i]=scope
     claimed="$claimed$eid "
     # an unscoped observation keeps the finding's verified scope, which
-    # was just re-checked at its line
+    # was just re-checked at its line, and its scoped fingerprint: a
+    # line-keyed one would let Pass B skip that check next time
     if [ -n "${ccontent[$i]:-}" ]; then
-      inherit[$i]=$(jq -c --arg id "$eid" '.findings[] | select(.finding_id == $id)
-        | .obs | {scope, scope_key, scope_status, occ}' "$(rl_tmp)/fold.json") || inherit[$i]=''
+      inherit[$i]=$(jq -ce --arg id "$eid" '.findings[] | select(.finding_id == $id)
+        | .obs | {fingerprint, scope, scope_key, scope_status, occ}' "$(rl_tmp)/fold.json") || {
+        rl_err "observe: could not read the scope of $eid; nothing was written"
+        return 1
+      }
     fi
   done
 

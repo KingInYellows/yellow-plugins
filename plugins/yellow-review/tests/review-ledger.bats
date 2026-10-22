@@ -302,6 +302,15 @@ setup() {
   [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
 }
 
+@test "CLAUDE-88: a repeated heading path does not merge two sections" {
+  printf '# Doc\n## A\nflag one\n## A\nflag one\n' >|r.md
+  H=$(commit_all repeated)
+  observe "$H" "[$(finding r.md 3 '{"scope":"Doc > A","category":"docs","rule":"wrong-doc"}')]" >/dev/null
+  [ "$(fold | jq -r '.findings[0].obs.scope_status')" = verified ]
+  out=$(observe "$H" "[$(finding r.md 5 '{"category":"docs","rule":"wrong-doc"}')]")
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
+}
+
 @test "CLAUDE-88: a scopeless markdown re-observation merges under its heading" {
   printf '# Doc\n## A\nflag one\n## B\nflag one\n' >|m.md
   H=$(commit_all md)
@@ -311,6 +320,8 @@ setup() {
   [ "$(printf '%s' "$out" | jq '.merged')" -eq 1 ]
   [ "$(printf '%s' "$out" | jq -r '.findings[0].finding_id')" = "$b" ]
   [ "$(fold | jq -r --arg id "$b" '.findings[] | select(.finding_id == $id) | .obs.scope')" = "Doc > B" ]
+  # the merge records the finding's scoped fingerprint, not a line-keyed one
+  [ "$(fold | jq -r --arg id "$b" '.findings[] | select(.finding_id == $id) | .fingerprints | length')" -eq 1 ]
 }
 
 @test "fingerprint: a line that moves without a code change rematches" {
