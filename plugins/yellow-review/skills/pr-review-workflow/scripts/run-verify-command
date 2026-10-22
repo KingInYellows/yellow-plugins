@@ -722,6 +722,9 @@ check_lib_integrity || exit 2
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$PLUGIN_ROOT/lib/resolve-paths.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-paths.sh\n' >&2; exit 2; }
 # Resolve git and the worktree-free PATH once, here, so later subshells reuse them.
+# The PATH is primed first with stderr open, so the note naming a worktree
+# directory the screen could not walk (yr_walk_failed_note) is shown.
+yr_prime_path || true
 yr_git --version >/dev/null 2>&1 || true
 # shellcheck source=../../../lib/resolve-text.sh
 . "$PLUGIN_ROOT/lib/resolve-text.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-text.sh\n' >&2; exit 2; }
@@ -1414,10 +1417,13 @@ check_untracked_special() {
     (
         PATH=$safe
         hash -r 2>/dev/null || true
+        # A sealed directory (root-owned, mode 700) is skipped, not a failure:
+        # this user cannot have made a node in it (yr_sealed_skip).
+        yr_sealed_skip find
         if [ -n "$IGNORED_SINCE" ]; then
-            find . -name .git -prune -o \( -type p -o -type s -o -type b -o -type c \) -newer "$IGNORED_SINCE" -print0
+            find . ${YR_SEALED[@]+"${YR_SEALED[@]}"} -name .git -prune -o \( -type p -o -type s -o -type b -o -type c \) -newer "$IGNORED_SINCE" -print0
         else
-            find . -name .git -prune -o \( -type p -o -type s -o -type b -o -type c \) -print0
+            find . ${YR_SEALED[@]+"${YR_SEALED[@]}"} -name .git -prune -o \( -type p -o -type s -o -type b -o -type c \) -print0
         fi || exit 1
         cap=$(rp_walk_cap)
         while IFS= read -r -d '' l; do
@@ -1436,8 +1442,8 @@ check_untracked_special() {
                 rp_is_special "$x" || continue
                 [ -z "$IGNORED_SINCE" ] || [ "$x" -nt "$IGNORED_SINCE" ] || continue
                 printf '%s\0' "${x#./}"
-            done < <(find -H "./$l" -name .git -prune -o -print0 2>/dev/null || printf '\001ERR\0')
-        done < <(find . -name .git -prune -o -type l -print0 2>/dev/null || printf '\001ERR\0')
+            done < <(find -H "./$l" ${YR_SEALED[@]+"${YR_SEALED[@]}"} -name .git -prune -o -print0 2>/dev/null || printf '\001ERR\0')
+        done < <(find . ${YR_SEALED[@]+"${YR_SEALED[@]}"} -name .git -prune -o -type l -print0 2>/dev/null || printf '\001ERR\0')
     ) >|"$out" 2>/dev/null || { rm -f -- "$out"; die 2 "cannot look for special files at trusted-config paths"; }
     while IFS= read -r -d '' f; do
         case "$f" in $'\002'*) SPECIAL_HITS+=("${f#$'\002'}"); continue ;; esac
@@ -1656,9 +1662,11 @@ fi
 TOP_REAL=$(pwd -P)
 # dir_has_mount <physical-dir>: 0 when a mount boundary sits at or under the
 # directory, 1 when none does, 2 when that cannot be told (the caller fails
-# closed). Two checks, because a same-filesystem bind mount shares st_dev: a
-# device change inside the tree, and any mount point at or under the path in
-# the mount table.
+# closed). Two checks, because a same-filesystem bind mount shares st_dev: any
+# mount point at or under the path in the mount table, then a device change
+# inside the tree. The mount table comes first and the device walk uses -xdev,
+# so a bind or FUSE mount inside the directory is found without walking it
+# (CLAUDE-109); -xdev still lists the mount point itself, with its own device.
 # Device check: GNU `find -printf %D`; where find lacks -printf (macOS, BSD),
 # `stat` over the tree in batches (`stat -c %d` on GNU, `stat -f %d` on BSD,
 # probed in that order because GNU `stat -f` means something else).
@@ -1666,11 +1674,14 @@ TOP_REAL=$(pwd -P)
 # mount point are decoded). Where the default is absent (no procfs), the output
 # of mount(8) is parsed instead: "dev on /path (opts)" (BSD, macOS) or
 # "dev on /path type fs (opts)" (Linux). A YR_MOUNTINFO that is set but
-# unreadable stays a failure; set to the empty string it forces the mount(8)
+# unreadable cannot be told; set to the empty string it forces the mount(8)
 # fallback (for tests).
 dir_has_mount() {
-    local d="$1" mi="${YR_MOUNTINFO-/proc/self/mountinfo}" mp devs line rest mnt="" m
-    devs=$(find -- "$d" -printf '%D\n' 2>/dev/null | LC_ALL=C sort -u | wc -l) || devs=""
+    local d="$1" mt devs
+    mt=0
+    dir_mount_listed "$d" || mt=$?
+    [ "$mt" -ne 0 ] || return 0
+    devs=$(find -- "$d" -xdev -printf '%D\n' 2>/dev/null | LC_ALL=C sort -u | wc -l) || devs=""
     case "$devs" in
         *[!0-9\ ]*|"") devs="" ;;
     esac
@@ -1679,6 +1690,13 @@ dir_has_mount() {
     fi
     [ "$((devs + 0))" -ge 1 ] || return 2
     [ "$((devs + 0))" -le 1 ] || return 0
+    return "$mt"
+}
+
+# dir_mount_listed <physical-dir>: 0 when the mount table lists a mount point
+# at or under the directory, 1 when it lists none, 2 when no table can be read.
+dir_mount_listed() {
+    local d="$1" mi="${YR_MOUNTINFO-/proc/self/mountinfo}" mp line rest mnt="" m
     if [ -n "$mi" ] && [ -r "$mi" ]; then
         while read -r _ _ _ _ mp _; do
             [ -n "$mp" ] || continue
@@ -1712,7 +1730,7 @@ dir_has_mount() {
 }
 
 # dir_device_count <dir>: the number of distinct device numbers in the tree, by
-# `stat` over `find -exec ... {} +`; non-zero exit when no stat flavor works.
+# `stat` over `find -xdev -exec ... {} +`; non-zero exit when no stat flavor works.
 dir_device_count() {
     local d="$1" fmt n
     if stat -c %d -- "$d" >/dev/null 2>&1; then
@@ -1722,7 +1740,7 @@ dir_device_count() {
     else
         return 1
     fi
-    n=$(find -- "$d" -exec stat "$fmt" %d {} + 2>/dev/null | LC_ALL=C sort -u | wc -l) || return 1
+    n=$(find -- "$d" -xdev -exec stat "$fmt" %d {} + 2>/dev/null | LC_ALL=C sort -u | wc -l) || return 1
     case "$n" in
         *[!0-9\ ]*|"") return 1 ;;
     esac
@@ -2071,7 +2089,7 @@ drop_hold_line() {
 }
 
 save_patch() {
-    local out="$1" fmt="$2" f rc c p held_dir="" held_parent=""
+    local out="$1" fmt="$2" f rc c p held_dir="" held_parent="" staged=""
     umask 077
     : >"$out" || return 1
     for f in ${FILES[@]+"${FILES[@]}"}; do
@@ -2104,7 +2122,17 @@ save_patch() {
                 fi
             fi
             rc=0
-            lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
+            # A held special file has no content to record. When the index
+            # holds staged content for the path (a new file, or a blob other
+            # than HEAD's), record that instead of the worktree's absence, so
+            # the revert does not lose it (CLAUDE-128); otherwise the diff
+            # records the deletion.
+            staged=""
+            if [ -n "$held_dir" ] && lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
+                && ! lgit_nohooks diff --cached --quiet --no-ext-diff --no-textconv HEAD -- "$f" 2>/dev/null; then
+                staged=--cached
+            fi
+            lgit_nohooks diff ${staged:+"$staged"} --no-color --no-ext-diff --no-textconv "$fmt" \
                 --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || rc=$?
             if [ -n "$held_dir" ]; then
                 if ! mv -- "$held_dir/node" "$f"; then
