@@ -16,4 +16,5 @@ A third-party `stack`-named gh extension is reported as
 
 `/review:pr` now resolves the stacked-PR provider before checkout: Graphite
 uses `gt checkout`, GitHub stacks use `gh pr checkout` and never run `gt`,
-and any unresolved provider state stops before touching the worktree.
+and any unresolved provider state stops before touching the worktree. Step 9
+still re-resolves the provider before pushing.
