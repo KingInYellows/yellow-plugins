@@ -842,13 +842,17 @@ async function main() {
       { mode: 0o700 }
     );
   }
-  const cliOverlays = ['gt', 'gh']
-    .filter((name) => fs.existsSync('/usr/bin/' + name))
-    .flatMap((name) => [
-      '--ro-bind',
-      path.join(scratch, 'stubs', name),
-      '/usr/bin/' + name,
-    ]);
+  // /runtime precedes /usr/bin on the sandbox PATH, so the stubs resolve even
+  // when the host installs gt or gh outside /usr/bin. The /usr/bin overlays
+  // also cover callers that use the absolute path.
+  const cliOverlays = ['gt', 'gh'].flatMap((name) => [
+    '--ro-bind',
+    path.join(scratch, 'stubs', name),
+    '/runtime/' + name,
+    ...(fs.existsSync('/usr/bin/' + name)
+      ? ['--ro-bind', path.join(scratch, 'stubs', name), '/usr/bin/' + name]
+      : []),
+  ]);
   const bwrap = [
     '--die-with-parent',
     '--unshare-pid',

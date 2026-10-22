@@ -15,6 +15,15 @@ const health = 'plugins/yellow-ci/skills/ci-runner-health';
 const diagnose = 'plugins/yellow-ci/skills/ci-diagnose';
 const setup = 'plugins/gt-workflow/skills/gt-setup';
 const fence = String.fromCharCode(96).repeat(3);
+// zsh rows skip where zsh is absent, except where it is required (CI set to
+// anything but '', 'false' or '0', or SHELL_COMPAT_REQUIRE_ZSH=1), matching
+// check-shell-parse.test.ts.
+const HAS_ZSH = spawnSync('zsh', ['-c', 'exit 0']).status === 0;
+const CI_VALUE = (process.env.CI ?? '').trim().toLowerCase();
+const ZSH_REQUIRED =
+  process.env.SHELL_COMPAT_REQUIRE_ZSH === '1' ||
+  !['', 'false', '0'].includes(CI_VALUE);
+const SHELLS = HAS_ZSH || ZSH_REQUIRED ? ['bash', 'zsh'] : ['bash'];
 
 function read(path: string): string {
   return readFileSync(join(ROOT, path), 'utf8');
@@ -135,6 +144,15 @@ function evidence(): { raw: string; data: string } {
   };
 }
 
+it.runIf(ZSH_REQUIRED && !HAS_ZSH)(
+  'has zsh installed where it is required',
+  () => {
+    expect.fail(
+      'zsh not found: CI or SHELL_COMPAT_REQUIRE_ZSH=1 requires it for the zsh rows below'
+    );
+  }
+);
+
 describe('pilot progressive-disclosure routing', () => {
   it.each([health, diagnose, setup])(
     'resolves every mandatory flat reference from %s',
@@ -179,7 +197,7 @@ describe('ci-diagnose moved shell behavior', () => {
   const details = () => bindRun(findBlock(resolveRef, 'RUN_ID="<digits'));
   const latest = () => bindRun(findBlock(resolveRef, 'RUN_ID=$(gh run list'));
 
-  it.each(['bash', 'zsh'])(
+  it.each(SHELLS)(
     'redacts/fences metadata and honors override in a fresh %s process',
     (shell) => {
       const fixture = evidence();
@@ -204,7 +222,7 @@ describe('ci-diagnose moved shell behavior', () => {
     }
   );
 
-  it.each(['bash', 'zsh'])(
+  it.each(SHELLS)(
     'drains bounded logs without treating truncation as failure in %s',
     (shell) => {
       const fixture = evidence();
@@ -301,7 +319,7 @@ describe('ci-runner-health moved shell behavior', () => {
     }
   );
 
-  it.each(['bash', 'zsh'])(
+  it.each(SHELLS)(
     'accepts Linux despite first-connection stderr in %s',
     (shell) => {
       const result = run(
@@ -351,7 +369,7 @@ describe('ci-runner-health moved shell behavior', () => {
     expect(result.stdout).not.toContain(fixture.raw);
   });
 
-  it.each(['bash', 'zsh'])(
+  it.each(SHELLS)(
     'redacts health and journal in independent %s processes',
     (shell) => {
       for (const probe of [healthProbe(), journal()]) {
@@ -416,51 +434,48 @@ describe('portability fail-closed behavior', () => {
 });
 
 describe('gt-setup disclosed prerequisites', () => {
-  it.each(['bash', 'zsh'])(
-    'keeps prerequisite diagnosis read-only in %s',
-    (shell) => {
-      writeFileSync(
-        join(directory, 'gt'),
-        [
-          '#!/bin/bash',
-          'printf "%s\\n" "$@" >> "$FIXTURE_CALLS"',
-          'case "$*" in',
-          '  --version) printf "1.6.7\\n" ;;',
-          '  trunk) printf "main\\n" ;;',
-          '  *) exit 99 ;;',
-          'esac',
-        ].join('\n'),
-        { mode: 0o755 }
-      );
-      writeFileSync(
-        join(directory, 'git'),
-        [
-          '#!/bin/bash',
-          'case "$*" in',
-          '  "rev-parse --show-toplevel") printf "%s\\n" "$HOME" ;;',
-          '  "rev-parse --git-path .graphite_repo_config") printf "%s\\n" "$HOME/repo-config" ;;',
-          '  "rev-parse --is-inside-work-tree") printf "true\\n" ;;',
-          '  *) exit 99 ;;',
-          'esac',
-        ].join('\n'),
-        { mode: 0o755 }
-      );
-      writeFileSync(join(directory, 'repo-config'), '{}\n');
-      writeFileSync(join(directory, '.graphite_user_config'), '{}\n');
-      const result = run(
-        findBlock(setup + '/references/prerequisites.md', 'version_gte()'),
-        '',
-        {},
-        shell
-      );
-      expect(result.status).toBe(0);
-      expect(result.stdout).toContain('mcp_server:    ok (gt >= 1.6.7)');
-      expect(result.stdout).toContain('gt_trunk:       main');
-      expect(result.stdout).toContain('auth_config:    present');
-      expect(calls()).not.toContain('user');
-      expect(calls()).not.toContain('auth');
-      expect(calls()).not.toContain('init');
-      expect(read(setup + '/SKILL.md')).toContain('end after this phase');
-    }
-  );
+  it.each(SHELLS)('keeps prerequisite diagnosis read-only in %s', (shell) => {
+    writeFileSync(
+      join(directory, 'gt'),
+      [
+        '#!/bin/bash',
+        'printf "%s\\n" "$@" >> "$FIXTURE_CALLS"',
+        'case "$*" in',
+        '  --version) printf "1.6.7\\n" ;;',
+        '  trunk) printf "main\\n" ;;',
+        '  *) exit 99 ;;',
+        'esac',
+      ].join('\n'),
+      { mode: 0o755 }
+    );
+    writeFileSync(
+      join(directory, 'git'),
+      [
+        '#!/bin/bash',
+        'case "$*" in',
+        '  "rev-parse --show-toplevel") printf "%s\\n" "$HOME" ;;',
+        '  "rev-parse --git-path .graphite_repo_config") printf "%s\\n" "$HOME/repo-config" ;;',
+        '  "rev-parse --is-inside-work-tree") printf "true\\n" ;;',
+        '  *) exit 99 ;;',
+        'esac',
+      ].join('\n'),
+      { mode: 0o755 }
+    );
+    writeFileSync(join(directory, 'repo-config'), '{}\n');
+    writeFileSync(join(directory, '.graphite_user_config'), '{}\n');
+    const result = run(
+      findBlock(setup + '/references/prerequisites.md', 'version_gte()'),
+      '',
+      {},
+      shell
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('mcp_server:    ok (gt >= 1.6.7)');
+    expect(result.stdout).toContain('gt_trunk:       main');
+    expect(result.stdout).toContain('auth_config:    present');
+    expect(calls()).not.toContain('user');
+    expect(calls()).not.toContain('auth');
+    expect(calls()).not.toContain('init');
+    expect(read(setup + '/SKILL.md')).toContain('end after this phase');
+  });
 });
