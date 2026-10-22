@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1.12
+
+### Patch Changes
+
+- [`85766df`](https://github.com/KingInYellows/yellow-plugins/commit/85766df25bfc66b93bb3b1423e6309b82de43197)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Guard shell
+  blocks that parse `ls`, `ps`, `df` or `top` output against user aliases
+  (`ls=eza`, `ps=procs`). Plan listings in `/flow:work`, `/flow:review` and
+  `/flow:decompose` now go through `command find -H … -exec ls -t {} +`, so an
+  aliased `ls` no longer makes them report "no plans" and zsh's `nomatch` error
+  no longer leaks on an empty `plans/`. `/plan:status` and
+  `/flow:pick-next-shell` get the same `find` existence check, and the
+  archived-plan count in `/plan:status` uses it too, so symlinked plans are
+  counted and dotfiles are skipped. The codex status listing, the browser-test
+  process check, the yellow-debt scanner and yellow-research code-researcher
+  cache-directory permission checks, the yellow-ci remote probes, and the
+  ruvector and worktree `.ruvector/` checks use `command`.
+
 ## 1.1.11
 
 ### Patch Changes

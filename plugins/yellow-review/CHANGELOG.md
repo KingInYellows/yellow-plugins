@@ -1,5 +1,67 @@
 # Changelog
 
+## 3.10.2
+
+### Patch Changes
+
+- [`667fc58`](https://github.com/KingInYellows/yellow-plugins/commit/667fc585daa281f8ca86734ddaef06fa7c694e76)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The resolver
+  hard-link screens in `lib/resolve-paths.sh` no longer compare a file's device
+  with the worktree root directory's device. Overlayfs reports a different
+  st_dev for directories than for regular files, so a hard link in an outside
+  PATH directory to a worktree file (a planted git-lfs or ssh) passed
+  `yr_resolve_tool`, `yr_safe_path` and `harden_git_config`. The screens now
+  match file to file (`find -samefile`, or device and inode against the tree
+  walk); the stat fallback also checks the devices of the worktree's multi-link
+  files. Unreadable link counts and failed walks still fail closed.
+
+- [`3ea85b4`](https://github.com/KingInYellows/yellow-plugins/commit/3ea85b4b78ff87a423d84a60e472b3cb819dc298)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make the
+  symlink-chain test for `rp_ignored_changed_since` deterministic: the two links
+  no longer share a directory, so readdir order cannot decide which one the walk
+  names.
+
+- [`93cb5c2`](https://github.com/KingInYellows/yellow-plugins/commit/93cb5c299d72a84e32cda8ea0b986f0bb7134839)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `run-verify-command --revert-denied` closes five gaps where it reported
+  `deniedClean: true` while edited trusted config stayed live. An untracked
+  trusted-config symlink has its target judged before the revert deletes the
+  link (CLAUDE-101). Below a tracked config directory link, a nested link whose
+  own mtime is newer than the marker counts (CLAUDE-115), and so does a nested
+  link that leads back into the worktree, even to an assume-unchanged file
+  (CLAUDE-94). A nested directory link that leaves the worktree below an alias
+  into agent memory is walked under the alias's name (CLAUDE-113). An untracked
+  FIFO, socket or device at a trusted-config path is reported and kept unopened
+  (CLAUDE-121), including when it is live through a directory symlink;
+  `--dry-run` lists those nodes in `specialHits` so interactive
+  `/review:resolve` does not skip them.
+
+  The `/review:resolve-stack` and `/review:sweep-all` dirty-tree cleanup now
+  always runs `--revert-denied` in its unrecognized-paths branch, since a write
+  through a tracked config link dirties only the link's target (CLAUDE-119).
+  Both commands create a marker file at pre-flight and the cleanup passes it as
+  `--ignored-since`, so a gitignored trusted-config edit is caught instead of
+  left on disk; `--no-ignored-guard` remains only when no marker could be made
+  (CLAUDE-156).
+
+- [`0f47626`](https://github.com/KingInYellows/yellow-plugins/commit/0f47626e9a632f0fe1635d6664a1123686dcdee1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Harden
+  `/review:sweep`'s local-config guard and its rate-limit reporting. Step 1b now
+  snapshots `yellow-plugins.local.md` whenever the work tree does not track it,
+  so a config that `/review:pr` creates behind a new ignore rule is removed
+  before `/review:resolve` reads it (CLAUDE-150). `head-ignore-probe` prints the
+  `headRefOid` it judged, and Step 2a stops with
+  `Sweep: skipped (head-mismatch)` when the checked-out branch does not contain
+  it; Step 2b re-applies the unignored-file abort to the tree actually checked
+  out (CLAUDE-84). The probe refuses a tree listing without `truncated: false`
+  and reports a transforming attribute from this clone's own attributes as
+  systemic (`error=local-attributes`, exit 3) instead of failing every PR
+  (CLAUDE-147). `commit-resolve-fixes` exits 7 and
+  `run-verify-command --unattended` reports `rateLimited: true` when listing the
+  PR's changed files hits a rate limit, and `/review:resolve` maps both to
+  `ratelimited=1` (CLAUDE-63). `/review:sweep-all` gives a rate-limited PR's row
+  a `skipped` outcome (CLAUDE-125).
+
 ## 3.10.1
 
 ### Patch Changes

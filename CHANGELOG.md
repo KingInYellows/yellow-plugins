@@ -13,6 +13,35 @@ and this project adheres to
 
 ---
 
+## [2.1.24] - 2026-10-22
+
+### Added
+
+- **yellow-research 5.2.0** — Research agents query Ceramic the way its docs
+  recommend (2–3 short keyword variants, `maxDescriptionLength: 1000`) and fall
+  back to other providers by how many results contain the query's distinctive
+  terms.
+
+### Fixed
+
+- **yellow-review 3.10.2** — `run-verify-command --revert-denied` closes five
+  gaps where edited trusted config stayed live behind symlinks or special files,
+  and `/review:resolve-stack` and `/review:sweep-all` cleanup always runs it
+  with a pre-flight marker. The resolver hard-link screens match file to file,
+  so overlayfs device numbers no longer let a planted hard link through.
+  `/review:sweep` binds its local-config guard to the checked-out head.
+- **yellow-core 2.11.3** — `jev-category-eval run` rejects a malformed `--model`
+  before spending requests; `/plan:complete` no longer exits when `gt` is
+  missing before the provider is resolved; `/worktree:restack --abort` reports
+  what it kept and cleared; the stack library lookup works without
+  `CLAUDE_PLUGIN_ROOT` and rejects symlinked or relative plugin roots; research
+  agents use the new Ceramic query pattern.
+- **yellow-browser-test 1.1.12, yellow-ci 1.5.8, yellow-codex 0.5.1, yellow-debt
+  1.9.2, yellow-ruvector 2.0.4** (and the plugins above) — Shell blocks that
+  parse `ls`, `ps`, `df` or `top` output call them through `command`, so user
+  aliases (`ls=eza`, `ps=procs`) no longer break plan listings, process checks
+  or permission probes.
+
 ## [2.0.4] - 2026-07-10
 
 ### Fixed

@@ -37,7 +37,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.11.2",
+      "version": "2.11.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -87,7 +87,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.10.1",
+      "version": "3.10.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -97,7 +97,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-ruvector",
       "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
-      "version": "2.0.3",
+      "version": "2.0.4",
       "author": {
         "name": "KingInYellows"
       },
@@ -107,7 +107,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-browser-test",
       "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting",
-      "version": "1.1.11",
+      "version": "1.1.12",
       "author": {
         "name": "KingInYellows"
       },
@@ -117,7 +117,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
-      "version": "1.9.1",
+      "version": "1.9.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -127,7 +127,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-ci",
       "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
-      "version": "1.5.7",
+      "version": "1.5.8",
       "author": {
         "name": "KingInYellows"
       },
@@ -147,7 +147,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, and Parallel Task MCP servers, plus optional ast-grep CLI code search. Code research inline; deep research saved to docs/research/.",
-      "version": "5.1.0",
+      "version": "5.2.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -187,7 +187,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-codex",
       "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -374,7 +374,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-browser-test/.claude-p
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-browser-test",
-  "version": "1.1.11",
+  "version": "1.1.12",
   "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, exploratory testing, and bug reporting",
   "author": {
     "name": "KingInYellows",
@@ -397,7 +397,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ci/.claude-plugin/plug
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-ci",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
   "author": {
     "name": "KingInYellows",
@@ -481,7 +481,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-codex/.claude-plugin/p
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-codex",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
   "author": {
     "name": "KingInYellows",
@@ -536,7 +536,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "2.11.2",
+  "version": "2.11.3",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
@@ -659,7 +659,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-debt/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-debt",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "description": "Technical debt audit and remediation with parallel scanner agents. Use when you need to assess codebase health, identify AI-generated debt patterns, prioritize findings, and systematically remediate technical debt.",
   "author": {
     "name": "KingInYellows",
@@ -922,7 +922,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-research/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-research",
-  "version": "5.1.0",
+  "version": "5.2.0",
   "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, and Parallel Task MCP servers, plus optional ast-grep CLI code search. Code research inline; deep research saved to docs/research/.",
   "author": {
     "name": "KingInYellows",
@@ -1032,7 +1032,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-review/.claude-plugin/
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-review",
-  "version": "3.10.1",
+  "version": "3.10.2",
   "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
   "author": {
     "name": "KingInYellows",
@@ -1083,7 +1083,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-ruvector",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
   "author": {
     "name": "KingInYellows",
