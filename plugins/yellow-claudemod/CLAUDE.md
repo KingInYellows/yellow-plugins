@@ -32,7 +32,7 @@ command hooks belong in `catalog/plugins/yellow-claudemod.json#hooks`.
   per ledger key and shown only to that session. Pruning old ledger keys runs
   after the row is stored but outside the chain, one prune at a time, so a
   store call that hangs there never blocks later rows. Because it is outside
-  the chain, it never deletes a key this module has written.
+  the chain, it skips a key with a queued write or one written while it runs.
 - Rows go under `ledger:<session id>`; `$.store` is machine-wide and the chain
   only serializes one session. `$.session.id()` is read per write because
   `/clear` changes it without a new `session.start`. Read the legacy `ledger`

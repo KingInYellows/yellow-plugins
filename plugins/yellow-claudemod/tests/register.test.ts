@@ -206,28 +206,61 @@ describe('ledger across sessions', () => {
 });
 
 describe('ledger pruning', () => {
-  test('never prunes a key this module wrote', async ($, on) => {
-    const entries: Record<string, unknown> = {
+  test('never deletes a key written while the prune runs', async ($, on) => {
+    const clock = mock.clock(on);
+    const held: Record<string, unknown> = {
       'ledger:a': [row('earlier-agent', '1970-01-01T00:00:00.000Z')],
     };
     for (let i = 0; i < 7; i += 1) {
-      entries[`ledger:old${i}`] = [
-        row(`agent-${i}`, '1970-01-01T00:00:00.000Z'),
-      ];
+      held[`ledger:old${i}`] = [row(`agent-${i}`, '1970-01-01T00:00:00.000Z')];
     }
-    let sessionId = 'a';
-    mock.store(on, entries);
+    let sessionId = 'b';
+    let isFirstKeys = true;
+    on('session.id', () => ({ value: sessionId }));
+    on('store.get', ($, e) => ({ value: held[e.key] }));
+    on('store.set', ($, e) => {
+      held[e.key] = e.value;
+      return { value: undefined };
+    });
+    // The first prune's listing is taken now and answers late.
+    on('store.keys', async () => {
+      const snapshot = Object.keys(held);
+      if (isFirstKeys) {
+        isFirstKeys = false;
+        await clock.sleep(500);
+      }
+      return { value: snapshot };
+    });
+    on('store.delete', ($, e) => {
+      delete held[e.key];
+      return { value: undefined };
+    });
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    await spawn($, REVIEWER);
+    // Session a is seen again while the prune that listed its key runs.
+    sessionId = 'a';
+    await spawn($, SECURITY);
+    await clock.advance(500);
+    const text = await status($);
+    expect(text).toContain('across 8 session(s)');
+    expect(text).toContain('earlier-agent: ran opus');
+    expect(text).toContain(`${SECURITY}: ran opus`);
+    expect(text).not.toContain('agent-0:');
+  });
+
+  test('keeps the cap across many sessions in one module', async ($, on) => {
+    let sessionId = 's0';
+    mock.store(on);
     mock.clock(on);
     on('session.id', () => ({ value: sessionId }));
     on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
     on('command.run', () => ({ text: 'engine' }));
-    await spawn($, REVIEWER);
-    sessionId = 'b';
-    await spawn($, SECURITY);
-    const text = await status($);
-    expect(text).toContain('across 8 session(s)');
-    expect(text).toContain('earlier-agent: ran opus');
-    expect(text).not.toContain('agent-0:');
+    for (let i = 0; i < 10; i += 1) {
+      sessionId = `s${i}`;
+      await spawn($, REVIEWER);
+    }
+    expect(await status($)).toContain('across 8 session(s)');
   });
 });
 

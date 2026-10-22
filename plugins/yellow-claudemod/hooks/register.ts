@@ -45,22 +45,22 @@ async function bounded<T>(
 
 // Drops the oldest session keys past the cap. Not part of the ledger's
 // read-modify-write; a failure is retried after the next write. Runs beside
-// the chain, so it never deletes a key this module writes: a queued write to
-// that key could land between the listing and the delete.
+// the chain, so it skips a key isBusy names: a write to that key could land
+// between the listing and the delete.
 async function pruneLedgerKeys(
   $: EngineInterface,
   ownKey: string,
-  writtenKeys: ReadonlySet<string>
+  isBusy: (key: string) => boolean
 ): Promise<void> {
   try {
     const keys = await $.store.keys();
     // Count every key toward the cap, but take the oldest from the others.
     const ordered = [
-      ...keys.filter((k) => !writtenKeys.has(k)),
-      ...keys.filter((k) => writtenKeys.has(k)),
+      ...keys.filter((k) => !isBusy(k)),
+      ...keys.filter((k) => isBusy(k)),
     ];
     for (const old of ledgerKeysToPrune(ordered, ownKey)) {
-      if (!writtenKeys.has(old)) await $.store.delete(old);
+      if (!isBusy(old)) await $.store.delete(old);
     }
   } catch {
     // Retried after the next write.
@@ -103,10 +103,13 @@ export const register: Register = (on, options) => {
   // instead, and while the chain is stalled spawns stop waiting on it.
   let writes: Promise<void> = Promise.resolve();
   let isChainStalled = false;
-  // The pending prune, if any, and every key this module has written: see
-  // pruneLedgerKeys.
+  // The pending prune, if any. A key is busy, and kept from it, while a write
+  // to it is queued or once one lands during the prune.
   let pruning: Promise<void> | undefined;
-  const writtenKeys = new Set<string>();
+  const queuedWrites = new Map<string, number>();
+  let writtenDuringPrune = new Set<string>();
+  const isBusy = (k: string): boolean =>
+    (queuedWrites.get(k) ?? 0) > 0 || writtenDuringPrune.has(k);
   // The last failed write per ledger key: /clear changes the session id
   // mid-module, and each session reports only its own.
   // Each entry remembers the spawn that recorded it, so a success clears only
@@ -199,7 +202,7 @@ export const register: Register = (on, options) => {
     const key = await bounded($, () => sessionLedgerKey($)).catch(() =>
       ledgerKeyFor('unknown')
     );
-    writtenKeys.add(key);
+    queuedWrites.set(key, (queuedWrites.get(key) ?? 0) + 1);
     const step = writes.then(async () => {
       try {
         const ledger = readLedger(await $.store.get(key));
@@ -210,10 +213,16 @@ export const register: Register = (on, options) => {
       } catch (err) {
         recordFailure(key, spawn, ts, err);
       }
+      const left = (queuedWrites.get(key) ?? 1) - 1;
+      if (left > 0) queuedWrites.set(key, left);
+      else queuedWrites.delete(key);
       // Pruning runs beside the chain, one at a time: a store call that
       // never answers there must not hold up later rows.
-      if (pruning === undefined) {
-        pruning = pruneLedgerKeys($, key, writtenKeys).finally(() => {
+      if (pruning !== undefined) {
+        writtenDuringPrune.add(key);
+      } else {
+        writtenDuringPrune = new Set();
+        pruning = pruneLedgerKeys($, key, isBusy).finally(() => {
           pruning = undefined;
         });
       }
