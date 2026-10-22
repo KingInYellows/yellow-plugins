@@ -218,6 +218,19 @@ P
   [ "${lines[${#lines[@]}-1]}" = "apply threads=3 done=3 skipped=0 issues_created=1 stopped=none" ]
 }
 
+@test "a failed dedupe check over the cap stops the thread instead of claiming no issue" {
+  cat >"$PLAN" <<'P'
+{"threadId":"PRRT_a","disposition":"oos","issue":{"title":"T","body":"B"},"reply":{"body":"tracked in {{issue}}"},"resolve":true}
+{"threadId":"PRRT_b","disposition":"oos","issue":{"title":"T","body":"B"},"reply":{"body":"tracked in {{issue}}"},"resolve":true}
+P
+  stub_rc find PRRT_a 1
+  run "$SCRIPT" --issue-cap 0 o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 0 ]
+  ! grep -q 'PRRT_a' "$TEXT_LOG"
+  [ "$(jq -r 'select(.threadId=="PRRT_a") | [.issue.status, (.issue.exit|tostring), .finalDisposition, .resolve.status, .outcome] | join(",")' "$RESULTS")" = "failed,1,unclear,not-attempted,stopped" ]
+  grep -qxF 'PRRT_b unclear: Out of scope for this PR. The automatic follow-up issue limit for this run was reached, so no issue was filed. Leaving open.' "$TEXT_LOG"
+}
+
 @test "exit 3 on resolve records the reason and the next thread still runs" {
   cat >"$PLAN" <<'P'
 {"threadId":"PRRT_a","disposition":"fixed","reply":{"body":"Fixed in abc1234."},"resolve":true}

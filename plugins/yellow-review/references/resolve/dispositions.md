@@ -345,7 +345,8 @@ after the previous one exited 0, with these fallbacks:
 - Issue exit 7: post the fixed `Not filed` reply (Issue filing) as `unclear`,
   never resolve, count no issue.
 - `--issue-cap` reached: `file-followup-issue --find` first, since a dedupe
-  hit does not count; with no hit, post the over-cap reply as `unclear`.
+  hit does not count; with no hit, post the over-cap reply as `unclear`. A
+  `--find` that fails is a failed issue stage: the thread stops, `unclear`.
 - Reply exit 6: post `reply.plain` once when given; otherwise, or when that is
   refused too, leave the thread open.
 - `already-replied` skip: resolve only when the reported disposition equals

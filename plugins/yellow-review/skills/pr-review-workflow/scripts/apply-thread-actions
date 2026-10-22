@@ -289,9 +289,12 @@ while IFS= read -r LINE; do
             case "$RC" in
                 0) ;;
                 4) ISSUE_J=$(stage_fail_json failed); FINAL=unclear; stop_rate "$REASON" ;;
-                *) ;;
+                # An unanswered dedupe check is a failed stage, not a no-hit.
+                *) ISSUE_J=$(stage_fail_json failed); FINAL=unclear; OK=0 ;;
             esac
-            if [ "$RC" -eq 0 ] && [ "$(jq -r '.exists' "$WORK/out")" = "true" ]; then
+            if [ "$OK" -eq 0 ]; then
+                :
+            elif [ "$(jq -r '.exists' "$WORK/out")" = "true" ]; then
                 _num=$(jq -r '.number' "$WORK/out")
                 _url=$(jq -r '.url' "$WORK/out")
                 ISSUE_J=$(jq -cn --argjson n "$_num" --arg u "$_url" '{status: "found", number: $n, url: $u, created: false}')
