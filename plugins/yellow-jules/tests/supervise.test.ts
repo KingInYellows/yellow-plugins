@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadGrants, revokeGrant } from '../src/authority.js';
+import { resolveGrantsPath } from '../src/config.js';
 import { controllerFilePath } from '../src/controller.js';
 import {
   AdapterError,
@@ -1245,6 +1246,17 @@ describe('--clear-deviation', () => {
     await deviate(PLAN_DEVIATION);
     await status(h.deps, { session: session.localId, reconcile: false });
     fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    expect(await codeOf(() => clear())).toBe('JULES_CONTROLLER_MISMATCH');
+    expect((await ownerRecord())?.deviations[0]?.reconciled).toBe(false);
+  });
+
+  it('a grant missing from grants.json fails closed', async () => {
+    await deviate(PLAN_DEVIATION);
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const file = resolveGrantsPath(h.dataDir);
+    const grants = JSON.parse(fs.readFileSync(file, 'utf8'));
+    delete grants.grants[grantId];
+    fs.writeFileSync(file, JSON.stringify(grants), { mode: 0o600 });
     expect(await codeOf(() => clear())).toBe('JULES_CONTROLLER_MISMATCH');
     expect((await ownerRecord())?.deviations[0]?.reconciled).toBe(false);
   });

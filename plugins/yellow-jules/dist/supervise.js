@@ -819,12 +819,18 @@ function deviationNeedsFreshGrant(reason) {
 }
 /** The controller check for an acknowledgement: the grant's epoch, or this host's hold on the data directory when the owner has no grant. */
 function assertDeviationControllerAuthority(deps, grantId) {
-    if (grantId !== undefined) {
-        assertPauseControllerAuthority(deps, grantId);
+    const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
+    if (grantId === undefined) {
+        (0, controller_js_1.assertHostControlsDataDir)(ctx.controllerDir, deps.dataDir, ctx.controllerId);
         return;
     }
-    const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
-    (0, controller_js_1.assertHostControlsDataDir)(ctx.controllerDir, deps.dataDir, ctx.controllerId);
+    // A grant the record names but grants.json lacks (a partial restore) proves
+    // nothing about this host: refuse rather than skip the check.
+    const grant = (0, authority_js_1.loadGrants)(deps.dataDir).grants[grantId];
+    if (grant === undefined) {
+        (0, errors_js_1.throwAppError)('JULES_CONTROLLER_MISMATCH', `the session's grant ${grantId} is not in grants.json, so this host's controller authority cannot be checked`);
+    }
+    (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId);
 }
 /** Order-sensitive fingerprint of the unreconciled deviations, so a newer one recorded during the confirmation is never acknowledged unseen. */
 function openDeviationKey(record) {

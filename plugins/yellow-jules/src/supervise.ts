@@ -1215,12 +1215,30 @@ function assertDeviationControllerAuthority(
   deps: WriteDeps,
   grantId: string | undefined
 ): void {
-  if (grantId !== undefined) {
-    assertPauseControllerAuthority(deps, grantId);
+  const ctx = resolveControllerContext(deps);
+  if (grantId === undefined) {
+    assertHostControlsDataDir(
+      ctx.controllerDir,
+      deps.dataDir,
+      ctx.controllerId
+    );
     return;
   }
-  const ctx = resolveControllerContext(deps);
-  assertHostControlsDataDir(ctx.controllerDir, deps.dataDir, ctx.controllerId);
+  // A grant the record names but grants.json lacks (a partial restore) proves
+  // nothing about this host: refuse rather than skip the check.
+  const grant = loadGrants(deps.dataDir).grants[grantId];
+  if (grant === undefined) {
+    throwAppError(
+      'JULES_CONTROLLER_MISMATCH',
+      `the session's grant ${grantId} is not in grants.json, so this host's controller authority cannot be checked`
+    );
+  }
+  assertControllerAuthority(
+    ctx.controllerDir,
+    deps.dataDir,
+    grant.epochRef,
+    ctx.controllerId
+  );
 }
 
 /** Order-sensitive fingerprint of the unreconciled deviations, so a newer one recorded during the confirmation is never acknowledged unseen. */

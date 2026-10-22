@@ -218,10 +218,12 @@ function takeOverEpoch(ctx, grants) {
     }
     return highest + 1;
 }
-function takeOverController(ctx, dataDir, grants) {
+function takeOverController(ctx, dataDir, grants, 
+/** The epoch the journal marker already names; computed here when absent. */
+epoch = takeOverEpoch(ctx, grants)) {
     const authority = {
         controllerId: ctx.controllerId,
-        epoch: takeOverEpoch(ctx, grants),
+        epoch,
         dataDir: (0, config_js_1.canonicalPath)(dataDir),
         updatedAt: nowIso(ctx),
     };

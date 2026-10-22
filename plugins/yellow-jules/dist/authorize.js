@@ -219,15 +219,15 @@ async function authorizeTakeOver(deps) {
         // newer marker), never rebound grants without a marker.
         const journal = await (0, state_js_1.readJournal)(deps.dataDir);
         const seq = (0, state_js_1.nextSeq)(journal);
+        // Computed once: a take-over of another data directory on this host
+        // shares the authority file but not this lock, so a recomputed epoch
+        // could differ from the one the marker names.
+        const epoch = (0, controller_js_1.takeOverEpoch)(ctx, grants);
         await (0, state_js_1.writeJournal)(deps.dataDir, {
             ...journal,
-            controllerTakeover: {
-                at: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
-                seq,
-                epoch: (0, controller_js_1.takeOverEpoch)(ctx, grants),
-            },
+            controllerTakeover: { at: (0, runtime_support_js_1.nowFn)(deps)().toISOString(), seq, epoch },
         });
-        const result = (0, controller_js_1.takeOverController)(ctx, deps.dataDir, grants);
+        const result = (0, controller_js_1.takeOverController)(ctx, deps.dataDir, grants, epoch);
         (0, authority_js_1.writeGrants)(deps.dataDir, result.grants);
         return {
             operation: 'authorize',

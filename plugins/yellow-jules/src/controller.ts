@@ -261,11 +261,13 @@ export function takeOverEpoch(
 export function takeOverController(
   ctx: ControllerContext,
   dataDir: string,
-  grants: GrantsFile
+  grants: GrantsFile,
+  /** The epoch the journal marker already names; computed here when absent. */
+  epoch: number = takeOverEpoch(ctx, grants)
 ): TakeOverResult {
   const authority: ControllerAuthority = {
     controllerId: ctx.controllerId,
-    epoch: takeOverEpoch(ctx, grants),
+    epoch,
     dataDir: canonicalPath(dataDir),
     updatedAt: nowIso(ctx),
   };
