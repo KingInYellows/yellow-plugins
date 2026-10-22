@@ -13,6 +13,44 @@ and this project adheres to
 
 ---
 
+## [2.1.25] - 2026-10-22
+
+### Changed
+
+- **yellow-core 2.11.4, yellow-review 3.10.3, yellow-debt 1.9.3** — `/setup:all`
+  no longer requires `gt` for yellow-review or yellow-debt, which now submit
+  through the enabled stacked-PR provider. The dashboard adds a `gt_mcp_check`
+  row, flags gt below 1.6.7, and reports a third-party `stack` gh extension as
+  `WRONG_OWNER`. `/review:pr` resolves the stacked-PR provider before checkout
+  and uses `gh pr checkout` for GitHub stacks.
+- **yellow-review 3.10.3** — `/review:sweep` and `/review:resolve-stack` are
+  trimmed under the 500-line command ceiling with no behaviour change.
+
+### Fixed
+
+- **yellow-core 2.11.4, yellow-review 3.10.3** — The resolver `PATH` screen no
+  longer trusts setuid/setgid bits: an unreadable executable fails closed unless
+  root owns it and the user cannot write it. `harden_git_config` splits
+  `git config --null` records in bash, so the resolver scripts run on hosts
+  whose only awk is BWK (stock macOS). `/statusline:setup` backups refuse
+  symlinks and are created `O_EXCL|O_NOFOLLOW` at 0600, and the context observer
+  can no longer crash on a late `SIGALRM`.
+- **yellow-review 3.10.3** — `check-resolve-text` treats an awk program that
+  never ran as a scan failure (exit 6) instead of clean, and the review-findings
+  ledger merges a finding observed once with a verified scope and once without
+  one, so `/review:triage` no longer shows these as duplicates.
+- **yellow-goal 0.3.2** — `/goal:setup`, `/goal:run-stub` and `/goal:run-real`
+  find yellow-core's `lib/validate-fs.sh` in the version-suffixed plugin cache
+  instead of reporting yellow-core missing.
+- **yellow-claudemod 0.1.1** — The spawn ledger keys rows per session so
+  concurrent sessions no longer overwrite each other, ledger writes give up
+  after 2 seconds, and `/claudemod:setup` reports an installed but disabled
+  plugin as disabled.
+- **yellow-core 2.11.4, yellow-devin 3.0.8, yellow-semgrep 4.2.8** (and the
+  plugins above) — Active-install sibling lookups rank a `local`-scoped install
+  above a `project`-scoped one for the same project, matching Claude Code's
+  precedence, and match projects recorded through a symlink.
+
 ## [2.1.24] - 2026-10-22
 
 ### Added
