@@ -90,6 +90,20 @@ command -v awk >/dev/null 2>&1 && printf 'awk:                OK\n' || printf 'a
 command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:           OK\n' || printf 'ast-grep:           NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
 [ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
+# gt-workflow's bundled Graphite MCP server (`gt mcp`) needs gt 1.6.7+.
+if [ -n "$_gt" ]; then
+  _gt_ver=$("$_gt" --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+  if [ -z "$_gt_ver" ]; then
+    printf 'gt_mcp_check:       unknown (could not parse gt --version)\n'
+  elif printf '%s\n' "$_gt_ver" | awk -F. '{ exit !($1 > 1 || ($1 == 1 && ($2 > 6 || ($2 == 6 && $3 >= 7)))) }'; then
+    printf 'gt_mcp_check:       ok\n'
+  else
+    printf 'gt_mcp_check:       too_old (%s < 1.6.7)\n' "$_gt_ver"
+  fi
+  unset _gt_ver
+else
+  printf 'gt_mcp_check:       SKIPPED (gt not found)\n'
+fi
 # yellow-ruvector installs ruvector into its own plugin data dir (not PATH):
 # ~/.claude/plugins/data/<yellow-ruvector id>/, or the XDG fallback when the
 # host does not set CLAUDE_PLUGIN_DATA. Count a dir only where the launcher
@@ -450,7 +464,8 @@ printf '\n=== Stacked-PR Provider Tooling ===\n'
 # Owner-scoped, not name-scoped: `gh extension search stack` returns three
 # third-party extensions that also expose a `gh stack` command, and only
 # github/gh-stack is first-party. Matching the bare name would report a
-# lookalike as READY.
+# lookalike as READY. A stack-named extension from any other owner is
+# WRONG_OWNER (same rule as lib/stack-tooling-probe.js parseExtensionIdentity).
 if [ -n "$_gh" ]; then
   # Capture the probe's own exit status rather than losing it to the pipe:
   # a failed `gh extension list` (network, or auth-required) must not be
@@ -459,6 +474,8 @@ if [ -n "$_gh" ]; then
   if _ext_list=$("$_gh" extension list 2>/dev/null); then
     if printf '%s\n' "$_ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
       printf 'gh_stack_ext: OK (github/gh-stack)\n'
+    elif printf '%s\n' "$_ext_list" | awk '{ for (i = 1; i <= NF; i++) if (tolower($i) ~ /(^|\/)(gh-)?stack$/) f = 1 } END { exit !f }'; then
+      printf 'gh_stack_ext: WRONG_OWNER (a stack-named extension that is not github/gh-stack)\n'
     else
       printf 'gh_stack_ext: MISSING\n'
     fi
@@ -649,6 +666,11 @@ SKIPPED` (no `gt`, or not in a git repo) is a failure, not a pass.
 - NEEDS SETUP: any of `git_repo`, `gt`, `jq`, `graphite_auth`,
   `graphite_repo` or `gt_trunk` fails
 
+Whatever the status, if `gt_mcp_check` is `too_old`, add to the Detail
+column: "gt <version> is below 1.6.7, so the bundled Graphite MCP server is
+unavailable; upgrade gt". The CLI workflow still works, so this does not
+change the status.
+
 **github-workflow:**
 
 Alternative provider of the `stacked-pr` capability group (see the
@@ -661,6 +683,11 @@ stacks as well.
 - PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `MISSING` — the
   provider plugin is installed but the official `github/gh-stack` extension
   is not; detail: "install with `gh extension install github/gh-stack`"
+- PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `WRONG_OWNER` —
+  a third-party extension holds the `gh stack` name, so the official one
+  cannot be installed beside it; detail: "a `stack`-named gh extension is
+  installed that is not `github/gh-stack`; remove it with
+  `gh extension remove stack`, then `gh extension install github/gh-stack`"
 - UNKNOWN: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `UNAVAILABLE` —
   `gh extension list` itself failed, so the extension's state was never
   read. Report it as undetermined; do NOT offer the install and do NOT
@@ -808,8 +835,9 @@ yellow-research` to re-trigger the userConfig prompts."
 **yellow-debt:**
 
 - READY: `git_repo` ok AND `repo_root` writable AND `git` OK AND `jq` OK AND
-  `yq` OK AND `realpath` OK AND `gt` OK AND `yellow-core`
-  installed AND `yellow-linear` installed
+  `yq` OK AND `realpath` OK AND `yellow-core` installed AND `yellow-linear`
+  installed. `gt` is not required: `/debt:fix` submits through the enabled
+  stacked-PR provider, whose own row reports its tooling.
 - PARTIAL: all required local checks pass AND `yellow-core` installed, but
   `yellow-linear` is NOT INSTALLED (optional — only `/debt:sync` needs it)
 - NEEDS SETUP: any required local check fails OR `yellow-core` is NOT
@@ -830,8 +858,9 @@ yellow-research` to re-trigger the userConfig prompts."
 
 **yellow-review:**
 
-- READY: `gh` OK AND `jq` OK AND `gt` OK AND `gh_auth` OK AND `awk` OK AND
-  `yellow-core` installed
+- READY: `gh` OK AND `jq` OK AND `gh_auth` OK AND `awk` OK AND
+  `yellow-core` installed. `gt` is not required: review pushes route through
+  the enabled stacked-PR provider, whose own row reports its tooling.
 - PARTIAL: required local review checks pass, but `yellow-core` is NOT INSTALLED
 - NEEDS SETUP: any required local review check fails (`awk` NOT FOUND
   means `/review:resolve`'s commit and verify scripts cannot run)

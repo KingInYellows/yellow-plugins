@@ -20,9 +20,10 @@ Run a single Bash call:
 
 ```bash
 printf '=== Prerequisites ===\n'
-for cmd in git jq yq realpath gt; do
+for cmd in git jq yq realpath; do
   command -v "$cmd" >/dev/null 2>&1 && printf '%-12s ok\n' "${cmd}:" || printf '%-12s NOT FOUND\n' "${cmd}:"
 done
+command -v gt >/dev/null 2>&1 && printf 'gt:          ok\n' || printf 'gt:          not found (needed only with gt-workflow)\n'
 
 printf '\n=== Repository ===\n'
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
@@ -65,14 +66,19 @@ fi
 
 Stop after reporting all required failures:
 
-- Any missing command in `git`, `jq`, `yq`, `realpath`, or `gt`
-  blocks setup. Report all missing commands together.
+- Any missing command in `git`, `jq`, `yq`, or `realpath` blocks setup.
+  Report all missing commands together.
 - `git_repo` not ok: "yellow-debt must run inside a git repository."
 - `repo_root` not writable: "The repository root is not writable, so debt
   workflows cannot create `.debt/`, `docs/audits/`, or `todos/debt/`."
 
 Missing `.debt/`, `docs/audits/`, or `todos/debt/` is informational only:
 `/debt:audit` creates them as needed.
+
+If `gt` is not found, note it and continue: "Graphite CLI is needed only
+when gt-workflow is the enabled stacked-PR provider, because `/debt:fix`
+submits through that provider; run `/stack:status` to see which one is
+enabled."
 
 If `yellow_linear` is not installed, warn but continue:
 
