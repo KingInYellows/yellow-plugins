@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.0.8
+
+### Patch Changes
+
+- [`9792007`](https://github.com/KingInYellows/yellow-plugins/commit/9792007055fd59cfacba07908afadf8a2933239c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Active-install
+  sibling lookups (`run-github-stack-runtime.js`, yellow-review's
+  `lib/sibling-plugin.sh`, yellow-core's `worktree-restack.sh`) now rank a
+  `local`-scoped `installed_plugins.json` entry above a `project`-scoped one for
+  the same `projectPath`, matching Claude Code's local > project > user
+  precedence, and canonicalize `projectPath` and the cwd before comparing them,
+  so a project recorded through a symlink still matches.
+
 ## 3.0.7
 
 ### Patch Changes
