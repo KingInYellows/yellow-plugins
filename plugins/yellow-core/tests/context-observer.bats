@@ -772,6 +772,39 @@ PY
   [ "$status" -eq 0 ]
 }
 
+@test "R19: main() cancels the deadline alarm once recording ends" {
+  payload disarm 61 > "$TEST_HOME/in"
+  cat > "$TEST_HOME/disarm.py" <<'PY'
+import importlib.util, signal, sys
+spec = importlib.util.spec_from_file_location("obs", sys.argv[1])
+obs = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(obs)
+sys.argv = [sys.argv[1]]
+try:
+    obs.main()
+except SystemExit as exc:
+    assert exc.code == 0, exc.code
+pending = signal.alarm(0)
+assert pending == 0, "alarm still armed: %d s left" % pending
+assert signal.getsignal(signal.SIGALRM) == signal.SIG_IGN
+sys.stderr.write("disarmed\n")
+PY
+  run --separate-stderr python3 "$TEST_HOME/disarm.py" "$OBS" < "$TEST_HOME/in"
+  [ "$status" -eq 0 ]
+  [ "$stderr" = "disarmed" ]
+}
+
+@test "R19: recording that ends just before the deadline exits 0 with nothing on stderr" {
+  local delay
+  payload edge 61 > "$TEST_HOME/in"
+  for delay in 1.9 1.95 1.99; do
+    run --separate-stderr env CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME="$delay" \
+      python3 "$OBS" < "$TEST_HOME/in"
+    [ "$status" -eq 0 ]
+    [ -z "$stderr" ]
+  done
+}
+
 @test "R19: closed stdin or closed stdout still exits 0" {
   payload closed 61 > "$TEST_HOME/in"
   run bash -c 'python3 "$1" < "$2" >&-' _ "$OBS" "$TEST_HOME/in"
@@ -1243,6 +1276,41 @@ assert backup('{"n": 3}\n') == third, "identical backup past the gap was not reu
 assert backup('{"n": 4}\n') == settings + ".pre-observer.backup.4", "a new backup filled the gap"
 PY
   [ "$status" -eq 0 ]
+}
+
+@test "T11: a dangling symlink at the backup name is skipped and its target is never created" {
+  seed_settings "bash ~/custom.sh"
+  ln -s "$TEST_HOME/victim" "$SETTINGS.pre-observer.backup"
+  run --separate-stderr setup_py install
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e --arg b "$SETTINGS.pre-observer.backup.2" '.backup == $b' >/dev/null
+  [ ! -e "$TEST_HOME/victim" ]
+  [ -L "$SETTINGS.pre-observer.backup" ]
+  [ ! -L "$SETTINGS.pre-observer.backup.2" ]
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS.pre-observer.backup.2"
+}
+
+@test "T11: a symlinked backup with identical content is not reused and its target is not rewritten" {
+  seed_settings "bash ~/custom.sh"
+  cp "$SETTINGS" "$TEST_HOME/elsewhere.json"
+  ln -s "$TEST_HOME/elsewhere.json" "$SETTINGS.pre-observer.backup"
+  run --separate-stderr setup_py install
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e --arg b "$SETTINGS.pre-observer.backup.2" '.backup == $b' >/dev/null
+  [ ! -L "$SETTINGS.pre-observer.backup.2" ]
+  cmp "$TEST_HOME/settings.orig" "$TEST_HOME/elsewhere.json"
+}
+
+@test "T11: the backup of a 0600 settings.json is 0600 and keeps CRLF bytes" {
+  seed_settings "bash ~/custom.sh"
+  python3 -c 'import sys; p = sys.argv[1]; d = open(p, "rb").read(); open(p, "wb").write(d.replace(b"\n", b"\r\n"))' "$SETTINGS"
+  cp "$SETTINGS" "$TEST_HOME/settings.orig"
+  chmod 600 "$SETTINGS"
+  run --separate-stderr bash -c 'umask 022; "$@"' _ python3 "$SETUP_PY" install --settings "$SETTINGS" \
+    --observer-src "$OBS" --observer-dest "$OBS_DEST" --statusline "$STATUSLINE"
+  [ "$status" -eq 0 ]
+  cmp "$TEST_HOME/settings.orig" "$SETTINGS.pre-observer.backup"
+  [ "$(python3 -c 'import os, stat, sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)))' "$SETTINGS.pre-observer.backup")" = "0o600" ]
 }
 
 # --- sweep follow-ups (PR #912 bot threads) ------------------------------------

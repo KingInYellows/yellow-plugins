@@ -416,6 +416,14 @@ def on_deadline(signum, frame):
     raise DeadlineReached("recording deadline reached")
 
 
+def disarm_deadline():
+    """Cancel the alarm and ignore a SIGALRM already pending, so a deadline that
+    lands as recording ends cannot escape the handler in main() as a traceback."""
+    if hasattr(signal, "SIGALRM"):
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, signal.SIG_IGN)
+
+
 def wants_help(argv):
     return any(arg in ("-h", "--help") for arg in argv[1:])
 
@@ -430,10 +438,13 @@ def main():
     raw = pass_through()
     release_stdout()
     try:
-        if hasattr(signal, "SIGALRM"):
-            signal.signal(signal.SIGALRM, on_deadline)
-            signal.alarm(DEADLINE_SECONDS)
-        skipped = record_observation(raw)
+        try:
+            if hasattr(signal, "SIGALRM"):
+                signal.signal(signal.SIGALRM, on_deadline)
+                signal.alarm(DEADLINE_SECONDS)
+            skipped = record_observation(raw)
+        finally:
+            disarm_deadline()
         if skipped is not None:
             debug("skip: " + skipped)
     except BaseException as exc:  # never let recording affect the statusline
