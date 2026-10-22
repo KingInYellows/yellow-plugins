@@ -33,6 +33,8 @@ _rt_awk() {
 # RT_HIT_RULE and RT_HIT_LINE name the rule and line that matched (see
 # rt_report_refusal). A missing or unreadable file returns 2: the failed
 # `< "$2"` redirect below would otherwise leave status 1, which reads as clean.
+# Clean also needs END's `clean` line: gawk exits 1 on a parse error, so the
+# status alone cannot tell a clean file from a program that never ran (3).
 _rt_scan() {
     RT_HIT_RULE=""
     RT_HIT_LINE=""
@@ -798,13 +800,20 @@ _rt_scan() {
             if (carry == 2) blockend()
             if (mqo) mqend(1)
             if (hit) print hitrule, hitline
+            else print "clean"
             exit hit ? 0 : 1
         }
     ' < "$2") || _rt_awk_rc=$?
-    if [ "$_rt_awk_rc" -eq 0 ]; then
-        RT_HIT_RULE=${_rt_out%% *}
-        RT_HIT_LINE=${_rt_out##* }
-    fi
+    case "$_rt_awk_rc:$_rt_out" in
+        1:clean) return 1 ;;
+        0:clean | 0:) return 3 ;;
+        0:*)
+            RT_HIT_RULE=${_rt_out%% *}
+            RT_HIT_LINE=${_rt_out##* }
+            return 0
+            ;;
+        1:*) return 3 ;;
+    esac
     return "$_rt_awk_rc"
 }
 
@@ -906,16 +915,18 @@ rt_text_clean() {
         }
         END {
             if (hit) print hitrule, hitline
+            else print "clean"
             exit hit ? 0 : 1
         }
     ' < "$1") || _rt_awk_rc=$?
-    case "$_rt_awk_rc" in
-        0)
+    case "$_rt_awk_rc:$_rt_out" in
+        1:clean) return 0 ;;
+        0:clean | 0:) return 2 ;;
+        0:*)
             RT_HIT_RULE=${_rt_out%% *}
             RT_HIT_LINE=${_rt_out##* }
             return 1
             ;;
-        1) return 0 ;;
         *) return 2 ;;
     esac
 }

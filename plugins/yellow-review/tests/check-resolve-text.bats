@@ -473,6 +473,28 @@ locale_installed() {
   [[ "$stderr" != *"resolve-text: refused"* ]]
 }
 
+@test "an awk that exits 1 without running (gawk parse error) is a scan failure, not clean" {
+  mkdir -p "${BATS_TEST_TMPDIR}/failbin"
+  printf '#!/bin/sh\necho "awk: syntax error" >&2\nexit 1\n' >| "${BATS_TEST_TMPDIR}/failbin/awk"
+  chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
+  PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" "$A"
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"resolve-text: scan failed"* ]]
+  [[ "$stderr" != *"resolve-text: refused"* ]]
+}
+
+@test "a parse error in the rt_text_clean second pass is a scan failure, not clean" {
+  # The shim runs the credential pass on the real awk and fails the
+  # mention/URL pass (the one given -v host=) the way gawk fails a parse error.
+  real_awk=$(command -v awk)
+  mkdir -p "${BATS_TEST_TMPDIR}/failbin"
+  printf '#!/bin/sh\ncase "$*" in *host=*) exit 1 ;; esac\nexec "%s" "$@"\n' "$real_awk" >| "${BATS_TEST_TMPDIR}/failbin/awk"
+  chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
+  PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" "$A"
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"resolve-text: scan failed"* ]]
+}
+
 @test "usage and unreadable-file errors carry no resolve-text token" {
   run --separate-stderr "$SCRIPT"
   [ "$status" -eq 2 ]
