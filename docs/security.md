@@ -481,6 +481,40 @@ interactive run asks before filing an issue. The controls
   line, so `/review:sweep-all` stops the batch. Step 2b re-checks after
   checkout.
 
+### Resolver Git Trust Boundary (yellow-review)
+
+Resolvers can write any file in the worktree, so `commit-resolve-fixes` and
+`run-verify-command` (`skills/pr-review-workflow/scripts/`, shared rules in
+`lib/resolve-paths.sh`) treat the worktree as untrusted when they run git and
+the verify command.
+
+- **PATH screen.** Every bare tool name resolves on a PATH that drops
+  directories inside the worktree, directories holding a symlink, hard link or
+  `#!` script that reaches into it, and directories that cannot be listed. The
+  hard-link walk skips a directory another user owns and this user can neither
+  read, write nor search (nothing in it is reachable), and fails closed on any
+  other unreadable directory, naming it on stderr.
+- **Git config.** `harden_git_config` forces `core.fsmonitor` and
+  `core.untrackedCache` off, `safe.bareRepository=explicit` and
+  `protocol.ext.allow=never`. It refuses a program-running key (transport
+  command, credential helper, filter, pager, ...) in the repository's own
+  config. In global or system config it refuses one that names a program
+  inside the worktree. It also refuses such a key that uses shell syntax the
+  check cannot judge. `alias.*`, pagers, editors and diff or merge tools are
+  exempt from that rule, since these scripts never run them. Any
+  `GIT_EXEC_PATH` or `GIT_CONFIG` is refused.
+- **Verify command.** The command runs on the caller's PATH (it may need
+  `node_modules/.bin`), behind a private shim directory whose `git` runs the
+  validated git on the screened PATH. For a git started by absolute path, the
+  ssh command line runs as `PATH=<screened> ...`. Bare `GIT_SSH`,
+  `GIT_ASKPASS`, `SSH_ASKPASS` and `GIT_PROXY_COMMAND` values, and bare
+  credential helpers, are pinned to absolute programs from the screened PATH.
+  Shell and absolute credential helpers run as `PATH=<screened> ...`.
+- **Residual.** Other programs an absolute git finds by name on the caller's
+  PATH, such as `git-remote-<scheme>` or a `git-<alias>`, are not pinned. A
+  worktree file planted there must still predate the `--ignored-since`
+  marker, which refuses newer gitignored files.
+
 ### Unattended Review Learning Staging (yellow-review / yellow-core)
 
 Unattended reviews write a short model-authored narrative into an empty

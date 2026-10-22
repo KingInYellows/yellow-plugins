@@ -1969,12 +1969,98 @@ run_verify() {
     vr_shq() { local q=${1//\'/\'\\\'\'}; printf "'%s'" "$q"; }
     printf '#!/bin/sh\nPATH=%s exec %s "$@"\n' "$(vr_shq "$YR_GIT_PATH")" "$(vr_shq "$YELLOW_REVIEW_GIT")" >"$VR_SHIM/git" \
         && chmod 700 "$VR_SHIM/git" || die 2 "cannot write the git shim; the verify command was not run"
+    # A git the command starts by absolute path (/usr/bin/git) skips the shim
+    # and looks its helpers up on the caller's PATH, where a worktree
+    # directory may come first (CLAUDE-100). vr_pin_git_helpers, run in the
+    # command's subshell, pins them to the screened PATH: the ssh command line
+    # (GIT_SSH_COMMAND, else core.sshCommand, else ssh unless GIT_SSH is
+    # set) runs as
+    # `PATH=<screened> <command line>`, so `ssh` and `env ssh` resolve
+    # outside the worktree, with GIT_SSH_VARIANT kept from its first word;
+    # a bare GIT_SSH, GIT_ASKPASS (or core.askpass), SSH_ASKPASS or
+    # GIT_PROXY_COMMAND becomes its absolute path on the screened PATH, or a
+    # path in the shim directory that does not exist when it has none there.
+    vr_pin_git_helpers() {
+        local v w name bin
+        # Git's order: GIT_SSH_COMMAND, then core.sshCommand, then GIT_SSH
+        # (pinned below), then ssh.
+        v=${GIT_SSH_COMMAND:-}
+        [ -n "$v" ] || v=$(yr_git config --get core.sshCommand 2>/dev/null) || v=""
+        [ -n "$v" ] || [ -n "${GIT_SSH:-}" ] || v=ssh
+        if [ -n "$v" ]; then
+            if [ -z "${GIT_SSH_VARIANT:-}" ] && [ -z "$(yr_git config --get ssh.variant 2>/dev/null)" ]; then
+                w=${v%%[[:space:]]*}
+                w=${w##*/}
+                case "$w" in ssh|plink|putty|tortoiseplink) export GIT_SSH_VARIANT="$w" ;; esac
+            fi
+            export GIT_SSH_COMMAND="PATH=$(vr_shq "$YR_GIT_PATH") $v"
+        fi
+        if [ -z "${GIT_ASKPASS:-}" ]; then
+            v=$(yr_git config --get core.askpass 2>/dev/null) || v=""
+            [ -z "$v" ] || export GIT_ASKPASS="$v"
+        fi
+        for name in GIT_SSH GIT_ASKPASS SSH_ASKPASS GIT_PROXY_COMMAND; do
+            v=${!name:-}
+            case "$v" in ''|*/*) continue ;; esac
+            bin=$(PATH=$YR_GIT_PATH; type -P -- "$v" 2>/dev/null) || bin=""
+            [ -n "$bin" ] || bin="$VR_SHIM/missing-$name"
+            export "$name=$bin"
+        done
+        vr_pin_credential_helpers
+    }
+    # vr_pin_credential_helpers: git runs a bare credential helper `foo` as
+    # git-credential-foo, looked up in its exec path and then on its own PATH,
+    # the caller's for an absolute git. Re-inject the helper list
+    # (credential.helper and credential.<url>.helper, in config order) behind
+    # an empty credential.helper, which resets it: a bare helper becomes the
+    # `!'<absolute git-credential-<name>>'`, from the exec path or the
+    # screened PATH (or a path that does not exist), a `!` helper runs with
+    # PATH=<screened>, and an absolute one is kept.
+    vr_pin_credential_helpers() {
+        local rec key val w rest bin n xp=""
+        local -a keys=() vals=()
+        while IFS= read -r -d '' rec; do
+            case "$rec" in *$'\n'*) ;; *) continue ;; esac
+            key=${rec%%$'\n'*}
+            val=${rec#*$'\n'}
+            keys+=("$key")
+            case "$val" in
+                '') ;;
+                # An absolute helper is a shell command line too: /usr/bin/env foo still looks up foo.
+                /*) val="!PATH=$(vr_shq "$YR_GIT_PATH") $val" ;;
+                '!'*) val="!PATH=$(vr_shq "$YR_GIT_PATH") ${val#!}" ;;
+                *)
+                    w=${val%%[[:space:]]*}
+                    rest=${val#"$w"}
+                    [ -n "$xp" ] || xp=$(yr_git --exec-path 2>/dev/null) || xp=""
+                    bin=""
+                    if [ -n "$xp" ] && [ -x "$xp/git-credential-$w" ]; then
+                        bin="$xp/git-credential-$w"
+                    else
+                        bin=$(PATH=$YR_GIT_PATH; type -P -- "git-credential-$w" 2>/dev/null) || bin=""
+                    fi
+                    [ -n "$bin" ] || bin="$VR_SHIM/missing-git-credential-$w"
+                    val="!$(vr_shq "$bin")$rest"
+                    ;;
+            esac
+            vals+=("$val")
+        done < <(yr_git config --null --get-regexp '^credential\..*helper$' 2>/dev/null)
+        [ "${#keys[@]}" -gt 0 ] || return 0
+        n=${GIT_CONFIG_COUNT:-0}
+        export "GIT_CONFIG_KEY_$n=credential.helper" "GIT_CONFIG_VALUE_$n="
+        n=$((n + 1))
+        for w in "${!keys[@]}"; do
+            export "GIT_CONFIG_KEY_$n=${keys[w]}" "GIT_CONFIG_VALUE_$n=${vals[w]}"
+            n=$((n + 1))
+        done
+        export "GIT_CONFIG_COUNT=$n"
+    }
     VR_PATH="$VR_SHIM:$YR_ORIG_PATH"
     if T=$(vr_timeout_bin); then
-        ( harden_git_config_for_verify; PATH=$VR_PATH; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; vr_pin_git_helpers; PATH=$VR_PATH; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
     else
-        ( harden_git_config_for_verify; PATH=$VR_PATH; exec "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; vr_pin_git_helpers; PATH=$VR_PATH; exec "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
         ( vr_watchdog "$CMD_PID" "$TIMEOUT" "$MARKER" "$KILL_AFTER" ) &
         WD_PID=$!
