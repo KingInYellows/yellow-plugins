@@ -1093,6 +1093,8 @@ describe('SHC-010 alias-prone commands', () => {
     ['sudo behind command', 'command sudo ls x'],
     ['sudo before a quoted word', "sudo 'ls' x"],
     ['sudo before an escaped word', 'sudo \\ls x'],
+    ['sudo before an assignment', 'sudo FOO=bar ls x'],
+    ['sudo before a redirect', 'sudo 2>/dev/null ls x'],
   ])('passes %s', (_name, text) => {
     expect(flagged(text)).toEqual([]);
   });

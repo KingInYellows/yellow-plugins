@@ -1064,7 +1064,7 @@ const PREFIX_WORDS_RE =
 // `sudo` right before the word. `timeout`, `env`, `nice` and the like exec
 // the real binary, so no alias applies after them; `sudo` does too, but the
 // common `alias sudo='sudo '` makes the shell alias-expand the next word.
-const SUDO_TAIL_RE = /(?:^|(?<=[\s;&|(`]))sudo$/;
+const SUDO_TAIL_RE = /(?:^|(?<=[\s;&|(`]))sudo\s+$/;
 
 // The text before a command word with closed `$(…)`, `<(…)`, `>(…)` and backtick
 // substitutions collapsed to `_`, then the assignments and redirects that end
@@ -1450,9 +1450,11 @@ function ruleAliasGuarded(line, commands, continued = false) {
     }
     // A quoted or escaped word is not alias-expanded, and `sudo` runs the
     // binary, so `sudo 'ls'` is safe.
-    if (!SUDO_TAIL_RE.test(prefix) || /['"\\]/.test(line[m.index - 1] ?? ''))
-      continue;
-    const beforeSudo = stripCommandPrefix(prefix.slice(0, -'sudo'.length));
+    // The trailing-space alias only reaches the word right after `sudo`, so
+    // `sudo FOO=1 ls` is safe; test adjacency before prefixes are stripped.
+    const sudoTail = rawPrefix.match(SUDO_TAIL_RE);
+    if (!sudoTail || /['"\\]/.test(line[m.index - 1] ?? '')) continue;
+    const beforeSudo = stripCommandPrefix(rawPrefix.slice(0, sudoTail.index));
     if (atCommandPosition(beforeSudo)) {
       found.push(
         `\`sudo ${m[1]}\`: with the common \`alias sudo='sudo '\` the shell alias-expands \`${m[1]}\`; write \`sudo -- ${m[1]}\``
