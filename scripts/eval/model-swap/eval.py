@@ -82,11 +82,11 @@ def plant(wt, p):
         handle.write(text)
 
 
-def system_prompt_with_skills(agent, work):
+def system_prompt_with_skills(aid, agent, work):
     """Agent file with preloaded skills appended, as `skills:` frontmatter does."""
     if not agent.get("preload_skills"):
         return os.path.join(REPO, agent["file"])
-    out = os.path.join(work, "prompts", os.path.basename(agent["file"]))
+    out = os.path.join(work, "prompts", "system-%s.md" % aid)
     with open(os.path.join(REPO, agent["file"]), encoding="utf-8") as handle:
         text = handle.read()
     for skill in agent["preload_skills"]:
@@ -161,7 +161,7 @@ def prepare(spec_path, work):
         os.makedirs(os.path.join(work, sub), exist_ok=True)
     rows = []
     for r in spec["replays"]:
-        wt = os.path.join(work, "wt", r["id"])
+        wt = os.path.join(work, "wt", "replay", r["id"])
         fresh_worktree(wt, r["commit"])
         try:
             for p in r["plants"]:
@@ -172,26 +172,28 @@ def prepare(spec_path, work):
             raise
         patch = os.path.join(work, "prompts", r["id"] + ".patch")
         with open(patch, "w", encoding="utf-8") as handle:
-            handle.write(git("diff", "HEAD^", cwd=wt))
+            # Fenced like any untrusted input (AGENTS.md): a replayed diff is data.
+            handle.write("--- begin replay diff (reference only) ---\n%s--- end replay diff ---\n"
+                         % git("diff", "HEAD^", cwd=wt))
         files = git("diff", "--name-only", "HEAD^", cwd=wt)
         with open(os.path.join(work, "prompts", r["id"] + ".txt"), "w", encoding="utf-8") as handle:
             handle.write(REVIEW_PROMPT.format(patch=patch, files=files))
     for aid, agent in spec["agents"].items():
-        sys_prompt = system_prompt_with_skills(agent, work)
+        sys_prompt = system_prompt_with_skills(aid, agent, work)
         for c in spec["configs"][agent["configs"]]:
             for rep in range(1, c["reps"] + 1):
                 if agent["kind"] == "replay":
                     for r in spec["replays"]:
                         prompt = os.path.join(work, "prompts", r["id"] + ".txt")
                         rows.append(["%s-%s-%s-%s-r%d" % (aid, r["id"], c["model"], c["effort"], rep),
-                                     sys_prompt, os.path.join(work, "wt", r["id"]), c["model"], c["effort"],
+                                     sys_prompt, os.path.join(work, "wt", "replay", r["id"]), c["model"], c["effort"],
                                      prompt, aid, r["id"],
                                      fingerprint(agent, r, c["model"], c["effort"], sys_prompt, prompt,
                                                  os.path.join(work, "prompts", r["id"] + ".patch"))])
                     continue
                 for s in spec["scans"]:
                     rid = "%s-%s-%s-%s-r%d" % (aid, s["id"], c["model"], c["effort"], rep)
-                    wt = os.path.join(work, "wt", rid)  # scanners write, so one tree per run
+                    wt = os.path.join(work, "wt", "scan", rid)  # scanners write, so one tree per run
                     fresh_worktree(wt, s["commit"])
                     os.makedirs(os.path.join(wt, ".debt", "scanner-output"), exist_ok=True)
                     with open(os.path.join(wt, ".debt", "file-list.txt"), "w", encoding="utf-8") as handle:
@@ -244,12 +246,16 @@ def read_matrix(work):
 
 
 def split_findings(text, as_json):
+    """Findings as strings, or None when a compact-JSON reply does not parse."""
     if as_json:
         m = re.search(r"\{.*\}", text, re.S)
         try:
-            return [json.dumps(f) for f in json.loads(m.group(0)).get("findings", [])]
-        except (AttributeError, ValueError):
-            return [text]
+            findings = json.loads(m.group(0))["findings"]
+        except (AttributeError, KeyError, TypeError, ValueError):
+            return None
+        if not isinstance(findings, list) or not all(isinstance(f, dict) for f in findings):
+            return None
+        return [json.dumps(f) for f in findings]
     return [p for p in re.split(r"(?=\*\*\[P[0-3]\])", text) if p.startswith("**[P")]
 
 
@@ -287,6 +293,12 @@ def scan_hits(golden, scan_file):
     return found, unmatched
 
 
+def reject(out, rid, why):
+    """Move a result grade cannot use to .bad so the next `run` redoes the row."""
+    os.replace(os.path.join(out, rid + ".json"), os.path.join(out, rid + ".bad"))
+    print("grade: %s: %s; moved to %s.bad, rerun `run`" % (rid, why, rid), file=sys.stderr)
+
+
 def grade(work):
     with open(os.path.join(work, "spec.json"), encoding="utf-8") as handle:
         spec = json.load(handle)
@@ -311,13 +323,12 @@ def grade(work):
             missing.append(rid)
             continue
         key = (aid, model, effort)
-        mu = d.get("modelUsage", {}).values()
-        usage[key].update(runs=1, cost=d.get("total_cost_usd") or 0, wall=d.get("eval_wall_s") or 0,
-                          turns=d.get("num_turns") or 0,
-                          tok_in=sum(v.get("inputTokens", 0) + v.get("cacheReadInputTokens", 0)
-                                     + v.get("cacheCreationInputTokens", 0) for v in mu))
         if agent["kind"] == "replay":
             findings = split_findings(d.get("result") or "", agent.get("output") == "json")
+            if findings is None:
+                reject(out, rid, "malformed JSON findings")
+                missing.append(rid + " (malformed JSON findings)")
+                continue
             plants = replays[target]["plants"]
             for p in plants:
                 if p["lane"] == agent["lane"]:
@@ -328,18 +339,24 @@ def grade(work):
             limits = agent["golden"]
             gkey = (target, limits["ccn_over"], limits["length_over"])
             if gkey not in goldens:
-                wt = os.path.join(work, "wt", "golden-%s-%s" % (target, scans[target]["commit"]))
+                wt = os.path.join(work, "wt", "golden", "%s-%s" % (target, scans[target]["commit"]))
                 worktree(wt, scans[target]["commit"])
                 goldens[gkey] = lizard_golden(wt, scans[target]["files"], limits)
             scan_file = os.path.join(out, rid + ".scan.json")
             try:
                 found, unmatched = scan_hits(goldens[gkey], scan_file) if os.path.exists(scan_file) else (set(), [])
             except (ValueError, AttributeError, TypeError):
+                reject(out, rid, "unreadable scan output")
                 missing.append(rid + " (unreadable scan output)")
                 continue
             recall[key][0] += len(found)
             recall[key][1] += len(goldens[gkey])
         other.extend((rid, " ".join(f.split())[:300]) for f in unmatched)
+        mu = d.get("modelUsage", {}).values()
+        usage[key].update(runs=1, cost=d.get("total_cost_usd") or 0, wall=d.get("eval_wall_s") or 0,
+                          turns=d.get("num_turns") or 0,
+                          tok_in=sum(v.get("inputTokens", 0) + v.get("cacheReadInputTokens", 0)
+                                     + v.get("cacheCreationInputTokens", 0) for v in mu))
         usage[key].update(extra=len(unmatched))
     print("| agent | model | effort | recall | non-golden findings | runs | mean cost (USD, API-equiv.) | mean wall s | mean turns | mean input tok |")
     print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
