@@ -1614,7 +1614,16 @@ rl_observe_locked() {
       fi
       [ "${ccontent[$i]}" != - ] || continue
       rl_scope_still "${ccontent[$i]}" "$cfile" "$cline" "$rskey" "$rdisp" || continue
-      IFS=$'\t' read -r sv _ css cend <<<"$(rl_verify_scope "${ccontent[$i]}" "$cfile" "$cline" "$rdisp")"
+      # the span: markdown re-derives it (the display copy may be cut or
+      # redacted); code re-verifies the display copy, which the hash check
+      # above has just shown to be the exact scope
+      case "$cfile" in
+        *.md | *.mdx | *.MD | *.markdown)
+          IFS=$'\t' read -r sv _ css cend _ <<<"$(rl_md_heading_path "${ccontent[$i]}" "$cline")"
+          [ -n "$sv" ] && sv=verified
+          ;;
+        *) IFS=$'\t' read -r sv _ css cend <<<"$(rl_verify_scope "${ccontent[$i]}" "$cfile" "$cline" "$rdisp")" ;;
+      esac
       [ "$sv" = verified ] || continue
       # the finding's own line must map unchanged into the same span: a
       # heading path can repeat, and the hash alone names no site
