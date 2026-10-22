@@ -1,20 +1,56 @@
-import type { Register } from 'claude-code';
+import type { EngineInterface, Register } from 'claude-code';
 
 import {
   appendRow,
   downshiftModel,
   formatStatus,
   fullestWindow,
+  isLedgerKey,
+  ledgerKeyFor,
+  ledgerKeysToPrune,
+  mergeLedgers,
   pluginOf,
   readLedger,
   type DownshiftConfig,
   type LedgerRow,
   type Window,
+  type WriteFailure,
 } from './policy.ts';
 
-const LEDGER_KEY = 'ledger';
 const STATUS_COMMAND = 'claudemod-status';
 const DOWNSHIFT_TARGET = 'sonnet';
+// How long one ledger step may wait on the store before it counts as failed.
+const STORE_TIMEOUT_MS = 2000;
+
+// Waits on work against the store, rejecting once STORE_TIMEOUT_MS passes so
+// a store call that never settles cannot stall a hook; the work runs on.
+async function bounded<T>(
+  $: EngineInterface,
+  work: () => Promise<T>
+): Promise<T> {
+  const timer = new AbortController();
+  try {
+    return await Promise.race([
+      work(),
+      $.clock
+        .sleep(STORE_TIMEOUT_MS, { signal: timer.signal })
+        .then((): never => {
+          throw new Error(`store did not answer in ${STORE_TIMEOUT_MS} ms`);
+        }),
+    ]);
+  } finally {
+    timer.abort();
+  }
+}
+
+// The id changes on /clear without a new session.start, so ask each time.
+async function sessionLedgerKey($: EngineInterface): Promise<string> {
+  try {
+    return ledgerKeyFor(await $.session.id());
+  } catch {
+    return ledgerKeyFor('unknown');
+  }
+}
 
 function readConfig(
   options: Readonly<Record<string, unknown>>
@@ -37,8 +73,31 @@ export const register: Register = (on, options) => {
   let windows: Window[] = [];
   let hasToasted = false;
   // Spawns in a review fan-out land together; chain the store's
-  // read-modify-write so no row is lost.
+  // read-modify-write so no row is lost. The chain itself is never cut short:
+  // a store call cannot be cancelled, so a step that moved on early could
+  // land its stale row list over a later one. Waiters bound their wait
+  // instead, and while the chain is stalled spawns stop waiting on it.
   let writes: Promise<void> = Promise.resolve();
+  let isChainStalled = false;
+  // The last failed write per ledger key: /clear changes the session id
+  // mid-module, and each session reports only its own.
+  // Each entry remembers the spawn that recorded it, so a success clears only
+  // its own failure, never a newer queued spawn's.
+  const writeFailures = new Map<string, WriteFailure & { spawn: number }>();
+  let spawnCount = 0;
+  const recordFailure = (
+    key: string,
+    spawn: number,
+    ts: string,
+    err: unknown
+  ): void => {
+    if ((writeFailures.get(key)?.spawn ?? -1) > spawn) return;
+    writeFailures.set(key, {
+      spawn,
+      ts,
+      reason: err instanceof Error ? err.message : String(err),
+    });
+  };
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -108,13 +167,43 @@ export const register: Register = (on, options) => {
       workflow: e.workflow !== undefined,
       denied: result.deny !== undefined,
     };
-    writes = writes
-      .then(async () => {
-        const ledger = readLedger(await $.store.get(LEDGER_KEY));
-        await $.store.set(LEDGER_KEY, appendRow(ledger, row));
-      })
-      .catch(() => undefined);
-    await writes;
+    const spawn = (spawnCount += 1);
+    const key = await bounded($, () => sessionLedgerKey($)).catch(() =>
+      ledgerKeyFor('unknown')
+    );
+    const step = writes.then(async () => {
+      try {
+        const ledger = readLedger(await $.store.get(key));
+        await $.store.set(key, appendRow(ledger, row));
+        if ((writeFailures.get(key)?.spawn ?? -1) <= spawn) {
+          writeFailures.delete(key);
+        }
+      } catch (err) {
+        recordFailure(key, spawn, ts, err);
+      }
+      // The row is stored by now; a failed prune is retried on the next
+      // write, so it is not a missing row.
+      try {
+        for (const old of ledgerKeysToPrune(await $.store.keys(), key)) {
+          await $.store.delete(old);
+        }
+      } catch {
+        // Retried on the next write.
+      }
+      if (writes === step) isChainStalled = false;
+    });
+    writes = step;
+    if (isChainStalled) {
+      // Queued behind a stalled write; cleared if the row lands later.
+      recordFailure(key, spawn, ts, 'an earlier ledger write is still pending');
+    } else {
+      try {
+        await bounded($, () => step);
+      } catch (err) {
+        isChainStalled = true;
+        recordFailure(key, spawn, ts, err);
+      }
+    }
 
     return result;
   }).catch(($, e, next) => next(e));
@@ -123,9 +212,24 @@ export const register: Register = (on, options) => {
     const asked = Number.parseInt(e.args.trim(), 10);
     const tail =
       Number.isFinite(asked) && asked > 0 ? Math.min(asked, 100) : 10;
-    await writes;
-    const ledger = readLedger(await $.store.get(LEDGER_KEY));
-    return { text: formatStatus(windows, config, ledger, tail) };
+    await bounded($, () => writes).catch(() => undefined);
+    const ownKey = await bounded($, () => sessionLedgerKey($)).catch(() =>
+      ledgerKeyFor('unknown')
+    );
+    const keys = (await bounded($, () => $.store.keys())).filter(isLedgerKey);
+    const ledgers = await bounded($, () =>
+      Promise.all(keys.map(async (k) => readLedger(await $.store.get(k))))
+    );
+    return {
+      text: formatStatus(
+        windows,
+        config,
+        mergeLedgers(ledgers),
+        tail,
+        keys.length,
+        writeFailures.get(ownKey)
+      ),
+    };
   }).catch(() => ({
     text: 'yellow-claudemod: the status command failed; see claude --debug.',
   }));

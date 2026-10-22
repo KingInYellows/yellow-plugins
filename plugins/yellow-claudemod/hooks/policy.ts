@@ -101,7 +101,48 @@ export type LedgerRow = {
   denied: boolean;
 };
 
+/** Rows kept per session's ledger key. */
 export const LEDGER_MAX = 500;
+
+/**
+ * Each session writes its own key, so concurrent sessions sharing the
+ * machine-wide store never overwrite each other's rows. `ledger` is the
+ * pre-0.2 single key: still read, and pruned like an old session's.
+ */
+export const LEDGER_KEY_PREFIX = 'ledger:';
+export const LEGACY_LEDGER_KEY = 'ledger';
+/** Session keys kept; at about 300 bytes a row, 8 full keys stay near 1 MiB. */
+export const LEDGER_SESSIONS_MAX = 8;
+
+export function ledgerKeyFor(sessionId: string): string {
+  return `${LEDGER_KEY_PREFIX}${sessionId}`;
+}
+
+export function isLedgerKey(key: string): boolean {
+  return key === LEGACY_LEDGER_KEY || key.startsWith(LEDGER_KEY_PREFIX);
+}
+
+/**
+ * The ledger keys to delete so at most LEDGER_SESSIONS_MAX remain, oldest
+ * first by the store's insertion order; never the writing session's own.
+ */
+export function ledgerKeysToPrune(
+  keys: readonly string[],
+  ownKey: string
+): string[] {
+  const ledgerKeys = keys.filter(isLedgerKey);
+  const excess = ledgerKeys.length - LEDGER_SESSIONS_MAX;
+  if (excess <= 0) return [];
+  return ledgerKeys.filter((k) => k !== ownKey).slice(0, excess);
+}
+
+/** Every session's rows in one list, oldest first. */
+export function mergeLedgers(ledgers: readonly LedgerRow[][]): LedgerRow[] {
+  return ledgers.flat().sort((a, b) => a.ts.localeCompare(b.ts));
+}
+
+/** The last ledger write that failed, for the status command. */
+export type WriteFailure = { ts: string; reason: string };
 
 export function appendRow(
   ledger: readonly LedgerRow[],
@@ -125,7 +166,9 @@ export function formatStatus(
   windows: readonly Window[],
   config: DownshiftConfig,
   ledger: readonly LedgerRow[],
-  tail: number
+  tail: number,
+  sessions = 1,
+  writeFailure?: WriteFailure
 ): string {
   const lines: string[] = [];
   lines.push(
@@ -153,12 +196,18 @@ export function formatStatus(
   lines.push(
     `Ledger: ${ledger.length} spawn(s) recorded${
       ledger.length
-        ? ` (${[...byModel]
+        ? ` across ${sessions} session(s) (${[...byModel]
             .map(([m, n]) => `${m} ${n}`)
             .join(', ')}; ${downshifted} downshifted)`
         : ''
     }.`
   );
+  if (writeFailure !== undefined) {
+    lines.push(
+      `Ledger write failed at ${writeFailure.ts} (${writeFailure.reason}); ` +
+        'that spawn is missing from the ledger.'
+    );
+  }
   for (const row of ledger.slice(-tail)) {
     const asked = row.requested ? ` asked ${row.requested},` : '';
     const ran = row.denied ? 'denied' : `ran ${row.resolved ?? 'unknown'}`;
