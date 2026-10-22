@@ -273,6 +273,24 @@ P
   [[ "$output" == *"stopped=rate-limit"* ]]
 }
 
+@test "a refusal's plain retry stays in the same stage under a zero budget" {
+  printf '%s\n' '{"threadId":"PRRT_a","disposition":"oos","issue":{"title":"T","body":"B @x"},"reply":{"body":"tracked in {{issue}} @x","plain":"tracked in {{issue}}"},"resolve":true}' >"$PLAN"
+  export YELLOW_REVIEW_APPLY_BUDGET=0
+  stub_rc file-followup-issue PRRT_a 6 0
+  stub_rc reply-pr-thread PRRT_a 6 0
+  local runs=0
+  while :; do
+    runs=$((runs + 1))
+    run "$SCRIPT" o/r 7 "$PLAN" "$RESULTS"
+    [ "$status" -eq 0 ] && break
+    [ "$status" -eq 5 ]
+    [ "$runs" -lt 5 ]
+  done
+  [ "$runs" -eq 3 ]
+  grep -qxF 'PRRT_a oos: tracked in #12' "$TEXT_LOG"
+  [ "$(jq -r 'select(.outcome=="complete") | [.issue.status, (.issue.plain|tostring), .reply.status, (.reply.plain|tostring), .resolve.status] | join(",")' "$RESULTS")" = "filed,true,posted,true,resolved" ]
+}
+
 @test "the time budget stops between stages and a re-run finishes the plan" {
   cat >"$PLAN" <<'P'
 {"threadId":"PRRT_a","disposition":"oos","issue":{"title":"T","body":"B"},"reply":{"body":"tracked in {{issue}}"},"resolve":true}

@@ -307,8 +307,12 @@ while IFS= read -r LINE; do
         else
             printf '%s' "$LINE" | jq -j '.issue.title' >"$WORK/title"
             printf '%s' "$LINE" | jq -j '.issue.body' >"$WORK/body"
+            # The text screen runs before any gh call, so a refusal (exit 6)
+            # takes seconds: the plain retry belongs to the same stage and is
+            # never split from it by the budget, or a resume would repeat the
+            # refused text forever.
             for _try in main plain; do
-                budget_allows "$COST_ISSUE" || stop_budget
+                [ "$_try" = plain ] || budget_allows "$COST_ISSUE" || stop_budget
                 run_stage file-followup-issue "$REPO" "$PR" "$TID" "$WORK/title" "$WORK/body"
                 [ "$RC" -eq 6 ] && [ "$_try" = main ] || break
                 # Refused: file once more with the plain title and body.
@@ -353,7 +357,7 @@ while IFS= read -r LINE; do
                 [ "$(printf '%s' "$LINE" | jq -r '.reply | has("plain")')" = "true" ]; then
                 text_file .reply.plain reply
                 PLAIN_USED=true
-                budget_allows "$COST_REPLY" || stop_budget
+                # Same stage as the refused reply (see the issue retry above).
                 post_reply "$FINAL" "$WORK/reply" && OK=1
             fi
         fi

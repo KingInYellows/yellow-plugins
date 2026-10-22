@@ -375,7 +375,9 @@ stopped=<none|rate-limit|timeout|budget>`.
 420 s for an issue, 340 s for a reply and 280 s for a resolve. A stage starts
 only when the run's elapsed time plus that worst case fits
 `YELLOW_REVIEW_APPLY_BUDGET` (default and maximum 540 s); the first stage of a
-run always starts. When the budget runs out the script writes a `partial` row
+run always starts. A plain retry after exit 6 belongs to the refused stage and
+never waits on the budget: both scripts screen text before any `gh` call, so a
+refusal costs seconds. When the budget runs out the script writes a `partial` row
 for a thread stopped between stages and exits 5. Running the same command
 again skips threads with a final row, resumes a `partial` thread after its
 last finished stage, and counts issues those rows created toward
