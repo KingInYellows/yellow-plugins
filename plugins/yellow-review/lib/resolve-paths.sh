@@ -217,11 +217,16 @@ yr_file_shebang_enters() {
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
     # An executable that cannot be read hides its #! line from this check,
-    # but the kernel still reads it: fail closed. A setuid or setgid file is
-    # left alone (an execute-only sudo is a binary on some systems).
+    # but the kernel still reads it: fail closed unless root owns it. Only root
+    # can make a root-owned file, and distributions ship execute-only binaries
+    # that way (Fedora's sudo is 4111, sudoreplay 0111). The setuid and setgid
+    # bits prove nothing: any user can chmod 4111 a script of their own.
     if [ ! -r "$f" ]; then
-        [ -x "$f" ] && [ ! -u "$f" ] && [ ! -g "$f" ] && return 0
-        return 1
+        [ -x "$f" ] || return 1
+        x=$(yr_helper find) || return 0
+        x=$("$x" -L "$f" -maxdepth 0 -user 0 -print 2>/dev/null) || return 0
+        [ -n "$x" ] && return 1
+        return 0
     fi
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
@@ -511,17 +516,18 @@ yr_shebang_inside() {
     local root="$1" find="$2" rp="$3" awk="$4" out dirs prog depth=1 d f
     shift 4
     # An executable the scan cannot read hides its #! line, but the kernel
-    # still reads it: fail closed, as yr_file_shebang_enters does (setuid and
-    # setgid files excepted). GNU find tests readability in one pass; without
-    # -readable the shell tests each entry.
+    # still reads it: fail closed unless root owns it, as yr_file_shebang_enters
+    # does. GNU find tests readability in one pass; without -readable the shell
+    # tests each entry.
     if "$find" / -maxdepth 0 -readable >/dev/null 2>&1; then
         out=$("$find" -L "$@" -maxdepth 1 -type f \( -perm -100 -o -perm -010 -o -perm -001 \) \
-            ! -readable ! -perm -4000 ! -perm -2000 -print -quit 2>/dev/null) || true
+            ! -readable ! -user 0 -print -quit 2>/dev/null) || true
         [ -z "$out" ] || return 0
     else
         for d in "$@"; do
             for f in "$d"/* "$d"/.[!.]* "$d"/..?*; do
-                [ -f "$f" ] && [ -x "$f" ] && [ ! -r "$f" ] && [ ! -u "$f" ] && [ ! -g "$f" ] && return 0
+                [ -f "$f" ] && [ -x "$f" ] && [ ! -r "$f" ] || continue
+                [ -n "$("$find" -L "$f" -maxdepth 0 -user 0 -print 2>/dev/null)" ] || return 0
             done
         done
     fi
@@ -1357,6 +1363,49 @@ yr_check_git_env() {
     return 0
 }
 
+# yr_pct_encode <text>: set YR_ENCODED to <text> with %, tab and newline
+# percent-encoded (%25, %09, %0A); yr_pct_decode reverses it.
+yr_pct_encode() {
+    local x="$1"
+    x=${x//%/%25}
+    x=${x//$'\t'/%09}
+    YR_ENCODED=${x//$'\n'/%0A}
+}
+
+# yr_cfg_null_candidates: read `git config --null --show-scope --show-origin
+# --list` on stdin (`scope NUL origin NUL key NL value NUL` per entry) and
+# print one line per entry outside the command scope whose key names a
+# program (yr_cfg_key_runs_command, no value refinements): scope, origin, key,
+# M or S (multi-line value or not) and value, tab-separated, each but the
+# marker percent-encoded (yr_pct_encode) so a tab or newline cannot shift the
+# columns. read -d '' splits on NUL in the shell, so BWK awk (stock macOS
+# /usr/bin/awk, which reads RS = "\0" as paragraph mode) never sees the stream.
+# A record count that is not a multiple of 3 prints a `<unparsed>` key, which
+# the caller refuses.
+yr_cfg_null_candidates() {
+    local rec n=0 sc="" og="" k v ml esc eog ek
+    while IFS= read -r -d '' rec || [ -n "$rec" ]; do
+        n=$((n + 1))
+        case $((n % 3)) in
+            1) sc=$rec; continue ;;
+            2) og=$rec; continue ;;
+        esac
+        case "$rec" in
+            *$'\n'*) k=${rec%%$'\n'*}; v=${rec#*$'\n'} ;;
+            *) k=$rec; v="" ;;
+        esac
+        [ "$sc" != command ] || continue
+        yr_cfg_key_runs_command "$k" || continue
+        case "$v" in *$'\n'*) ml=M ;; *) ml=S ;; esac
+        yr_pct_encode "$sc"; esc=$YR_ENCODED
+        yr_pct_encode "$og"; eog=$YR_ENCODED
+        yr_pct_encode "$k"; ek=$YR_ENCODED
+        yr_pct_encode "$v"
+        printf '%s\t%s\t%s\t%s\t%s\n' "$esc" "$eog" "$ek" "$ml" "$YR_ENCODED"
+    done
+    [ $((n % 3)) -eq 0 ] || printf 'local\t-\t<unparsed>\tM\t\n'
+}
+
 # harden_git_config [full|revert]: force core.fsmonitor and
 # core.untrackedCache off, and safe.bareRepository=explicit, for this process
 # and its children (GIT_CONFIG_COUNT, appended to the caller's). It reads
@@ -1416,35 +1465,14 @@ harden_git_config() {
     # (rollback) judges the checkout subset of the list. gpg.* in the local
     # scopes is not refused here: signing is forced off below.
     # --null --show-scope --show-origin emits `scope NUL origin NUL key NL
-    # value NUL` per entry, so a value holding newlines is read whole. awk
-    # pre-filters with the same list and prints one tab-separated line per
-    # candidate (M marks a multi-line value). Every field is percent-encoded
-    # (%, tab and newline) so a path or value holding a tab cannot shift the
-    # columns; the shell decodes them (yr_pct_decode); git's status 0 is required, and
-    # an awk that cannot split on NUL is refused by the probe below.
+    # value NUL` per entry, so a value holding newlines is read whole.
+    # yr_cfg_null_candidates splits the records in the shell (no awk has to
+    # handle NUL), pre-filters with the same list and prints one tab-separated,
+    # percent-encoded line per candidate; the loop below decodes them
+    # (yr_pct_decode). git's status 0 is required.
     local tkey="" tscope trigin tkeyname tml tval ofile c oroot cache=$'\n'
     local recs
-    # BWK awk (macOS /usr/bin/awk) reads RS = "\0" as paragraph mode and cuts
-    # lines at NUL; blank lines in a value can then make the count a multiple
-    # of 3 and hide a key. Refuse unless awk splits NUL records.
-    recs=$(printf 'a\0b\0c\0' | yr_awk 'BEGIN { RS = "\0" } END { print NR }' 2>/dev/null) || recs=""
-    if [ "$recs" != 3 ]; then
-        YR_HARDEN_MSG="could not parse the git transport config: awk cannot split NUL-separated records (install gawk or mawk)"
-        return 1
-    fi
-    recs=$(set -o pipefail; yr_git config --null --show-scope --show-origin --list 2>/dev/null | YR_RE="$YR_CFG_CMD_KEY_RE" yr_awk 'function pe(x) { gsub(/%/, "%25", x); gsub(/\t/, "%09", x); gsub(/\n/, "%0A", x); return x }
-        BEGIN { RS = "\0" }
-        NR % 3 == 1 { sc = $0; next }
-        NR % 3 == 2 { og = $0; next }
-        {
-            i = index($0, "\n")
-            if (i == 0) { k = $0; v = "" } else { k = substr($0, 1, i - 1); v = substr($0, i + 1) }
-            if (sc == "command") next
-            if (tolower(k) !~ ENVIRON["YR_RE"]) next
-            ml = (index(v, "\n") > 0) ? "M" : "S"
-            printf "%s\t%s\t%s\t%s\t%s\n", pe(sc), pe(og), pe(k), ml, pe(v)
-        }
-        END { if (NR % 3 != 0) printf "local\t-\t<unparsed>\tM\t\n" }') \
+    recs=$(set -o pipefail; yr_git config --null --show-scope --show-origin --list 2>/dev/null | yr_cfg_null_candidates) \
         || { YR_HARDEN_MSG="could not parse the git transport config"; return 1; }
     oroot=$(yr_worktree_root || true)
     local ckmode=""

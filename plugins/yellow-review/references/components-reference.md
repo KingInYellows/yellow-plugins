@@ -356,7 +356,10 @@ load nothing (python `-E -s -u`, perl `-w -T`, ruby `-w`, awk `-f`); a
 code-loading option (`env -S python3 -m evil`, `perl -Mevil`) or a relative
 operand counts as entering, in the shell, batched and bootstrap checks alike. An
 executable these checks cannot read (mode `0111`) counts as entering too, since
-the kernel still reads its `#!` line; a setuid or setgid file is left alone. A
+the kernel still reads its `#!` line, setuid and setgid files included (any user
+can `chmod 4111` a script of their own); only a root-owned one is left alone,
+since only root can make it (Fedora ships `sudo` as `4111` and `sudoreplay` as
+`0111`), and a missing `find` to check the owner fails closed. A
 short option's attached value in a `#!` line (`ssh -Fconfig`) is judged as a
 path in the batched scan as well. `env -S`/`--split-string` (attached or
 separate, also in a cluster such as `-vS`) and options with arguments (`-u`,

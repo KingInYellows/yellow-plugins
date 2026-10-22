@@ -85,9 +85,6 @@ elif [ -n "${ZSH_VERSION:-}" ]; then
 else
   printf 'shell_check:        unsupported\n'
 fi
-# yellow-review's /review:resolve refuses BWK awk (stock macOS /usr/bin/awk).
-nul_n=$(printf 'a\0b\0c\0' | awk 'BEGIN { RS = "\0" } END { print NR }' 2>/dev/null)
-[ "$nul_n" = 3 ] && printf 'awk_nul:            ok\n' || printf 'awk_nul:            UNSUPPORTED\n'
 command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:           OK\n' || printf 'ast-grep:           NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
 [ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
@@ -831,12 +828,10 @@ yellow-research` to re-trigger the userConfig prompts."
 
 **yellow-review:**
 
-- READY: `gh` OK AND `jq` OK AND `gt` OK AND `gh_auth` OK AND `awk_nul` ok
-  AND `yellow-core` installed
+- READY: `gh` OK AND `jq` OK AND `gt` OK AND `gh_auth` OK AND `yellow-core`
+  installed
 - PARTIAL: required local review checks pass, but `yellow-core` is NOT INSTALLED
-- NEEDS SETUP: any required local review check fails (`awk_nul`
-  UNSUPPORTED means BWK awk, e.g. stock macOS `/usr/bin/awk`, which
-  `/review:resolve` refuses; install gawk or mawk)
+- NEEDS SETUP: any required local review check fails
 
 **yellow-browser-test:**
 

@@ -15,9 +15,6 @@ resolution, and sequential stack review.
 - `gh` CLI (GitHub) installed and authenticated
 - `jq` installed
 - Graphite CLI (`gt`) for branch management
-- An `awk` that splits NUL-separated records (gawk or mawk) first on `PATH`
-  for `/review:resolve`; stock macOS `/usr/bin/awk` cannot. On macOS:
-  `brew install gawk` and put its `libexec/gnubin` first on `PATH`
 - Clean working directory before running review commands
 - For the review-findings ledger: `flock`, `realpath`, git 2.31+ and the
   yellow-core plugin (credential redaction). On macOS:
@@ -460,6 +457,24 @@ may ignore the setting — check `cache_read_input_tokens` in the transcript
   splitting
 - Draft PRs excluded from `/review:all scope=all` by default
 - Cross-plugin agents require the yellow-core plugin to be installed
+- On WSL2, `commit-resolve-fixes` and `run-verify-command` can take a minute
+  or more to start. Their `PATH` screen reads every entry of every `PATH`
+  directory, and WSL's default `appendWindowsPath = true` adds dozens of
+  `/mnt/c` directories (`System32` alone holds thousands of files) read over
+  the slow 9p mount. One measurement: 92 s with 37 `/mnt/c` entries, 0.6 s
+  without them. Fix it by adding this to `/etc/wsl.conf` and running
+  `wsl --shutdown` from Windows:
+
+  ```ini
+  [interop]
+  appendWindowsPath = false
+  ```
+
+  Windows programs still run by full path, and you can add back the few you
+  need (for example `/mnt/c/Windows/System32`) in your shell profile, at the
+  cost of screening those directories. The screen result is not cached across
+  script starts: the resolvers run as you and could edit both a cache and a
+  script in a cached directory without changing its mtime.
 
 ## License
 
