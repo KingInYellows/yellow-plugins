@@ -2,14 +2,16 @@
  * Parity gate for the two shell secret redactors:
  *
  * - yellow-ci `hooks/scripts/lib/redact.sh` `redact_secrets` (CI logs), plus
- *   the copies of its sed pipeline inlined in the ci-diagnose and
+ *   the copies of its sed + awk pipeline inlined in the ci-diagnose and
  *   ci-runner-health references, which Codex loads without the hooks lib;
  * - yellow-core `lib/compound-staging.sh` `cs_redact_secrets` (session text
  *   staged to disk).
  *
  * The engines stay separate on purpose: yellow-ci's is a GNU-sed BRE pipeline
  * with provenance sentinels and quoted-value rules, yellow-core's is a
- * portable ERE pipeline with an awk stage. What must match is the set of
+ * portable ERE pipeline with an awk stage. Both decode a bare `Basic` payload
+ * to tell a `user:pass` from prose; only yellow-core follows a payload folded
+ * onto the next line. What must match is the set of
  * credential shapes each one catches. A labelled rule (`[REDACTED:<label>]`)
  * added to one side fails here until the other side gains it or the label is
  * listed below with its reason. Unlabelled rules are covered by the corpus.
@@ -70,6 +72,16 @@ function sedBlocks(text: string): string[][] {
   }
   if (cur.length) blocks.push(cur);
   return blocks.filter((b) => b.some((l) => l.includes('REDACTED')));
+}
+
+/** The awk program text after each `awk '`, one entry per pipeline. */
+function awkPrograms(text: string): string[] {
+  return [...text.matchAll(/\| awk '([^']*)'/g)].map((m) =>
+    m[1]
+      .split('\n')
+      .map((l) => l.trim())
+      .join('\n')
+  );
 }
 
 function redact(lib: string, fn: string, input: string): string {
@@ -140,6 +152,12 @@ CORPUS.push(
     secret: 'dXNlcjpwYXNz',
   },
   {
+    // Letters only, no camelCase hump: only the decode stage catches it.
+    name: 'bare basic, decoded',
+    line: 'sent Basic Znpvejph ok',
+    secret: 'Znpvejph',
+  },
+  {
     name: 'url userinfo',
     line: 'https://bob:s3cretpass@github.com/x/y',
     secret: 's3cretpass',
@@ -164,6 +182,7 @@ CORPUS.push(
 // Prose and identifiers both redactors must leave alone.
 const KEEP = [
   'Basic Authentication is enabled and basic setup works',
+  'Basic Only mode, BASIC SETTINGS and xBasic Znpvejph',
   'commit 3f786850e387550fdab836ed7e6dc881de23001b',
   'id 550e8400-e29b-41d4-a716-446655440000',
 ];
@@ -183,8 +202,12 @@ describe('secret redaction parity (yellow-ci <-> yellow-core)', () => {
 
   it('every inline yellow-ci pipeline copy matches redact.sh', () => {
     const [canonical] = sedBlocks(ciBody);
+    const [canonicalAwk] = awkPrograms(ciBody);
+    expect(canonicalAwk, 'redact.sh has no awk stage').toBeDefined();
     for (const file of CI_INLINE_COPIES) {
       const blocks = sedBlocks(read(file));
+      const programs = awkPrograms(read(file));
+      expect(programs, file).toEqual(blocks.map(() => canonicalAwk));
       expect(
         blocks.length,
         `${file} has no redaction pipeline`

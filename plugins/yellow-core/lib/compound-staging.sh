@@ -114,8 +114,9 @@ cs_atomic_jsonl_write() {
 # tests/integration/redaction-parity.test.ts fails when either list gains a
 # labelled pattern the other lacks, so add a new credential shape to both.
 # A bare Basic payload the sed shapes miss is ambiguous with prose, so
-# _cs_redact_bare_basic decodes it and redacts only a control-free user:pass;
-# that decoding stage has no yellow-ci counterpart.
+# _cs_redact_bare_basic decodes it and redacts only a control-free user:pass.
+# yellow-ci runs a smaller awk stage with the same decode check; following a
+# payload folded onto the next line is yellow-core only.
 # Redact a bare `Basic <base64>` payload that base64-decodes to a control-free
 # `user:pass` (non-empty user), and a Basic payload folded onto the line after
 # its scheme (see carried). Shape heuristics cannot tell a short

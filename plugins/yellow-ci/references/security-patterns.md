@@ -25,7 +25,7 @@ content. The credential shapes match yellow-core's `cs_redact_secrets`;
 | 13  | SSH private keys        | `-----BEGIN.*PRIVATE KEY-----` through `-----END.*PRIVATE KEY-----`                                                                                | `[REDACTED:ssh-key]`                                                                                      |
 | 14  | Vendor API keys         | `sk-ant-api…`, `sk-(admin\|proj\|svcacct)-…`, `sk-[A-Za-z0-9]{48}`, `xox[baprsu]-…`, `sk_live_…`, `rk_live_…`, `hf_…`, `tvly-…`, `pplx-…`, `sgp_…` | `[REDACTED:<vendor>-key]` / `-token`                                                                      |
 | 15  | URL userinfo            | `https?://user:pass@`                                                                                                                              | `https://[REDACTED:basic-auth]@`                                                                          |
-| 16  | Bare Basic payload      | `Basic <base64>` outside a header, when the payload has padding, a digit/`+`/`/`, or a camelCase hump                                              | `Basic [REDACTED]`                                                                                        |
+| 16  | Bare Basic payload      | `Basic <base64>` outside a header, when the payload has padding, a digit/`+`/`/`, a camelCase hump, or decodes to `user:pass`                      | `Basic [REDACTED]`                                                                                        |
 
 ### Multi-layer Defense
 
