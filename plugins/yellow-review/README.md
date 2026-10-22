@@ -14,7 +14,9 @@ resolution, and sequential stack review.
 
 - `gh` CLI (GitHub) installed and authenticated
 - `jq` installed
-- Graphite CLI (`gt`) for branch management
+- The enabled stacked-PR provider's tooling: Graphite CLI (`gt`) with
+  gt-workflow, or `gh` plus `github/gh-stack` with github-workflow
+  (`/stack:status` shows which)
 - Clean working directory before running review commands
 - For the review-findings ledger: `flock`, `realpath`, git 2.31+ and the
   yellow-core plugin (credential redaction). On macOS:

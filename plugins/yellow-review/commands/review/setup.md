@@ -8,8 +8,10 @@ allowed-tools:
 
 # Set Up yellow-review
 
-Validate the GitHub, Graphite, yellow-core and review-ledger prerequisites
-used by the review commands. This command does not write any files.
+Validate the GitHub, yellow-core and review-ledger prerequisites used by the
+review commands. This command does not write any files. Review pushes route
+through the enabled stacked-PR provider (`/stack:status`), so `gt` is
+reported but not required.
 
 ## Workflow
 
@@ -21,7 +23,7 @@ Run a single Bash call:
 printf '=== Prerequisites ===\n'
 command -v gh >/dev/null 2>&1 && printf 'gh:            ok\n' || printf 'gh:            NOT FOUND\n'
 command -v jq >/dev/null 2>&1 && printf 'jq:            ok\n' || printf 'jq:            NOT FOUND\n'
-command -v gt >/dev/null 2>&1 && printf 'gt:            ok\n' || printf 'gt:            NOT FOUND\n'
+command -v gt >/dev/null 2>&1 && printf 'gt:            ok\n' || printf 'gt:            not found (needed only with gt-workflow)\n'
 command -v awk >/dev/null 2>&1 && printf 'awk:           ok\n' || printf 'awk:           NOT FOUND\n'
 
 printf '\n=== GitHub Auth ===\n'
@@ -101,7 +103,6 @@ Stop after reporting all required failures:
 
 - `gh` missing: "GitHub CLI is required. Install it from https://cli.github.com/ and run `gh auth login`."
 - `jq` missing: "jq is required for review GraphQL helpers. Install it from https://jqlang.github.io/jq/download/."
-- `gt` missing: "Graphite CLI is required for review submission flows. Install it from https://graphite.dev/docs/cli."
 - `awk` missing: "awk is required by `/review:resolve`'s commit and verify
   scripts. Install it with your package manager (any awk works)."
 - `gh_auth` not authenticated: "GitHub CLI is not authenticated. Run `gh auth login` and re-run `/review:setup`."
@@ -115,6 +116,11 @@ Stop after reporting all required failures:
   named in its shebang (reported above), and needs Bash 3.2 or newer (stock
   macOS `/bin/bash` 3.2 is supported)." Reviews still run, but every ledger
   write fails and is reported in Coverage.
+
+If `gt` is not found, note it and continue: "Graphite CLI is not installed.
+It is needed only when gt-workflow is the enabled stacked-PR provider; run
+`/stack:status` to see which provider is enabled, and its setup command
+(`/gt-setup` or `/github-stack:setup`) to install that provider's tooling."
 
 If `yellow_core` is not installed, warn but continue:
 
@@ -150,7 +156,7 @@ yellow-review Setup Results
 ───────────────────────────
 GitHub CLI:    ready
 GitHub auth:   active
-Graphite CLI:  ready
+Graphite CLI:  ready / not installed (needed only with gt-workflow)
 yellow-core:   installed / optional-missing
 Ledger:        ready / degraded (<what is missing>)
 

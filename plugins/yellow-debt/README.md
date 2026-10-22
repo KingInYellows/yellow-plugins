@@ -234,7 +234,9 @@ All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock, writ
 
 ## Dependencies
 
-- **Required**: git, jq, yq, realpath, Graphite CLI (gt)
+- **Required**: git, jq, yq, realpath, plus the enabled stacked-PR provider's
+  tooling for `/debt:fix`: Graphite CLI `gt` with gt-workflow
+  (`READY_GRAPHITE`), or the github-workflow plugin (`READY_GITHUB`)
 - **Optional**: yellow-linear plugin (for `/debt:sync`)
 - **Optional**: github-workflow plugin (optional): under `READY_GITHUB`, stack operations run its `lib/github-stack-runtime.js` through this plugin's `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the active installed version (the newest cached one when that is unknown). Without it they report `RUNTIME_NOT_FOUND` and tell you to install it or run `/stack:select`.
 
