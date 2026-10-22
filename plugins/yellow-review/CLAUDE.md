@@ -71,12 +71,13 @@ it before editing a script, library or command.
   `disagree`/`unclear`); ends with the `Resolve:` contract line;
   `--non-interactive` suppresses all gates
 - `/review:resolve-stack` — walk a Graphite stack bottom-up running
-  `/review:resolve --non-interactive`, fully unattended
+  `/review:resolve --non-interactive`, fully unattended; ends with the
+  `ResolveStack:` outcome line
 - `/review:all` — sequential review of multiple PRs (stack, all open, or one)
 - `/review:sweep` — `/review:pr` then `/review:resolve` then `/review:triage` on
   one PR, all non-interactive
 - `/review:sweep-all` — `/review:sweep` over every open non-draft PR you
-  authored; one upfront confirmation
+  authored; one upfront confirmation; ends with the `SweepAll:` outcome line
 - `/review:triage` — own the review-findings ledger lifecycle for one PR
   (reconcile, apply, dismiss, restore); `rl prune` is the only ledger deletion
   path
