@@ -205,6 +205,32 @@ describe('ledger across sessions', () => {
   });
 });
 
+describe('ledger pruning', () => {
+  test('never prunes a key this module wrote', async ($, on) => {
+    const entries: Record<string, unknown> = {
+      'ledger:a': [row('earlier-agent', '1970-01-01T00:00:00.000Z')],
+    };
+    for (let i = 0; i < 7; i += 1) {
+      entries[`ledger:old${i}`] = [
+        row(`agent-${i}`, '1970-01-01T00:00:00.000Z'),
+      ];
+    }
+    let sessionId = 'a';
+    mock.store(on, entries);
+    mock.clock(on);
+    on('session.id', () => ({ value: sessionId }));
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    await spawn($, REVIEWER);
+    sessionId = 'b';
+    await spawn($, SECURITY);
+    const text = await status($);
+    expect(text).toContain('across 8 session(s)');
+    expect(text).toContain('earlier-agent: ran opus');
+    expect(text).not.toContain('agent-0:');
+  });
+});
+
 describe('ledger write failures', () => {
   test('a store that never answers does not stall the spawn', async ($, on) => {
     const clock = mock.clock(on);
