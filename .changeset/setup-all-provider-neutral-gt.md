@@ -14,6 +14,6 @@ A third-party `stack`-named gh extension is reported as
 `gh_stack_ext: WRONG_OWNER` instead of `MISSING`, matching
 `lib/stack-tooling-probe.js`, with removal and reinstall steps.
 
-`/review:pr` now resolves the stacked-PR provider before checkout and uses
-`gh pr checkout` outside Graphite, so it never runs `gt` for a GitHub-stacks
-user.
+`/review:pr` now resolves the stacked-PR provider before checkout: Graphite
+uses `gt checkout`, GitHub stacks use `gh pr checkout` and never run `gt`,
+and any unresolved provider state stops before touching the worktree.

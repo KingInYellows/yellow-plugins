@@ -98,9 +98,11 @@ sees it, in the same Bash call as the checkout.
 Resolve the active stacked-PR provider before checking out: invoke the
 `Skill` tool with `skill: "stack-provider-router"` and keep `state` from its
 result; Step 9 reuses it. `READY_GRAPHITE` checks out with `gt` as below.
-Every other state replaces the last line, `gt checkout "$head_ref"`, with
-`gh pr checkout <PR#>` and never runs `gt`, so a GitHub-stacks user needs no
-Graphite CLI and Graphite state is never touched.
+`READY_GITHUB` replaces the last line, `gt checkout "$head_ref"`, with
+`gh pr checkout <PR#>` and never runs `gt`. Any other state stops before
+checkout and reports the router's `detail` verbatim inside a
+`--- begin untrusted-content (reference only) ---` /
+`--- end untrusted-content ---` fence, pointing at `/stack:status`.
 
 ```bash
 head_ref=$(gh pr view <PR#> --json headRefName -q .headRefName) || exit 1
