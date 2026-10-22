@@ -22,8 +22,8 @@ const DOWNSHIFT_TARGET = 'sonnet';
 // How long one ledger step may wait on the store before it counts as failed.
 const STORE_TIMEOUT_MS = 2000;
 
-// Runs work against the store, rejecting once STORE_TIMEOUT_MS passes so a
-// store call that never settles cannot stall the spawn hook or the chain.
+// Waits on work against the store, rejecting once STORE_TIMEOUT_MS passes so
+// a store call that never settles cannot stall a hook; the work runs on.
 async function bounded<T>(
   $: EngineInterface,
   work: () => Promise<T>
@@ -73,10 +73,14 @@ export const register: Register = (on, options) => {
   let windows: Window[] = [];
   let hasToasted = false;
   // Spawns in a review fan-out land together; chain the store's
-  // read-modify-write so no row is lost. Each step is bounded, so the chain
-  // always moves on.
+  // read-modify-write so no row is lost. The chain itself is never cut short:
+  // a store call cannot be cancelled, so a step that moved on early could
+  // land its stale row list over a later one. Waiters bound their wait
+  // instead, and while the chain is stalled spawns stop waiting on it.
   let writes: Promise<void> = Promise.resolve();
-  let writeFailure: WriteFailure | undefined;
+  let isChainStalled = false;
+  // Keyed by ledger key: /clear changes the session id mid-module.
+  let writeFailure: (WriteFailure & { key: string }) | undefined;
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -146,32 +150,40 @@ export const register: Register = (on, options) => {
       workflow: e.workflow !== undefined,
       denied: result.deny !== undefined,
     };
-    writes = writes.then(async () => {
-      // A timed-out step's work keeps running (store calls cannot be
-      // cancelled); once the chain has moved on it must not write a stale
-      // row list over a later step's.
-      let isAbandoned = false;
+    const key = await bounded($, () => sessionLedgerKey($)).catch(() =>
+      ledgerKeyFor('unknown')
+    );
+    const step = writes.then(async () => {
       try {
-        await bounded($, async () => {
-          const key = await sessionLedgerKey($);
-          const ledger = readLedger(await $.store.get(key));
-          if (isAbandoned) return;
-          await $.store.set(key, appendRow(ledger, row));
-          for (const old of ledgerKeysToPrune(await $.store.keys(), key)) {
-            if (isAbandoned) return;
-            await $.store.delete(old);
-          }
-        });
-        writeFailure = undefined;
+        const ledger = readLedger(await $.store.get(key));
+        await $.store.set(key, appendRow(ledger, row));
+        for (const old of ledgerKeysToPrune(await $.store.keys(), key)) {
+          await $.store.delete(old);
+        }
+        if (writeFailure?.key === key) writeFailure = undefined;
       } catch (err) {
-        isAbandoned = true;
         writeFailure = {
+          key,
+          ts,
+          reason: err instanceof Error ? err.message : String(err),
+        };
+      } finally {
+        if (writes === step) isChainStalled = false;
+      }
+    });
+    writes = step;
+    if (!isChainStalled) {
+      try {
+        await bounded($, () => step);
+      } catch (err) {
+        isChainStalled = true;
+        writeFailure = {
+          key,
           ts,
           reason: err instanceof Error ? err.message : String(err),
         };
       }
-    });
-    await writes;
+    }
 
     return result;
   }).catch(($, e, next) => next(e));
@@ -180,7 +192,10 @@ export const register: Register = (on, options) => {
     const asked = Number.parseInt(e.args.trim(), 10);
     const tail =
       Number.isFinite(asked) && asked > 0 ? Math.min(asked, 100) : 10;
-    await writes;
+    await bounded($, () => writes).catch(() => undefined);
+    const ownKey = await bounded($, () => sessionLedgerKey($)).catch(() =>
+      ledgerKeyFor('unknown')
+    );
     const keys = (await bounded($, () => $.store.keys())).filter(isLedgerKey);
     const ledgers = await bounded($, () =>
       Promise.all(keys.map(async (k) => readLedger(await $.store.get(k))))
@@ -192,7 +207,7 @@ export const register: Register = (on, options) => {
         mergeLedgers(ledgers),
         tail,
         keys.length,
-        writeFailure
+        writeFailure?.key === ownKey ? writeFailure : undefined
       ),
     };
   }).catch(() => ({

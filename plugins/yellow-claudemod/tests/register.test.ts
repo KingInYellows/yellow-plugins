@@ -218,7 +218,12 @@ describe('ledger write failures', () => {
     await clock.settle();
     await clock.advance(2000);
     expect((await running).model).toBe('opus');
-    expect(await status($)).toContain('Ledger write failed at');
+    // The chain is still stalled: a later spawn does not wait on it.
+    expect((await spawn($, SECURITY)).model).toBe('opus');
+    const shown = status($);
+    await clock.settle();
+    await clock.advance(2000);
+    expect(await shown).toContain('Ledger write failed at');
   });
 
   test('reports a rejected write until one succeeds', async ($, on) => {
@@ -244,13 +249,13 @@ describe('ledger write failures', () => {
     expect(text).toContain('Ledger: 1 spawn(s) recorded');
   });
 
-  test('a timed-out write never lands over a later one', async ($, on) => {
+  test('a slow write delays later rows instead of losing them', async ($, on) => {
     const clock = mock.clock(on);
     const held: Record<string, unknown> = {};
     let isFirstGet = true;
     on('session.id', () => ({ value: 's1' }));
     // The first read takes its snapshot now and answers late, as a slow
-    // store would: by then a later spawn has written its row.
+    // store would.
     on('store.get', async ($, e) => {
       const snapshot = held[e.key];
       if (isFirstGet) {
@@ -273,7 +278,27 @@ describe('ledger write failures', () => {
     await spawn($, SECURITY);
     await clock.advance(3000);
     const text = await status($);
-    expect(text).toContain('Ledger: 1 spawn(s) recorded');
+    expect(text).toContain('Ledger: 2 spawn(s) recorded');
+    expect(text).toContain(`${REVIEWER}: ran opus`);
     expect(text).toContain(`${SECURITY}: ran opus`);
+    expect(text).not.toContain('Ledger write failed');
+  });
+
+  test('reports a failure only to the session it belongs to', async ($, on) => {
+    mock.clock(on);
+    let sessionId = 's1';
+    on('session.id', () => ({ value: sessionId }));
+    on('store.get', () => ({ value: undefined }));
+    on('store.set', () => {
+      throw new Error('disk full');
+    });
+    on('store.keys', () => ({ value: [] }));
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    await spawn($, REVIEWER);
+    sessionId = 's2';
+    expect(await status($)).not.toContain('Ledger write failed');
+    sessionId = 's1';
+    expect(await status($)).toContain('Ledger write failed at');
   });
 });
