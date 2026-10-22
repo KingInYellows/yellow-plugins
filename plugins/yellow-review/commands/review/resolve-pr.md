@@ -697,11 +697,15 @@ object per thread, so no text reaches a command line:
   contract's "Linear procedure" (team resolution, dedupe, text check) and its
   "Linear response checks", which every reused `list_issues` hit and the
   `save_issue` response must pass. That thread then has no `issue` key; a
-  Linear failure falls back to GitHub once by giving it one.
+  Linear failure falls back to GitHub once by giving it one. Unattended, a
+  Linear issue created here counts toward the cap: once the cap is reached,
+  give the remaining `oos` threads an `issue` key instead, so the script's
+  dedupe check and over-cap reply apply to them.
 
 Then apply the plan with a Bash `timeout` of 600000 ms. Unattended runs pass
-`--issue-cap` with the issues this PR may still create this run (3 minus those
-created in earlier passes); interactive runs omit it:
+`--issue-cap` with the issues this PR may still create this run: 3 minus every
+issue created this run, in earlier passes and on Linear for this plan.
+Interactive runs omit it:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/apply-thread-actions" --issue-cap "<n>" "<owner/repo>" "<PR#>" "<plan-file>" "<results-file>"
