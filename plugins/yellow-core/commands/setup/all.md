@@ -667,9 +667,9 @@ SKIPPED` (no `gt`, or not in a git repo) is a failure, not a pass.
   `graphite_repo` or `gt_trunk` fails
 
 Whatever the status, if `gt_mcp_check` is `too_old`, add to the Detail
-column: "gt <version> is below 1.6.7, so the bundled Graphite MCP server is
-unavailable; upgrade gt". The CLI workflow still works, so this does not
-change the status.
+column: "gt is below 1.6.7 (show the version from that row), so the bundled
+Graphite MCP server is unavailable; upgrade gt". The CLI workflow still
+works, so this does not change the status.
 
 **github-workflow:**
 
