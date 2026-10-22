@@ -1519,14 +1519,18 @@ function lintShellText(
     subjectDepth: 0,
     subjectTick: false,
   };
-  const expandSub = { depth: 0 };
+  const expandSub = { depth: 0, continued: false };
   // The calling shell runs the `$(…)` and backtick substitutions in an
   // unquoted heredoc body or a multi-line double-quoted string.
   const expandAliasHits = (text, i) => {
+    const continued = expandSub.continued && expandSub.depth > 0;
     const subs = keepCommandSubs(text, expandSub, { literalQuotes: true });
+    // A `\` ending a line inside a kept substitution joins the next line.
+    expandSub.continued = /(?<!\\)\\$/.test(subs);
     for (const detail of ruleAliasGuarded(
       subs,
-      ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED
+      ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED,
+      continued
     )) {
       add('SHC-010', i, detail);
     }
@@ -1554,6 +1558,7 @@ function lintShellText(
     }
     if (expandHead !== undefined) expandAliasHits(expandHead, i);
     expandSub.depth = 0;
+    expandSub.continued = false;
     // A `$(` opened inside the string on this line carries into the next
     // lines of the string; the line itself is linted as code below.
     if (opensDouble) keepCommandSubs(line, expandSub);
