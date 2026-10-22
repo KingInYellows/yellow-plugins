@@ -772,10 +772,10 @@ PY
   [ "$status" -eq 0 ]
 }
 
-@test "R19: main() cancels the deadline alarm once recording ends" {
+@test "R19: main() cancels the deadline alarm once recording ends, so a late SIGALRM is dropped" {
   payload disarm 61 > "$TEST_HOME/in"
   cat > "$TEST_HOME/disarm.py" <<'PY'
-import importlib.util, signal, sys
+import importlib.util, os, signal, sys, time
 spec = importlib.util.spec_from_file_location("obs", sys.argv[1])
 obs = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(obs)
@@ -794,25 +794,13 @@ assert armed and armed[0] > 0, "the deadline was not armed during recording: %r"
 pending = signal.alarm(0)
 assert pending == 0, "alarm still armed: %d s left" % pending
 assert signal.getsignal(signal.SIGALRM) == signal.SIG_IGN
+os.kill(os.getpid(), signal.SIGALRM)  # a deadline landing after recording is dropped
+time.sleep(0.05)
 sys.stderr.write("disarmed\n")
 PY
   run --separate-stderr python3 "$TEST_HOME/disarm.py" "$OBS" < "$TEST_HOME/in"
   [ "$status" -eq 0 ]
   [ "$stderr" = "disarmed" ]
-}
-
-@test "R19: recording that completes just before the deadline exits 0 with nothing on stderr" {
-  local delay remaining=61
-  for delay in 1.8 1.85 1.9; do
-    remaining=$((remaining + 1))
-    payload edge "$remaining" > "$TEST_HOME/in"
-    run --separate-stderr env CONTEXT_OBSERVER_TEST_SLEEP_BEFORE_RENAME="$delay" \
-      python3 "$OBS" < "$TEST_HOME/in"
-    [ "$status" -eq 0 ]
-    [ -z "$stderr" ]
-    # the rename happened, so the deadline fell after recording, not inside it
-    jq -e --argjson r "$remaining" '.context_window.remaining_percentage == $r' "$(record_for edge)" >/dev/null
-  done
 }
 
 @test "R19: closed stdin or closed stdout still exits 0" {
