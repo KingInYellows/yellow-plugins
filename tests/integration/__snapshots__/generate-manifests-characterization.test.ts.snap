@@ -37,7 +37,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.11.3",
+      "version": "2.11.4",
       "author": {
         "name": "KingInYellows"
       },
@@ -67,7 +67,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains",
-      "version": "3.0.7",
+      "version": "3.0.8",
       "author": {
         "name": "KingInYellows"
       },
@@ -87,7 +87,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.10.2",
+      "version": "3.10.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -117,7 +117,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
-      "version": "1.9.2",
+      "version": "1.9.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -167,7 +167,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-semgrep",
       "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
-      "version": "4.2.7",
+      "version": "4.2.8",
       "author": {
         "name": "KingInYellows"
       },
@@ -207,7 +207,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-goal",
       "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets, run zero-spend stub scenarios, and forward a user-only approval-gated real run. Never imports the engine.",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -217,7 +217,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-claudemod",
       "description": "Claude Code mod that records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -443,7 +443,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-claudemod/.claude-plug
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-claudemod",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Claude Code mod that records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit",
   "author": {
     "name": "KingInYellows",
@@ -536,7 +536,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "2.11.3",
+  "version": "2.11.4",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
@@ -659,7 +659,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-debt/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-debt",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "description": "Technical debt audit and remediation with parallel scanner agents. Use when you need to assess codebase health, identify AI-generated debt patterns, prioritize findings, and systematically remediate technical debt.",
   "author": {
     "name": "KingInYellows",
@@ -709,7 +709,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-devin/.claude-plugin/p
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-devin",
-  "version": "3.0.7",
+  "version": "3.0.8",
   "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains",
   "author": {
     "name": "KingInYellows",
@@ -776,7 +776,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-goal/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-goal",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets, run zero-spend stub scenarios, and forward a user-only approval-gated real run. Never imports the engine.",
   "author": {
     "name": "KingInYellows",
@@ -1032,7 +1032,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-review/.claude-plugin/
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-review",
-  "version": "3.10.2",
+  "version": "3.10.3",
   "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
   "author": {
     "name": "KingInYellows",
@@ -1159,7 +1159,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-semgrep/.claude-plugin
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-semgrep",
-  "version": "4.2.7",
+  "version": "4.2.8",
   "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
   "author": {
     "name": "KingInYellows",

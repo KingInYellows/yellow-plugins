@@ -1,5 +1,81 @@
 # Changelog
 
+## 3.10.3
+
+### Patch Changes
+
+- [`9792007`](https://github.com/KingInYellows/yellow-plugins/commit/9792007055fd59cfacba07908afadf8a2933239c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Active-install
+  sibling lookups (`run-github-stack-runtime.js`, yellow-review's
+  `lib/sibling-plugin.sh`, yellow-core's `worktree-restack.sh`) now rank a
+  `local`-scoped `installed_plugins.json` entry above a `project`-scoped one for
+  the same `projectPath`, matching Claude Code's local > project > user
+  precedence, and canonicalize `projectPath` and the cwd before comparing them,
+  so a project recorded through a symlink still matches.
+
+- [`fdb2df2`](https://github.com/KingInYellows/yellow-plugins/commit/fdb2df22e4966631c01988f1318c8396934f71ed)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Docs only.
+  yellow-review's pr-review-workflow skill now says `reply-pr-thread` still
+  posts an upgrade reply (`disagree`/`unclear` to `fixed`/`addressed`/`oos`,
+  `oos` to `fixed`/`addressed`). yellow-core's git-worktree SKILL.md is trimmed
+  to 499 lines, under the RULE 15a ceiling, with no behaviour change.
+
+- [`a1aa653`](https://github.com/KingInYellows/yellow-plugins/commit/a1aa653d9ff821418f552ff0fdbcda62f91b6ac2)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - resolve-text:
+  an awk program that never ran (gawk exits 1 on a parse error) is now a scan
+  failure instead of clean. Both the credential scan and the `rt_text_clean`
+  mention/URL pass require an END `clean` line before reporting clean, so
+  `check-resolve-text` exits 6 rather than 0.
+
+- [`3c18d01`](https://github.com/KingInYellows/yellow-plugins/commit/3c18d01a50ce95913327095f2ba63be9636c94a2)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The
+  review-findings ledger now merges a finding observed once with a verified
+  scope and once without one. An unscoped observation joins a scope-verified
+  finding with the same file, category, rule and anchor hash when that scope
+  still holds at its line; a scoped observation absorbs a matching unscoped
+  finding whose line maps unchanged into its scope span. A merge happens only
+  when exactly one finding qualifies and neither side carries an occurrence key,
+  so identical code in two scopes stays separate. `/review:triage` no longer
+  shows these as duplicates.
+
+- [`3c0cd62`](https://github.com/KingInYellows/yellow-plugins/commit/3c0cd62cc7d832bae13605098f2731becdfc86a6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/setup:all` no
+  longer requires `gt` for yellow-review or yellow-debt, since both now submit
+  through the enabled stacked-PR provider; `/review:setup` and `/debt:setup`
+  report `gt` as needed only with gt-workflow (CLAUDE-160).
+
+  The dashboard adds a `gt_mcp_check` row, and the gt-workflow Detail column
+  flags gt below 1.6.7, where the bundled Graphite MCP server is unavailable. A
+  third-party `stack`-named gh extension is reported as
+  `gh_stack_ext: WRONG_OWNER` instead of `MISSING`, matching
+  `lib/stack-tooling-probe.js`, with removal and reinstall steps.
+
+  `/review:pr` now resolves the stacked-PR provider before checkout: Graphite
+  uses `gt checkout`, GitHub stacks use `gh pr checkout` and never run `gt`, and
+  any unresolved provider state stops before touching the worktree. Step 9 still
+  re-resolves the provider before pushing.
+
+- [`1fbd615`](https://github.com/KingInYellows/yellow-plugins/commit/1fbd61507861bbc64a2347f3f5973976b706addc)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The resolver
+  `PATH` screen no longer trusts the setuid and setgid bits: an executable it
+  cannot read (so its `#!` line is hidden) now fails closed unless root owns it
+  and the user cannot write it, since any user can `chmod 4111` a script of
+  their own. Root-owned execute-only binaries, such as Fedora's `sudo` (4111)
+  and `sudoreplay` (0111), keep their directory on `PATH`. `harden_git_config`
+  now splits `git config --null` records in bash (`read -d ''`) instead of awk,
+  so `commit-resolve-fixes` and `run-verify-command` run on hosts whose only awk
+  is BWK (stock macOS `/usr/bin/awk`); `/review:setup` and `/setup:all` drop the
+  `awk_nul` check. The README documents the WSL2 `appendWindowsPath = false` fix
+  for the slow `PATH` screen.
+
+- [`36365b8`](https://github.com/KingInYellows/yellow-plugins/commit/36365b8c01ea0d949edc14d6527e8b40980d43a5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Trim
+  `/review:sweep` from 654 to 497 lines and `/review:resolve-stack` from 520 to
+  497, under the RULE 21 command ceiling. Restated prose and the Error Handling
+  recaps are condensed into the steps that already define each stop; every stop,
+  message, skip line and contract rule is unchanged. Both files are now
+  Prettier-clean.
+
 ## 3.10.2
 
 ### Patch Changes

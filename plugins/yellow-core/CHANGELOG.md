@@ -1,5 +1,66 @@
 # Changelog
 
+## 2.11.4
+
+### Patch Changes
+
+- [`9792007`](https://github.com/KingInYellows/yellow-plugins/commit/9792007055fd59cfacba07908afadf8a2933239c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Active-install
+  sibling lookups (`run-github-stack-runtime.js`, yellow-review's
+  `lib/sibling-plugin.sh`, yellow-core's `worktree-restack.sh`) now rank a
+  `local`-scoped `installed_plugins.json` entry above a `project`-scoped one for
+  the same `projectPath`, matching Claude Code's local > project > user
+  precedence, and canonicalize `projectPath` and the cwd before comparing them,
+  so a project recorded through a symlink still matches.
+
+- [`fdb2df2`](https://github.com/KingInYellows/yellow-plugins/commit/fdb2df22e4966631c01988f1318c8396934f71ed)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Docs only.
+  yellow-review's pr-review-workflow skill now says `reply-pr-thread` still
+  posts an upgrade reply (`disagree`/`unclear` to `fixed`/`addressed`/`oos`,
+  `oos` to `fixed`/`addressed`). yellow-core's git-worktree SKILL.md is trimmed
+  to 499 lines, under the RULE 15a ceiling, with no behaviour change.
+
+- [`3c0cd62`](https://github.com/KingInYellows/yellow-plugins/commit/3c0cd62cc7d832bae13605098f2731becdfc86a6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/setup:all` no
+  longer requires `gt` for yellow-review or yellow-debt, since both now submit
+  through the enabled stacked-PR provider; `/review:setup` and `/debt:setup`
+  report `gt` as needed only with gt-workflow (CLAUDE-160).
+
+  The dashboard adds a `gt_mcp_check` row, and the gt-workflow Detail column
+  flags gt below 1.6.7, where the bundled Graphite MCP server is unavailable. A
+  third-party `stack`-named gh extension is reported as
+  `gh_stack_ext: WRONG_OWNER` instead of `MISSING`, matching
+  `lib/stack-tooling-probe.js`, with removal and reinstall steps.
+
+  `/review:pr` now resolves the stacked-PR provider before checkout: Graphite
+  uses `gt checkout`, GitHub stacks use `gh pr checkout` and never run `gt`, and
+  any unresolved provider state stops before touching the worktree. Step 9 still
+  re-resolves the provider before pushing.
+
+- [`f89a1e9`](https://github.com/KingInYellows/yellow-plugins/commit/f89a1e9e0f4953f62155f82a03a9fc2e2cdb1c16)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Harden the
+  `/statusline:setup` settings backups and the context observer's deadline.
+  `statusline-settings.py` no longer reuses or writes through a symlink at a
+  backup name (a dangling link counts as taken), creates each new backup with
+  `O_EXCL|O_NOFOLLOW` at 0600 before applying the source's mode, and writes the
+  exact bytes it compared, CRLF included (CLAUDE-52). `context-observer.py`
+  cancels its `SIGALRM` deadline and ignores a pending one once recording ends,
+  so a deadline that lands just as recording finishes can no longer escape as a
+  traceback with a non-zero exit (CLAUDE-51).
+
+- [`1fbd615`](https://github.com/KingInYellows/yellow-plugins/commit/1fbd61507861bbc64a2347f3f5973976b706addc)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The resolver
+  `PATH` screen no longer trusts the setuid and setgid bits: an executable it
+  cannot read (so its `#!` line is hidden) now fails closed unless root owns it
+  and the user cannot write it, since any user can `chmod 4111` a script of
+  their own. Root-owned execute-only binaries, such as Fedora's `sudo` (4111)
+  and `sudoreplay` (0111), keep their directory on `PATH`. `harden_git_config`
+  now splits `git config --null` records in bash (`read -d ''`) instead of awk,
+  so `commit-resolve-fixes` and `run-verify-command` run on hosts whose only awk
+  is BWK (stock macOS `/usr/bin/awk`); `/review:setup` and `/setup:all` drop the
+  `awk_nul` check. The README documents the WSL2 `appendWindowsPath = false` fix
+  for the slow `PATH` screen.
+
 ## 2.11.3
 
 ### Patch Changes

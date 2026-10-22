@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.9.3
+
+### Patch Changes
+
+- [`9792007`](https://github.com/KingInYellows/yellow-plugins/commit/9792007055fd59cfacba07908afadf8a2933239c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Active-install
+  sibling lookups (`run-github-stack-runtime.js`, yellow-review's
+  `lib/sibling-plugin.sh`, yellow-core's `worktree-restack.sh`) now rank a
+  `local`-scoped `installed_plugins.json` entry above a `project`-scoped one for
+  the same `projectPath`, matching Claude Code's local > project > user
+  precedence, and canonicalize `projectPath` and the cwd before comparing them,
+  so a project recorded through a symlink still matches.
+
+- [`3c0cd62`](https://github.com/KingInYellows/yellow-plugins/commit/3c0cd62cc7d832bae13605098f2731becdfc86a6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/setup:all` no
+  longer requires `gt` for yellow-review or yellow-debt, since both now submit
+  through the enabled stacked-PR provider; `/review:setup` and `/debt:setup`
+  report `gt` as needed only with gt-workflow (CLAUDE-160).
+
+  The dashboard adds a `gt_mcp_check` row, and the gt-workflow Detail column
+  flags gt below 1.6.7, where the bundled Graphite MCP server is unavailable. A
+  third-party `stack`-named gh extension is reported as
+  `gh_stack_ext: WRONG_OWNER` instead of `MISSING`, matching
+  `lib/stack-tooling-probe.js`, with removal and reinstall steps.
+
+  `/review:pr` now resolves the stacked-PR provider before checkout: Graphite
+  uses `gt checkout`, GitHub stacks use `gh pr checkout` and never run `gt`, and
+  any unresolved provider state stops before touching the worktree. Step 9 still
+  re-resolves the provider before pushing.
+
 ## 1.9.2
 
 ### Patch Changes
