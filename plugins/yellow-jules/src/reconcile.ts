@@ -723,11 +723,10 @@ async function persist(
         r.outcome === 'policy-deviation' &&
         r.deviation !== undefined
       ) {
-        // Only an open deviation suppresses it: reconcile records events, and
-        // one that happens again after an acknowledgement blocks again.
-        const known = current.deviations.some(
-          (d) => d.reason === r.deviation && !d.reconciled
-        );
+        // Every reconcile re-reads this unresolved record's evidence, so an
+        // acknowledged deviation still suppresses it, or the acknowledgement
+        // could never hold.
+        const known = current.deviations.some((d) => d.reason === r.deviation);
         if (!known) {
           next = {
             ...next,
@@ -754,10 +753,15 @@ async function persist(
         const owner = Object.values(operations).find(
           (o) => ownsSession(o) && o.sessionResource === next.sessionResource
         );
+        // Each reconcile re-reads an unresolved approve, so one acknowledged
+        // for this approve stays acknowledged. Another approve with the same
+        // fate is a new event and blocks again.
         if (
           owner !== undefined &&
           !owner.deviations.some(
-            (d) => d.reason === r.deviation && !d.reconciled
+            (d) =>
+              d.reason === r.deviation &&
+              (!d.reconciled || d.sourceRequestId === current.localRequestId)
           )
         ) {
           operations[owner.localRequestId] = {
@@ -767,6 +771,7 @@ async function persist(
               {
                 kind: 'policy-deviation',
                 reason: r.deviation,
+                sourceRequestId: current.localRequestId,
                 observedAt: now,
                 reconciled: false,
               },

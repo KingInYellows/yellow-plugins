@@ -242,7 +242,7 @@ function isValidDeviation(value) {
         return false;
     return (value['kind'] === 'policy-deviation' &&
         typeof value['reason'] === 'string' &&
-        hasOptionalStrings(value, ['prUrl', 'reconciledAt']) &&
+        hasOptionalStrings(value, ['prUrl', 'reconciledAt', 'sourceRequestId']) &&
         typeof value['observedAt'] === 'string' &&
         typeof value['reconciled'] === 'boolean');
 }

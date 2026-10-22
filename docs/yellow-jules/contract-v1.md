@@ -667,8 +667,9 @@ transient failure from an undetermined one.
   the session outside its grant's scope: acknowledging it also revokes the
   owning grant, so further writes need a fresh grant. The acknowledgement is
   refused if the open deviations changed while the prompt was open. Evidence
-  that every walk re-reads (the same PR) is not recorded again; a one-off event
-  (an approval that landed on another plan) recorded after the acknowledgement
+  that every walk re-reads (the same PR, or the same unresolved approve's
+  ambiguity on a later reconcile) is not recorded again; a one-off event (an
+  approval that landed on another plan) recorded after the acknowledgement
   blocks again. A create whose tagged session is on another repository or branch
   never binds, so it has no session to acknowledge: revoke its grant and
   authorize a new one.

@@ -335,8 +335,9 @@ TTY-confirmed, controller-checked, after a complete `status` walk newer than the
 newest open deviation. It marks the session's open deviations reconciled. A PR
 reference that failed validation (scope escape) also revokes the owning grant in
 the same locked step; the rest leave the grant usable. Deviations a walk
-re-reads are recorded once; approval-mismatch events record again after an
-acknowledgement.
+re-reads are recorded once, and so is the deviation an unresolved approve's
+reconcile records on its owner (keyed by `sourceRequestId`); approval-mismatch
+events from another approve record again after an acknowledgement.
 
 The pending-plan rebase orders a plan against a concurrent walk's watermark by
 `createTime` only: an older plan is dropped, the watermark's own activity is

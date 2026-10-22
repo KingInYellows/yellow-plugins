@@ -233,6 +233,8 @@ export interface DeviationRecord {
   readonly reason: string;
   /** External PR reference (R13); present only when it passed validatePullRequestUrl. */
   readonly prUrl?: string;
+  /** The operation whose reconcile recorded it on its session's owner. */
+  readonly sourceRequestId?: string;
   readonly observedAt: string;
   readonly reconciled: boolean;
   /** When the owner acknowledged it with `supervise --clear-deviation`. */

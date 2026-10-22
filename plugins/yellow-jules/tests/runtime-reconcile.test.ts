@@ -1197,6 +1197,63 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect(ops[session.localRequestId]?.deviations).toHaveLength(1);
   });
 
+  it('an acknowledged ambiguous approve stays acknowledged across reconciles; another approve blocks again', async () => {
+    const session = await strandedApprove();
+    const now = h.deps.clock.now();
+    for (const [i, planId] of ['plan-2', 'plan-3'].entries()) {
+      addActivity(h, session.sessionResource, {
+        type: 'planApproved',
+        approvedPlanId: planId,
+        createTime: new Date(now + 1_000 + i * 1_000).toISOString(),
+      });
+    }
+    const owner = session.localRequestId;
+    // An earlier approve's acknowledged deviation with the same reason does
+    // not cover this approve.
+    await updateJournal(h.dataDir, (operations) => {
+      const record = operations[owner]!;
+      operations[owner] = {
+        ...record,
+        deviations: [
+          {
+            kind: 'policy-deviation',
+            reason:
+              'a different plan was approved after an unresolved approve was sent, and it cannot be attributed to that approve',
+            sourceRequestId: 'approve-0',
+            observedAt: new Date(now).toISOString(),
+            reconciled: true,
+          },
+        ],
+      };
+    });
+    await status(h.deps, { session: session.localId, reconcile: true });
+    let deviations = (await readJournal(h.dataDir)).operations[owner]
+      ?.deviations;
+    expect(deviations).toHaveLength(2);
+    expect(deviations?.[1]).toMatchObject({
+      sourceRequestId: 'approve-1',
+      reconciled: false,
+    });
+    await updateJournal(h.dataDir, (operations) => {
+      const record = operations[owner]!;
+      operations[owner] = {
+        ...record,
+        deviations: record.deviations.map((d) => ({ ...d, reconciled: true })),
+      };
+    });
+    const again = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(again.reconciled?.[0]).toMatchObject({
+      localRequestId: 'approve-1',
+      outcome: 'ambiguous-reconcile',
+    });
+    deviations = (await readJournal(h.dataDir)).operations[owner]?.deviations;
+    expect(deviations).toHaveLength(2);
+    expect(deviations?.every((d) => d.reconciled)).toBe(true);
+  });
+
   it('an unordered same-plan match plus a later approval of another plan is ambiguous and still records a blocking deviation', async () => {
     const session = await strandedApprove();
     const floor = (await readJournal(h.dataDir)).operations['approve-1']
