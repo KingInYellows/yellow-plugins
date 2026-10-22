@@ -4,6 +4,7 @@
     "plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh",
     "plugins/yellow-ci/hooks/scripts/lib/validate.sh",
     "plugins/yellow-debt/lib/validate.sh",
+    "plugins/yellow-goal/lib/sibling-plugin.sh",
     "plugins/yellow-ruvector/hooks/scripts/lib/resolve.sh",
     "plugins/yellow-ruvector/lib/install-ruvector.sh"
   ],

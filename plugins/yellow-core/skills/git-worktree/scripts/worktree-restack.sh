@@ -859,27 +859,39 @@ gh_version_ok() {
 # active_version CACHE PLUGIN: the version directory name installed_plugins.json
 # (${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/) records as PLUGIN's active
 # install. CACHE is <marketplace>/<plugin>; the entry key is
-# <plugin>@<marketplace>. A project-scoped entry applies only when $PWD is
-# inside its projectPath and beats a user-scoped one (the deepest projectPath
-# wins); an installPath outside CACHE is ignored. Returns 1 when the file or a
-# usable entry is missing. yellow-review's lib/sibling-plugin.sh and
-# lib/run-github-stack-runtime.js apply the same rule.
+# <plugin>@<marketplace>. A project- or local-scoped entry applies only when
+# the physical cwd is inside its projectPath (both resolved with cd -P) and
+# beats a user-scoped one: the deepest projectPath wins, then local beats
+# project (Claude Code's precedence), then file order. An installPath outside
+# CACHE is ignored. Returns 1 when the file or a usable entry is missing.
+# yellow-review's lib/sibling-plugin.sh and lib/run-github-stack-runtime.js
+# apply the same rule.
 active_version() {
-  local file real mkt ver
+  local file real mkt cwd tab ver
   file="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json"
   [ -f "$file" ] || return 1
   real=$(cd -P -- "$1" 2>/dev/null && pwd -P) || return 1
+  cwd=$(pwd -P) || return 1
   mkt=${real%/*}
   mkt=${mkt##*/}
-  ver=$(jq -r --arg key "$2@$mkt" --arg cwd "$PWD" '
-    [ (.plugins[$key] // empty) | if type == "array" then .[] else . end
+  tab=$(printf '\t')
+  # Rows: scope rank (local 2, project 1, other 0), then "p"+projectPath (the
+  # prefix keeps an empty field from collapsing under IFS), then installPath.
+  ver=$(jq -r --arg key "$2@$mkt" '
+    (.plugins[$key] // empty) | if type == "array" then .[] else . end
       | select(type == "object" and (.installPath | type) == "string")
-      | (.projectPath // "") as $pp
-      | if $pp == "" then [0, .installPath]
-        elif $cwd == $pp or ($cwd | startswith($pp + "/")) then [1 + ($pp | length), .installPath]
-        else empty end ]
-    | sort_by(-.[0]) | .[] | .[1]' "$file" 2>/dev/null |
-    while IFS= read -r dir; do
+      | [ (if .scope == "local" then 2 elif .scope == "project" then 1 else 0 end),
+          ("p" + (.projectPath | if type == "string" then . else "" end)),
+          .installPath ] | @tsv' "$file" 2>/dev/null |
+    while IFS="$tab" read -r sc pp dir; do
+      pp=${pp#p}
+      if [ -z "$pp" ]; then
+        printf '0\t%s\t%s\n' "$sc" "$dir"
+      elif pp=$(cd -P -- "$pp" 2>/dev/null && pwd -P); then
+        case "$cwd/" in "$pp"/*) printf '%s\t%s\t%s\n' "$((1 + ${#pp}))" "$sc" "$dir" ;; esac
+      fi
+    done | sort -s -t "$tab" -k1,1nr -k2,2nr |
+    while IFS="$tab" read -r _rank _scope dir; do
       dir=$(cd -P -- "$dir" 2>/dev/null && pwd -P) || continue
       [ "${dir%/*}" = "$real" ] && { printf '%s' "${dir##*/}"; break; }
     done)

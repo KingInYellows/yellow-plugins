@@ -70,9 +70,10 @@ function realpathOrNull(p) {
  * <plugin>'s active install in this marketplace, or null when the file, the
  * entry, or a usable installPath is missing. Entry shape (v2):
  * {"plugins": {"<plugin>@<marketplace>": [{installPath, projectPath?, ...}]}}.
- * A project-scoped entry applies only when the cwd is inside its projectPath
- * and beats a user-scoped one (the deepest projectPath wins); an installPath
- * outside <marketplace>/<plugin>/ is ignored.
+ * A project- or local-scoped entry applies only when the cwd is inside its
+ * projectPath (both canonicalized) and beats a user-scoped one: the deepest
+ * projectPath wins, then local beats project (Claude Code's precedence), then
+ * file order. An installPath outside <marketplace>/<plugin>/ is ignored.
  * @param {string} cacheDir <marketplace>/<plugin>
  * @param {string} plugin
  * @returns {string|null}
@@ -91,22 +92,25 @@ function activeVersion(cacheDir, plugin) {
   let entries = data && data.plugins && typeof data.plugins === 'object' ? data.plugins[key] : null;
   if (!entries) return null;
   if (!Array.isArray(entries)) entries = [entries];
-  const cwd = process.cwd();
+  const cwd = realpathOrNull(process.cwd()) || path.resolve(process.cwd());
+  const scopeRank = { local: 2, project: 1 };
   let best = null;
-  let bestRank = -1;
+  let bestRank = [-1, -1];
   for (const e of entries) {
     if (!e || typeof e.installPath !== 'string') continue;
     let rank = 0;
     if (typeof e.projectPath === 'string' && e.projectPath !== '') {
-      const rel = path.relative(e.projectPath, cwd);
+      const pp = realpathOrNull(e.projectPath) || path.resolve(e.projectPath);
+      const rel = path.relative(pp, cwd);
       if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) continue;
-      rank = 1 + e.projectPath.length;
+      rank = 1 + pp.length;
     }
+    const scope = Object.hasOwn(scopeRank, e.scope) ? scopeRank[e.scope] : 0;
     const real = realpathOrNull(e.installPath);
     if (!real || path.dirname(real) !== realCache) continue;
-    if (rank > bestRank) {
+    if (rank > bestRank[0] || (rank === bestRank[0] && scope > bestRank[1])) {
       best = path.basename(real);
-      bestRank = rank;
+      bestRank = [rank, scope];
     }
   }
   return best;

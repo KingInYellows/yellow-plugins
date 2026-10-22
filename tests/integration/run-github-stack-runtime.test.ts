@@ -7,7 +7,7 @@
  */
 
 import { execFileSync, spawnSync } from 'child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -148,6 +148,32 @@ describe('run-github-stack-runtime.js', () => {
     ]);
     expect(tagOf(run(shim, ['view'], { env, cwd: join(project, 'sub') }))).toBe('v1.8.0');
     expect(tagOf(run(shim, ['view'], { env, cwd: other }))).toBe('v1.9.0');
+  });
+
+  it('ranks a local-scoped install above a project-scoped one for the same projectPath', () => {
+    const { market, shim } = cacheWithTwoVersions('ghsr-local-');
+    plant(join(market, 'github-workflow', '1.8.0'), 'v1.8.0');
+    const project = join(tmp, 'project');
+    mkdirSync(project, { recursive: true });
+    const env = installed(join(tmp, 'config'), 'github-workflow@yellow-plugins', [
+      { scope: 'project', projectPath: project, installPath: join(market, 'github-workflow', '1.9.0') },
+      { scope: 'local', projectPath: project, installPath: join(market, 'github-workflow', '1.8.0') },
+    ]);
+    expect(tagOf(run(shim, ['view'], { env, cwd: project }))).toBe('v1.8.0');
+  });
+
+  it('matches a projectPath recorded through a symlink', () => {
+    const { market, shim } = cacheWithTwoVersions('ghsr-symlink-');
+    plant(join(market, 'github-workflow', '1.8.0'), 'v1.8.0');
+    const project = join(tmp, 'project');
+    const link = join(tmp, 'link');
+    mkdirSync(join(project, 'sub'), { recursive: true });
+    symlinkSync(project, link);
+    const env = installed(join(tmp, 'config'), 'github-workflow@yellow-plugins', [
+      { scope: 'user', installPath: join(market, 'github-workflow', '1.9.0') },
+      { scope: 'project', projectPath: link, installPath: join(market, 'github-workflow', '1.8.0') },
+    ]);
+    expect(tagOf(run(shim, ['view'], { env, cwd: join(project, 'sub') }))).toBe('v1.8.0');
   });
 
   it('falls back to the highest version when the active entry is unusable', () => {
