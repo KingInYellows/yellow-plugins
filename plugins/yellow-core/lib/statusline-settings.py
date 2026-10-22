@@ -178,8 +178,8 @@ def load_settings(path, recover_invalid=False, result=None, dry_run=False):
     if not os.path.exists(path):
         return {}, None, False
     try:
-        with open(path, "r", encoding="utf-8") as handle:
-            raw = handle.read()
+        with open(path, "r", encoding="utf-8", newline="") as handle:
+            raw = handle.read()  # newline="": a backup written from raw keeps CRLF bytes
     except (OSError, UnicodeDecodeError) as exc:
         raise SetupError("settings_unreadable", "cannot read %s: %s" % (path, exc))
     try:
@@ -358,35 +358,65 @@ def aliases(candidate, path):
 
 
 def numbered_backup(path, suffix, raw):
-    """Copy path aside; reuse an identical backup, never clobber a different one.
+    """Write raw aside; reuse an identical backup, never clobber a different one.
 
     Every existing backup is checked for identical content, so a gap left by
     pruning never hides a match. A new numbered backup takes the next number
     after the highest, so the suffix orders backups by creation. Keeps the
     first backup (the original) and the newest MAX_BACKUPS - 1.
+
+    A symlink at a backup name is never reused or written through: a dangling
+    link still counts as taken (lexists), and the new file is created with
+    O_EXCL|O_NOFOLLOW at 0600, so a copy of a 0600 settings.json is never
+    readable by others, even for a moment.
     """
     original = path + suffix
     numbered = numbered_backups(path, suffix)
-    for candidate in ([original] if os.path.exists(original) else []) + numbered:
-        if aliases(candidate, path):
-            continue  # a symlinked settings.json may point at its own backup name
+    for candidate in ([original] if os.path.lexists(original) else []) + numbered:
+        if os.path.islink(candidate) or aliases(candidate, path):
+            continue  # a link is not a backup, even one whose target matches
         try:
-            with open(candidate, "r", encoding="utf-8") as handle:
-                if handle.read() == raw:
+            # O_NOFOLLOW: a link swapped in after the islink check fails here
+            fd = os.open(candidate, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            with os.fdopen(fd, "r", encoding="utf-8", newline="") as handle:
+                if stat.S_ISREG(os.fstat(fd).st_mode) and handle.read() == raw:
                     return candidate
         except (OSError, UnicodeDecodeError):
             pass
-    if not os.path.exists(original):
-        candidate = original
-    else:
-        last = int(numbered[-1][len(original) + 1:]) if numbered else 1
-        candidate = "%s%s.%d" % (path, suffix, last + 1)
-        while aliases(candidate, path):
-            last += 1
-            candidate = "%s%s.%d" % (path, suffix, last + 1)
-    shutil.copy2(path, candidate)
+    last = int(numbered[-1][len(original) + 1:]) if numbered else 1
+    candidate = original
+    while os.path.lexists(candidate) or aliases(candidate, path) \
+            or not create_backup(candidate, raw, path):
+        last += 1
+        candidate = "%s%s.%d" % (path, suffix, last)
     prune_backups(path, suffix, keep=candidate)
     return candidate
+
+
+def create_backup(candidate, raw, source):
+    """Create candidate holding raw, then give it source's mode; False if the name is taken.
+
+    O_EXCL fails on any existing entry, a dangling symlink included, and
+    O_NOFOLLOW is a second guard where the platform has it.
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(candidate, flags, 0o600)
+    except FileExistsError:
+        return False
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+            handle.write(raw)
+            handle.flush()
+            if hasattr(os, "fchmod"):
+                os.fchmod(handle.fileno(), stat.S_IMODE(os.stat(source).st_mode))
+    except BaseException:
+        try:
+            os.unlink(candidate)
+        except OSError:
+            pass
+        raise
+    return True
 
 
 def prune_backups(path, suffix, keep):
