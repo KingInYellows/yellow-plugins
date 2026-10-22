@@ -1423,7 +1423,7 @@ rl_build_candidate() {
     --arg text "$text" --argjson withheld "$withheld" --arg src "$src" --arg title "$title" \
     --arg fix "$fix" --arg bcc "$bcc" --arg mig "$mig" --argjson ro "$report_only" \
     --argjson defaulted "$defaulted" --argjson unmapped "$((1 - mapped))" --argjson ord "${RL_ORDINAL:-0}" \
-    --arg rev_red "$rev_red" '
+    --arg rev_red "$rev_red" --arg sstart "${sstart:-}" --arg send "${send:-}" '
     def nn: if . == "" then null else . end;
     {fingerprint: $fp,
      reviewers: ((if ($f.reviewers | type) == "array" then $f.reviewers
@@ -1443,13 +1443,14 @@ rl_build_candidate() {
      requires_verification: $f.requires_verification, pre_existing: $f.pre_existing,
      title: $title, suggested_fix: ($fix | nn), breaking_change_class: ($bcc | nn),
      migration_path: ($mig | nn), report_only: $ro, _defaulted: $defaulted, _unmapped: $unmapped,
-     _ordinals: [$ord]}'
+     _ordinals: [$ord], _span: (if $sstart == "" then null else [($sstart | tonumber), ($send | tonumber)] end)}'
 }
 
 # Candidate rows for the matching passes, \x1f-separated like the index:
 #   1 fingerprint  2 category  3 rule  4 scope key  5 anchor_hash  6 deletion
 #   7 file  8 line  9 occ  10 anchor text (normalized, or empty)
 #   11 report_only  12 input ordinals (space-joined)
+#   13 verified scope span start  14 span end (0 = EOF; both empty when unscoped)
 RL_CAND_ROW_JQ='
   def f: (. // "") | tostring | gsub("[\u0000-\u001f]"; " ");
   def norm: gsub("\r"; "") | gsub("\t"; " ") | gsub(" +"; " ") | sub("^ "; "") | sub(" $"; "");
@@ -1457,18 +1458,36 @@ RL_CAND_ROW_JQ='
     (.file | f), (.line | tostring), (.occ | f),
     (if .anchor_lines == null then "" else (.anchor_lines | join(" ") | norm)
        | (if test("[\u0000-\u001f\u007f]") then "" else . end) end),
-    (.report_only | tostring), (._ordinals | map(tostring) | join(" ")) ] | join("\u001f")'
+    (.report_only | tostring), (._ordinals | map(tostring) | join(" ")),
+    (._span[0]? // "" | tostring), (._span[1]? // "" | tostring) ] | join("\u001f")'
 
 # --- observe: matching and append (under the lock) --------------------------
 
+# Current content of a candidate's anchor file for scope checks: the HEAD
+# blob, or a copy of the worktree file under --anchor-source worktree.
+rl_candidate_content() {
+  local vres oid root f
+  if [ "$RL_O_ASRC" = worktree ]; then
+    root=$(rl_repo_root) || return 1
+    rl_worktree_entry_ok "$root" "$1" || return 1
+    f=$(mktemp "$(rl_tmp)/wt.XXXXXX") || return 1
+    cp -- "$root/$1" "$f" || return 1
+    printf '%s' "$f"
+    return 0
+  fi
+  vres=$(rl_validate_path anchor "$RL_O_HEAD" "$1") || return 1
+  read -r _ oid _ <<<"$vres"
+  rl_blob_file "$oid"
+}
+
 # Globals set by cmd_observe: RL_O_DIR RL_O_PR RL_O_HEAD RL_O_BASE RL_O_RUN
-# RL_O_STEP RL_O_SOURCE RL_O_CANDS (JSONL, one grouped candidate per line)
+# RL_O_STEP RL_O_SOURCE RL_O_ASRC RL_O_CANDS (JSONL, one grouped candidate per line)
 # RL_O_REJECTED (JSON array) RL_O_DEFAULTED RL_O_UNMAPPED.
 rl_observe_locked() {
   local f fold n i c r eid res ln np dist claimed=' ' pairs='' at id state row status results='' o
   local cfp cdel cfile cline cocc ctext cro cords
   local rid _rstate rfile rline rhead rbase ranchor
-  local -a cands crows match via unavail
+  local -a cands crows match via unavail inherit
   rl_writer_gate "$RL_O_DIR" "$RL_O_PR" || return $?
   f="$RL_O_DIR/$RL_O_PR.jsonl"
   rl_repair_tail "$f" || return 1
@@ -1571,14 +1590,67 @@ rl_observe_locked() {
     claimed="$claimed$eid "
   done < <(printf '%s' "$pairs_c" | sort -n -k1,1)
 
+  # Pass D: a scope seen on one side only. Some personas never claim a
+  # scope and some claims fail to verify, so one issue can arrive with and
+  # without a verified scope. Same file, category, rule and anchor hash,
+  # and then: an unscoped candidate joins a verified finding whose scope
+  # still holds at the candidate's line; a verified candidate absorbs an
+  # unscoped finding whose line maps unchanged into its scope span. Only a
+  # sole qualifier merges, so identical code in two scopes, or twice in one
+  # scope (an occurrence key on either side), stays separate.
+  local cskey cocc css cend rskey rss rocc rdisp eid rest
+  local -a quals qbad ccontent
+  while IFS= read -r r; do
+    i=${r%%$'\x1f'*}
+    r=${r#*$'\x1f'}
+    [ -n "${match[$i]:-}" ] && continue
+    IFS=$'\x1f' read -r _ _ _ cskey _ _ cfile cline cocc _ _ _ css cend <<<"${crows[$i]}"
+    IFS=$'\x1f' read -r rid _rstate rfile rline rhead _rbase _ _ _ rskey rss rocc _ _ _ _ _ _ rdisp <<<"$r"
+    if [ "$cskey" = unscoped ] && [ "$rss" = verified ]; then
+      if [ -z "${ccontent[$i]:-}" ]; then
+        ccontent[$i]=$(rl_candidate_content "$cfile") || ccontent[$i]=-
+      fi
+      [ "${ccontent[$i]}" != - ] || continue
+      rl_scope_still "${ccontent[$i]}" "$cfile" "$cline" "$rskey" "$rdisp" || continue
+      [ -z "$rocc" ] || qbad[$i]=1
+    elif [ "$cskey" != unscoped ] && [ "$rss" = unscoped ] && [ -n "$css" ]; then
+      [ -z "$cocc" ] || continue
+      IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"
+      case "$res" in exact | shifted) ;; *) continue ;; esac
+      [ "$np" = "$cfile" ] && [ "$ln" -ge "$css" ] || continue
+      [ "$cend" -eq 0 ] || [ "$ln" -le "$cend" ] || continue
+    else
+      continue
+    fi
+    quals[$i]="${quals[$i]:-} $rid"
+  done < <(awk -F '\037' '
+    NR == FNR { if ($6 != "true") { k = $7 FS $2 FS $3 FS $5; c[k] = c[k] " " (FNR - 1) } next }
+    $13 != "true" { k = $3 FS $8 FS $9 FS $7; if (k in c) { n = split(c[k], a, " "); for (j = 1; j <= n; j++) print a[j] "\037" $0 } }' \
+    "$(rl_tmp)/crows" "$(rl_tmp)/index")
+  for i in "${!quals[@]}"; do
+    [ -z "${match[$i]:-}" ] && [ -z "${qbad[$i]:-}" ] || continue
+    read -r eid rest <<<"${quals[$i]}"
+    [ -n "$eid" ] && [ -z "$rest" ] || continue
+    [[ "$claimed" == *" $eid "* ]] && continue
+    match[$i]=$eid via[$i]=scope
+    claimed="$claimed$eid "
+    # an unscoped observation keeps the finding's verified scope, which
+    # was just re-checked at its line
+    if [ -n "${ccontent[$i]:-}" ]; then
+      inherit[$i]=$(jq -c --arg id "$eid" '.findings[] | select(.finding_id == $id)
+        | .obs | {scope, scope_key, scope_status, occ}' "$(rl_tmp)/fold.json") || inherit[$i]=''
+    fi
+  done
+
   # Actions.
   local new=0 merged=0 reopened=0 suppressed=0 app
   at=$(rl_now)
   RL_AT=$at
   for ((i = 0; i < n; i++)); do
     c="${cands[$i]}"
-    IFS=$'\x1f' read -r cfp _ _ _ _ _ _ _ _ _ cro cords <<<"${crows[$i]}"
+    IFS=$'\x1f' read -r cfp _ _ _ _ _ _ _ _ _ cro cords _ <<<"${crows[$i]}"
     id="${match[$i]:-}"
+    [ -n "${inherit[$i]:-}" ] && c=$(jq -c --argjson s "${inherit[$i]}" '. + $s' <<<"$c")
     if [ -z "$id" ]; then
       id=$cfp
       if rl_index_row "$id" >/dev/null; then
@@ -1642,7 +1714,7 @@ rl_observe_locked() {
 rl_observation_record() {
   jq -c --arg id "$2" --argjson pr "$RL_O_PR" --arg H "$RL_O_HEAD" --arg B "$RL_O_BASE" --arg at "$3" \
     --arg run "$RL_O_RUN" --arg src "$RL_O_SOURCE" --arg step "$RL_O_STEP" --arg state "${4:-}" '
-    ({v: 1, type: "observation", finding_id: $id} + del(.report_only, ._ordinals, ._defaulted, ._unmapped)
+    ({v: 1, type: "observation", finding_id: $id} + del(.report_only, ._ordinals, ._defaulted, ._unmapped, ._span)
      + {pr: $pr, head_sha: $H, base_sha: (if $B == "" then null else $B end), at: $at, run_id: $run, source: $src, step: $step}),
     (if $state == "" then empty else
       {v: 1, type: "transition", finding_id: $id, state: $state, reason: null, head_sha: $H, at: $at,
@@ -1758,7 +1830,7 @@ cmd_observe() {
     "$(rl_tmp)/cands.jsonl" >|"$(rl_tmp)/grouped.jsonl" || rl_die 1 "observe: grouping failed"
   read -r RL_O_DEFAULTED RL_O_UNMAPPED < <(jq -rs '"\(map(._defaulted) | add // 0) \(map(._unmapped) | add // 0)"' "$(rl_tmp)/cands.jsonl")
   RL_O_DIR=$(rl_ensure_dir) || rl_die 1 "cannot create ledger directory"
-  RL_O_PR=$pr RL_O_HEAD=$head RL_O_BASE=$base RL_O_RUN=$run RL_O_STEP=$step RL_O_SOURCE=$source
+  RL_O_PR=$pr RL_O_HEAD=$head RL_O_BASE=$base RL_O_RUN=$run RL_O_STEP=$step RL_O_SOURCE=$source RL_O_ASRC=$src
   RL_O_CANDS="$(rl_tmp)/grouped.jsonl"
   rl_locked "$pr" rl_observe_locked
 }

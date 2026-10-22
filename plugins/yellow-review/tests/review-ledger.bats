@@ -225,6 +225,81 @@ setup() {
   [ "$(printf '%s' "$out" | jq '.merged')" -eq 2 ]
 }
 
+# CLAUDE-88: a scopeless re-observation of a scope-verified finding.
+@test "CLAUDE-88: a scopeless re-observation merges into its own scoped finding" {
+  source "$RL"
+  require_universal_ctags
+  printf 'admin_create() {\n  eval "$cmd"\n}\nhandlers_create() {\n  eval "$cmd"\n}\n' >|h.sh
+  H=$(commit_all handlers)
+  observe "$H" "[$(finding h.sh 2 '{"scope":"admin_create"}'), $(finding h.sh 5 '{"scope":"handlers_create"}')]" >/dev/null
+  [ "$(fold | jq -r '[.findings[].obs.scope_status] | unique | join(",")')" = verified ]
+  read -r a h < <(ids | paste -sd ' ' -)
+  out=$(observe "$H" "[$(finding h.sh 2), $(finding h.sh 5)]")
+  [ "$(printf '%s' "$out" | jq '.merged')" -eq 2 ]
+  [ "$(printf '%s' "$out" | jq -r '[.findings[].finding_id] | join(" ")')" = "$a $h" ]
+  [ "$(fold | jq '.findings | length')" -eq 2 ]
+  # the merged observation keeps the verified scope
+  [ "$(fold | jq -r '[.findings[] | "\(.obs.scope_status):\(.obs.scope)"] | sort | join(",")')" = "verified:admin_create,verified:handlers_create" ]
+  # and the scoped claim still matches afterwards
+  out=$(observe "$H" "[$(finding h.sh 2 '{"scope":"admin_create"}')]")
+  [ "$(printf '%s' "$out" | jq '.merged')" -eq 1 ]
+}
+
+@test "CLAUDE-88: a scoped re-observation absorbs its unscoped finding" {
+  source "$RL"
+  require_universal_ctags
+  printf 'admin_create() {\n  eval "$cmd"\n}\nhandlers_create() {\n  eval "$cmd"\n}\n' >|h.sh
+  H=$(commit_all handlers)
+  observe "$H" "[$(finding h.sh 2), $(finding h.sh 5)]" >/dev/null
+  read -r a h < <(ids | paste -sd ' ' -)
+  out=$(observe "$H" "[$(finding h.sh 5 '{"scope":"handlers_create"}')]")
+  [ "$(printf '%s' "$out" | jq '.merged')" -eq 1 ]
+  [ "$(printf '%s' "$out" | jq -r '.findings[0].finding_id')" = "$h" ]
+  [ "$(fold | jq '.findings | length')" -eq 2 ]
+  [ "$(fold | jq -r --arg id "$h" '.findings[] | select(.finding_id == $id) | .obs.scope')" = handlers_create ]
+}
+
+@test "CLAUDE-88: a scopeless line in two candidate spans, or in none, stays separate" {
+  source "$RL"
+  require_universal_ctags
+  printf 'class Admin:\n    def create_user(self):\n        run(x)\n\n\n\n\nrun(x)\n' >|n.py
+  H=$(commit_all nested)
+  # two findings on one line: one scoped to the class, one to the method
+  observe "$H" "[$(finding n.py 3 '{"scope":"Admin"}'), $(finding n.py 3 '{"scope":"Admin.create_user","rule":"logic-error"}')]" >/dev/null
+  [ "$(fold | jq '.findings | length')" -eq 2 ]
+  [ "$(fold | jq -r '[.findings[].obs.scope] | sort | join(",")')" = "Admin,Admin.create_user" ]
+  out=$(observe "$H" "[$(finding n.py 3)]")
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
+  [ "$(fold | jq '.findings | length')" -eq 3 ]
+  # an identical line outside every recorded scope (and beyond the line
+  # window that matches unscoped findings to each other)
+  out=$(observe "$H" "[$(finding n.py 8)]")
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
+  [ "$(fold | jq '.findings | length')" -eq 4 ]
+}
+
+@test "CLAUDE-88: an occurrence-keyed scoped finding does not absorb a scopeless line" {
+  source "$RL"
+  require_universal_ctags
+  printf 'admin_create() {\n  eval "$cmd"\n  eval "$cmd"\n}\n' >|o.sh
+  H=$(commit_all twice)
+  observe "$H" "[$(finding o.sh 2 '{"scope":"admin_create"}')]" >/dev/null
+  [ "$(fold | jq -r '.findings[0].obs.occ')" = 1/2 ]
+  out=$(observe "$H" "[$(finding o.sh 3)]")
+  [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
+}
+
+@test "CLAUDE-88: a scopeless markdown re-observation merges under its heading" {
+  printf '# Doc\n## A\nflag one\n## B\nflag one\n' >|m.md
+  H=$(commit_all md)
+  observe "$H" "[$(finding m.md 3 '{"scope":"A","category":"docs","rule":"wrong-doc"}'), $(finding m.md 5 '{"scope":"B","category":"docs","rule":"wrong-doc"}')]" >/dev/null
+  read -r a b < <(ids | paste -sd ' ' -)
+  out=$(observe "$H" "[$(finding m.md 5 '{"category":"docs","rule":"wrong-doc"}')]")
+  [ "$(printf '%s' "$out" | jq '.merged')" -eq 1 ]
+  [ "$(printf '%s' "$out" | jq -r '.findings[0].finding_id')" = "$b" ]
+  [ "$(fold | jq -r --arg id "$b" '.findings[] | select(.finding_id == $id) | .obs.scope')" = "Doc > B" ]
+}
+
 @test "fingerprint: a line that moves without a code change rematches" {
   observe "$BASE" "[$(finding a.sh 4)]" >/dev/null
   id=$(ids)
@@ -695,9 +770,12 @@ pr_with_finding() {
   # swapped claims: each resolves to its true heading or falls back to unscoped
   observe "$H" "[$(finding s.md 5 '{"scope":"Admin","category":"docs","rule":"wrong-doc"}'), $(finding s.md 9 '{"scope":"Handlers","category":"docs","rule":"wrong-doc"}')]" >/dev/null
   [ "$(fold | jq -r '[.findings[].obs.scope] | sort | join("|")')" = "Doc > Admin|Doc > Handlers" ]
-  observe "$H" "[$(finding s.md 5 '{"scope":"Handlers","category":"docs","rule":"wrong-doc"}')]" >/dev/null
-  [ "$(fold | jq '.findings | length')" -eq 3 ]
-  [ "$(fold | jq -r '[.findings[] | select(.obs.scope_status == "unscoped")] | length')" -eq 1 ]
+  # a wrong claim falls back to unscoped, and the unscoped observation then
+  # merges into the finding under its true heading (CLAUDE-88)
+  out=$(observe "$H" "[$(finding s.md 5 '{"scope":"Handlers","category":"docs","rule":"wrong-doc"}')]")
+  [ "$(printf '%s' "$out" | jq '.merged')" -eq 1 ]
+  [ "$(fold | jq '.findings | length')" -eq 2 ]
+  [ "$(fold | jq -r '.findings[] | select(.obs.line == 5) | "\(.obs.scope_claimed)>\(.obs.scope)"')" = "Handlers>Doc > Admin" ]
 }
 
 @test "CLAUDE-49: a heading literally containing '>' does not collide with true nesting" {
