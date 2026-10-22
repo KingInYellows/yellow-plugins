@@ -23,8 +23,8 @@ allowed-tools:
 # Multi-Agent PR Review (Wave 2 persona pipeline)
 
 Run a tiered multi-agent persona review on a single PR, apply P0/P1 fixes,
-and push via Graphite. The pipeline includes a learnings pre-pass against
-`docs/solutions/`, structured compact-return findings per reviewer,
+and push via the active stacked-PR provider. The pipeline includes a learnings
+pre-pass against `docs/solutions/`, structured compact-return findings per reviewer,
 cross-reviewer agreement promotion, and a confidence gate before any
 finding is surfaced.
 
@@ -93,7 +93,14 @@ into command text — not quoted, and not into a validation command either:
 substituting it into any Bash command runs its `$(...)` before a check can
 reject it. Capture it from `gh` into a variable and validate the variable
 against `^[A-Za-z0-9._/-]+$` with no leading `-`, before any other command
-sees it, in the same Bash call as the checkout:
+sees it, in the same Bash call as the checkout.
+
+Resolve the active stacked-PR provider before checking out: invoke the
+`Skill` tool with `skill: "stack-provider-router"` and keep `state` from its
+result; Step 9 reuses it. `READY_GRAPHITE` checks out with `gt` as below.
+Every other state replaces the last line, `gt checkout "$head_ref"`, with
+`gh pr checkout <PR#>` and never runs `gt`, so a GitHub-stacks user needs no
+Graphite CLI and Graphite state is never touched.
 
 ```bash
 head_ref=$(gh pr view <PR#> --json headRefName -q .headRefName) || exit 1
@@ -116,9 +123,9 @@ refused by design. If either check fails, stop. The installed `gt` does not
 accept `--` to end option parsing (`gt checkout -- <branch>` raises
 "Unexpected argument"), so do not add it.
 
-If `gt checkout` fails, try `gh pr checkout <PR#>` then `gt track` — that
-path checks out by numeric PR and never passes the raw ref to a shell
-command.
+If `gt checkout` fails (`READY_GRAPHITE` only), try `gh pr checkout <PR#>`
+then `gt track` — that path checks out by numeric PR and never passes the
+raw ref to a shell command.
 
 ### Step 3a: Fetch base branch (CE PR #544 hardening)
 
@@ -1071,8 +1078,7 @@ If any changes were made:
 3. **If non-interactive mode is ON**: Skip the AskUserQuestion entirely and
    proceed directly to the push commands below — the caller has accepted
    responsibility for the push.
-4. Resolve the active stacked-PR provider first: invoke the `Skill` tool
-   with `skill: "stack-provider-router"` and read `state` from its result.
+4. Use the provider `state` resolved in Step 3.
    `READY_GRAPHITE` continues with the Graphite push commands below;
    `READY_GITHUB` skips them and uses the GitHub push commands instead; any
    other state stops here and reports the router's `detail` verbatim

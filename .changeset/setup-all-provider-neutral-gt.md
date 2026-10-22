@@ -13,3 +13,7 @@ flags gt below 1.6.7, where the bundled Graphite MCP server is unavailable.
 A third-party `stack`-named gh extension is reported as
 `gh_stack_ext: WRONG_OWNER` instead of `MISSING`, matching
 `lib/stack-tooling-probe.js`, with removal and reinstall steps.
+
+`/review:pr` now resolves the stacked-PR provider before checkout and uses
+`gh pr checkout` outside Graphite, so it never runs `gt` for a GitHub-stacks
+user.
