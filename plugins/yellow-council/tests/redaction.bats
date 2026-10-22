@@ -1051,6 +1051,17 @@ assert_finishes_under_all() {
   assert_survives_under_all "$input" "Verdict: REJECT"
 }
 
+@test "a key column beside a wider base64 peer keeps its own width" {
+  # Learning one width per row kept the 21-char peer cell, so the digit-free
+  # 12-char slices below it failed the width chain and released the window.
+  # Every passing cell width on a body row now feeds the chain.
+  local strict="Ab1dEfGhIjKl" free="AbCdEfGhIjKl" peer="Xy9zAbCdEfGhIjKlMnOpQ" input
+  input="$(printf '| n | value | note |\n|---|---|---|\n| a | %s | |\n| b | %s | %s |\n| c | %s | |\n| d | %s | |\n| e | %s | |\n| f | %s | |\n| | %s | |\n\nVerdict: REJECT' \
+    "$BEGIN_PK" "$strict" "$peer" "$free" "$free" "$free" "$free" "$END_PK")"
+  assert_redacted_under_all "$input" "$free"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+}
+
 @test "a key wrapped as an escaped newline-joined string is fully redacted" {
   # A JSON or YAML string with literal \n escapes, wrapped across lines by
   # the reviewer: every body line carries backslash escapes that are not

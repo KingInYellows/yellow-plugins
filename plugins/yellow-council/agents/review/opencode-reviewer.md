@@ -511,10 +511,13 @@ function is_base64_line(s, minlen) {
 # block still learns its body width. Choosing by proxy alone let a longer hex
 # checksum, or a shorter digit-bearing label beside a digit-free slice, stand
 # in for the slice and release the window. A slice never contains "|", so a
-# body line is never split.
+# body line is never split. kt_widths lists the width of every passing cell
+# so the caller can learn them all (see note_widths): returning only the
+# longest dropped the width of a narrower key column beside a wider peer.
 function key_text(s,   n, i, c, best, rank, r, hit, cell) {
   s = strip_deco(s)
   gsub(/\\[nr]/, "", s)
+  kt_widths = ""
   if (index(s, "|") > 0) {
     n = split(s, cell, "|")
     best = ""
@@ -524,7 +527,10 @@ function key_text(s,   n, i, c, best, rank, r, hit, cell) {
       c = unwrap_cell(cell[i])
       if (c ~ /^-----END [A-Z ]*PRIVATE KEY-----$/) return c
       if (c !~ /^[A-Za-z0-9+\/=]+$/) continue
-      if (is_key_body(c) && length(c) > length(hit)) hit = c
+      if (is_key_body(c)) {
+        kt_widths = kt_widths "," length(c)
+        if (length(c) > length(hit)) hit = c
+      }
       r = (c ~ /[G-Zg-z+\/=]/) + (c ~ /[G-Zg-z+\/=]/ && c ~ /[0-9+\/=]/)
       if (r > rank || (r == rank && length(c) > length(best))) { best = c; rank = r }
     }
@@ -573,7 +579,19 @@ function is_narrow_key_run(s) {
   # the window), while a run of equal-length words after a quoted marker or
   # a genuine END no longer extends the window toward the verdict.
   return pem_key_len > 0 && is_base64_line(s, 12) &&
-    length(s) == pem_key_len && s !~ /^[A-Z]?[a-z]+$/
+    (length(s) == pem_key_len || index(pem_widths, "," length(s) ",") > 0) &&
+    s !~ /^[A-Z]?[a-z]+$/
+}
+# Learn the widths of every key-shaped table cell on a body line, kept as
+# ",12,21," in pem_widths and cleared with pem_key_len at each BEGIN. A
+# table row can hold a key column beside a wider base64 peer; one width
+# per line kept the peer and dropped the key column, so its digit-free
+# slices failed the chain and released the window.
+function note_widths(list,   n, i, w) {
+  if (pem_widths == "") pem_widths = ","
+  n = split(list, w, ",")
+  for (i = 1; i <= n; i++)
+    if (w[i] != "" && index(pem_widths, "," w[i] ",") == 0) pem_widths = pem_widths w[i] ","
 }
 # The body test of the bounded window: a wide base64 slice with a non-hex
 # character, or a narrow one by the rules above. key_text applies it to each
@@ -658,6 +676,7 @@ function is_key_body(s) {
       pem_stray = 0
       pem_span = 0
       pem_key_len = 0
+      pem_widths = ","
       pem_chain = 0
       # Retire any re-arm window left over from an EARLIER block. pem_watch is
       # only decremented while !in_pem, so a countdown still running when this
@@ -772,7 +791,9 @@ function is_key_body(s) {
       # the re-arm window, whose continuation test needs the width to
       # recognise a narrow, digit-free resumed line.
       pem_body = key_text($0)
-      if (is_base64_line(pem_body, 12)) { pem_key_len = length(pem_body); pem_chain = 1 }
+      if (is_base64_line(pem_body, 12)) {
+        pem_key_len = length(pem_body); note_widths(kt_widths); pem_chain = 1
+      }
     } else {
       # Stray prose mention: bounded window so an ordinary report does not
       # get swallowed by a BEGIN marker quoted in passing. PEM armor is
@@ -808,6 +829,7 @@ function is_key_body(s) {
             # DEK-Info header, or a repeated BEGIN, resets the stray counter
             # but must not feed its own length into the chain.
             pem_key_len = length(pem_body)
+            note_widths(kt_widths)
             pem_chain = 1
           } else if (pem_body ~ /^(Proc-Type|DEK-Info):/) {
             pem_stray = 0
@@ -821,7 +843,7 @@ function is_key_body(s) {
             # only if it passes; an embedded mention keeps the stray reset.
             pem_check = strip_deco($0)
             if (pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
-              pem_real = 1; pem_span = 0; pem_key_len = 0; pem_chain = 0
+              pem_real = 1; pem_span = 0; pem_key_len = 0; pem_widths = ","; pem_chain = 0
             }
             pem_stray = 0
           } else if (++pem_stray >= 3) { in_pem = 0; pem_release = 1 }
