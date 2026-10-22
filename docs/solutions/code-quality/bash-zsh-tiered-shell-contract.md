@@ -114,9 +114,15 @@ replaces the two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`.
   form, and keep `-type l` in any `find` that replaces a glob. SHC-010 flags
   every alias-prone word in command position, including a display-only call:
   `ls=eza` changes that output too, and `command ls` is the same fix. A leading
-  run of environment assignments is stripped first (`LC_ALL=C ls`). A wrapper
-  prefix (`timeout`, `sudo`) is still not command position. The fixes were
-  verified only by the local suites.
+  run of environment assignments and redirects is stripped first
+  (`LC_ALL=C ls`, `FOO=$(…) ls`, `2>/dev/null ls`). `\ls` and `'ls'` are
+  flagged because they skip only the alias, not a snapshotted function.
+  Wrappers that exec the binary (`timeout`, `env`) are not command position;
+  `sudo ls` is, because `alias sudo='sudo '` alias-expands the next word
+  (`sudo -- ls` is the fix). Case arms are tracked from `case … in` to `esac`
+  rather than guessed from `)` and `|`, arithmetic spans are found by counting
+  parens, and substitutions in unquoted heredoc bodies are linted. The fixes
+  were verified only by the local suites.
 - **Expanded text counts.** `${reviewer^}` inside a multi-line double-quoted
   string, or in an unquoted-tag heredoc, is a zsh `bad substitution` even
   though it is not a command.
