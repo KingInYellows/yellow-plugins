@@ -423,7 +423,9 @@ interactive run asks before filing an issue. The controls
   command line.
 - **Deduplication.** Each post carries a hidden marker keyed to the thread ID. A
   reply is skipped when the viewer's newest marked comment among the last 10
-  carries the marker and only Bot authors have commented since. An issue is
+  carries the marker and only Bot authors have commented since. The exception
+  is an upgrade: a prior `disagree` or `unclear` reply is followed by `fixed`,
+  `addressed`, or `oos`, and a prior `oos` by `fixed` or `addressed`. An issue is
   skipped when a viewer-authored issue already carries the marker; that scan
   reads every page of the viewer's issues. Markers by other authors are ignored.
 - **Scope.** The scripts file GitHub issues only in the PR's repository and

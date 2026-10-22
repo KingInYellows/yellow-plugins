@@ -46,7 +46,9 @@ before relying on it:
   mode. Run mode refuses it (exit 2). `--revert-only` and `--revert-dirty` hold
   it aside until `save_patch` records the deletion, then remove it without
   opening it and restore the file. `--revert-denied` leaves it in place and
-  reports `deniedClean: false`. `run-verify-command.bats` is the spec.
+  reports `deniedClean: false`. `run-verify-command.bats` is the spec. (Later
+  update: the special-file handling described here landed in c49559a on
+  2026-10-10, after this snapshot.)
 - `--revert-dirty` still reverts every dirty path and takes no path list. The
   deny-list mode is a separate flag, `--revert-denied`.
 - Sweep-all Step 6 was already removed. Do not put it back.

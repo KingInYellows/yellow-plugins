@@ -430,8 +430,9 @@ Located at `skills/pr-review-workflow/scripts/`:
   and `lookupReason` when a lookup failed
 - **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with
   an idempotency marker; skips when our latest recent comment carries a marker for
-  this thread, whatever its disposition, and only bot comments follow it, and
-  reports that disposition
+  this thread and only bot comments follow it, and reports that disposition.
+  An upgrade still posts: `disagree`/`unclear` to `fixed`/`addressed`/`oos`, and
+  `oos` to `fixed`/`addressed`
 - **resolve-pr-thread** `<thread-node-id>` — Resolves a single thread
   (idempotent). Exit codes: 1 other failure, 2 usage, 3 not found or
   permission, 4 rate limited or `gh` timed out (`YELLOW_REVIEW_GH_TIMEOUT`,

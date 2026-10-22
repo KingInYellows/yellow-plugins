@@ -558,7 +558,8 @@ None new at runtime. CI gains `universal-ctags` (apt) in the new job.
 - A FIFO in the revert list hangs a test: never open it; use `[ -p ]` and `timeout`.
 - Two worktrees mid-rebase when `--abort` runs (PR 6): abort both, re-check, then clear.
 - The new CI job times out: that is a cancelled job and turns `ci-status` red;
-  keep both caps at 15 and cut them only after two measured runs.
+  keep the 15/30 split (`plugin-shell-tests` 15 minutes, `yellow-review-shell-tests`
+  30) and cut either cap only after two measured runs.
 - A Linear issue has an active owner at reconcile time: skip it and tell the user.
 
 <!-- deepen-plan: codebase -->
