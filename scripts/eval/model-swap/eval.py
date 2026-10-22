@@ -106,9 +106,18 @@ No <standards-paths> or <rule-vocabulary> block is supplied (standalone usage); 
 SCAN_PROMPT = """Run your scan for a /debt:audit. Read .debt/file-list.txt for the files to scan (scan only those files) and write your findings to .debt/scanner-output/{name}.json per the v2.0 schema. When done, reply with a one-line summary."""
 
 
+def check_ids(spec):
+    """Ids become path components under <work>; keep them to one plain name."""
+    ids = [*spec["agents"], *(r["id"] for r in spec["replays"]), *(s["id"] for s in spec["scans"])]
+    bad = [i for i in ids if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", i) or ".." in i]
+    if bad:
+        sys.exit("prepare: ids must match [A-Za-z0-9][A-Za-z0-9_.-]*: %s" % ", ".join(bad))
+
+
 def prepare(spec_path, work):
     with open(spec_path, encoding="utf-8") as handle:
         spec = json.load(handle)
+    check_ids(spec)
     for sub in ("wt", "prompts", "out"):
         os.makedirs(os.path.join(work, sub), exist_ok=True)
     rows = []
@@ -281,7 +290,11 @@ def grade(work):
                 worktree(wt, scans[target]["commit"])
                 goldens[gkey] = lizard_golden(wt, scans[target]["files"], limits)
             scan_file = os.path.join(out, rid + ".scan.json")
-            found, unmatched = scan_hits(goldens[gkey], scan_file) if os.path.exists(scan_file) else (set(), [])
+            try:
+                found, unmatched = scan_hits(goldens[gkey], scan_file) if os.path.exists(scan_file) else (set(), [])
+            except (ValueError, AttributeError, TypeError):
+                missing.append(rid + " (unreadable scan output)")
+                continue
             recall[key][0] += len(found)
             recall[key][1] += len(goldens[gkey])
         other.extend((rid, " ".join(f.split())[:300]) for f in unmatched)

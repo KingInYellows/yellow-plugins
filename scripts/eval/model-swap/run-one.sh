@@ -48,10 +48,15 @@ start=$(date +%s)
 rc=$?
 wall=$(($(date +%s) - start))
 scan=$(find "$workdir/.debt/scanner-output" -maxdepth 1 -name '*.json' -print -quit 2>/dev/null)
-[ -n "$scan" ] && cp "$scan" "$out_dir/$id.scan.json"
+scan_ok=1
+if [ -n "$scan" ]; then
+  # A truncated or non-object scanner file fails the run so it reruns.
+  jq -e 'type == "object"' "$scan" >/dev/null 2>&1 && cp "$scan" "$out_dir/$id.scan.json" || scan_ok=0
+fi
 # -s: jq exits 0 with no output on an empty file (a timeout or a crash).
 # is_error: a rate limit or max-turns still prints JSON; fail it so it reruns.
-if [ -s "$out.tmp" ] && jq -e '(.is_error // false) | not' "$out.tmp" >/dev/null 2>&1 &&
+if [ "$rc" -eq 0 ] && [ "$scan_ok" -eq 1 ] && [ -s "$out.tmp" ] &&
+  jq -e '(.is_error // false) | not' "$out.tmp" >/dev/null 2>&1 &&
   jq -e --arg rc "$rc" --argjson wall "$wall" \
     --arg fp "$fp" '. + {eval_rc: ($rc | tonumber), eval_wall_s: $wall, eval_fingerprint: $fp}' \
     "$out.tmp" >"$out" 2>/dev/null; then
