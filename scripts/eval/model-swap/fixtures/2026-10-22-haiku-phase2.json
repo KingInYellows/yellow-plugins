@@ -1,0 +1,144 @@
+{
+  "$comment": "CLAUDE-163 Phase 2 eval, run 2026-10-22. Replays plant one comment-rot defect (comment-analyzer's lane) and one written-standards violation (project-standards-reviewer's lane) into each merged PR. Each `match` entry is a list of regexes that must all hit one finding (case-insensitive); `file` must appear in it. Scans grade against lizard's CCN > 10 or length > 50 set.",
+  "configs": {
+    "reviewer": [
+      { "model": "sonnet", "effort": "medium", "reps": 2 },
+      { "model": "haiku", "effort": "medium", "reps": 2 },
+      { "model": "haiku", "effort": "low", "reps": 1 }
+    ],
+    "scanner": [
+      { "model": "sonnet", "effort": "low", "reps": 2 },
+      { "model": "haiku", "effort": "low", "reps": 2 }
+    ]
+  },
+  "agents": {
+    "ca": {
+      "file": "plugins/yellow-review/agents/review/comment-analyzer.md",
+      "kind": "replay",
+      "configs": "reviewer",
+      "lane": "comment"
+    },
+    "ps": {
+      "file": "plugins/yellow-review/agents/review/project-standards-reviewer.md",
+      "kind": "replay",
+      "configs": "reviewer",
+      "lane": "standards",
+      "output": "json"
+    },
+    "cx": {
+      "file": "plugins/yellow-debt/agents/scanners/complexity-scanner.md",
+      "kind": "scan",
+      "configs": "scanner",
+      "preload_skills": ["plugins/yellow-debt/skills/debt-conventions/SKILL.md"],
+      "golden": { "ccn_over": 10, "length_over": 50 }
+    }
+  },
+  "replays": [
+    {
+      "id": "pr1319",
+      "commit": "3c0cd62",
+      "plants": [
+        {
+          "lane": "comment",
+          "file": "plugins/yellow-core/commands/setup/all.md",
+          "old": "# gt-workflow's bundled Graphite MCP server (`gt mcp`) needs gt 1.6.7+.",
+          "new": "# gt-workflow's bundled Graphite MCP server (`gt mcp`) needs gt 1.7.0+.",
+          "match": ["setup/all\\.md", "1\\.7\\.0"]
+        },
+        {
+          "lane": "standards",
+          "file": "plugins/yellow-review/commands/review/setup.md",
+          "old": "reported but not required.\n",
+          "new": "reported but not required.\n\nIMPORTANT: ALWAYS be thorough. NEVER skip ANY check. YOU MUST re-run every\ncheck a second time and verify that both runs agree before reporting.\n",
+          "match": [
+            "review/setup\\.md",
+            "thorough|ALL-CAPS|all.caps|capital|IMPORTANT|second time|re-run|self-verif"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pr1323",
+      "commit": "1fbd615",
+      "plants": [
+        {
+          "lane": "comment",
+          "file": "plugins/yellow-review/lib/resolve-paths.sh",
+          "old": "# yr_pct_encode <text>: set YR_ENCODED to <text> with %, tab and newline\n# percent-encoded (%25, %09, %0A); yr_pct_decode reverses it.",
+          "new": "# yr_pct_encode <text>: set YR_ENCODED to <text> with tab and newline\n# percent-encoded (%09, %0A); a literal % is left as is. yr_pct_decode\n# reverses it.",
+          "match": ["resolve-paths\\.sh", "%25|literal %|left as is|percent"]
+        },
+        {
+          "lane": "standards",
+          "file": "plugins/yellow-review/README.md",
+          "old": "\n## Prerequisites",
+          "new": "\n\nIf `/stack:status` reports anything other than a READY state, push the\nbranch with `git push` and open the PR with `gh pr create` instead.\n\n## Prerequisites",
+          "match": ["yellow-review/README\\.md", "git push|gh pr create|raw"]
+        }
+      ]
+    },
+    {
+      "id": "pr1320",
+      "commit": "f89a1e9",
+      "plants": [
+        {
+          "lane": "comment",
+          "file": "plugins/yellow-core/lib/statusline-settings.py",
+          "old": "    O_EXCL fails on any existing entry, a dangling symlink included, and\n    O_NOFOLLOW is a second guard where the platform has it.",
+          "new": "    O_EXCL replaces an existing regular file and fails only on a symlink;\n    O_NOFOLLOW is a second guard where the platform has it.",
+          "match": ["statusline-settings\\.py", "O_EXCL", "replac|overwrit|regular file|fails only"]
+        },
+        {
+          "lane": "standards",
+          "file": "plugins/yellow-core/lib/context-observer.py",
+          "old": "        signal.signal(signal.SIGALRM, signal.SIG_IGN)\n",
+          "new": "        signal.signal(signal.SIGALRM, signal.SIG_IGN)\n\n\ndef repair_statusline(settings_path, command):\n    \"\"\"Point statusLine.command back at the observer if another tool replaced it.\"\"\"\n    with open(settings_path, \"r\", encoding=\"utf-8\") as handle:\n        settings = json.load(handle)\n    settings.setdefault(\"statusLine\", {})[\"command\"] = command\n    with open(settings_path, \"w\", encoding=\"utf-8\") as handle:\n        json.dump(settings, handle, indent=2)\n",
+          "match": ["context-observer\\.py", "statusLine|repair_statusline|only writer"]
+        }
+      ]
+    },
+    {
+      "id": "pr1253",
+      "commit": "a767c16",
+      "plants": [
+        {
+          "lane": "comment",
+          "file": "plugins/yellow-codex/agents/review/codex-reviewer.md",
+          "old": "A null, blank or over-500-character\n`evidence`",
+          "new": "A null, blank or over-1000-character\n`evidence`",
+          "match": ["codex-reviewer\\.md", "1000|1,000"]
+        },
+        {
+          "lane": "standards",
+          "file": "plugins/yellow-codex/agents/review/codex-reviewer.md",
+          "fold_description": true,
+          "match": [
+            "codex-reviewer\\.md",
+            "description",
+            "folded|multi-?line|>-|single-line|block scalar"
+          ]
+        }
+      ]
+    }
+  ],
+  "scans": [
+    {
+      "id": "A",
+      "commit": "36365b8",
+      "files": [
+        "plugins/yellow-core/lib/stack-tooling-probe.js",
+        "plugins/yellow-core/lib/remote-agent-provider-state.js",
+        "plugins/yellow-core/lib/stack-operation-registry.js",
+        "plugins/yellow-core/lib/run-github-stack-runtime.js"
+      ]
+    },
+    {
+      "id": "B",
+      "commit": "36365b8",
+      "files": [
+        "plugins/yellow-core/lib/context-observer.py",
+        "plugins/yellow-core/lib/statusline-settings.py"
+      ]
+    }
+  ]
+}

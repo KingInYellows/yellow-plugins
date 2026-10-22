@@ -206,7 +206,9 @@ Watch for two weeks after a release:
 per-reviewer yield rollup from the review ledger's `reviewers` array, then
 grade each swap deterministically against golden findings, not with an Opus
 judge. The ledger is per clone and pruned when a PR closes, so the rollup
-needs an export or retention step first. Candidates:
+needs an export or retention step first. Until that rollup exists,
+`scripts/eval/model-swap/` grades swaps against planted defects in replayed
+PRs and against a lizard golden set for scanners. Candidates:
 
 - **Sonnet → Haiku:**
   - scan-verifier, after `/semgrep:fix` handles a refused verifier.
