@@ -696,19 +696,26 @@ parse_reviewer_return() {
     # promoted `- "<marker>"` bullets to real keys and swallowed the report).
     # A table row is split into cells, since its other columns stay populated
     # ("| key.pem | <slice> |"): an END marker in any cell is returned as the
-    # END, otherwise the longest base64-only cell. A slice never contains "|",
-    # so a body line is never split, and the cell still has to pass the same
-    # width and character-class tests as any other body line.
-    function key_text(s,   n, i, c, best, cell) {
+    # END, otherwise the base64-only cell that looks most like key material --
+    # a digit or +/= together with a non-hex letter, then a non-hex letter
+    # alone, then any -- and the longest within that rank. Length alone let a
+    # longer hex checksum column beat a narrow key slice, fail the non-hex test
+    # and release the window. A slice never contains "|", so a body line is
+    # never split, and the chosen cell still has to pass the same width and
+    # character-class tests as any other body line.
+    function key_text(s,   n, i, c, best, rank, r, cell) {
       s = strip_deco(s)
       gsub(/\\[nr]/, "", s)
       if (index(s, "|") > 0) {
         n = split(s, cell, "|")
         best = ""
+        rank = -1
         for (i = 1; i <= n; i++) {
           c = unwrap_cell(cell[i])
           if (c ~ /^-----END [A-Z ]*PRIVATE KEY-----$/) return c
-          if (c ~ /^[A-Za-z0-9+\/=]+$/ && length(c) > length(best)) best = c
+          if (c !~ /^[A-Za-z0-9+\/=]+$/) continue
+          r = (c ~ /[G-Zg-z+\/=]/) + (c ~ /[G-Zg-z+\/=]/ && c ~ /[0-9+\/=]/)
+          if (r > rank || (r == rank && length(c) > length(best))) { best = c; rank = r }
         }
         if (best != "") return best
       }
@@ -2899,19 +2906,26 @@ for reviewer in claude codex gemini opencode; do
       # promoted `- "<marker>"` bullets to real keys and swallowed the report).
       # A table row is split into cells, since its other columns stay populated
       # ("| key.pem | <slice> |"): an END marker in any cell is returned as the
-      # END, otherwise the longest base64-only cell. A slice never contains "|",
-      # so a body line is never split, and the cell still has to pass the same
-      # width and character-class tests as any other body line.
-      function key_text(s,   n, i, c, best, cell) {
+      # END, otherwise the base64-only cell that looks most like key material --
+      # a digit or +/= together with a non-hex letter, then a non-hex letter
+      # alone, then any -- and the longest within that rank. Length alone let a
+      # longer hex checksum column beat a narrow key slice, fail the non-hex test
+      # and release the window. A slice never contains "|", so a body line is
+      # never split, and the chosen cell still has to pass the same width and
+      # character-class tests as any other body line.
+      function key_text(s,   n, i, c, best, rank, r, cell) {
         s = strip_deco(s)
         gsub(/\\[nr]/, "", s)
         if (index(s, "|") > 0) {
           n = split(s, cell, "|")
           best = ""
+          rank = -1
           for (i = 1; i <= n; i++) {
             c = unwrap_cell(cell[i])
             if (c ~ /^-----END [A-Z ]*PRIVATE KEY-----$/) return c
-            if (c ~ /^[A-Za-z0-9+\/=]+$/ && length(c) > length(best)) best = c
+            if (c !~ /^[A-Za-z0-9+\/=]+$/) continue
+            r = (c ~ /[G-Zg-z+\/=]/) + (c ~ /[G-Zg-z+\/=]/ && c ~ /[0-9+\/=]/)
+            if (r > rank || (r == rank && length(c) > length(best))) { best = c; rank = r }
           }
           if (best != "") return best
         }

@@ -1026,6 +1026,19 @@ assert_finishes_under_all() {
   assert_survives_under_all "$input" "Verdict: APPROVE"
 }
 
+@test "a longer hex checksum column does not hide a narrow key slice" {
+  # Picking the longest base64-only cell chose the 64-character hex column,
+  # which fails the non-hex test, so the narrow slice beside it counted as
+  # stray and the window released. Cells are ranked by key shape first.
+  local sum input
+  sum="$(printf 'a1%.0s' $(seq 1 32))"
+  input="$(printf '| sha256 | value |\n|---|---|\n| %s | %s |\n| %s | %s |\n| %s | %s |\n| %s | %s |\n| %s | %s |\n| %s | %s |\n\nVerdict: REJECT' \
+    "$sum" "$BEGIN_RSA" "$sum" "$NARROW_DIGIT_BODY" "$sum" "$NARROW_DIGIT_BODY" \
+    "$sum" "$NARROW_DIGIT_BODY" "$sum" "$NARROW_DIGIT_BODY" "$sum" "$END_RSA")"
+  assert_redacted_under_all "$input" "$NARROW_DIGIT_BODY"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+}
+
 @test "a key wrapped as an escaped newline-joined string is fully redacted" {
   # A JSON or YAML string with literal \n escapes, wrapped across lines by
   # the reviewer: every body line carries backslash escapes that are not
