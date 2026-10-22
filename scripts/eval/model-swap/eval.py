@@ -106,18 +106,57 @@ No <standards-paths> or <rule-vocabulary> block is supplied (standalone usage); 
 SCAN_PROMPT = """Run your scan for a /debt:audit. Read .debt/file-list.txt for the files to scan (scan only those files) and write your findings to .debt/scanner-output/{name}.json per the v2.0 schema. When done, reply with a one-line summary."""
 
 
-def check_ids(spec):
-    """Ids become path components under <work>; keep them to one plain name."""
-    ids = [*spec["agents"], *(r["id"] for r in spec["replays"]), *(s["id"] for s in spec["scans"])]
-    bad = [i for i in ids if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", i) or ".." in i]
+SAFE_NAME = r"[A-Za-z0-9][A-Za-z0-9_.-]*"
+
+
+def check_spec(spec):
+    """Reject spec values that would read or write outside the repo or worktrees.
+
+    Ids, models and efforts become path components under <work>; agent, skill,
+    plant and scan files must be plain repo-relative paths.
+    """
+    names = [*spec["agents"], *(r["id"] for r in spec["replays"]), *(s["id"] for s in spec["scans"]),
+             *(c[k] for cs in spec["configs"].values() for c in cs for k in ("model", "effort"))]
+    bad = [n for n in names if not isinstance(n, str) or not re.fullmatch(SAFE_NAME, n) or ".." in n]
+    paths = [*(a["file"] for a in spec["agents"].values()),
+             *(f for a in spec["agents"].values() for f in a.get("preload_skills", [])),
+             *(p["file"] for r in spec["replays"] for p in r["plants"]),
+             *(f for s in spec["scans"] for f in s["files"])]
+    bad += [f for f in paths if not isinstance(f, str) or os.path.isabs(f)
+            or os.path.normpath(f) != f or f.split("/")[0] == ".."]
     if bad:
-        sys.exit("prepare: ids must match [A-Za-z0-9][A-Za-z0-9_.-]*: %s" % ", ".join(bad))
+        sys.exit("prepare: unsafe spec values (names must match %s; files must be "
+                 "relative paths without ..): %s" % (SAFE_NAME, ", ".join(map(str, bad))))
+
+
+def agent_tools(path):
+    """The `tools:` frontmatter as a comma list: block list, flow list or plain string."""
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    end = text.find("\n---", 3)
+    lines = text[4:end].splitlines() if text.startswith("---\n") and end > 0 else []
+    for i, line in enumerate(lines):
+        m = re.match(r"tools:\s*(.*)$", line)
+        if not m:
+            continue
+        value = re.sub(r"\s+#.*$", "", m.group(1)).strip()
+        if value:
+            items = value.strip("[]").split(",")
+        else:
+            items = []
+            for item in lines[i + 1:]:
+                im = re.match(r"\s+-\s*(.*)$", item)
+                if not im:
+                    break
+                items.append(re.sub(r"\s+#.*$", "", im.group(1)))
+        return ",".join(t.strip().strip("'\"") for t in items if t.strip())
+    return ""
 
 
 def prepare(spec_path, work):
     with open(spec_path, encoding="utf-8") as handle:
         spec = json.load(handle)
-    check_ids(spec)
+    check_spec(spec)
     for sub in ("wt", "prompts", "out"):
         os.makedirs(os.path.join(work, sub), exist_ok=True)
     rows = []
@@ -163,6 +202,9 @@ def prepare(spec_path, work):
                         handle.write(SCAN_PROMPT.format(name=name))
                     rows.append([rid, sys_prompt, wt, c["model"], c["effort"], prompt, aid, s["id"],
                                  fingerprint(agent, s, c["model"], c["effort"], sys_prompt, prompt)])
+    dupes = sorted({r[0] for r in rows if [x[0] for x in rows].count(r[0]) > 1})
+    if dupes:
+        sys.exit("prepare: these run ids collide; rename an agent or target id: %s" % ", ".join(dupes))
     with open(os.path.join(work, "matrix.tsv"), "w", encoding="utf-8") as handle:
         handle.writelines("\t".join(row) + "\n" for row in rows)
     with open(os.path.join(work, "spec.json"), "w", encoding="utf-8") as handle:
@@ -182,7 +224,7 @@ def run(work, jobs, dry_run):
     def one(row):
         rid, sys_prompt, wt, model, effort, prompt = row[:6]
         rc = subprocess.run([os.path.join(HERE, "run-one.sh"), out, rid, sys_prompt, wt,
-                             model, effort, prompt],
+                             model, effort, prompt, agent_tools(sys_prompt)],
                             env=dict(os.environ, EVAL_FINGERPRINT=row[8])).returncode
         return rid, rc
 
