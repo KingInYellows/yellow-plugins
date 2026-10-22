@@ -307,6 +307,37 @@ describe('ledger write failures', () => {
     expect(text).not.toContain('Ledger write failed');
   });
 
+  test('a prune that never answers does not hold up later rows', async ($, on) => {
+    const clock = mock.clock(on);
+    const held: Record<string, unknown> = {};
+    let keysCalls = 0;
+    on('session.id', () => ({ value: 's1' }));
+    on('store.get', ($, e) => ({ value: held[e.key] }));
+    on('store.set', ($, e) => {
+      held[e.key] = e.value;
+      return { value: undefined };
+    });
+    // The first prune's key listing never answers.
+    on('store.keys', () => {
+      keysCalls += 1;
+      if (keysCalls === 1) return new Promise<never>(() => {});
+      return { value: Object.keys(held) };
+    });
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    await spawn($, REVIEWER);
+    await spawn($, SECURITY);
+    const shown = status($);
+    await clock.settle();
+    await clock.advance(2000);
+    const text = await shown;
+    expect(text).toContain('Ledger: 2 spawn(s) recorded');
+    expect(text).toContain(`${SECURITY}: ran opus`);
+    expect(text).not.toContain('Ledger write failed');
+    // The second spawn skipped its prune while the first was pending.
+    expect(keysCalls).toBe(2);
+  });
+
   test('a spawn queued behind a stalled write reports it', async ($, on) => {
     const clock = mock.clock(on);
     let sessionId = 's1';
