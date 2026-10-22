@@ -212,16 +212,23 @@ async function authorizeTakeOver(deps) {
     ].join('\n'));
     return (0, state_js_1.withJournalLock)(deps.dataDir, async () => {
         const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
-        const result = (0, controller_js_1.takeOverController)(ctx, deps.dataDir, grants);
-        (0, authority_js_1.writeGrants)(deps.dataDir, result.grants);
         // Reservations from the earlier epoch carry the old host's clock; reconcile
-        // ages them from this moment on this host's clock.
+        // ages them from this moment on this host's clock. The marker is written
+        // before anything is rebound: a crash after it leaves grants on the old
+        // epoch (writes fail closed until the take-over is re-run, which writes a
+        // newer marker), never rebound grants without a marker.
         const journal = await (0, state_js_1.readJournal)(deps.dataDir);
         const seq = (0, state_js_1.nextSeq)(journal);
         await (0, state_js_1.writeJournal)(deps.dataDir, {
             ...journal,
-            controllerTakeover: { at: (0, runtime_support_js_1.nowFn)(deps)().toISOString(), seq },
+            controllerTakeover: {
+                at: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
+                seq,
+                epoch: (0, controller_js_1.takeOverEpoch)(ctx, grants),
+            },
         });
+        const result = (0, controller_js_1.takeOverController)(ctx, deps.dataDir, grants);
+        (0, authority_js_1.writeGrants)(deps.dataDir, result.grants);
         return {
             operation: 'authorize',
             controllerId: result.authority.controllerId,

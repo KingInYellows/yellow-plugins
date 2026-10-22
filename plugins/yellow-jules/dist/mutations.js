@@ -1003,6 +1003,7 @@ async function approveInner(deps, args, ids) {
                 await (0, state_js_1.recordDeviation)(deps.dataDir, target.owner.localRequestId, {
                     kind: 'policy-deviation',
                     reason: 'the plan approved by the vendor differs from the plan evaluated before approval',
+                    recurAfterAck: true,
                 }, (0, runtime_support_js_1.nowFn)(deps));
             }
             catch (err) {

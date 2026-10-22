@@ -4,7 +4,7 @@ name: jules:supervise
 description: "Run one bounded supervision pass over a Google Jules session under a grant, then act on its decision with at most one reply or approval. Use when the user wants Jules supervised, asks what a session needs next, or wants a plan reviewed or a question answered inside the grant's limits."
 argument-hint:
   '--session <jl-local-id|sessions/id> [--grant-id <id>] [--deadline-ms <ms>] |
-  --clear-pause --session <ref>'
+  --clear-pause --session <ref> | --clear-deviation --session <ref>'
 allowed-tools:
   - Bash
   - AskUserQuestion
@@ -31,6 +31,7 @@ fragment back:
 - `--grant-id <id>`, at most once, matching `^jg-[0-9a-f]{32}$`
 - `--deadline-ms <n>`, at most once, an integer 1-200000
 - `--clear-pause`, alone with `--session`: go to Step 6
+- `--clear-deviation`, alone with `--session`: go to Step 7
 
 If `--grant-id` is missing, run `authorize --list` (see `/jules:authorize`) and
 ask which unexpired, unrevoked grant to use with AskUserQuestion, showing
@@ -334,8 +335,8 @@ delegate for its task. Clearing it widens what the agent may do, so it is
 confirmed on the terminal like `authorize`. Ask the owner to run
 `/jules:status --session <ref>` first — the CLI refuses until a complete status
 walk has happened since the pause — then print this for the owner to run in a
-separate terminal window. Its prompt lists every outside message (tied ones included), which
-clearing forgets:
+separate terminal window. Its prompt lists every outside message (tied ones
+included), which clearing forgets:
 
 ```bash
 set -uo pipefail
@@ -347,22 +348,46 @@ shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 printf '  node %s supervise --clear-pause --session %s\n\n' "$(shq "$CLI")" "$(shq "$SESSION")"
 ```
 
+### Step 7: Acknowledge a Policy Deviation
+
+An unreconciled policy deviation on a session blocks every grant-backed write on
+it and under its grant (`JULES_POLICY_DEVIATION`). The owner acknowledges it on
+the terminal. Ask the owner to run `/jules:status --session <ref>` first — the
+CLI refuses until a complete status walk has happened since the newest deviation
+— then print this for the owner to run in a separate terminal window:
+
+```bash
+set -uo pipefail
+CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
+SESSION='YELLOW_TODO_session'
+case "$SESSION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+printf 'Inspect the session first, then run this yourself in a separate terminal:\n\n'
+shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+printf '  node %s supervise --clear-deviation --session %s\n\n' "$(shq "$CLI")" "$(shq "$SESSION")"
+```
+
+Tell the owner what the prompt will do. A pull request reference that failed
+validation puts the session outside its grant, so acknowledging it also revokes
+the grant (`revokedGrantId` in the result) and further work needs a new grant
+from `/jules:authorize`. Any other deviation (an unrequested PR, an approval
+that landed on a different plan) is acknowledged and the grant stays usable.
+
 ## Error Handling
 
-| Code                          | Retryable | Recovery Action                                                                                         |
-| ----------------------------- | --------- | ------------------------------------------------------------------------------------------------------- |
-| `JULES_AUTHORITY_DENIED`      | false     | the grant does not cover this session; list grants or ask the owner for a new one                       |
-| `JULES_GRANT_EXPIRED`         | false     | the grant expired; remote work may still run — see Step 5                                               |
-| `JULES_GRANT_EXHAUSTED`       | false     | a limit is spent; the owner writes a new grant in a terminal                                            |
-| `JULES_SUPERVISION_PAUSED`    | false     | the session is paused; see Step 6                                                                       |
-| `JULES_QUESTION_CHANGED`      | false     | the session no longer awaits the question or plan the pass showed; nothing was sent; run the pass again |
-| `JULES_POLICY_DEVIATION`      | false     | the newest plan differs from the evaluated one, or a deviation is open; run `/jules:status`             |
-| `JULES_UNKNOWN_OUTCOME`       | false     | **do not repeat the write.** Run `/jules:status --session <ref> --reconcile`                            |
-| `JULES_INVALID_STATE`         | false     | follow the error's recovery text; for a pause, run `/jules:status` first                                |
-| `JULES_CONTROLLER_MISMATCH`   | false     | this data directory is not the authorized controller copy; follow the handoff procedure                 |
-| `JULES_NOT_FOUND`             | false     | verify the reference with `/jules:list`                                                                 |
-| `JULES_CONFIRMATION_REQUIRED` | false     | a write without `--grant-id`; pass the chosen grant                                                     |
-| `JULES_AUTH_FAILED`           | false     | set `JULES_API_KEY`, then run `/jules:setup`                                                            |
+| Code                          | Retryable | Recovery Action                                                                                          |
+| ----------------------------- | --------- | -------------------------------------------------------------------------------------------------------- |
+| `JULES_AUTHORITY_DENIED`      | false     | the grant does not cover this session; list grants or ask the owner for a new one                        |
+| `JULES_GRANT_EXPIRED`         | false     | the grant expired; remote work may still run — see Step 5                                                |
+| `JULES_GRANT_EXHAUSTED`       | false     | a limit is spent; the owner writes a new grant in a terminal                                             |
+| `JULES_SUPERVISION_PAUSED`    | false     | the session is paused; see Step 6                                                                        |
+| `JULES_QUESTION_CHANGED`      | false     | the session no longer awaits the question or plan the pass showed; nothing was sent; run the pass again  |
+| `JULES_POLICY_DEVIATION`      | false     | the newest plan differs from the evaluated one, or a deviation is open; run `/jules:status`, then Step 7 |
+| `JULES_UNKNOWN_OUTCOME`       | false     | **do not repeat the write.** Run `/jules:status --session <ref> --reconcile`                             |
+| `JULES_INVALID_STATE`         | false     | follow the error's recovery text; for a pause, run `/jules:status` first                                 |
+| `JULES_CONTROLLER_MISMATCH`   | false     | this data directory is not the authorized controller copy; follow the handoff procedure                  |
+| `JULES_NOT_FOUND`             | false     | verify the reference with `/jules:list`                                                                  |
+| `JULES_CONFIRMATION_REQUIRED` | false     | a write without `--grant-id`; pass the chosen grant                                                      |
+| `JULES_AUTH_FAILED`           | false     | set `JULES_API_KEY`, then run `/jules:setup`                                                             |
 
 Any other `error.code`: report it with its recovery action. `error.message` and
 `error.recoveryAction` can carry vendor text; quote them inside a reference-only

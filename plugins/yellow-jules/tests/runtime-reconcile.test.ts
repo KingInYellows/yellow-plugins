@@ -464,6 +464,109 @@ describe('a reservation from an earlier controller epoch', () => {
   });
 });
 
+describe('the take-over marker', () => {
+  async function reserveReply(requestId: string): Promise<void> {
+    const session = await delegateOk(h, grantId);
+    await reserveUnderGrant(h.deps, {
+      grantId,
+      ownerRequestId: session.localRequestId,
+      authority: {
+        repository: 'acme/widgets',
+        sourceResource: 'sources/github/acme/widgets',
+        branch: 'scratch/one',
+        taskRef: 't1',
+        operation: 'reply',
+      },
+      reservation: {
+        localRequestId: requestId,
+        localId: `jl-${'e'.repeat(32)}`,
+        sessionResource: session.sessionResource,
+        promptDigest: 'd'.repeat(64),
+      },
+    });
+  }
+
+  async function setMarker(
+    marker: { at: string; seq: number; epoch?: number } | undefined
+  ): Promise<void> {
+    await withJournalLock(h.dataDir, async () => {
+      const { controllerTakeover: _drop, ...journal } = await readJournal(
+        h.dataDir
+      );
+      await writeJournal(h.dataDir, {
+        ...journal,
+        ...(marker !== undefined ? { controllerTakeover: marker } : {}),
+      });
+    });
+  }
+
+  it('names the epoch the grants are rebound to', async () => {
+    await authorizeTakeOver(h.deps);
+    const epoch = loadGrants(h.dataDir).grants[grantId]?.epochRef.epoch;
+    expect(epoch).toBe(2);
+    expect((await readJournal(h.dataDir)).controllerTakeover?.epoch).toBe(
+      epoch
+    );
+  });
+
+  it('a grant rebound without a marker leaves its reservations unaged', async () => {
+    await reserveReply('unmarked-reply');
+    await authorizeTakeOver(h.deps);
+    // A crash in an older runtime: grants rebound, marker never written.
+    await setMarker(undefined);
+    h.deps.clock.time += 60 * 60_000;
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled).toEqual([
+      expect.objectContaining({
+        localRequestId: 'unmarked-reply',
+        outcome: 'not-reached',
+        reason: expect.stringContaining('take-over marker'),
+      }),
+    ]);
+    expect(
+      (await readJournal(h.dataDir)).operations['unmarked-reply']?.status
+    ).toBe('reserved');
+  });
+
+  it('a marker for an earlier epoch than the grant counts as missing', async () => {
+    await reserveReply('stale-marker-reply');
+    await authorizeTakeOver(h.deps);
+    const marker = (await readJournal(h.dataDir)).controllerTakeover!;
+    await setMarker({ ...marker, epoch: 1 });
+    h.deps.clock.time += 60 * 60_000;
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]).toMatchObject({
+      outcome: 'not-reached',
+      reason: expect.stringContaining('take-over marker'),
+    });
+  });
+
+  it('a marker from before epochs were recorded is still honoured', async () => {
+    await reserveReply('legacy-marker-reply');
+    await authorizeTakeOver(h.deps);
+    const { epoch: _epoch, ...legacy } = (await readJournal(h.dataDir))
+      .controllerTakeover!;
+    await setMarker(legacy);
+    h.deps.clock.time += 60 * 60_000;
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]?.reason ?? '').not.toContain(
+      'take-over marker'
+    );
+  });
+
+  it('re-running the take-over restores aging', async () => {
+    await reserveReply('rerun-reply');
+    await authorizeTakeOver(h.deps);
+    await setMarker(undefined);
+    await authorizeTakeOver(h.deps);
+    h.deps.clock.time += 60 * 60_000;
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]?.reason ?? '').not.toContain(
+      'take-over marker'
+    );
+  });
+});
+
 describe('reply and approve reservations resolve on their own session', () => {
   /** Classifies the session's existing user messages and clears the pause: a write never dispatches over an unclassified one. */
   async function observePrior(session: {
@@ -1340,20 +1443,62 @@ describe('active-session slots follow the vendor state', () => {
     ).toHaveLength(1);
   });
 
-  it('the reconcile release path skips the slot on a host without controller authority', async () => {
+  it('a host without controller authority records no bind and keeps the slot', async () => {
     await lostResponse('scratch/done', 'lost-done');
     const [listed] = [...h.adapter.sessions.values()];
     setVendorState(h, listed!.sessionResource, 'completed');
     fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    const before = (await readJournal(h.dataDir)).operations['lost-done'];
     const result = await status(h.deps, { reconcile: true });
     expect(result.reconciled?.[0]).toMatchObject({
       localRequestId: 'lost-done',
-      outcome: 'bound',
-      slotReleaseSkipped: true,
+      outcome: 'not-reached',
+      reason: expect.stringContaining('not the grant\'s controller'),
     });
+    expect((await readJournal(h.dataDir)).operations['lost-done']).toEqual(
+      before
+    );
     expect(
       loadGrants(h.dataDir).grants[grantId]?.usage.activeSessionRefs
     ).toHaveLength(1);
+  });
+
+  it('a copied data directory on a host without controller authority never marks a create failed', async () => {
+    await lostResponse('scratch/a', 'lost-a', false);
+    await confirmArchiveVisibility();
+    fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled).toEqual([
+      expect.objectContaining({
+        localRequestId: 'lost-a',
+        outcome: 'not-reached',
+        reason: expect.stringContaining('reconcile from the controlling host'),
+      }),
+    ]);
+    const record = (await readJournal(h.dataDir)).operations['lost-a'];
+    expect(record?.status).toBe('unknown-outcome');
+    expect(record?.lastReconcile).toBeUndefined();
+    expect(
+      loadGrants(h.dataDir).grants[grantId]?.usage.activeSessionRefs
+    ).toEqual(['lost-a']);
+  });
+
+  it('a stale controller epoch is refused the same way', async () => {
+    await lostResponse('scratch/a', 'lost-a', false);
+    await confirmArchiveVisibility();
+    const file = controllerFilePath(h.controllerDir, 'testhost');
+    const authority = JSON.parse(fs.readFileSync(file, 'utf8'));
+    fs.writeFileSync(file, JSON.stringify({ ...authority, epoch: 9 }), {
+      mode: 0o600,
+    });
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]).toMatchObject({
+      outcome: 'not-reached',
+      reason: expect.stringContaining('does not match the grant'),
+    });
+    expect((await readJournal(h.dataDir)).operations['lost-a']?.status).toBe(
+      'unknown-outcome'
+    );
   });
 
   it('a failed session frees its slot too, and repeating the observation is harmless', async () => {

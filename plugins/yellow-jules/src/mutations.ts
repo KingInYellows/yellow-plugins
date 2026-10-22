@@ -1668,6 +1668,7 @@ async function approveInner(
             kind: 'policy-deviation',
             reason:
               'the plan approved by the vendor differs from the plan evaluated before approval',
+            recurAfterAck: true,
           },
           nowFn(deps)
         );

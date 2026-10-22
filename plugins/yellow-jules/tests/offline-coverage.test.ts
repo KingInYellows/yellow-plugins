@@ -591,6 +591,16 @@ describe('mutating subcommands refuse before sending anything (PR3)', () => {
     expect(['JULES_INVALID_STATE', 'JULES_AUTHORITY_DENIED']).toContain(
       errorCode(clear)
     );
+    const ack = await cli(workspacePlugin, [
+      'supervise',
+      '--clear-deviation',
+      '--session',
+      'sessions/s1',
+    ]);
+    expect(ack.code).toBe(1);
+    expect(['JULES_INVALID_STATE', 'JULES_AUTHORITY_DENIED']).toContain(
+      errorCode(ack)
+    );
   });
 
   it.each([
@@ -608,6 +618,27 @@ describe('mutating subcommands refuse before sending anything (PR3)', () => {
         'sessions/s1',
         '--grant-id',
         'jg-x',
+      ],
+      'supervise',
+    ],
+    [
+      [
+        'supervise',
+        '--clear-deviation',
+        '--session',
+        'sessions/s1',
+        '--grant-id',
+        'jg-x',
+      ],
+      'supervise',
+    ],
+    [
+      [
+        'supervise',
+        '--clear-deviation',
+        '--clear-pause',
+        '--session',
+        'sessions/s1',
       ],
       'supervise',
     ],

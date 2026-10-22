@@ -501,6 +501,55 @@ describe('read-state, external records, deviations, retention', () => {
     });
   });
 
+  it('orders a pending plan against a concurrent watermark by createTime only', async () => {
+    const t = '2026-01-01T00:01:00Z';
+    const plan = (id: string, createTime = t) => ({
+      planId: `p-${id}`,
+      steps: [],
+      activityCreateTime: createTime,
+      activityId: id,
+    });
+    // A concurrent walk advanced the watermark to another activity at the
+    // plan's createTime, with an id that sorts after the plan's.
+    const tied = await ensureObservedRecord(dataDir, 'sessions/wm-tie');
+    await upsertReadState(dataDir, tied.localRequestId, {
+      watermark: { createTime: t, activityId: 'zzz' },
+      rebase: { ring: [] },
+    });
+    const kept = await upsertReadState(dataDir, tied.localRequestId, {
+      pendingPlan: plan('aaa'),
+      rebase: { ring: [] },
+    });
+    expect(kept.pendingPlan).toMatchObject({
+      activityId: 'aaa',
+      ambiguous: true,
+    });
+
+    // The watermark IS the plan's activity: that walk saw it, so it stays dropped.
+    const self = await ensureObservedRecord(dataDir, 'sessions/wm-self');
+    await upsertReadState(dataDir, self.localRequestId, {
+      watermark: { createTime: t, activityId: 'aaa' },
+      rebase: { ring: [] },
+    });
+    const selfNext = await upsertReadState(dataDir, self.localRequestId, {
+      pendingPlan: plan('aaa'),
+      rebase: { ring: [] },
+    });
+    expect(selfNext.pendingPlan).toBeUndefined();
+
+    // A strictly older plan is still dropped, whatever the ids.
+    const older = await ensureObservedRecord(dataDir, 'sessions/wm-older');
+    await upsertReadState(dataDir, older.localRequestId, {
+      watermark: { createTime: '2026-01-01T00:02:00Z', activityId: 'aaa' },
+      rebase: { ring: [] },
+    });
+    const olderNext = await upsertReadState(dataDir, older.localRequestId, {
+      pendingPlan: plan('zzz'),
+      rebase: { ring: [] },
+    });
+    expect(olderNext.pendingPlan).toBeUndefined();
+  });
+
   it('marks the pending plan ambiguous when a rebase meets a different plan at the same createTime', async () => {
     const t = '2026-01-01T00:01:00Z';
     const plan = (id: string) => ({

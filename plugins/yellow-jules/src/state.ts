@@ -240,7 +240,7 @@ function isValidDeviation(value: unknown): value is DeviationRecord {
   return (
     value['kind'] === 'policy-deviation' &&
     typeof value['reason'] === 'string' &&
-    hasOptionalStrings(value, ['prUrl']) &&
+    hasOptionalStrings(value, ['prUrl', 'reconciledAt']) &&
     typeof value['observedAt'] === 'string' &&
     typeof value['reconciled'] === 'boolean'
   );
@@ -502,7 +502,9 @@ function parseJournal(raw: string): Journal | undefined {
       isPlainObject(takeover) &&
       typeof takeover['at'] === 'string' &&
       !Number.isNaN(Date.parse(takeover['at'])) &&
-      isNonNegativeInt(takeover['seq'])
+      isNonNegativeInt(takeover['seq']) &&
+      (takeover['epoch'] === undefined ||
+        (isNonNegativeInt(takeover['epoch']) && takeover['epoch'] >= 1))
     )
   )
     return undefined;
@@ -522,6 +524,9 @@ function parseJournal(raw: string): Journal | undefined {
           controllerTakeover: {
             at: takeover['at'] as string,
             seq: takeover['seq'] as number,
+            ...(takeover['epoch'] !== undefined
+              ? { epoch: takeover['epoch'] as number }
+              : {}),
           },
         }
       : {}),
@@ -1465,21 +1470,26 @@ export async function upsertReadState(
               : winner;
         } else if (
           current.lastActivityCreateTime !== undefined &&
-          current.lastActivityId !== undefined &&
-          compareStamp(
-            {
-              createTime: update.pendingPlan.activityCreateTime,
-              activityId: update.pendingPlan.activityId,
-            },
-            {
-              createTime: current.lastActivityCreateTime,
-              activityId: current.lastActivityId,
-            }
-          ) <= 0
+          current.lastActivityId !== undefined
         ) {
           // No plan is stored, and a concurrent walk already advanced past
           // this one: it saw the plan and its approval, so do not resurrect it.
-          pendingPlan = undefined;
+          // Only time orders the two: ids at one createTime are opaque, so a
+          // watermark at the plan's own time (another activity) proves nothing
+          // about the plan; it is kept, flagged unknown.
+          const order = compareStamp(
+            { createTime: update.pendingPlan.activityCreateTime, activityId: '' },
+            { createTime: current.lastActivityCreateTime, activityId: '' }
+          );
+          if (
+            order < 0 ||
+            (order === 0 &&
+              update.pendingPlan.activityId === current.lastActivityId)
+          ) {
+            pendingPlan = undefined;
+          } else if (order === 0) {
+            pendingPlan = { ...update.pendingPlan, ambiguous: true as const };
+          }
         }
         if (
           watermark !== undefined &&
@@ -1690,20 +1700,32 @@ export async function recordArtifacts(
   );
 }
 
-/** R13: record a policy deviation once per distinct reason + PR reference. */
+/**
+ * R13: record a policy deviation once per distinct reason + PR reference.
+ * Evidence every status walk re-reads (a PR on the session) is recorded once
+ * even after the owner acknowledged it, or the acknowledgement could never
+ * hold. A one-off event (`recurAfterAck`, an approval that landed on another
+ * plan) is a new deviation each time it happens after an acknowledgement.
+ */
 export async function recordDeviation(
   dataDir: string,
   localRequestId: string,
-  deviation: Omit<DeviationRecord, 'observedAt' | 'reconciled'>,
+  deviation: Omit<DeviationRecord, 'observedAt' | 'reconciled'> & {
+    readonly recurAfterAck?: boolean;
+  },
   now: () => Date = () => new Date(),
   config: LockConfig = DEFAULT_LOCK_CONFIG
 ): Promise<OperationRecord> {
+  const { recurAfterAck, ...record } = deviation;
   return updateJournal(
     dataDir,
     (operations) => {
       const current = requireRecord(operations, localRequestId);
       const duplicate = current.deviations.some(
-        (d) => d.reason === deviation.reason && d.prUrl === deviation.prUrl
+        (d) =>
+          d.reason === record.reason &&
+          d.prUrl === record.prUrl &&
+          (recurAfterAck !== true || !d.reconciled)
       );
       if (duplicate) return current;
       const nowIso = now().toISOString();
@@ -1711,7 +1733,7 @@ export async function recordDeviation(
         ...current,
         deviations: [
           ...current.deviations,
-          { ...deviation, observedAt: nowIso, reconciled: false },
+          { ...record, observedAt: nowIso, reconciled: false },
         ],
         updatedAt: nowIso,
       };

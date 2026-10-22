@@ -144,6 +144,13 @@ clears the pause on their terminal with
 `supervise --clear-pause --session <ref>`, which lists the outside activity and
 asks for a typed code. You cannot clear it.
 
+A policy deviation blocks writes the same way (`JULES_POLICY_DEVIATION`,
+`grant-policy-deviation`). The operator runs `status`, inspects the session, and
+acknowledges it on their terminal with
+`supervise --clear-deviation --session <ref>`. A PR reference outside the
+grant's repository also revokes the grant, so work continues only under a new
+grant. You cannot acknowledge it.
+
 ### Corrections
 
 A correction is a reply or a repair delegate that asks for a fix. Each spends

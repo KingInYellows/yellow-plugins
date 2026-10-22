@@ -20,15 +20,19 @@ import {
   STATUS_PAGE_SIZE,
   walkActivities,
 } from './activity-walk.js';
+import { loadGrants } from './authority.js';
+import { assertControllerAuthority } from './controller.js';
 import { type Deadline, isExpired } from './deadline.js';
-import { AppErrorException } from './errors.js';
+import { AppErrorException, errorLabel } from './errors.js';
 import { redactDeep } from './redact.js';
 import {
   type RuntimeDeps,
   nowFn,
   read,
+  resolveControllerContext,
   withAdapter,
   conditionOf,
+  type WriteDeps,
 } from './runtime-support.js';
 import { releaseTerminalSlot, TERMINAL_VENDOR_STATES } from './slot-release.js';
 import {
@@ -44,6 +48,7 @@ import {
 } from './state.js';
 import type {
   AdapterSession,
+  GrantsFile,
   Journal,
   OperationRecord,
   ReconciledEntry,
@@ -564,12 +569,54 @@ async function resolveOnOwnSession(
 // persistence
 // ---------------------------------------------------------------------------
 
+type ControllerDeps = Pick<
+  WriteDeps,
+  'dataDir' | 'env' | 'controllerDir' | 'controllerId' | 'clock'
+>;
+
+/**
+ * Why this host may not write the reconciliation of `record`, or `undefined`
+ * when it may: the record's grant must name this host's controller epoch for
+ * this data directory. Any failure to tell is a refusal (fail closed). A record
+ * without a grant predates grants and has no controller to check.
+ */
+function controllerRefusal(
+  deps: ControllerDeps,
+  grants: GrantsFile | Error,
+  record: OperationRecord
+): string | undefined {
+  if (record.grantId === undefined) return undefined;
+  try {
+    if (grants instanceof Error) throw grants;
+    const grant = grants.grants[record.grantId];
+    if (grant === undefined) {
+      return `its grant ${record.grantId} is not in grants.json`;
+    }
+    const ctx = resolveControllerContext(deps);
+    assertControllerAuthority(
+      ctx.controllerDir,
+      deps.dataDir,
+      grant.epochRef,
+      ctx.controllerId
+    );
+    return undefined;
+  } catch (err) {
+    return err instanceof AppErrorException &&
+      err.appError.code === 'JULES_CONTROLLER_MISMATCH'
+      ? err.appError.message
+      : errorLabel(err);
+  }
+}
+
 async function persist(
-  deps: RuntimeDeps,
+  deps: ControllerDeps,
   resolutions: readonly Resolution[]
 ): Promise<{
   readonly released: ReadonlySet<string>;
-  /** Binds refused under the lock because another create already owns the session. */
+  /**
+   * Writes refused under the lock: a bind whose session another create already
+   * owns, or any write from a host that is not the grant's controller.
+   */
   readonly refused: ReadonlyMap<string, Resolution>;
 }> {
   const now = nowFn(deps)().toISOString();
@@ -577,10 +624,29 @@ async function persist(
   const released = new Set<string>();
   const refused = new Map<string, Resolution>();
   await updateJournal(deps.dataDir, (operations) => {
+    // Read under the journal lock, which every grants.json writer also holds.
+    let grants: GrantsFile | Error;
+    try {
+      grants = loadGrants(deps.dataDir);
+    } catch (err) {
+      grants = err instanceof Error ? err : new Error(String(err));
+    }
     for (const r of resolutions) {
       const current = operations[r.record.localRequestId];
       // Another process may have settled it since this pass read the journal.
       if (current === undefined || !UNRESOLVED_STATUSES.has(current.status)) {
+        continue;
+      }
+      // A copied or shared data directory on a host without the controller
+      // authority must not settle anything: a `failed` written here would make
+      // the create abandonable while the controller's POST may still land.
+      const refusal = controllerRefusal(deps, grants, current);
+      if (refusal !== undefined) {
+        refused.set(current.localRequestId, {
+          record: r.record,
+          outcome: 'not-reached',
+          reason: `not recorded: this host is not the grant's controller (${refusal}); reconcile from the controlling host`,
+        });
         continue;
       }
       // A second create owning the same session would leave two owners, and
@@ -657,7 +723,11 @@ async function persist(
         r.outcome === 'policy-deviation' &&
         r.deviation !== undefined
       ) {
-        const known = current.deviations.some((d) => d.reason === r.deviation);
+        // Only an open deviation suppresses it: reconcile records events, and
+        // one that happens again after an acknowledgement blocks again.
+        const known = current.deviations.some(
+          (d) => d.reason === r.deviation && !d.reconciled
+        );
         if (!known) {
           next = {
             ...next,
@@ -686,7 +756,9 @@ async function persist(
         );
         if (
           owner !== undefined &&
-          !owner.deviations.some((d) => d.reason === r.deviation)
+          !owner.deviations.some(
+            (d) => d.reason === r.deviation && !d.reconciled
+          )
         ) {
           operations[owner.localRequestId] = {
             ...owner,
@@ -750,16 +822,46 @@ export async function reconcile(
     (r.createSeq === undefined || r.createSeq < takeover.seq)
       ? takeoverMs
       : Date.parse(r.createdAt);
-  const inFlight = targets.filter(
-    (r) =>
-      r.status === 'reserved' && nowMs - ageStartMs(r) < RESERVATION_SETTLE_MS
-  );
-  const settled = targets.filter((r) => !inFlight.includes(r));
-  const early: Resolution[] = inFlight.map((record) =>
-    notReached(
-      record,
-      'the reservation may still be in flight; try again shortly'
-    )
+  // A grant on an epoch the marker does not cover was rebound by a take-over
+  // the journal never recorded (a crash between the two in an older runtime):
+  // its reservations have no trustworthy age start, so none is aged at all.
+  // Epoch 1 is the first authorize; every take-over writes a later one.
+  let grants: GrantsFile | undefined;
+  try {
+    grants = loadGrants(deps.dataDir);
+  } catch {
+    // Unreadable grants: persist refuses every write anyway.
+  }
+  const unmarked = (r: OperationRecord): boolean => {
+    const epoch =
+      r.grantId !== undefined
+        ? grants?.grants[r.grantId]?.epochRef.epoch
+        : undefined;
+    return (
+      epoch !== undefined &&
+      epoch > 1 &&
+      (takeover === undefined ||
+        (takeover.epoch !== undefined && takeover.epoch < epoch))
+    );
+  };
+  const early: Resolution[] = [];
+  for (const r of targets) {
+    if (r.status !== 'reserved') continue;
+    if (unmarked(r)) {
+      early.push(
+        notReached(
+          r,
+          'its grant was rebound to a new controller epoch without a take-over marker in the journal, so the reservation cannot be aged; run authorize --take-over again'
+        )
+      );
+    } else if (nowMs - ageStartMs(r) < RESERVATION_SETTLE_MS) {
+      early.push(
+        notReached(r, 'the reservation may still be in flight; try again shortly')
+      );
+    }
+  }
+  const settled = targets.filter(
+    (r) => !early.some((e) => e.record === r)
   );
   const creates = settled.filter((r) => r.kind === 'create');
   const others = settled.filter(
