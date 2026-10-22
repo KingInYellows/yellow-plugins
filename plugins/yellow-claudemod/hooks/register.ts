@@ -45,12 +45,14 @@ async function bounded<T>(
 
 // Drops the oldest session keys past the cap. Not part of the ledger's
 // read-modify-write; a failure is retried after the next write. Runs beside
-// the chain, so it skips a key isBusy names: a write to that key could land
-// between the listing and the delete.
+// the chain, so it skips a key isBusy names (a write to it could land between
+// the listing and the delete) and lists each delete in flight in deleting,
+// for a later write to that key to wait on.
 async function pruneLedgerKeys(
   $: EngineInterface,
   ownKey: string,
-  isBusy: (key: string) => boolean
+  isBusy: (key: string) => boolean,
+  deleting: Map<string, Promise<void>>
 ): Promise<void> {
   try {
     const keys = await $.store.keys();
@@ -60,7 +62,14 @@ async function pruneLedgerKeys(
       ...keys.filter((k) => isBusy(k)),
     ];
     for (const old of ledgerKeysToPrune(ordered, ownKey)) {
-      if (!isBusy(old)) await $.store.delete(old);
+      if (isBusy(old)) continue;
+      const done = $.store.delete(old).then(
+        () => undefined,
+        () => undefined
+      );
+      deleting.set(old, done);
+      await done;
+      deleting.delete(old);
     }
   } catch {
     // Retried after the next write.
@@ -108,6 +117,7 @@ export const register: Register = (on, options) => {
   let pruning: Promise<void> | undefined;
   const queuedWrites = new Map<string, number>();
   let writtenDuringPrune = new Set<string>();
+  const deleting = new Map<string, Promise<void>>();
   const isBusy = (k: string): boolean =>
     (queuedWrites.get(k) ?? 0) > 0 || writtenDuringPrune.has(k);
   // The last failed write per ledger key: /clear changes the session id
@@ -205,6 +215,12 @@ export const register: Register = (on, options) => {
     queuedWrites.set(key, (queuedWrites.get(key) ?? 0) + 1);
     const step = writes.then(async () => {
       try {
+        // A prune that picked this key before the write was queued may still
+        // be deleting it; land the row after that delete, not under it.
+        const pendingDelete = deleting.get(key);
+        if (pendingDelete !== undefined) {
+          await bounded($, () => pendingDelete).catch(() => undefined);
+        }
         const ledger = readLedger(await $.store.get(key));
         await $.store.set(key, appendRow(ledger, row));
         if ((writeFailures.get(key)?.spawn ?? -1) <= spawn) {
@@ -222,7 +238,7 @@ export const register: Register = (on, options) => {
         writtenDuringPrune.add(key);
       } else {
         writtenDuringPrune = new Set();
-        pruning = pruneLedgerKeys($, key, isBusy).finally(() => {
+        pruning = pruneLedgerKeys($, key, isBusy, deleting).finally(() => {
           pruning = undefined;
         });
       }
