@@ -234,6 +234,31 @@ vr_ssh_fixture() {
   [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: $stderr" >&2; return 1; }
 }
 
+@test "CLAUDE-100: a git started by absolute path from the verify command resolves ssh on the screened PATH" {
+  vr_ssh_fixture
+  cp ignored/helper node_modules/.bin/ssh
+  touch -t 201901010000 node_modules/.bin/ssh
+  real_git=$(type -P git)
+  printf '%s\n' "'$real_git' ls-remote ssh://host.invalid/repo.git >/dev/null 2>&1 || true" >| "$CMD"
+  caller="$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH"
+  for cmdline in '' 'ssh' 'env ssh'; do
+    rm -f "$BATS_TEST_TMPDIR/bad-ran" "$BATS_TEST_TMPDIR/good-ran"
+    run --separate-stderr env "PATH=$caller" ${cmdline:+"GIT_SSH_COMMAND=$cmdline"} "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+    [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ] || { echo "worktree ssh ran: '$cmdline'" >&2; return 1; }
+    [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: '$cmdline': $stderr" >&2; return 1; }
+  done
+}
+
+@test "CLAUDE-100: a bare GIT_SSH with no program outside the worktree does not run the worktree one" {
+  vr_ssh_fixture
+  cp ignored/helper node_modules/.bin/my-ssh
+  touch -t 201901010000 node_modules/.bin/my-ssh
+  real_git=$(type -P git)
+  printf '%s\n' "'$real_git' ls-remote ssh://host.invalid/repo.git >/dev/null 2>&1 || true" >| "$CMD"
+  run --separate-stderr env "PATH=$REPO/node_modules/.bin:$PATH" GIT_SSH=my-ssh "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
+}
+
 @test "an ssh hard-linked to a worktree file in an outside PATH directory never runs from the verify command's git" {
   vr_ssh_fixture
   ln ignored/helper "$BATS_TEST_TMPDIR/hardbin/ssh"

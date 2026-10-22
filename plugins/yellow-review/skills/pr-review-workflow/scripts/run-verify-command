@@ -1969,12 +1969,47 @@ run_verify() {
     vr_shq() { local q=${1//\'/\'\\\'\'}; printf "'%s'" "$q"; }
     printf '#!/bin/sh\nPATH=%s exec %s "$@"\n' "$(vr_shq "$YR_GIT_PATH")" "$(vr_shq "$YELLOW_REVIEW_GIT")" >"$VR_SHIM/git" \
         && chmod 700 "$VR_SHIM/git" || die 2 "cannot write the git shim; the verify command was not run"
+    # A git the command starts by absolute path (/usr/bin/git) skips the shim
+    # and looks its helpers up on the caller's PATH, where a worktree
+    # directory may come first (CLAUDE-100). vr_pin_git_helpers, run in the
+    # command's subshell, pins them to the screened PATH: the ssh command line
+    # (GIT_SSH_COMMAND, else core.sshCommand, else ssh) runs as
+    # `PATH=<screened> <command line>`, so `ssh` and `env ssh` resolve
+    # outside the worktree, with GIT_SSH_VARIANT kept from its first word;
+    # a bare GIT_SSH, GIT_ASKPASS (or core.askpass), SSH_ASKPASS or
+    # GIT_PROXY_COMMAND becomes its absolute path on the screened PATH, or a
+    # path in the shim directory that does not exist when it has none there.
+    vr_pin_git_helpers() {
+        local v w name bin
+        if [ -z "${GIT_SSH:-}" ]; then
+            v=${GIT_SSH_COMMAND:-}
+            [ -n "$v" ] || v=$(yr_git config --get core.sshCommand 2>/dev/null) || v=""
+            [ -n "$v" ] || v=ssh
+            if [ -z "${GIT_SSH_VARIANT:-}" ] && [ -z "$(yr_git config --get ssh.variant 2>/dev/null)" ]; then
+                w=${v%%[[:space:]]*}
+                w=${w##*/}
+                case "$w" in ssh|plink|putty|tortoiseplink) export GIT_SSH_VARIANT="$w" ;; esac
+            fi
+            export GIT_SSH_COMMAND="PATH=$(vr_shq "$YR_GIT_PATH") $v"
+        fi
+        if [ -z "${GIT_ASKPASS:-}" ]; then
+            v=$(yr_git config --get core.askpass 2>/dev/null) || v=""
+            [ -z "$v" ] || export GIT_ASKPASS="$v"
+        fi
+        for name in GIT_SSH GIT_ASKPASS SSH_ASKPASS GIT_PROXY_COMMAND; do
+            v=${!name:-}
+            case "$v" in ''|*/*) continue ;; esac
+            bin=$(PATH=$YR_GIT_PATH; type -P -- "$v" 2>/dev/null) || bin=""
+            [ -n "$bin" ] || bin="$VR_SHIM/missing-$name"
+            export "$name=$bin"
+        done
+    }
     VR_PATH="$VR_SHIM:$YR_ORIG_PATH"
     if T=$(vr_timeout_bin); then
-        ( harden_git_config_for_verify; PATH=$VR_PATH; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; vr_pin_git_helpers; PATH=$VR_PATH; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
     else
-        ( harden_git_config_for_verify; PATH=$VR_PATH; exec "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; vr_pin_git_helpers; PATH=$VR_PATH; exec "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
         ( vr_watchdog "$CMD_PID" "$TIMEOUT" "$MARKER" "$KILL_AFTER" ) &
         WD_PID=$!

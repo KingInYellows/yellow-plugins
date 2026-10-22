@@ -1231,10 +1231,14 @@ yr_cfg_value_path_key() {
 # yr_cfg_value_enters <key> <value> <root>: succeed when a program-running
 # config value would run something inside <root>. Used for entries from files
 # outside the worktree, whose origin is trusted but whose value can still name
-# `./evil`, which resolves against the worktree. Shell syntax this check cannot
-# judge is tolerated here (the user's own global alias or pager keeps working);
-# only a definite hit refuses. For url.ext::<command>.insteadOf the command
-# in the key is judged too.
+# `./evil`, which resolves against the worktree. Returns 0 on a definite hit,
+# 2 when the value uses shell syntax this check cannot judge (yr_cmd_enters)
+# and the key is one the scripts' own git calls can reach, 1 otherwise. A
+# command the scripts never trigger (alias.*, a pager or editor, a diff or
+# merge tool) keeps unjudgeable syntax, so the user's own `!f() { ...; }; f`
+# alias keeps working; a transport command, credential helper, filter or
+# similar such as `sh $PWD/evil` is refused (CLAUDE-100). For
+# url.ext::<command>.insteadOf the command in the key is judged too.
 yr_cfg_value_enters() {
     local k="$1" v="$2" root="$3" rc=0 l
     # url.ext::<command>.insteadOf keeps the command git runs in the key's
@@ -1255,7 +1259,13 @@ yr_cfg_value_enters() {
         return $?
     fi
     yr_cmd_enters "$v" "$root" || rc=$?
-    [ "$rc" -eq 0 ]
+    [ "$rc" -ne 0 ] || return 0
+    [ "$rc" -eq 2 ] || return 1
+    l=$(rp_lower "$k")
+    case "$l" in
+        alias.*|pager.*|core.pager|core.editor|sequence.editor|difftool.*|mergetool.*) return 1 ;;
+    esac
+    return 2
 }
 
 # yr_env_path_verdict <name> <value> <root> [note]: like yr_env_cmd_verdict for
@@ -1445,14 +1455,15 @@ yr_cfg_null_candidates() {
 }
 
 # harden_git_config [full|revert]: force core.fsmonitor and
-# core.untrackedCache off, and safe.bareRepository=explicit, for this process
+# core.untrackedCache off, safe.bareRepository=explicit and
+# protocol.ext.allow=never, for this process
 # and its children (GIT_CONFIG_COUNT, appended to the caller's). It reads
 # config through yr_git, so no caller needs a git shadow.
 # Scope `full` (the default) also refuses a local or worktree transport
 # command, credential helper, or non-LFS filter, and forces signing off only
 # when local or worktree gpg config exists. Scope `revert` is for the
 # rollback and check-ignored modes, which run no submit step: it applies the
-# three overrides and refuses only a non-LFS filter (a checkout runs a smudge
+# four overrides and refuses only a non-LFS filter (a checkout runs a smudge
 # filter), so a resolver-set core.sshCommand cannot block its own rollback.
 # Does not set core.hooksPath (that stays in the commit script's
 # disable_git_hooks) and does not exit: return 0, or 1 with YR_HARDEN_MSG set.
@@ -1481,13 +1492,18 @@ harden_git_config() {
     yr_prime_path || { YR_HARDEN_MSG="no usable directory is left on PATH after the worktree screen"; return 1; }
     n=$((10#$n))
     YR_HARDEN_FROM_N=$n
+    # protocol.ext.allow=never: an ext:: remote URL (remote.<name>.url, or a
+    # URL on the command line) runs its embedded command when a config allows
+    # the protocol, and no command-key check sees a URL value (CLAUDE-100).
     export "GIT_CONFIG_KEY_$n=core.fsmonitor" "GIT_CONFIG_VALUE_$n=false" \
         "GIT_CONFIG_KEY_$((n + 1))=core.untrackedCache" "GIT_CONFIG_VALUE_$((n + 1))=false" \
         "GIT_CONFIG_KEY_$((n + 2))=safe.bareRepository" "GIT_CONFIG_VALUE_$((n + 2))=explicit" \
-        "GIT_CONFIG_COUNT=$((n + 3))"
+        "GIT_CONFIG_KEY_$((n + 3))=protocol.ext.allow" "GIT_CONFIG_VALUE_$((n + 3))=never" \
+        "GIT_CONFIG_COUNT=$((n + 4))"
     [ "$(yr_git config --get core.fsmonitor 2>/dev/null)" = false ] \
         && [ "$(yr_git config --get core.untrackedCache 2>/dev/null)" = false ] \
         && [ "$(yr_git config --get safe.bareRepository 2>/dev/null)" = explicit ] \
+        && [ "$(yr_git config --get protocol.ext.allow 2>/dev/null)" = never ] \
         || { YR_HARDEN_MSG="could not disable core.fsmonitor"; return 1; }
     # Every config entry that names a program (yr_cfg_key_runs_command, the one
     # list) is judged by where it came from, not by its scope: refused when it is
@@ -1545,9 +1561,19 @@ harden_git_config() {
         # Global, system and other scopes: the value first (a trusted file can
         # still name `./evil`, which resolves against the worktree), then the
         # file the entry came from.
-        if [ -n "$oroot" ] && yr_cfg_value_enters "$tkeyname" "$tval" "$oroot"; then
-            YR_HARDEN_MSG="a global or system git config sets $(yr_cfg_key_label "$tkeyname") to a program inside the repository; point it outside the repository"
-            return 1
+        if [ -n "$oroot" ]; then
+            c=0
+            yr_cfg_value_enters "$tkeyname" "$tval" "$oroot" || c=$?
+            case "$c" in
+                0)
+                    YR_HARDEN_MSG="a global or system git config sets $(yr_cfg_key_label "$tkeyname") to a program inside the repository; point it outside the repository"
+                    return 1
+                    ;;
+                2)
+                    YR_HARDEN_MSG="a global or system git config sets $(yr_cfg_key_label "$tkeyname") with shell syntax (\$, backticks, ; & | < > ( ) * ? [ backslashes, quotes inside a word or ~user) that cannot be checked against the repository; use a plain command line or a script outside the repository"
+                    return 1
+                    ;;
+            esac
         fi
         case "$trigin" in file:*) ofile=${trigin#file:} ;; *) continue ;; esac
         case "$cache" in *$'\n'"$ofile"$'\n'*) continue ;; esac
@@ -1581,7 +1607,7 @@ harden_git_config() {
     hit=$(printf '%s\n' "$cfg" | yr_awk -F'\t' '($1 == "local" || $1 == "worktree") && tolower($2) !~ /^commit\.gpgsign (false|no|off|0)$/ { print "y"; exit }') \
         || { YR_HARDEN_MSG="could not parse the git signing config"; return 1; }
     [ -n "$hit" ] || return 0
-    n=$((n + 3))
+    n=$((n + 4))
     # push.gpgSign and log.showSignature reach gpg.program in the child git of
     # the submit step, so they are forced off with commit signing.
     export "GIT_CONFIG_KEY_$n=commit.gpgSign" "GIT_CONFIG_VALUE_$n=false" \

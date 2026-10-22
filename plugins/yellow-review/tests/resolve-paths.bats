@@ -1288,6 +1288,7 @@ commit_repo() {
   [ "$(git config --get core.fsmonitor)" = false ]
   [ "$(git config --get core.untrackedCache)" = false ]
   [ "$(git config --get safe.bareRepository)" = explicit ]
+  [ "$(git config --get protocol.ext.allow)" = never ]
   [ -z "$(git config --get core.hooksPath 2>/dev/null || true)" ]
   [ ! -s "$BATS_TEST_TMPDIR/harden.err" ]
   git status --porcelain >/dev/null
@@ -1407,8 +1408,8 @@ CFG_CMD_KEYS=(
   # the rollback modes judge the checkout subset of the same list
   yr_cfg_key_runs_command filter.x.clean evil checkout
   yr_cfg_key_runs_command lfs.standalonetransferagent e checkout
-  ! yr_cfg_key_runs_command merge.m.driver evil checkout
-  ! yr_cfg_key_runs_command core.sshCommand evil checkout
+  ! yr_cfg_key_runs_command merge.m.driver evil checkout || false
+  ! yr_cfg_key_runs_command core.sshCommand evil checkout || false
 }
 
 @test "harden_git_config refuses every table key set in the repository config, naming the key and not the value" {
@@ -1528,17 +1529,18 @@ CFG_CMD_KEYS=(
   export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=Preset
   rc=0; harden_git_config revert || rc=$?
   [ "$rc" -eq 0 ]
-  [ "$GIT_CONFIG_COUNT" -eq 4 ]
+  [ "$GIT_CONFIG_COUNT" -eq 5 ]
   [ "$(git config --get user.name)" = Preset ]
   [ "$(git config --get safe.bareRepository)" = explicit ]
   harden_git_config_for_verify
-  [ "$GIT_CONFIG_COUNT" -eq 3 ]
+  [ "$GIT_CONFIG_COUNT" -eq 4 ]
   [ "$(git config --get user.name)" = Preset ]
   [ "$(git config --get core.fsmonitor)" = false ]
   [ "$(git config --get core.untrackedCache)" = false ]
+  [ "$(git config --get protocol.ext.allow)" = never ]
   rc=0; git config --get safe.bareRepository >/dev/null || rc=$?
   [ "$rc" -eq 1 ]
-  [ -z "${GIT_CONFIG_KEY_3:-}" ]
+  [ -z "${GIT_CONFIG_KEY_4:-}" ]
 }
 
 @test "harden_git_config_for_verify lets git open a bare repository that the override refuses" {
@@ -2139,10 +2141,10 @@ EOF
   yr_has_root "x '$root'" "$root"
   yr_has_root "a=$root:b" "$root"
   yr_has_root "$root" "$root"
-  ! yr_has_root "ssh -i ${root}-keys/id" "$root"
-  ! yr_has_root "${root}2/bin/ssh" "$root"
-  ! yr_has_root "${root}.bak/x" "$root"
-  ! yr_has_root "pre${root}/x" "$root"
+  ! yr_has_root "ssh -i ${root}-keys/id" "$root" || false
+  ! yr_has_root "${root}2/bin/ssh" "$root" || false
+  ! yr_has_root "${root}.bak/x" "$root" || false
+  ! yr_has_root "pre${root}/x" "$root" || false
   yr_has_root "${root}2/x $root/y" "$root"
 }
 
@@ -2616,7 +2618,7 @@ EOF
   ln -s "$BATS_TEST_TMPDIR/okreal" "$BATS_TEST_TMPDIR/oklink"
   yr_links_inside "$BATS_TEST_TMPDIR/linkbin" "$PWD"
   yr_links_inside "$BATS_TEST_TMPDIR/linkscript" "$PWD"
-  ! yr_links_inside "$BATS_TEST_TMPDIR/oklink" "$PWD"
+  ! yr_links_inside "$BATS_TEST_TMPDIR/oklink" "$PWD" || false
   # A symlinked directory with only outside children stays in the batched screen.
   out=$(PATH="$BATS_TEST_TMPDIR/oklink:/usr/bin:/bin" yr_safe_path)
   [[ "$out" == "$BATS_TEST_TMPDIR/oklink:"* ]]
@@ -2644,7 +2646,7 @@ EOF
   mkdir -p "$d"
   printf '#!/usr/bin/env sh\n' >| "$d/tool"
   chmod +x "$d/tool"
-  ! yr_file_shebang_enters "$d/tool" "$PWD"
+  ! yr_file_shebang_enters "$d/tool" "$PWD" || false
   out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
   [[ "$out" == "$d:"* ]]
 }
@@ -2865,7 +2867,7 @@ unprivileged() {
   printf '#!/bin/sh\nprintf "%%s\\n" "$2"\n' >| "$BATS_TEST_TMPDIR/rootfind"
   chmod +x "$BATS_TEST_TMPDIR/rootfind"
   yr_helper() { [ "$1" = find ] && { printf '%s\n' "$BATS_TEST_TMPDIR/rootfind"; return 0; }; return 1; }
-  ! yr_file_shebang_enters "$d/tool" "$PWD"
+  ! yr_file_shebang_enters "$d/tool" "$PWD" || false
   # One this user can write could be rewritten with any #! line, root or not.
   chmod 0333 "$d/tool"
   yr_file_shebang_enters "$d/tool" "$PWD"
@@ -3048,9 +3050,9 @@ walk_fixture() {
   yr_prog_enters sub/evil "$root"
   # cwd outside the worktree: a relative word that exists under the worktree counts
   ( cd "$BATS_TEST_TMPDIR" && yr_prog_enters sub/evil "$root" )
-  ! yr_prog_enters "$BATS_TEST_TMPDIR/own/tool" "$root"
-  ! yr_prog_enters ssh "$root"
-  ! yr_prog_enters '' "$root"
+  ! yr_prog_enters "$BATS_TEST_TMPDIR/own/tool" "$root" || false
+  ! yr_prog_enters ssh "$root" || false
+  ! yr_prog_enters '' "$root" || false
 }
 
 @test "rp_ignored_changed_since ignores vitest's results cache behind a symlinked .vite directory but not its siblings" {
@@ -3070,4 +3072,37 @@ walk_fixture() {
   run rp_ignored_changed_since "$MARKER" "$SCRATCH"
   [ "$status" -eq 1 ]
   [ "$output" = node_modules/.vite ]
+}
+
+# --- CLAUDE-100: git trust-boundary leftovers ---
+
+@test "CLAUDE-100: a global transport command with unjudgeable shell syntax is refused; a global ! alias is not" {
+  mkdir -p tools
+  : >| tools/evil
+  local g="$BATS_TEST_TMPDIR/global" kv rc
+  for kv in 'core.sshCommand=sh $PWD/tools/evil' 'credential.helper=!f() { cat; }; f' 'core.sshCommand=ssh `pwd`/x'; do
+    : >| "$g"
+    git config -f "$g" "${kv%%=*}" "${kv#*=}"
+    rc=0; ( export GIT_CONFIG_GLOBAL="$g"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "accepted: $kv" >&2; return 1; }
+    ( export GIT_CONFIG_GLOBAL="$g"; harden_git_config full || true
+      [[ "$YR_HARDEN_MSG" == *"uses"*"shell syntax"* || "$YR_HARDEN_MSG" == *"with shell syntax"* ]] && [[ "$YR_HARDEN_MSG" != *evil* ]] )
+  done
+  for kv in 'alias.up=!f() { git pull "$@"; }; f' 'core.pager=less -R $LESS' 'core.editor=vim +$LINE'; do
+    : >| "$g"
+    git config -f "$g" "${kv%%=*}" "${kv#*=}"
+    rc=0; ( export GIT_CONFIG_GLOBAL="$g"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $kv" >&2; return 1; }
+  done
+}
+
+@test "CLAUDE-100: harden_git_config forces protocol.ext.allow=never, so an ext:: remote does not run its command" {
+  marker="$BATS_TEST_TMPDIR/ext-ran"
+  git config --local protocol.ext.allow always
+  git remote add extr "ext::sh -c touch% $marker"
+  harden_git_config full
+  [ "$(git config --get protocol.ext.allow)" = never ]
+  rc=0; git ls-remote extr >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ]
+  [ ! -e "$marker" ]
 }

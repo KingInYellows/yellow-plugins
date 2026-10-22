@@ -239,13 +239,21 @@ drops directories inside the worktree, any directory that holds a symlink
 (dangling or not) whose target is inside it, whatever the link is named, and any
 directory with an executable script whose `#!` interpreter is inside it. Both
 scripts also refuse an inherited `GIT_SSH_COMMAND`, `GIT_ASKPASS`, `GIT_PAGER`,
-`EDITOR`, `GIT_EXEC_PATH` or injected git config (`core.sshCommand`,
-`credential.helper`, ...) whose command line names a path inside the worktree
-(`sh <worktree>/script` included), or uses shell syntax that cannot be judged
-(`$VAR`, backticks, `;`, `|`, ...), or a `HOME`/`XDG_CONFIG_HOME` that puts git's
-global config inside the worktree; values outside it keep working. A script
-whose `#!` line passes a path inside the worktree as an argument is treated like
-one whose interpreter is inside it.
+`EDITOR` or injected git config (`core.sshCommand`, `credential.helper`, ...)
+whose command line names a path inside the worktree (`sh <worktree>/script`
+included), or uses shell syntax that cannot be judged (`$VAR`, backticks, `;`,
+`|`, ...), or a `HOME`/`XDG_CONFIG_HOME` that puts git's global config inside
+the worktree; values outside it keep working. Any non-empty `GIT_EXEC_PATH` or
+`GIT_CONFIG` is refused, wherever it points. A program-running key in the
+user's own global or system config is refused on the same unjudgeable shell
+syntax, except `alias.*`, pagers, editors and diff or merge tools, which these
+scripts never run. A script whose `#!` line passes a path inside the worktree as
+an argument is treated like one whose interpreter is inside it. Both scripts
+force `protocol.ext.allow=never`, so an `ext::` remote cannot run its command.
+In the verify command's environment the ssh command line runs on the screened
+`PATH`, and a bare `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS` or
+`GIT_PROXY_COMMAND` is pinned to its absolute path there, so a git the command
+starts by absolute path (`/usr/bin/git`) still skips worktree helpers.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
 `resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
