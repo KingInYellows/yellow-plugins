@@ -44,7 +44,7 @@ if command -v claude >/dev/null 2>&1; then
       let rows;
       try { rows = JSON.parse(raw); } catch { rows = null; }
       if (!Array.isArray(rows)) { process.stdout.write("unknown"); return; }
-      const mine = rows.filter((r) => typeof r?.id === "string" && r.id.startsWith("yellow-claudemod@"));
+      const mine = rows.filter((r) => r?.id === "yellow-claudemod@yellow-plugins");
       process.stdout.write(mine.length === 0 ? "absent" : mine.some((r) => r.enabled === true) ? "enabled" : "disabled");
     });
   ' 2>/dev/null)

@@ -79,8 +79,15 @@ export const register: Register = (on, options) => {
   // instead, and while the chain is stalled spawns stop waiting on it.
   let writes: Promise<void> = Promise.resolve();
   let isChainStalled = false;
-  // Keyed by ledger key: /clear changes the session id mid-module.
-  let writeFailure: (WriteFailure & { key: string }) | undefined;
+  // The last failed write per ledger key: /clear changes the session id
+  // mid-module, and each session reports only its own.
+  const writeFailures = new Map<string, WriteFailure>();
+  const recordFailure = (key: string, ts: string, err: unknown): void => {
+    writeFailures.set(key, {
+      ts,
+      reason: err instanceof Error ? err.message : String(err),
+    });
+  };
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -157,13 +164,9 @@ export const register: Register = (on, options) => {
       try {
         const ledger = readLedger(await $.store.get(key));
         await $.store.set(key, appendRow(ledger, row));
-        if (writeFailure?.key === key) writeFailure = undefined;
+        writeFailures.delete(key);
       } catch (err) {
-        writeFailure = {
-          key,
-          ts,
-          reason: err instanceof Error ? err.message : String(err),
-        };
+        recordFailure(key, ts, err);
       }
       // The row is stored by now; a failed prune is retried on the next
       // write, so it is not a missing row.
@@ -177,16 +180,15 @@ export const register: Register = (on, options) => {
       if (writes === step) isChainStalled = false;
     });
     writes = step;
-    if (!isChainStalled) {
+    if (isChainStalled) {
+      // Queued behind a stalled write; cleared if the row lands later.
+      recordFailure(key, ts, 'an earlier ledger write is still pending');
+    } else {
       try {
         await bounded($, () => step);
       } catch (err) {
         isChainStalled = true;
-        writeFailure = {
-          key,
-          ts,
-          reason: err instanceof Error ? err.message : String(err),
-        };
+        recordFailure(key, ts, err);
       }
     }
 
@@ -212,7 +214,7 @@ export const register: Register = (on, options) => {
         mergeLedgers(ledgers),
         tail,
         keys.length,
-        writeFailure?.key === ownKey ? writeFailure : undefined
+        writeFailures.get(ownKey)
       ),
     };
   }).catch(() => ({

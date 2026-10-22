@@ -307,6 +307,27 @@ describe('ledger write failures', () => {
     expect(text).not.toContain('Ledger write failed');
   });
 
+  test('a spawn queued behind a stalled write reports it', async ($, on) => {
+    const clock = mock.clock(on);
+    let sessionId = 's1';
+    on('session.id', () => ({ value: sessionId }));
+    on('store.get', () => ({ value: undefined }));
+    on('store.set', () => new Promise<never>(() => {}));
+    on('store.keys', () => ({ value: [] }));
+    on('agent.spawn', ($, e) => ({ model: e.model ?? 'opus', agentId: 'a' }));
+    on('command.run', () => ({ text: 'engine' }));
+    const first = spawn($, REVIEWER);
+    await clock.settle();
+    await clock.advance(2000);
+    await first;
+    sessionId = 's2';
+    await spawn($, SECURITY);
+    const shown = status($);
+    await clock.settle();
+    await clock.advance(2000);
+    expect(await shown).toContain('an earlier ledger write is still pending');
+  });
+
   test('reports a failure only to the session it belongs to', async ($, on) => {
     mock.clock(on);
     let sessionId = 's1';
