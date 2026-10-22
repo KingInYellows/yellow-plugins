@@ -98,8 +98,13 @@ def prepare(spec_path, work):
         fresh = not os.path.isdir(wt)
         worktree(wt, r["commit"])
         if fresh:
-            for p in r["plants"]:
-                plant(wt, p)
+            try:
+                for p in r["plants"]:
+                    plant(wt, p)
+            except BaseException:
+                # A half-planted tree would look prepared to the next run.
+                git("worktree", "remove", "--force", wt)
+                raise
         patch = os.path.join(work, "prompts", r["id"] + ".patch")
         with open(patch, "w", encoding="utf-8") as handle:
             handle.write(git("diff", "HEAD^", cwd=wt))

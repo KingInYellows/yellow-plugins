@@ -41,12 +41,14 @@ wall=$(($(date +%s) - start))
 scan=$(find "$workdir/.debt/scanner-output" -maxdepth 1 -name '*.json' -print -quit 2>/dev/null)
 [ -n "$scan" ] && cp "$scan" "$out_dir/$id.scan.json"
 # -s: jq exits 0 with no output on an empty file (a timeout or a crash).
-if [ -s "$out.tmp" ] && jq -e --arg rc "$rc" --argjson wall "$wall" \
-  '. + {eval_rc: ($rc | tonumber), eval_wall_s: $wall}' "$out.tmp" >"$out" 2>/dev/null; then
+# is_error: a rate limit or max-turns still prints JSON; fail it so it reruns.
+if [ -s "$out.tmp" ] && jq -e '(.is_error // false) | not' "$out.tmp" >/dev/null 2>&1 &&
+  jq -e --arg rc "$rc" --argjson wall "$wall" \
+    '. + {eval_rc: ($rc | tonumber), eval_wall_s: $wall}' "$out.tmp" >"$out" 2>/dev/null; then
   rm -f "$out.tmp"
 else
   rm -f "$out"
   mv "$out.tmp" "$out_dir/$id.bad"
-  printf 'run-one: %s produced no JSON (rc %s); see %s.err\n' "$id" "$rc" "$out_dir/$id" >&2
+  printf 'run-one: %s failed or produced no JSON (rc %s); see %s.err and .bad\n' "$id" "$rc" "$out_dir/$id" >&2
   exit 1
 fi
