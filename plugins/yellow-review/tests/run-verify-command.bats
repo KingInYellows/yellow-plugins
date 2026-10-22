@@ -249,6 +249,17 @@ vr_ssh_fixture() {
   done
 }
 
+@test "CLAUDE-100: GIT_SSH_COMMAND is pinned even when GIT_SSH is also set" {
+  vr_ssh_fixture
+  cp ignored/helper node_modules/.bin/ssh
+  touch -t 201901010000 node_modules/.bin/ssh
+  real_git=$(type -P git)
+  printf '%s\n' "'$real_git' ls-remote ssh://host.invalid/repo.git >/dev/null 2>&1 || true" >| "$CMD"
+  run --separate-stderr env "PATH=$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH" GIT_SSH_COMMAND=ssh "GIT_SSH=$BATS_TEST_TMPDIR/goodbin/ssh" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
+  [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: $stderr" >&2; return 1; }
+}
+
 @test "CLAUDE-100: a bare GIT_SSH with no program outside the worktree does not run the worktree one" {
   vr_ssh_fixture
   cp ignored/helper node_modules/.bin/my-ssh

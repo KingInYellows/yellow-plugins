@@ -1973,7 +1973,8 @@ run_verify() {
     # and looks its helpers up on the caller's PATH, where a worktree
     # directory may come first (CLAUDE-100). vr_pin_git_helpers, run in the
     # command's subshell, pins them to the screened PATH: the ssh command line
-    # (GIT_SSH_COMMAND, else core.sshCommand, else ssh) runs as
+    # (GIT_SSH_COMMAND, else core.sshCommand, else ssh unless GIT_SSH is
+    # set) runs as
     # `PATH=<screened> <command line>`, so `ssh` and `env ssh` resolve
     # outside the worktree, with GIT_SSH_VARIANT kept from its first word;
     # a bare GIT_SSH, GIT_ASKPASS (or core.askpass), SSH_ASKPASS or
@@ -1981,10 +1982,12 @@ run_verify() {
     # path in the shim directory that does not exist when it has none there.
     vr_pin_git_helpers() {
         local v w name bin
-        if [ -z "${GIT_SSH:-}" ]; then
-            v=${GIT_SSH_COMMAND:-}
-            [ -n "$v" ] || v=$(yr_git config --get core.sshCommand 2>/dev/null) || v=""
-            [ -n "$v" ] || v=ssh
+        # Git's order: GIT_SSH_COMMAND, then core.sshCommand, then GIT_SSH
+        # (pinned below), then ssh.
+        v=${GIT_SSH_COMMAND:-}
+        [ -n "$v" ] || v=$(yr_git config --get core.sshCommand 2>/dev/null) || v=""
+        [ -n "$v" ] || [ -n "${GIT_SSH:-}" ] || v=ssh
+        if [ -n "$v" ]; then
             if [ -z "${GIT_SSH_VARIANT:-}" ] && [ -z "$(yr_git config --get ssh.variant 2>/dev/null)" ]; then
                 w=${v%%[[:space:]]*}
                 w=${w##*/}
