@@ -753,15 +753,17 @@ async function persist(
         const owner = Object.values(operations).find(
           (o) => ownsSession(o) && o.sessionResource === next.sessionResource
         );
-        // Each reconcile re-reads an unresolved approve, so one acknowledged
-        // for this approve stays acknowledged. Another approve with the same
-        // fate is a new event and blocks again.
+        // Each reconcile re-reads an unresolved approve, so one recorded for
+        // this approve, open or acknowledged, is not recorded again. Another
+        // approve with the same fate is its own event and gets its own entry.
+        // A legacy entry with no source still suppresses while it is open.
         if (
           owner !== undefined &&
           !owner.deviations.some(
             (d) =>
               d.reason === r.deviation &&
-              (!d.reconciled || d.sourceRequestId === current.localRequestId)
+              (d.sourceRequestId === current.localRequestId ||
+                (d.sourceRequestId === undefined && !d.reconciled))
           )
         ) {
           operations[owner.localRequestId] = {

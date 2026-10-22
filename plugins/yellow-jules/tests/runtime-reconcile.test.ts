@@ -1208,8 +1208,8 @@ describe('reply and approve reservations resolve on their own session', () => {
       });
     }
     const owner = session.localRequestId;
-    // An earlier approve's acknowledged deviation with the same reason does
-    // not cover this approve.
+    // Another approve's deviation with the same reason, still open, does not
+    // cover this approve.
     await updateJournal(h.dataDir, (operations) => {
       const record = operations[owner]!;
       operations[owner] = {
@@ -1221,7 +1221,7 @@ describe('reply and approve reservations resolve on their own session', () => {
               'a different plan was approved after an unresolved approve was sent, and it cannot be attributed to that approve',
             sourceRequestId: 'approve-0',
             observedAt: new Date(now).toISOString(),
-            reconciled: true,
+            reconciled: false,
           },
         ],
       };
