@@ -22,6 +22,7 @@ printf '=== Prerequisites ===\n'
 command -v gh >/dev/null 2>&1 && printf 'gh:            ok\n' || printf 'gh:            NOT FOUND\n'
 command -v jq >/dev/null 2>&1 && printf 'jq:            ok\n' || printf 'jq:            NOT FOUND\n'
 command -v gt >/dev/null 2>&1 && printf 'gt:            ok\n' || printf 'gt:            NOT FOUND\n'
+command -v awk >/dev/null 2>&1 && printf 'awk:           ok\n' || printf 'awk:           NOT FOUND\n'
 
 printf '\n=== GitHub Auth ===\n'
 if command -v gh >/dev/null 2>&1; then
@@ -101,6 +102,8 @@ Stop after reporting all required failures:
 - `gh` missing: "GitHub CLI is required. Install it from https://cli.github.com/ and run `gh auth login`."
 - `jq` missing: "jq is required for review GraphQL helpers. Install it from https://jqlang.github.io/jq/download/."
 - `gt` missing: "Graphite CLI is required for review submission flows. Install it from https://graphite.dev/docs/cli."
+- `awk` missing: "awk is required by `/review:resolve`'s commit and verify
+  scripts. Install it with your package manager (any awk works)."
 - `gh_auth` not authenticated: "GitHub CLI is not authenticated. Run `gh auth login` and re-run `/review:setup`."
 - `flock`, `realpath` missing or `git>=2.31` too old: "The review-findings
   ledger needs flock, realpath and git 2.31+. On macOS:
