@@ -175,7 +175,7 @@ aggregation rules change there, propagate the same change here.
 2. **Fetch PR metadata + base branch** (mirrors review-pr.md Step 3 + 3a):
 
    ```bash
-   gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid
+   gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid,isCrossRepository
    git fetch origin "<baseRefName>" --no-tags
    ```
 
@@ -355,7 +355,9 @@ aggregation rules change there, propagate the same change here.
    concrete `suggested_fix`, apply sequentially via Edit. Then apply the
    high-confidence P2 tier exactly as `review-pr.md` Step 7 defines it (up
    to 5 P2 `safe_auto` findings owned by `review-fixer` at anchor 100, each
-   having passed the quality gates above). Other P2/P3 findings are not auto-applied
+   having passed the quality gates above), after the same `--check-paths`
+   pre-check, and apply nothing on a fork PR (`isCrossRepository`), as that
+   step defines. Other P2/P3 findings are not auto-applied
    here — they go through the resolve-PR flow at Step 12 instead. Parity
    rule with `review-pr.md` Step 7. Record each applied fix with
    ledger.md "Step 7".
@@ -373,37 +375,24 @@ aggregation rules change there, propagate the same change here.
 11. **Commit + submit** (mirrors review-pr.md Step 9):
 
     Show `git diff --stat` summary. Use `AskUserQuestion` to confirm:
-    "Push review fixes for PR #<PR#>?" On approval, using the provider
-    resolved in Step 0:
-
-    Graphite (`READY_GRAPHITE`):
-
-    ```bash
-    gt modify -m "fix: address review findings from <reviewer-categories>"
-    gt submit --no-interactive
-    ```
-
-    GitHub (`READY_GITHUB`):
-
-    ```bash
-    git add -- <specific files, never -A/.>
-    msgfile=$(mktemp)
-    printf 'fix: address review findings from %s\n' "<reviewer-categories>" >| "$msgfile"
-    git commit -F "$msgfile"
-    rm -f "$msgfile"
-    node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit
-    ```
-
-    Read the JSON result's `status` field; `SUCCESS` continues, anything
-    else reports the result's `recoveryAction`.
+    "Push review fixes for PR #<PR#>?" On approval, write the files
+    sub-step 9 edited to `<files-file>` and run `commit-resolve-fixes`
+    exactly as `review-pr.md` Step 9 items 5 and 6 define it, with
+    `--provider graphite` for `READY_GRAPHITE` or `--provider github` for
+    `READY_GITHUB` (the provider resolved in Step 0) and
+    `--message "fix: address review findings from <reviewer-categories>"`.
+    It stages only the listed files and adds a **new** commit, never an
+    amend. Handle its result as that step does.
 
     **Ledger** (mirrors review-pr.md Step 9): when sub-step 9 applied
-    fixes, run the commit command, then ledger.md "Step 9" item 1, then the
-    submit command, then item 2 once submission reports success. A
-    rejected or failed push appends nothing more.
+    fixes, run ledger.md "Step 9" item 1 once the script returns `PUSHED`
+    or exits 5 or 6, then item 2 on `PUSHED` only. Any other outcome
+    appends nothing more.
 
-    If rejected: report changes remain uncommitted for manual review and
-    continue to the next PR (do not run Step 12 or Step 13 for this PR).
+    If rejected, or the script ended in anything but `PUSHED` or `NOOP`:
+    report the outcome (changes uncommitted for manual review, or a local
+    commit to resubmit after exit 5 or 6) and continue to the next PR (do
+    not run Step 12 or Step 13 for this PR).
 
 12. **Resolve**: Fetch unresolved comments → run `/review:resolve` flow if
     any exist.

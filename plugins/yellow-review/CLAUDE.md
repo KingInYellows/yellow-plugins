@@ -34,9 +34,10 @@ resolution, and sequential stack review. Graphite-native workflow.
   validation, `set -eu`)
 - Working directory must be clean before running any review command
 - Commit messages: `fix: address review findings from <agents>` or
-  `fix: resolve PR #<num> review comments (<n> files)`. `/review:resolve` always
-  adds a new commit via `commit-resolve-fixes` (explicit `git add`, then a new
-  commit — never an amend)
+  `fix: resolve PR #<num> review comments (<n> files)`. `/review:pr`,
+  `/review:all`, `/review:triage` and `/review:resolve` always add a new commit
+  via `commit-resolve-fixes` (explicit `git add`, then a new commit — never an
+  amend)
 - Always confirm with user via `AskUserQuestion` before pushing changes — never
   auto-push without human approval. **Exceptions** (commands that intentionally
   run unattended and suppress every push gate by design):

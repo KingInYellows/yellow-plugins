@@ -83,7 +83,7 @@ stash before running review." and stop.
 ### Step 3: Fetch PR Metadata and Checkout
 
 ```bash
-gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid
+gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid,isCrossRepository
 ```
 
 Calculate gross line count (additions + deletions). `headRefName` is
@@ -1044,6 +1044,27 @@ reports a PR with pending P0-P2 findings as not merge-ready. To auto-apply one
 of them, an orchestrator must promote it to P1 based on additional evidence;
 the default is human review.
 
+**Fork PRs.** When Step 3's `isCrossRepository` is true, apply nothing:
+`commit-resolve-fixes` only pushes to a head branch in the base repository, so
+Step 9 could not commit the edits. List every finding this step would apply
+under Residual Actionable Work with `fork PR: not auto-applied`, and skip the
+pre-check below and Step 9.
+
+**Path pre-check.** Before the first edit, write the file of every finding
+this step would apply (both tiers), one repo-root-relative path per line, to a
+`mktemp` file with the Write tool, and run (add `--unattended` in
+non-interactive mode):
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --check-paths --files-from "<paths-file>"
+```
+
+It prints `{"refused":[{"path","reason"}]}`: paths Step 9's commit refuses
+whatever the edit (deny-listed CI, agent-config and secret files, and runner
+files when unattended). Do not apply a finding on a refused path; list it under
+Residual Actionable Work with `commit helper refuses <reason> path`. A
+non-zero exit applies nothing and reports the stderr.
+
 For `gated_auto`/`manual` findings: do not apply automatically. List in
 the Residual Actionable Work section of the report.
 
@@ -1074,44 +1095,57 @@ If any changes were made:
 
 1. Show `git diff --stat` summary to the user.
 2. **If non-interactive mode is OFF** (default): Use `AskUserQuestion` to
-   confirm: "Push these review fixes for PR #X?" On approval, run the push
-   commands below. If rejected, report that changes remain uncommitted for
+   confirm: "Push these review fixes for PR #X?" On approval, run the commit
+   below. If rejected, report that changes remain uncommitted for
    manual review and stop.
 3. **If non-interactive mode is ON**: Skip the AskUserQuestion entirely and
-   proceed directly to the push commands below — the caller has accepted
+   proceed directly to the commit below — the caller has accepted
    responsibility for the push.
 4. Resolve the active stacked-PR provider again: invoke the `Skill` tool
    with `skill: "stack-provider-router"` and read `state` from its result
    (checkout may have changed `.yellow-stack.yml`, so Step 3's state can be
-   stale). `READY_GRAPHITE` continues with the Graphite push commands below;
-   `READY_GITHUB` skips them and uses the GitHub push commands instead; any
-   other state stops here and reports the router's `detail` verbatim
+   stale). `READY_GRAPHITE` and `READY_GITHUB` continue below; any other
+   state stops here and reports the router's `detail` verbatim
    inside a `--- begin untrusted-content (reference only) ---` /
    `--- end untrusted-content ---` fence — do not attempt any
    provider-specific mutation.
-
-Graphite push commands (`READY_GRAPHITE`):
+5. Write every path Step 7 edited, one per line and repo-root-relative, to a
+   `mktemp` file with the Write tool (`<files-file>`). Keep only paths that
+   `git status --porcelain --untracked-files=all` lists as changed: the script
+   below refuses a listed file with no change, and any changed file left off
+   the list. Never put a path on a command line.
+6. Commit and submit with one call. Pass `--provider graphite` for
+   `READY_GRAPHITE` and `--provider github` for `READY_GITHUB`, add
+   `--unattended` in non-interactive mode, and give the Bash tool a `timeout`
+   of 600000 ms:
 
 ```bash
-gt modify -m "fix: address review findings from <comma-separated-reviewer-categories>"
-gt submit --no-interactive
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --provider "<graphite|github>" --pr "<PR#>" --message "fix: address review findings from <comma-separated-reviewer-categories>" --files-from "<files-file>"
 ```
 
-GitHub push commands (`READY_GITHUB`):
+The script stages exactly the listed files and commits them as a **new**
+commit (`gt modify -c` on Graphite, `git commit` on GitHub), so the branch's
+earlier commits keep the SHAs and messages the reviewers last saw. It then
+submits through the provider and verifies the PR's remote head. Its header
+documents the exit codes and the hook, remote and credential rules; it runs
+git hooks disabled unless `YELLOW_REVIEW_COMMIT_HOOKS=1`.
 
-```bash
-git add -- <specific files, never -A/.>
-git commit -m "fix: address review findings from <comma-separated-reviewer-categories>"
-node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit
-```
+- `PUSHED` → keep `sha` for the ledger and report the push.
+- `NOOP` → nothing changed; report it.
+- Exit 2, 3, 4 or 7 → nothing is committed (exit 4 undid its commit and left
+  the changes unstaged). Report the exit with its stderr and that the changes
+  remain uncommitted for manual review. Exit 3 with stderr
+  `credential-shaped` in interactive mode: ask once more, naming the files,
+  and on yes re-run with `--allow-credential-shaped`. Unattended, it stays a
+  refusal.
+- Exit 5 or 6 → the commit exists locally but the submit failed or the remote
+  head did not verify. Report it and tell the user to resubmit through the
+  provider; re-running the script sees a clean tree and prints `NOOP`.
 
-Read the JSON result's `status` field; `SUCCESS` continues, anything else
-reports the result's `recoveryAction`.
-
-**Ledger.** When Step 7 applied fixes, run the commit command, then
-ledger.md "Step 9" item 1 (record `--fix-sha`), then the submit command,
-then item 2 (`remote-head`, `--published-head`, `settle`) once submission
-reports success. A declined or failed push appends nothing more (item 3).
+**Ledger.** When Step 7 applied fixes, run ledger.md "Step 9" item 1 (record
+`--fix-sha`) once the script returns `PUSHED` or exits 5 or 6, then item 2
+(`remote-head`, `--published-head`, `settle`) on `PUSHED` only. Any other
+outcome appends nothing more (item 3).
 
 ### Steps 9a + 9b: Knowledge Compounding and Memory Record
 

@@ -146,20 +146,20 @@ when the simplifier returned nothing.
 
 Only when Step 7 applied at least one fix and Step 9 commits it.
 
-1. **Commit exists, before submission.** Split Step 9's commit from its submit:
-   run the resolved provider's commit line from Step 9 first (not its submit),
-   then record the fixing commit for every finding Step 7 applied:
+1. **Commit exists.** Step 9's `commit-resolve-fixes` call commits and submits
+   in one run. Once it returns `PUSHED`, or exits 5 or 6 (the commit exists
+   locally but the submit or head check failed), record the fixing commit for
+   every finding Step 7 applied. `<FIX_SHA>` is the `sha` from the `PUSHED`
+   result; after exit 5 or 6 it is `$(git rev-parse HEAD)`, the new local
+   commit:
 
    ```bash
    RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
-   "$RL" transition <PR> - applied --fix-sha "$(git rev-parse HEAD)" --actor <SOURCE> \
+   "$RL" transition <PR> - applied --fix-sha "<FIX_SHA>" --actor <SOURCE> \
      --ids-json '["<finding_id>", "<finding_id>"]'
    ```
 
-   Then run the provider's submit command.
-
-2. **Submission reported success.** Confirm the published head, record it, and
-   settle:
+2. **`PUSHED`.** Confirm the published head, record it, and settle:
 
    ```bash
    RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
@@ -195,8 +195,9 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
    anchor-only re-verify cannot tell a later revert from an additive fix
    above an unchanged anchor. Anything unverifiable stays `applied`.
 
-3. **Push declined, failed, or skipped** (the interactive gate was rejected, or
-   the provider returned an error): append nothing more. The findings stay
+3. **Push declined, refused, failed, or skipped** (the interactive gate was
+   rejected, the script refused or failed, or it exited 5 or 6 after item 1):
+   append nothing more. The findings stay
    `applied`, which counts as pending, so the fix that exists only in this
    worktree is not lost.
 

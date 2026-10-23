@@ -7,6 +7,8 @@
 #                             [-- <files...>]
 #        commit-resolve-fixes --check-ranges --ranges-from <file>
 #                             [--files-from <file>] [-- <files...>]
+#        commit-resolve-fixes --check-paths [--unattended]
+#                             [--files-from <file>] [-- <files...>]
 #   files:   repo-root-relative paths the resolvers modified, one per line in
 #            --files-from and/or after --. Resolver output is untrusted, so
 #            callers pass it through --files-from, never on a command line.
@@ -37,6 +39,15 @@
 #            caller runs it before verification so out-of-range files can be
 #            reverted first; the check on the staged set (above) stays as the
 #            backstop.
+#   paths:   --check-paths reports which listed paths the commit would refuse
+#            by path alone, before anything is edited: it stages and commits
+#            nothing, needs no --provider, --pr or --message, makes no network
+#            call, and prints {"refused":[{"path":"<file>","reason":"deny-listed"}]}
+#            (reason "runner" for a runner file under --unattended; an empty
+#            list when none is refused). The files need not be changed yet.
+#            Exit 0 when the check ran, 2 for a non-canonical path or with
+#            --check-ranges. /review:pr Step 7 runs it so it never applies a
+#            fix this script would then refuse to commit.
 #   Added lines that look like a credential are refused (exit 3, stderr
 #   "credential-shaped") unless --allow-credential-shaped is passed, which an
 #   interactive caller does only after the user confirms a second time.
@@ -681,7 +692,7 @@ yr_adopt_path || die 3 "no PATH directory is left once those that reach into the
 PLUGIN_ROOT=$(cd -- "$CRF_DIR/../../.." && pwd) || { printf '[commit-resolve-fixes] Error: cannot resolve the plugin root\n' >&2; exit 2; }
 
 usage() {
-    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--files-from <file>] [--ranges-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-ranges --ranges-from <file> [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--files-from <file>] [--ranges-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-ranges --ranges-from <file> [--files-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-paths [--unattended] [--files-from <file>] [-- <files...>]\n' >&2
     exit 2
 }
 
@@ -693,6 +704,7 @@ ALLOW_CREDENTIAL=0
 RANGES_FROM=""
 RANGE_ROWS=""
 CHECK_RANGES=0
+CHECK_PATHS=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --provider) [ $# -ge 2 ] || usage; PROVIDER="$2"; shift 2 ;;
@@ -706,6 +718,7 @@ while [ $# -gt 0 ]; do
             shift 2
             ;;
         --check-ranges) CHECK_RANGES=1; shift ;;
+        --check-paths) CHECK_PATHS=1; shift ;;
         --ranges-from)
             [ $# -ge 2 ] || usage
             RANGES_FROM="$2"
@@ -717,6 +730,31 @@ while [ $# -gt 0 ]; do
     esac
 done
 FILES=(${RP_FILES[@]+"${RP_FILES[@]}"})
+
+# --- Path-check mode: report the listed paths the commit would refuse ---
+if [ "$CHECK_PATHS" = 1 ]; then
+    [ "$CHECK_RANGES" = 0 ] || die 2 "--check-paths and --check-ranges are separate modes"
+    [ -n "${YELLOW_REVIEW_GIT:-}" ] || die 2 "git not found"
+    yr_bind_outside jq YELLOW_REVIEW_JQ || die 2 "jq not found"
+    jq() { "$YELLOW_REVIEW_JQ" "$@"; }
+    TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
+    cd -- "$TOP"
+    REPORT='{"refused":[]}'
+    for f in ${FILES[@]+"${FILES[@]}"}; do
+        rp_canonical "$f" || die 2 "path must be canonical and repo-relative: $f"
+        reason=""
+        if rp_denied "$f"; then
+            reason=deny-listed
+        elif [ "$UNATTENDED" = 1 ] && rp_runner "$f"; then
+            reason=runner
+        fi
+        [ -z "$reason" ] && continue
+        REPORT=$(jq -c --arg p "$f" --arg r "$reason" '.refused += [{path: $p, reason: $r}]' <<<"$REPORT") \
+            || die 3 "could not build the report"
+    done
+    printf '%s\n' "$REPORT"
+    exit 0
+fi
 
 # Each row is "<path> <ranges>" as pr-changed-ranges prints it; anything else
 # means the file is not that script's output, so the guard would be guessing.

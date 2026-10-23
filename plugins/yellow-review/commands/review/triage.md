@@ -104,10 +104,21 @@ gh pr view <PR> --json number,state,headRefName,headRefOid,baseRefName,baseRefOi
 
 ## Step 4: Edit gate
 
-Edits are allowed only when `git rev-parse HEAD` equals `headRefOid` and
-`git status --porcelain` is empty. Otherwise triage runs read-only: it
-re-verifies against the fetched head but never edits, restores or commits. The
-gate compares SHAs, not branch names, so a detached HEAD at the PR head passes.
+Edits are allowed only when `git rev-parse HEAD` equals `headRefOid`,
+`git status --porcelain` is empty, and the checked-out branch is the PR's head
+branch: Step 8's `commit-resolve-fixes` refuses a detached HEAD and any branch
+other than `headRefName`. Compare the names without writing `headRefName` into
+command text:
+
+```bash
+head_ref=$(gh pr view <PR#> --json headRefName -q .headRefName) || head_ref=""
+cur_ref=$(git symbolic-ref -q --short HEAD) || cur_ref=""
+[ -n "$head_ref" ] && [ "$cur_ref" = "$head_ref" ] && echo branch-ok || echo branch-mismatch
+```
+
+Otherwise triage runs read-only: it re-verifies against the fetched head but
+never edits, restores or commits. A detached HEAD or a differently named branch
+at the PR head stays read-only until the PR is checked out as Apply describes.
 
 ## Step 5: Reconcile
 
@@ -194,7 +205,13 @@ offered.
   ```
 
   It re-validates the stored path at the PR head and in the worktree and prints
-  `{"file", "path"}`. Exit 3 means the id is unknown, the worktree is not
+  `{"file", "path"}`. Before editing, write that `file` to a `mktemp` file with
+  the Write tool and run `review-pr.md` Step 7's `commit-resolve-fixes
+  --check-paths` pre-check on it (`--unattended` in unattended mode); a refused
+  path cannot be committed in Step 8, so offer Dismiss or Skip instead. Restore
+  file runs the same pre-check. Neither is offered on a fork PR
+  (`gh pr view <PR#> --json isCrossRepository -q .isCrossRepository` prints
+  `true`): Step 8 cannot push to a fork. Exit 3 means the id is unknown, the worktree is not
   checked out at `headRefOid` (a stale local branch: the edit gate is closed
   again), or the stored path is unsafe at the head or in the worktree: tell the
   human and offer Dismiss or Skip, never the file name from the card. Exit 6
@@ -257,13 +274,14 @@ offered.
 
 If any Apply or Restore changed files, commit and submit exactly as
 `review-pr.md` Step 9 does: the push confirmation, the
-`stack-provider-router` resolution, the provider's own commit and submit
-commands, and the commit message
-`fix: address review-ledger findings for PR #<n>`. Around those commands,
+`stack-provider-router` resolution, the `commit-resolve-fixes` call (with the
+files Apply or Restore changed, `--unattended` in unattended mode) and its
+result handling, and the commit message
+`fix: address review-ledger findings for PR #<n>`. Around that call,
 Read `${CLAUDE_PLUGIN_ROOT}/references/review-pr/ledger.md` and run its
-"Step 9" items 1 and 2 with `--actor triage`: `--fix-sha` after the commit,
-then `remote-head`, `--published-head` and `settle` once submission
-succeeds. If the Read fails, stop and report the path. A declined or failed
+"Step 9" items 1 and 2 with `--actor triage`: `--fix-sha` once the commit
+exists, then `remote-head`, `--published-head` and `settle` once it reports
+`PUSHED`. If the Read fails, stop and report the path. A declined or failed
 push leaves the fixes `applied`, which still counts as pending.
 
 ## Step 9: Report

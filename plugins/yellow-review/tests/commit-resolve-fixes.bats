@@ -473,6 +473,28 @@ STUB
   [[ "$stderr" == *"--ranges-from not readable"* ]]
 }
 
+# --- Path-check mode (--check-paths) ---
+
+@test "--check-paths reports deny-listed paths, and runner files only when unattended" {
+  run --separate-stderr "$SCRIPT" --check-paths -- src/a.txt CLAUDE.md .github/workflows/ci.yml package.json
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"refused":[{"path":"CLAUDE.md","reason":"deny-listed"},{"path":".github/workflows/ci.yml","reason":"deny-listed"}]}' ]
+  run --separate-stderr "$SCRIPT" --check-paths --unattended -- src/a.txt package.json
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"refused":[{"path":"package.json","reason":"runner"}]}' ]
+  # nothing is staged or committed
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "--check-paths refuses a non-canonical path and the --check-ranges combination" {
+  run --separate-stderr "$SCRIPT" --check-paths -- ../x
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"canonical"* ]]
+  run --separate-stderr "$SCRIPT" --check-paths --check-ranges -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"separate modes"* ]]
+}
+
 # --- Check-only mode (--check-ranges) ---
 
 run_check() { run --separate-stderr "$SCRIPT" --check-ranges "$@"; }
