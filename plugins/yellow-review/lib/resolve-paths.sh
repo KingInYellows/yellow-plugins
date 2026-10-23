@@ -2457,7 +2457,7 @@ rp_path_link_newer() {
 # Git reads (including included files, and conditional includes whose
 # condition is false now) counts as a hit when written after <marker> while
 # the effective directory holds a hook (a repointed core.hooksPath), or when
-# it sets core.hooksPath or an includeIf path itself. Only the directory's
+# it sets core.hooksPath or an include path itself. Only the directory's
 # top-level entries count, since those are what Git runs; a symlinked hook is
 # judged by its target (find -L) and by every link on its way
 # (rp_path_link_newer), as are the hooks directory and each config file, and a
@@ -2537,16 +2537,15 @@ rp_hooks_changed_since() {
             seen+=("$c")
             if [ -f "$c" ]; then
                 d=$(dirname -- "$c") || exit 2
-                yr_git config --file "$c" -z --get-regexp '^include(if\..*)?\.path$' >|"$origins" 2>/dev/null
+                yr_git config --file "$c" -z --type=path --get-regexp '^include(if\..*)?\.path$' >|"$origins" 2>/dev/null
                 rc=$?
                 [ "$rc" = 0 ] || [ "$rc" = 1 ] || exit 2
                 while IFS= read -r -d '' rec; do
                     inc="${rec#*$'\n'}"
                     [ "$inc" != "$rec" ] && [ -n "$inc" ] || continue
+                    # --type=path has expanded ~/, ~user/ and %(prefix)/.
                     case "$inc" in
-                        *[[:cntrl:]]*|%\(*) exit 2 ;;
-                        "~/"*) inc="${HOME:?}/${inc#\~/}" ;;
-                        "~"*) exit 2 ;;
+                        *[[:cntrl:]]*) exit 2 ;;
                         /*) ;;
                         *) inc="$d/$inc" ;;
                     esac
@@ -2562,12 +2561,13 @@ rp_hooks_changed_since() {
             fi
             case " ${cfgs[*]-} " in *" $c "*) continue ;; esac
             cfgs+=("$c")
-            # A changed file that sets core.hooksPath or a conditional
-            # include counts even while the current directory holds no hook:
-            # a branch switch in the verify command can make Git use it.
+            # A changed file that sets core.hooksPath or any include counts
+            # even while the current directory holds no hook: a branch switch
+            # in the verify command can make Git use it, or an older file it
+            # now includes.
             if [ -f "$c" ]; then
                 rc=0
-                yr_git config --file "$c" --get-regexp '^(core\.hookspath|includeif\..*\.path)$' >/dev/null 2>&1 || rc=$?
+                yr_git config --file "$c" --get-regexp '^(core\.hookspath|include(if\..*)?\.path)$' >/dev/null 2>&1 || rc=$?
                 case "$rc" in 0) strong=1 ;; 1) ;; *) exit 2 ;; esac
             fi
         done

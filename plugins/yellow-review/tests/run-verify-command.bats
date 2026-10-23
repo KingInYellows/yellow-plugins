@@ -2802,6 +2802,36 @@ mark_hooks() {
   [[ "$stderr" == *".git/config"* ]]
 }
 
+@test "--ignored-since refuses a dormant includeIf config that now only includes an older hooksPath file" {
+  hooks_fixture
+  old_hook_dirs
+  rm -f .git/hooks/post-checkout
+  printf '[user]\n\tname = x\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/evil-hooks" >| "$BATS_TEST_TMPDIR/old.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/branch.cfg" "$BATS_TEST_TMPDIR/old.cfg"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '[include]\n\tpath = old.cfg\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"branch.cfg"* ]]
+}
+
+@test "--ignored-since expands ~/ and %(prefix)/ include paths and passes a clean run" {
+  hooks_fixture
+  printf '[user]\n\tname = x\n' >| "$HOME/home.cfg"
+  touch -t 201901010000 "$HOME/home.cfg"
+  git config --add include.path '~/home.cfg'
+  git config --add include.path '%(prefix)/share/yellow-review-absent.cfg'
+  git config --add includeIf.onbranch:other.path '~/home.cfg'
+  touch -t 201901010000 .git/config
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample
