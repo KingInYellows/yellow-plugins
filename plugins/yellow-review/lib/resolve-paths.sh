@@ -2390,9 +2390,10 @@ rp_hooks_untracked() {
 # (rp_hooks_untracked returns 4). In an in-tree hooks directory only a
 # symlinked hook whose target lies outside the tree or in the git directory is
 # judged (by that target):
-# the tree listing and the ignored-file walk cover the rest. The repository's
-# config and config.worktree count as hits when written after <marker> while
-# the effective directory holds a hook (a repointed core.hooksPath). Only the directory's
+# the tree listing and the ignored-file walk cover the rest. Every config file
+# Git reads (including included files) counts as a hit when written after
+# <marker> while the effective directory holds a hook (a repointed
+# core.hooksPath). Only the directory's
 # top-level entries count, since those are what Git runs; a symlinked hook is
 # judged by its target (find -L) and by the link itself (find -P), and a
 # *.sample is never run. Writes one
@@ -2417,16 +2418,29 @@ rp_hooks_changed_since() {
         # Git runs no hook from a path that is not a directory (/dev/null).
         [ -d "$hp" ] || exit 0
         hp=$(cd -P -- "$hp" 2>/dev/null && pwd -P) || exit 2
-        # An edit to the repository's own config can repoint core.hooksPath
-        # at a directory of hooks older than the marker, which no hook mtime
-        # flags. A config written after the marker counts when the effective
-        # directory holds a hook Git would run.
-        local c cfgs=() any
+        # A config edit can repoint core.hooksPath at a directory of hooks
+        # older than the marker, which no hook mtime flags. Every config file
+        # Git read (the repository's config and config.worktree, the global
+        # and system files and any file they include) counts when written
+        # after the marker while the effective directory holds a hook Git
+        # would run. --show-origin -z prints origin NUL key-and-value NUL.
+        local c cfgs=() any origins rec n=0 links=""
+        origins=$(mktemp) || exit 2
+        trap 'rm -f -- "$origins" ${links:+"$links"}' EXIT
+        yr_git config --list --show-origin --includes -z >|"$origins" 2>/dev/null || exit 2
         for c in config config.worktree; do
             c=$(yr_git rev-parse --git-path "$c" 2>/dev/null) || exit 2
-            case "$c" in /*) ;; *) c="$top/$c" ;; esac
-            [ -e "$c" ] && [ "$c" -nt "$marker" ] && cfgs+=("$c")
+            printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
         done
+        while IFS= read -r -d '' rec; do
+            n=$((n + 1))
+            [ $((n % 2)) = 1 ] || continue
+            case "$rec" in file:*) c="${rec#file:}" ;; *) continue ;; esac
+            case "$c" in /*) ;; *) c="$top/$c" ;; esac
+            [ -e "$c" ] && [ "$c" -nt "$marker" ] || continue
+            case " ${cfgs[*]-} " in *" $c "*) continue ;; esac
+            cfgs+=("$c")
+        done <"$origins"
         if [ "${#cfgs[@]}" -gt 0 ]; then
             any=$(find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -print -quit 2>/dev/null) || exit 2
             if [ -n "$any" ]; then
@@ -2443,9 +2457,8 @@ rp_hooks_changed_since() {
                 # ignored-file walk, but a tracked symlinked hook whose target
                 # lies outside the tree is not: an edit through it leaves the
                 # link unchanged. Judge only those targets.
-                local links l t
+                local l t
                 links=$(mktemp) || exit 2
-                trap 'rm -f -- "$links"' EXIT
                 find -P "$hp" -mindepth 1 -maxdepth 1 -type l ! -name '*.sample' -print0 >|"$links" 2>/dev/null || exit 2
                 while IFS= read -r -d '' l; do
                     t=$(yr_canon_path "$l") || exit 2

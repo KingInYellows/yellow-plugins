@@ -2635,6 +2635,24 @@ hooks_fixture() {
   [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
 }
 
+@test "--ignored-since refuses a core.hooksPath set after the marker in an included config file" {
+  hooks_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/old-hooks"
+  printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/hooked"\n' >| "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  chmod +x "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  printf '[user]\n\tname = x\n' >| "$BATS_TEST_TMPDIR/inc.cfg"
+  git config include.path "$BATS_TEST_TMPDIR/inc.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/inc.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/old-hooks" >| "$BATS_TEST_TMPDIR/inc.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"inc.cfg"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample
