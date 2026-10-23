@@ -104,10 +104,14 @@ gh pr view <PR> --json number,state,headRefName,headRefOid,baseRefName,baseRefOi
 
 ## Step 4: Edit gate
 
-Edits are allowed only when `git rev-parse HEAD` equals `headRefOid` and
-`git status --porcelain` is empty. Otherwise triage runs read-only: it
+Edits are allowed only when `git rev-parse HEAD` equals `headRefOid`,
+`git status --porcelain` is empty, and `git symbolic-ref -q --short HEAD`
+names a branch: Step 8's `commit-resolve-fixes` commits on the checked-out
+branch and refuses a detached HEAD. Otherwise triage runs read-only: it
 re-verifies against the fetched head but never edits, restores or commits. The
-gate compares SHAs, not branch names, so a detached HEAD at the PR head passes.
+gate compares SHAs, not branch names, so any local branch at the PR head
+passes; a detached HEAD at the PR head stays read-only until the PR is checked
+out as Apply describes.
 
 ## Step 5: Reconcile
 
