@@ -183,9 +183,10 @@ It never fails the run; keep its JSON (`changesRequested`,
 without a resolver dispatch, commit, push, reply or issue, and go to Step 9 with
 `push=skipped, verify=none, ratelimited=1`.
 
-If there are no unresolved threads, report "No unresolved comments found on PR
-#X." and go straight to Step 9, which still reports `CHANGES_REQUESTED`
-reviewers and prints the `Resolve:` line (`push=skipped, verify=none`).
+If there are no unresolved threads, report
+`No unresolved comments found on PR #X.` and go straight to Step 9, which still
+reports `CHANGES_REQUESTED` reviewers and prints the `Resolve:` line
+(`push=skipped, verify=none`).
 
 ### Step 3b: Query institutional memory (optional)
 
@@ -390,15 +391,19 @@ not already. Then, for every thread sent to a resolver:
      description) with "Keep the resolver's partial edits and stop / Roll back
      the conflicted cluster's edits / Cancel and reconcile manually". To roll
      back, write the cluster's files to a `mktemp` file with the Write tool and
-     run
-     `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-only --files-from "<file>"`
-     (it saves a patch). The revert is per file, and edits to a shared file
-     cannot be separated by cluster, so list every file the conflicted cluster
-     modified, shared or not. Every other cluster that modified a listed file
-     loses its edits with the revert: its threads become `unclear` too and stay
-     open, and its remaining files fall under Step 6's no-`fixed`-thread revert.
-     Cancel runs `run-verify-command --pr "<PR#>" --revert-dirty` (patch saved,
-     so manual reconciliation can start from it: the edits are unscreened and a
+     run (it saves a patch):
+
+     ```bash
+     "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-only --files-from "<file>"
+     ```
+
+     The revert is per file, and edits to a shared file cannot be separated by
+     cluster, so list every file the conflicted cluster modified, shared or not.
+     Every other cluster that modified a listed file loses its edits with the
+     revert: its threads become `unclear` too and stay open, and its remaining
+     files fall under Step 6's no-`fixed`-thread revert. Cancel runs
+     `run-verify-command --pr "<PR#>" --revert-dirty` (patch saved, so manual
+     reconciliation can start from it: the edits are unscreened and a
      deny-listed one must not stay on disk), then stops before Step 6 and goes
      to Step 9 with `push=skipped, verify=none`; run Step 6's marker cleanup
      block first. Keep stops the same way but reverts nothing: every edit stays
@@ -406,10 +411,12 @@ not already. Then, for every thread sent to a resolver:
      edits never depend on another cluster. Every `fixed` thread of the other
      clusters becomes `unclear` too, because nothing publishes it; Step 9 lists
      the files left on disk.
+
    - **Non-interactive:** do not prompt and do not keep unreconciled edits: roll
      the conflicted cluster back exactly as above (same shared-file rule), so
      Step 6 never commits or pushes its edits, and log the conflict for Step 9.
      Either way, the conflicted cluster's threads become `unclear`.
+
 2. **Parse and validate** each `THREAD` line, applying the contract's downgrade
    rules, skipped-reason mapping and `addressed` evidence rules. A line that
    does not match the contract's full-line regex is malformed: that thread is

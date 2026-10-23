@@ -191,8 +191,8 @@ Use the `AskUserQuestion` tool with:
   `P` 5; `W` of `0` prints `Re-pass wait: disabled`).
 
 - **Options**:
-  - **Proceed — sweep all <N> PRs** — run Step 3b's prune (when there is a prune
-    list), then continue to Step 4
+  - **Proceed — sweep all `<N>` PRs** — run Step 3b's prune (when there is a
+    prune list), then continue to Step 4
   - **Cancel** — stop without running any sweep or deleting any ledger
 
 If the user selects **Cancel** — OR the prompt is dismissed, times out, or

@@ -4,9 +4,10 @@ Local (non-GraphQL) scripts used by `/review:resolve` Steps 5–7 and the caller
 that walk several PRs. Exit codes and markers are defined in
 `references/resolve/dispositions.md`.
 
-- **commit-resolve-fixes**
-  `--provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--files-from <f>] [-- <files...>]`
-  — Stage, new commit, submit, verify remote head; never runs a push itself
+- **commit-resolve-fixes** `--provider graphite|github --pr <N> --message <msg>`
+  `[--unattended]` `[--allow-credential-shaped]`
+  `[--files-from <f>] [-- <files...>]` — Stage, new commit, submit, verify
+  remote head; never runs a push itself
 - **run-verify-command** — prints `{result, patch, log, treeClean}` plus a
   `reason` that is non-empty when something was skipped or only partly reverted:
   - `--pr <N> --timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker> [--files-from <f>]`
