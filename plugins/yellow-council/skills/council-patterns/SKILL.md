@@ -168,92 +168,110 @@ Apply this awk block to all reviewer output BEFORE injection fencing and
 BEFORE writing to `docs/council/<file>.md`:
 
 ```awk
-function strip_deco(s,   prev, guard, limit) {
-  # Strip to a FIXPOINT rather than in one fixed pass. Decoration nests in
-  # arbitrary order and depth: a blockquote inside a list item
+function strip_deco(s,   pre) {
+  # Remove every layer of leading decoration in ONE anchored match, so the
+  # cost is linear in the line whatever the attacker nests. Decoration nests
+  # in arbitrary order and depth: a blockquote inside a list item
   # ("- > <header>"), a combined diff with one prefix character per parent
-  # ("++"/"--"), a numbered excerpt wrapping either. A single ordered pass
-  # removes whichever layer it happens to reach first and leaves the rest, so
-  # the marker never normalises, the anchored classifier fails, and the block
-  # drops to the bounded path where a narrowly wrapped body leaks.
+  # ("++"/"--"), a numbered excerpt wrapping either. The tokens are
+  # whitespace, a blockquote or table bar, a diff "+" or "-", a "*" list
+  # marker followed by whitespace, a numbered-list prefix ("3. ", "3) ") and
+  # a numbered-excerpt bar ("12 | "). The longest prefix made of those tokens
+  # is exactly where an earlier strip-one-layer-per-pass loop stopped, but
+  # that loop copied the rest of the line once per layer, so a hostile run of
+  # "- " or "-+" pairs, or of numbered prefixes, was quadratic (seconds under
+  # gawk for a 100,000-character prefix).
   #
-  # Repeating until nothing changes removes every layer regardless of order
-  # or count. The bound is derived from the INPUT LENGTH, not a constant: an
-  # iteration only continues after removing at least one character, so
-  # length(s)+2 iterations always reach the fixpoint. A CONSTANT ceiling (the
-  # original 8, then 64) is a real limit on a nesting depth the attacker
-  # chooses -- 100 leading "+" exhausted the 64-ceiling with prefixes still
-  # attached, the anchored classifier below then failed, and the block leaked
-  # on the bounded path.
-  #
-  # Reaching `limit` is therefore impossible while every substitution above
-  # shrinks s; it can only mean a later edit added one that rewrites without
-  # shrinking. That is a bug, not deep nesting, so record it and let the
-  # caller fail CLOSED (treat the line as a real key) instead of falling
-  # through to the bounded path. No test exercises this arm today -- it exists
-  # so a future edit degrades safely rather than silently leaking.
-  # A "+" run is consumed whole below, and a "-" run longer than a delimiter
-  # collapses to five in one pass, so both flood cases are linear (a 100,000
-  # dash prefix went from 19 seconds under gawk to 20 milliseconds). An
-  # earlier revision bounded the dash case with a flat length cap that failed
-  # CLOSED, but keying "this is a real key" off LENGTH ALONE meant any long
-  # line that merely MENTIONED a marker was promoted to a real key and
-  # swallowed the report through EOF; collapsing the run keeps the per-line
-  # classification exactly as it was.
-  guard = 0
-  limit = length(s) + 2
-  do {
-    prev = s
-    sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
-    sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", s)
-    sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", s)
-    # A "+" run can never be part of a PEM delimiter, so take the whole run in
-    # one pass. Only the dash case below needs character-at-a-time care.
-    sub(/^\+\+*/, "", s)
-    # Never strip a leading dash off a line that is ALREADY a valid PEM
-    # delimiter: that corrupts "-----BEGIN" into "----BEGIN" and breaks every
-    # anchored test downstream.
-    # A dash run longer than a delimiter can never BE one, so collapse it
-    # to five in one pass: a flood of 100,000 dashes cost one pass per
-    # character (quadratic, about nine seconds) and could stall the
-    # council. Five is exactly what the per-character step below would
-    # leave before reaching a marker, so classification is unchanged.
-    if (s ~ /^------/) sub(/^--*/, "-----", s)
-    if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
-    sub(/^[[:space:]]+/, "", s)
-  } while (s != prev && ++guard < limit)
-  deco_exhausted = (s != prev)
+  # A "-" run is part of a PEM delimiter as well as a diff prefix. The match
+  # takes every dash, so when what is left starts with BEGIN or END and the
+  # stripped prefix ended in at least five dashes, the five dashes of the delimiter
+  # are put back: "------BEGIN" and "+-----BEGIN" both normalise to
+  # "-----BEGIN", and "---BEGIN" (not a delimiter) loses its dashes as before.
+  if (match(s, /^([[:space:]]|[>|+-]|[*][[:space:]]|[0-9]+[.)][[:space:]]|[0-9]+[[:space:]]*[|])+/)) {
+    pre = substr(s, 1, RLENGTH)
+    s = substr(s, RLENGTH + 1)
+    if (s ~ /^(BEGIN|END)/ && pre ~ /-----$/) s = "-----" s
+  }
   sub(/[[:space:]]+$/, "", s)
   return s
 }
-function cred_hit(re, minlen,   s) {
+function cred_hit(prefix, class, n,   re, i) {
+  # True when the line holds `prefix` followed by at least n characters of
+  # `class` ANYWHERE, tested with one regex match over the line.
   # mawk (the default /usr/bin/awk on Debian/Ubuntu) does not support
-  # interval expressions ({n,}/{n}) — it matches them literally, so a
-  # `{20,}`-gated credential regex silently stops matching real secrets on
-  # a mawk host. match()+RLENGTH (POSIX, mawk-safe) reproduces the same
-  # trigger condition without interval syntax: `+` greedily consumes the
-  # run after the literal prefix, RLENGTH is prefix-plus-run length, so
-  # RLENGTH >= prefixlen+N is equivalent to {N,} / {N} for detection
-  # purposes (we only ever discard the matched text, never reuse it, so
-  # {N} exact and {N,} at-least are interchangeable here).
-  # match() returns only the LEFTMOST occurrence. When a short placeholder
-  # sharing the same literal prefix appears before a real token on the same
-  # line ("example sk-ant-xxx ... sk-ant-<real>"), the leftmost RLENGTH falls
-  # under minlen and the line — real token included — is emitted unredacted.
-  # Walk every start position instead of testing only the first, advancing by
-  # ONE character rather than past the whole match: a longer occurrence can
-  # begin inside a shorter one ("sk-sk-ant-<real>"), and skipping RLENGTH
-  # would step over it.
-  s = $0
-  while (match(s, re)) {
-    if (RLENGTH >= minlen) return 1
-    s = substr(s, RSTART + 1)
+  # interval expressions ({n,}/{n}) and matches them literally, so the
+  # regex spells the class out n times instead: POSIX, mawk-safe, and built
+  # once per prefix. A regex search tries every start position itself, so a
+  # short placeholder sharing the prefix ("example sk-ant-xxx ...
+  # sk-ant-<real>") cannot shadow a real token later on the line, and an
+  # occurrence beginning inside a shorter one ("sk-sk-ant-<real>") is found
+  # too. The previous walk re-ran match() on a fresh suffix copy after every
+  # short hit, which was quadratic in the number of hits: a 300KB line of
+  # short "sk-" placeholders outlasted a 100-second timeout under gawk in a
+  # UTF-8 locale.
+  if (!(prefix in cred_re)) {
+    re = prefix
+    for (i = 0; i < n; i++) re = re class
+    cred_re[prefix] = re
   }
-  return 0
+  return $0 ~ cred_re[prefix]
 }
 function is_base64_line(s, minlen) {
   if (s !~ /^[A-Za-z0-9+\/=]+$/) return 0
   return length(s) >= minlen
+}
+# The text of a line that may be key material: decoration stripped, then the
+# serialisation a reviewer wraps a quoted key in. A key pasted as a JSON
+# string array, a markdown table column or an escaped "\n"-joined string
+# keeps its base64 slices, but the quotes, trailing commas, table bars and
+# literal "\n" escapes around them failed the base64 test, so every body
+# line counted as stray, the bounded window released after three of them,
+# and the rest of the key printed. Only the body tests use this: the
+# real-versus-prose decision at BEGIN time still sees strip_deco alone, so
+# a quoted MENTION is still a mention (normalising the marker line itself
+# promoted `- "<marker>"` bullets to real keys and swallowed the report).
+# A table row is split into cells, since its other columns stay populated
+# ("| key.pem | <slice> |"). An END marker in any cell is returned as the
+# END. Otherwise every cell is tested with is_key_body(), the same test the
+# bounded window applies to a whole line (width chain included), and the
+# longest cell that passes is returned. Only when none passes does a proxy
+# pick one: the base64-only cell with a digit or +/= and a non-hex letter,
+# then a non-hex letter alone, then any, longest within a rank, so a real
+# block still learns its body width. Choosing by proxy alone let a longer hex
+# checksum, or a shorter digit-bearing label beside a digit-free slice, stand
+# in for the slice and release the window. A slice never contains "|", so a
+# body line is never split. kt_widths lists the width of every passing cell
+# so the caller can learn them all (see note_widths): returning only the
+# longest dropped the width of a narrower key column beside a wider peer.
+function key_text(s,   n, i, c, best, rank, r, hit, cell) {
+  s = strip_deco(s)
+  gsub(/\\[nr]/, "", s)
+  kt_widths = ""
+  if (index(s, "|") > 0) {
+    n = split(s, cell, "|")
+    best = ""
+    hit = ""
+    rank = -1
+    for (i = 1; i <= n; i++) {
+      c = unwrap_cell(cell[i])
+      if (c ~ /^-----END [A-Z ]*PRIVATE KEY-----$/) return c
+      if (c !~ /^[A-Za-z0-9+\/=]+$/) continue
+      if (is_key_body(c)) {
+        kt_widths = kt_widths "," length(c)
+        if (length(c) > length(hit)) hit = c
+      }
+      r = (c ~ /[G-Zg-z+\/=]/) + (c ~ /[G-Zg-z+\/=]/ && c ~ /[0-9+\/=]/)
+      if (r > rank || (r == rank && length(c) > length(best))) { best = c; rank = r }
+    }
+    if (hit != "") return hit
+    if (best != "") return best
+  }
+  return unwrap_cell(s)
+}
+function unwrap_cell(s) {
+  sub(/^[[:space:]"`]+/, "", s)
+  sub(/[",;|`[:space:]]+$/, "", s)
+  return s
 }
 # Narrow-wrapped key body. A real key whose BEGIN shared its line with prose
 # runs under the bounded stray window, and a decoy END inside a real key
@@ -290,21 +308,39 @@ function is_narrow_key_run(s) {
   # the window), while a run of equal-length words after a quoted marker or
   # a genuine END no longer extends the window toward the verdict.
   return pem_key_len > 0 && is_base64_line(s, 12) &&
-    length(s) == pem_key_len && s !~ /^[A-Z]?[a-z]+$/
+    (length(s) == pem_key_len || index(pem_widths, "," length(s) ",") > 0) &&
+    s !~ /^[A-Z]?[a-z]+$/
+}
+# Learn the widths of every key-shaped table cell on a body line, kept as
+# ",12,21," in pem_widths and cleared with pem_key_len at each BEGIN. A
+# table row can hold a key column beside a wider base64 peer; one width
+# per line kept the peer and dropped the key column, so its digit-free
+# slices failed the chain and released the window.
+function note_widths(list,   n, i, w) {
+  if (pem_widths == "") pem_widths = ","
+  n = split(list, w, ",")
+  for (i = 1; i <= n; i++)
+    if (w[i] != "" && index(pem_widths, "," w[i] ",") == 0) pem_widths = pem_widths w[i] ","
+}
+# The body test of the bounded window: a wide base64 slice with a non-hex
+# character, or a narrow one by the rules above. key_text applies it to each
+# table cell, so the two can never disagree about what a body line is.
+function is_key_body(s) {
+  return (is_base64_line(s, 20) && s ~ /[G-Zg-z+\/=]/) || is_narrow_key_run(s)
 }
 {
   line = $0
   # OpenAI / Anthropic / Google / GitHub / AWS / Bearer / Authorization
-  if (cred_hit("sk-proj-[A-Za-z0-9_-]+", 28)) line = "--- redacted credential at line " NR " ---"
-  else if (cred_hit("sk-ant-[A-Za-z0-9_-]+", 27)) line = "--- redacted credential at line " NR " ---"
-  else if (cred_hit("sk-[A-Za-z0-9]+", 23)) line = "--- redacted credential at line " NR " ---"
-  else if (cred_hit("AIza[0-9A-Za-z_-]+", 39)) line = "--- redacted credential at line " NR " ---"
-  else if (cred_hit("gh[pous]_[A-Za-z0-9]+", 40)) line = "--- redacted credential at line " NR " ---"
-  else if (cred_hit("github_pat_[A-Za-z0-9_]+", 51)) line = "--- redacted credential at line " NR " ---"
-  else if (cred_hit("AKIA[0-9A-Z]+", 20)) line = "--- redacted credential at line " NR " ---"
-  else if (cred_hit("Bearer [A-Za-z0-9._~+\\/-]+", 27)) line = "--- redacted credential at line " NR " ---"
-  else if (cred_hit("Authorization: [A-Za-z0-9 ._~+\\/-]+", 35)) line = "--- redacted credential at line " NR " ---"
-  else if (cred_hit("ses_[A-Za-z0-9]+", 20)) line = "--- redacted credential at line " NR " ---"
+  if (cred_hit("sk-proj-", "[A-Za-z0-9_-]", 20)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("sk-ant-", "[A-Za-z0-9_-]", 20)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("sk-", "[A-Za-z0-9]", 20)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("AIza", "[0-9A-Za-z_-]", 35)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("gh[pous]_", "[A-Za-z0-9]", 36)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("github_pat_", "[A-Za-z0-9_]", 40)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("AKIA", "[0-9A-Z]", 16)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("Bearer ", "[A-Za-z0-9._~+\\/-]", 20)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("Authorization: ", "[A-Za-z0-9 ._~+\\/-]", 20)) line = "--- redacted credential at line " NR " ---"
+  else if (cred_hit("ses_", "[A-Za-z0-9]", 16)) line = "--- redacted credential at line " NR " ---"
   # PEM private key block — multi-line state machine.
   # NOTE: test the ORIGINAL line ($0) for BEGIN/END so the redaction-replacement
   # of `line` does not blind the END check (otherwise in_pem never resets).
@@ -369,6 +405,7 @@ function is_narrow_key_run(s) {
       pem_stray = 0
       pem_span = 0
       pem_key_len = 0
+      pem_widths = ","
       pem_chain = 0
       # Retire any re-arm window left over from an EARLIER block. pem_watch is
       # only decremented while !in_pem, so a countdown still running when this
@@ -378,10 +415,7 @@ function is_narrow_key_run(s) {
       # then re-enter UNBOUNDED real mode on the strength of a key that ended
       # long before. The window belongs to the block that closed, so close it.
       pem_watch = 0
-      # deco_exhausted: strip_deco could not reach its fixpoint, so pem_check
-      # may still carry decoration and cannot be trusted to fail the anchor
-      # honestly. Fail closed -- treat the block as a real key.
-      if (deco_exhausted || pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
+      if (pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
       else pem_real = 0
     }
   }
@@ -413,7 +447,7 @@ function is_narrow_key_run(s) {
   # indefinitely, which reintroduces the "swallow the whole report"
   # failure the window exists to prevent.
   if (!in_pem && pem_watch > 0) {
-    pem_check = strip_deco($0)
+    pem_check = key_text($0)
     # The re-arm additionally requires a digit or a base64-only punctuation
     # character. Without it an ordinary camelCase identifier
     # ("additionalRecommendationsForReviewers") satisfies the shape test and
@@ -470,7 +504,11 @@ function is_narrow_key_run(s) {
   pem_was_in = in_pem
   pem_release = 0
   if (in_pem) {
-    if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+    # A delimiter quoted the way key_text unwraps body lines ("-----END
+    # ... KEY-----",) closes the block too; garbage after the marker still
+    # fails both tests, so a decoy END keeps failing closed.
+    if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/ ||
+        key_text($0) ~ /^-----END [A-Z ]*PRIVATE KEY-----$/) {
       pem_prev_real = pem_real
       in_pem = 0
       pem_watch = 5
@@ -481,8 +519,10 @@ function is_narrow_key_run(s) {
       # the same: a decoy END injected mid-body hands the rest of the key to
       # the re-arm window, whose continuation test needs the width to
       # recognise a narrow, digit-free resumed line.
-      pem_body = strip_deco($0)
-      if (is_base64_line(pem_body, 12)) { pem_key_len = length(pem_body); pem_chain = 1 }
+      pem_body = key_text($0)
+      if (is_base64_line(pem_body, 12)) {
+        pem_key_len = length(pem_body); note_widths(kt_widths); pem_chain = 1
+      }
     } else {
       # Stray prose mention: bounded window so an ordinary report does not
       # get swallowed by a BEGIN marker quoted in passing. PEM armor is
@@ -502,7 +542,7 @@ function is_narrow_key_run(s) {
         in_pem = 0
         pem_release = 1
       } else {
-        pem_body = strip_deco($0)
+        pem_body = key_text($0)
         if (pem_body != "") {
           # The width chain (is_narrow_key_run) closes the digit-free-slice
           # gap: without it roughly one real key in six released the window
@@ -512,13 +552,13 @@ function is_narrow_key_run(s) {
           # a new BEGIN. Prose never earns it: the chain starts only from a
           # line that passed one of the strict tests, so equal-length words
           # after a mention stay stray.
-          if ((is_base64_line(pem_body, 20) && pem_body ~ /[G-Zg-z+\/=]/) ||
-              is_narrow_key_run(pem_body)) {
+          if (is_key_body(pem_body)) {
             pem_stray = 0
             # Only a base64 body line establishes the width: a Proc-Type or
             # DEK-Info header, or a repeated BEGIN, resets the stray counter
             # but must not feed its own length into the chain.
             pem_key_len = length(pem_body)
+            note_widths(kt_widths)
             pem_chain = 1
           } else if (pem_body ~ /^(Proc-Type|DEK-Info):/) {
             pem_stray = 0
@@ -531,8 +571,8 @@ function is_narrow_key_run(s) {
             # Reuse the real-vs-prose test the entry branch applies and promote
             # only if it passes; an embedded mention keeps the stray reset.
             pem_check = strip_deco($0)
-            if (deco_exhausted || pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
-              pem_real = 1; pem_span = 0; pem_key_len = 0; pem_chain = 0
+            if (pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+              pem_real = 1; pem_span = 0; pem_key_len = 0; pem_widths = ","; pem_chain = 0
             }
             pem_stray = 0
           } else if (++pem_stray >= 3) { in_pem = 0; pem_release = 1 }

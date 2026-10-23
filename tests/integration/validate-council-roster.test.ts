@@ -1041,6 +1041,35 @@ describe('validate-council-roster', () => {
       );
     });
 
+    it('skips gitignored files when the root is a git work tree', () => {
+      writeFixture(root);
+      execFileSync('git', ['init', '-q'], { cwd: root });
+      writeFile(root, '.gitignore', 'scratch/\n');
+      stamp(root);
+      writeFile(
+        root,
+        'scratch/notes.md',
+        '# notes\n\nCouncil uses Codex, Gemini and OpenCode.\n'
+      );
+
+      expect(run(root).status).toBe(0);
+    });
+
+    it('still checks untracked files git does not ignore', () => {
+      writeFixture(root);
+      execFileSync('git', ['init', '-q'], { cwd: root });
+      stamp(root);
+      writeFile(
+        root,
+        'docs/untracked.md',
+        '# notes\n\nCouncil uses Codex, Gemini and OpenCode.\n'
+      );
+
+      const r = run(root);
+      expect(r.status).not.toBe(0);
+      expect(r.stdout + r.stderr).toContain('docs/untracked.md');
+    });
+
     it('reports an unreadable file instead of dropping it from the ledger', () => {
       writeFixture(root);
       writeFile(

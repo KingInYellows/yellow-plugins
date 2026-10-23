@@ -439,8 +439,8 @@ body_files() {
   # Decoration NESTS. `- > <header>` needs the list strip and the blockquote
   # strip in the other order than a single ordered pass applies them, so one
   # layer survived, the marker never normalised, and the block dropped to the
-  # bounded path. The stripper now runs to a fixpoint, so order stops
-  # mattering.
+  # bounded path. The stripper now takes every layer in one match, so order
+  # stops mattering.
   local input
   input="$(printf -- '- > %s\n- > %s\n- > %s\n- > %s\n- > %s' \
     "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$END_PK")"
@@ -470,9 +470,10 @@ body_files() {
 }
 
 @test "prefix stripping scales with input length rather than a constant" {
-  # The companion to the test above: the bound is derived from length(s), so
-  # raising the prefix count by 5x must not change the outcome. A future edit
-  # that swaps the derived bound back for any constant turns these red.
+  # The companion to the test above: strip_deco takes the whole decoration
+  # run in one unbounded match, so raising the prefix count by 5x must not
+  # change the outcome. A future edit that reintroduces any constant bound on
+  # the nesting depth turns these red.
   local prefix input
   prefix="$(printf '+%.0s' $(seq 1 500))"
   input="$(printf -- '%s%s\n%s\n%s\n%s\n%s\n%s' \
@@ -483,9 +484,9 @@ body_files() {
 
 @test "a long plus-run is consumed in bulk rather than one pass per character" {
   # Stripping one character per pass while copying the remainder is quadratic
-  # in the run length. A "+" can never be part of a PEM delimiter, so the whole
-  # run is taken in a single substitution; only "-" needs character-at-a-time
-  # care, and a hostile "-" flood remains a known open cost (see strip_deco).
+  # in the run length. strip_deco now takes the whole decoration run, "+" and
+  # "-" alike, in a single match (see the nested-prefix and dash-run tests at
+  # the end of this file).
   # Assert BOTH halves: the secret is redacted, AND it finishes quickly — the
   # redaction alone would pass even at quadratic cost, just slowly.
   #
@@ -591,10 +592,11 @@ body_files() {
 }
 
 @test "a short placeholder does not shadow a real token later on the same line" {
-  # cred_hit() uses match(), which returns only the LEFTMOST occurrence. When
-  # a short placeholder sharing the prefix appears first, RLENGTH reflects the
-  # placeholder, falls under minlen, and the whole line — real token included
-  # — is emitted unredacted.
+  # An earlier cred_hit() used match(), which returns only the LEFTMOST
+  # occurrence. When a short placeholder sharing the prefix appeared first,
+  # RLENGTH reflected the placeholder, fell under the minimum, and the whole
+  # line — real token included — was emitted unredacted. The regex now spells
+  # out the minimum run, so the search itself considers every start.
   local secret="sk-ant-A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0"
   local input="example sk-ant-xxx then the real one ${secret}"
   assert_redacted_under_all "$input" "$secret"
@@ -917,4 +919,166 @@ body_files() {
     "Verdict: REJECT" "Summary: key was exposed")"
   assert_redacted_under_all "$input" "$WIDE_BODY"
   assert_survives_under_all "$input" "Verdict: REJECT"
+}
+
+# --- Serialized keys and linear-time scans (CLAUDE-16) ---------------------
+
+# assert_finishes_under_all <seconds> <input-file> <secret> — every awk must
+# finish within <seconds> AND redact <secret>. `timeout` bounds the run
+# instead of a stopwatch (see the plus-run test above for why). The input is a
+# file because these fixtures are megabytes long.
+assert_finishes_under_all() {
+  local bound="$1" file="$2" secret="$3" impl out status
+  for impl in $(available_awks); do
+    out="$(timeout "$bound" "$impl" -f "$AWK_PROG" "$file")"
+    status=$?
+    if [ "$status" -eq 124 ]; then
+      echo "${impl} exceeded ${bound}s: the scan is not linear in the line length" >&2
+      return 1
+    fi
+    [ "$status" -eq 0 ] || { echo "${impl} exited ${status}" >&2; return 1; }
+    if [[ "$out" == *"$secret"* ]]; then
+      echo "LEAK under ${impl}: the secret survived redaction on the timing fixture." >&2
+      return 1
+    fi
+  done
+}
+
+@test "many short placeholders on one line are scanned in linear time" {
+  # cred_hit used to re-run match() on a fresh copy of the rest of the line
+  # after every short hit, so a line of N short "sk-" placeholders cost N
+  # suffix copies: 33 seconds for 400,000 of them under both mawk and gawk,
+  # and over 100 seconds for a 300KB line under gawk in a UTF-8 locale. The
+  # real token at the end must still be found after all of them.
+  # Assembled at runtime for the same scanner reason as the PEM markers.
+  local secret file="${BATS_TEST_TMPDIR}/placeholders.txt"
+  secret="sk-$(printf 'Q%s' 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)"
+  awk -v s="$secret" 'BEGIN { for (i = 0; i < 800000; i++) printf "sk-ab "; print s }' >| "$file"
+  assert_finishes_under_all 30 "$file" "$secret"
+  LC_ALL=C.UTF-8 assert_finishes_under_all 30 "$file" "$secret"
+}
+
+@test "nested list, diff and numbered prefixes are stripped in linear time" {
+  # The plus-run test pins one shape. strip_deco used to take one layer per
+  # pass and copy the rest of the line each time, so a run of "- " list
+  # markers, alternating "-+" diff prefixes or "1. " numbered prefixes was
+  # still quadratic (4 to 8 seconds under gawk at 100,000 characters).
+  local prefix input file="${BATS_TEST_TMPDIR}/prefix.txt"
+  for prefix in '- ' '-+' '1. ' '> - '; do
+    awk -v p="$prefix" -v m="$BEGIN_PK" -v b="$NARROW_BODY" -v e="$END_PK" \
+      'BEGIN { for (i = 0; i < 200000; i++) printf "%s", p; print m; for (i = 0; i < 4; i++) print b; print e }' >| "$file"
+    assert_finishes_under_all 30 "$file" "$NARROW_BODY" || {
+      echo "prefix shape: '${prefix}'" >&2
+      return 1
+    }
+  done
+}
+
+@test "a dash run before a marker still normalises to the delimiter" {
+  # strip_deco takes every leading dash in one match and puts the delimiter's
+  # five back only in front of BEGIN or END, so an over-long dash run, a diff
+  # prefix glued to the delimiter, and a list marker before it all classify as
+  # a real key; a short dash run is not a delimiter and stays a mention.
+  local prefix input
+  for prefix in '-' '--' '+' '- ' '-- ' '+-+'; do
+    input="$(printf '%s%s\n%s\n%s\n%s\n%s\n%s' \
+      "$prefix" "$BEGIN_RSA" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$END_RSA")"
+    assert_redacted_under_all "$input" "$NARROW_BODY" || {
+      echo "prefix: '${prefix}'" >&2
+      return 1
+    }
+  done
+}
+
+@test "a key pasted as a JSON string array is fully redacted and the report survives" {
+  # The serialized-key leak: the quotes and trailing commas around each slice
+  # failed the base64 test, every body line counted as stray, and the bounded
+  # window opened by the quoted (prose-classified) BEGIN released after three
+  # of them and printed the rest of the key.
+  local input
+  input="$(printf '%s\n  "%s",\n  "%s",\n  "%s",\n  "%s",\n  "%s",\n  "%s"\n]\nVerdict: REJECT\nSummary: key in fixture' \
+    '"private_key": [' "$BEGIN_PK" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$END_PK")"
+  assert_redacted_under_all "$input" "$WIDE_BODY"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+  assert_survives_under_all "$input" "Summary: key in fixture"
+}
+
+@test "a key pasted as a markdown table column is fully redacted and the report survives" {
+  local input
+  input="$(printf '| file | value |\n|---|---|\n| key.pem | %s |\n| | %s |\n| | %s |\n| | %s |\n| | %s |\n| | %s |\n\nVerdict: REJECT' \
+    "$BEGIN_RSA" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$END_RSA")"
+  assert_redacted_under_all "$input" "$WIDE_BODY"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+}
+
+@test "a key in a table whose other columns stay populated is fully redacted" {
+  # Each body row keeps its first column filled, so stripping only the outer
+  # bars left "key.pem | <slice>", which is not base64; key_text now splits
+  # the row into cells. A row of ordinary cells after a mention still
+  # releases: none of them passes the body tests.
+  local input
+  input="$(printf '| file | value |\n|---|---|\n| key.pem | %s |\n| key.pem | %s |\n| key.pem | %s |\n| key.pem | %s |\n| key.pem | %s |\n| key.pem | %s |\n\nVerdict: REJECT' \
+    "$BEGIN_RSA" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$END_RSA")"
+  assert_redacted_under_all "$input" "$WIDE_BODY"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+  input="$(printf '| note | value |\n|---|---|\n| header | %s |\n| a.js | recommendation |\n| b.js | abc1234 |\n| c.js | considerations |\n| d.js | fine |\nVerdict: APPROVE' \
+    "$BEGIN_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+}
+
+@test "a longer hex checksum column does not hide a narrow key slice" {
+  # Picking the longest base64-only cell chose the 64-character hex column,
+  # which fails the non-hex test, so the narrow slice beside it counted as
+  # stray and the window released. Cells are ranked by key shape first.
+  local sum input
+  sum="$(printf 'a1%.0s' $(seq 1 32))"
+  input="$(printf '| sha256 | value |\n|---|---|\n| %s | %s |\n| %s | %s |\n| %s | %s |\n| %s | %s |\n| %s | %s |\n| %s | %s |\n\nVerdict: REJECT' \
+    "$sum" "$BEGIN_RSA" "$sum" "$NARROW_DIGIT_BODY" "$sum" "$NARROW_DIGIT_BODY" \
+    "$sum" "$NARROW_DIGIT_BODY" "$sum" "$NARROW_DIGIT_BODY" "$sum" "$END_RSA")"
+  assert_redacted_under_all "$input" "$NARROW_DIGIT_BODY"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+}
+
+@test "a digit-free slice beside a shorter digit-bearing label is still key material" {
+  # Ranking cells by a proxy (digit plus non-hex letter) picked the 5-char
+  # "row1z" label over the digit-free slice the width chain accepts, so the
+  # rows counted as stray and the window released. Every cell now runs the
+  # window's own body test.
+  local strict="Ab1dEfGhIjKl" free="AbCdEfGhIjKl" input
+  input="$(printf '| n | value |\n|---|---|\n| row0z | %s |\n| row0z | %s |\n| row1z | %s |\n| row2z | %s |\n| row3z | %s |\n| row4z | %s |\n| | %s |\n\nVerdict: REJECT' \
+    "$BEGIN_PK" "$strict" "$free" "$free" "$free" "$free" "$END_PK")"
+  assert_redacted_under_all "$input" "$free"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+}
+
+@test "a key column beside a wider base64 peer keeps its own width" {
+  # Learning one width per row kept the 21-char peer cell, so the digit-free
+  # 12-char slices below it failed the width chain and released the window.
+  # Every passing cell width on a body row now feeds the chain.
+  local strict="Ab1dEfGhIjKl" free="AbCdEfGhIjKl" peer="Xy9zAbCdEfGhIjKlMnOpQ" input
+  input="$(printf '| n | value | note |\n|---|---|---|\n| a | %s | |\n| b | %s | %s |\n| c | %s | |\n| d | %s | |\n| e | %s | |\n| f | %s | |\n| | %s | |\n\nVerdict: REJECT' \
+    "$BEGIN_PK" "$strict" "$peer" "$free" "$free" "$free" "$free" "$END_PK")"
+  assert_redacted_under_all "$input" "$free"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+}
+
+@test "a key wrapped as an escaped newline-joined string is fully redacted" {
+  # A JSON or YAML string with literal \n escapes, wrapped across lines by
+  # the reviewer: every body line carries backslash escapes that are not
+  # base64, so the window released and printed the tail.
+  local input
+  input="$(printf '"key": "%s\\n%s\\n\n%s\\n%s\\n\n%s\\n%s\\n\n%s\\n%s\\n\n%s\\n"\nVerdict: REJECT' \
+    "$BEGIN_PK" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$WIDE_BODY" "$END_PK")"
+  assert_redacted_under_all "$input" "$WIDE_BODY"
+  assert_survives_under_all "$input" "Verdict: REJECT"
+}
+
+@test "a quoted mention followed by quoted prose still releases the report" {
+  # The other direction: unwrapping quotes for the body test must not turn a
+  # JSON list of ordinary words or short identifiers into key material.
+  local input
+  input="$(printf '"header": "%s",\n"notes": [\n  "do not paste keys into findings",\n  "recommendation",\n  "considerations",\n  "abc1234",\n]\nVerdict: APPROVE\nSummary: fine' \
+    "$BEGIN_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+  assert_survives_under_all "$input" "Summary: fine"
 }
