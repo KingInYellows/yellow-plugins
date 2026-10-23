@@ -24,7 +24,8 @@
 #   (only \" and \\ escapes). Anything else under resolve_pr (a flow mapping,
 #   a nested block, an anchor, a tag, a block scalar, a key given twice) warns
 #   and that key takes its default. Booleans are true/false (also True/TRUE,
-#   False/FALSE) unquoted; integers are unquoted decimals.
+#   False/FALSE) unquoted; integers are unquoted decimals; resolve_human_threads
+#   may be plain or quoted.
 # Exit codes: 0 snapshot printed (also when the file is absent or refused),
 #   1 jq missing or a jq failure, 2 usage.
 # Contract: references/resolve/dispositions.md ("Verify")
@@ -138,7 +139,7 @@ jq -n -c --rawfile text "$WORK/config" --arg file "$FILE" --arg tracked "$TRACKE
           elif $f[$k].kind == "plain" and ($v | test("\\A(?:false|False|FALSE)\\z")) then .out[$k] = false
           else .out[$k] = false | if given($k) then .warn += [bad($k)] else . end end
       elif $k == "resolve_human_threads" then
-        if $f[$k].kind == "plain" and ($f[$k].value | IN("evidence", "never", "all"))
+        if ($f[$k].kind == "plain" or $f[$k].kind == "quoted") and ($f[$k].value | IN("evidence", "never", "all"))
         then .out[$k] = $f[$k].value
         else .out[$k] = "evidence" | if given($k) then .warn += [bad($k)] else . end end
       else

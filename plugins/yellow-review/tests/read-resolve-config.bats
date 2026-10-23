@@ -121,6 +121,16 @@ CFG
   [ "$(field verify_command)" = null ]
 }
 
+@test "a quoted resolve_human_threads mode is honoured, never dropped to evidence" {
+  printf -- "---\nresolve_pr:\n  resolve_human_threads: \"never\"\n---\n" >| yellow-plugins.local.md
+  run --separate-stderr "$SCRIPT"
+  [ "$(field resolve_human_threads)" = '"never"' ]
+  [ "$(field warnings)" = '[]' ]
+  printf -- "---\nresolve_pr:\n  resolve_human_threads: 'all'\n---\n" >| yellow-plugins.local.md
+  run --separate-stderr "$SCRIPT"
+  [ "$(field resolve_human_threads)" = '"all"' ]
+}
+
 @test "CRLF line endings parse like LF" {
   printf -- "---\r\nresolve_pr:\r\n  cluster_cap: 3\r\n---\r\n" >| yellow-plugins.local.md
   run --separate-stderr "$SCRIPT"
