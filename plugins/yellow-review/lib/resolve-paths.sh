@@ -2624,7 +2624,8 @@ rp_hooks_changed_since() {
             line=$((line + 1))
             [ "$line" -gt 2 ] || continue
             [ "$tag" = yellow-review-hooks-v1 ] || break
-            [ -e "$c" ] || [ -L "$c" ] || cfgs+=("$c")
+            # A dangling link counts as gone: Git skips it like a missing file.
+            [ -e "$c" ] || cfgs+=("$c")
         done <"$marker"
         while IFS= read -r -d '' c; do
             # A symlink on the way to the config counts by its own mtime too:

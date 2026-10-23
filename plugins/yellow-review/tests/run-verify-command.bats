@@ -2922,6 +2922,22 @@ mark_hooks() {
   [[ "$stderr" == *"branch.cfg"* ]]
 }
 
+@test "--ignored-since refuses a dormant includeIf link whose target was deleted after --mark-hooks" {
+  hooks_fixture
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$BATS_TEST_TMPDIR/real.cfg"
+  ln -s "$BATS_TEST_TMPDIR/real.cfg" "$BATS_TEST_TMPDIR/branch.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/real.cfg"
+  touch -h -t 201901010000 "$BATS_TEST_TMPDIR/branch.cfg"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  rm -f "$BATS_TEST_TMPDIR/real.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"branch.cfg"* ]]
+}
+
 @test "--ignored-since passes an include that was already missing at --mark-hooks" {
   hooks_fixture
   git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/never.cfg"
