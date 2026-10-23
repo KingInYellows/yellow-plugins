@@ -757,13 +757,15 @@ SH
 }
 
 @test "a busy store never makes the session's next edit lose its place" {
-  # Two background edits ordered only by sleep 0.02. A busy runner can
-  # finish the later edit first; the earlier one then overwrites .last.
-  skip "background edit order is not synchronized"
   edit q1 "$PROJECT_ROOT/src/a.ts"
   mkdir "$RUVECTOR_DIR/.coedit.lock"
   ( edit q1 "$PROJECT_ROOT/src/b.ts" ) &
-  sleep 0.02
+  # Start the second edit only once the first has saved its session state
+  # and is waiting on the store lock, so the launch order is the edit order.
+  for _ in $(seq 1 100); do
+    [ "$(jq -r .last "$RUVECTOR_DIR/coedit-sessions/q1" 2>/dev/null)" = "src/b.ts" ] && break
+    sleep 0.02
+  done
   ( edit q1 "$PROJECT_ROOT/src/c.ts" ) &
   wait
   rmdir "$RUVECTOR_DIR/.coedit.lock"
