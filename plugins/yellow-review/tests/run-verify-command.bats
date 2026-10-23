@@ -2837,6 +2837,23 @@ mark_hooks() {
   [ "$status" -eq 0 ]
 }
 
+@test "--ignored-since refuses an emptied global config that only held a dormant includeIf" {
+  hooks_fixture
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  git config -f "$BATS_TEST_TMPDIR/user-gitconfig" includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/user-gitconfig" "$BATS_TEST_TMPDIR/branch.cfg"
+  export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/user-gitconfig"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # Emptied: git lists no origin for it, and on the other branch the older
+  # .git/hooks would run.
+  : >| "$BATS_TEST_TMPDIR/user-gitconfig"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"user-gitconfig"* ]]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample

@@ -2517,6 +2517,30 @@ rp_hooks_changed_since() {
             c=$(yr_git rev-parse --git-path "$c" 2>/dev/null) || exit 2
             printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
         done
+        # The global and system files too: one emptied of a dormant includeIf
+        # drops out of --show-origin, and nothing includes it. git var names
+        # them on Git 2.42 and later; the defaults cover older ones. A device
+        # such as GIT_CONFIG_GLOBAL=/dev/null holds no config.
+        local roots
+        roots=$(
+            yr_git var GIT_CONFIG_GLOBAL 2>/dev/null
+            yr_git var GIT_CONFIG_SYSTEM 2>/dev/null
+            if [ -n "${GIT_CONFIG_GLOBAL+x}" ]; then
+                printf '%s\n' "$GIT_CONFIG_GLOBAL"
+            elif [ -n "${HOME:-}" ]; then
+                printf '%s\n' "$HOME/.gitconfig" "${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
+            fi
+            case "${GIT_CONFIG_NOSYSTEM:-}" in
+                ''|0|false|no|off) printf '%s\n' "${GIT_CONFIG_SYSTEM:-/etc/gitconfig}" ;;
+            esac
+        )
+        while IFS= read -r c; do
+            case "$c" in /*) ;; *) continue ;; esac
+            [ ! -e "$c" ] || [ -f "$c" ] || continue
+            printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
+        done <<EOF_ROOTS
+$roots
+EOF_ROOTS
         local queue=() seen=() i=0 inc d
         while IFS= read -r -d '' rec; do
             n=$((n + 1))
