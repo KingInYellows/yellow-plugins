@@ -108,16 +108,15 @@ cs_atomic_jsonl_write() {
 }
 
 # Redact secrets from stdin, write to stdout.
-# A self-contained pattern list, separate from yellow-ci's
-# hooks/scripts/lib/redact.sh and not a subset of it: password=, token=,
-# api_key=, secret=, Bearer, basic auth, the high-value vendor token prefixes
-# (including tvly-, pplx- and sgp_) and PEM key blocks. A bare Basic payload
-# the sed shapes miss is ambiguous with prose, so _cs_redact_bare_basic decodes it
-# and redacts only a control-free user:pass. Pipes sed into awk, whose output
-# is spooled to a private temp file until the input ends (memory stays flat).
-#
-# Future consolidation: when yellow-ci's redact.sh is relocated to a
-# shared yellow-core/lib/redact.sh, this wrapper can `. ` that file.
+# A portable (BSD + GNU sed) pattern list kept in parity with yellow-ci's
+# GNU-only hooks/scripts/lib/redact.sh: password=, token=, api_key=, secret=,
+# Bearer, basic auth, the high-value vendor token prefixes and PEM key blocks.
+# tests/integration/redaction-parity.test.ts fails when either list gains a
+# labelled pattern the other lacks, so add a new credential shape to both.
+# A bare Basic payload the sed shapes miss is ambiguous with prose, so
+# _cs_redact_bare_basic decodes it and redacts only a control-free user:pass.
+# yellow-ci runs a smaller awk stage with the same decode check; following a
+# payload folded onto the next line is yellow-core only.
 # Redact a bare `Basic <base64>` payload that base64-decodes to a control-free
 # `user:pass` (non-empty user), and a Basic payload folded onto the line after
 # its scheme (see carried). Shape heuristics cannot tell a short
@@ -281,6 +280,9 @@ cs_redact_secrets() {
   { sed -E \
     -e 's/ghp_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
+    -e 's/gho_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
+    -e 's/ghr_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
+    -e 's/ghu_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]{22,255}/[REDACTED:github-pat]/g' \
     -e 's/(AKIA|ASIA|ABIA|ACCA)[0-9A-Z]{16}/[REDACTED:aws-access-key]/g' \
     -e 's/(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]{40}/\1=[REDACTED:aws-secret]/g' \
@@ -297,6 +299,7 @@ cs_redact_secrets() {
     -e 's/eyJ[A-Za-z0-9_-]{10,500}\.eyJ[A-Za-z0-9_-]{10,500}\.[A-Za-z0-9_-]{10,500}/[REDACTED:jwt]/g' \
     -e 's/dckr_pat_[A-Za-z0-9_-]{32,}/[REDACTED:docker-token]/g' \
     -e 's/npm_[A-Za-z0-9]{36}/[REDACTED:npm-token]/g' \
+    -e 's/pypi-[A-Za-z0-9_-]{32,}/[REDACTED:pypi-token]/g' \
     -e 's/tvly-[A-Za-z0-9_-]{20,}/[REDACTED:tavily-key]/g' \
     -e 's/pplx-[A-Za-z0-9_-]{40,}/[REDACTED:perplexity-key]/g' \
     -e 's/sgp_[A-Za-z0-9]{20,}/[REDACTED:semgrep-token]/g' \

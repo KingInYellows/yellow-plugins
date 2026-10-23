@@ -146,7 +146,7 @@ else
   exit 1
 fi
 
-# Redact secrets in run metadata BEFORE fence-escaping — same 13+-pattern
+# Redact secrets in run metadata BEFORE fence-escaping — same 30+-pattern
 # pipeline 4a applies to log content (see 4a's comment for the
 # PROTECT/RESTORE provenance rationale; mirrors hooks/scripts/lib/redact.sh).
 # displayTitle, headBranch, and job/step names are user-authored strings that
@@ -161,7 +161,7 @@ SAFE_DETAILS=$(
     -e 's/ghr_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/ghu_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/\x01REDACTED:github-pat]/g' \
-    -e 's/AKIA[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
+    -e 's/\(AKIA\|ASIA\|ABIA\|ACCA\)[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
     -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=\x01REDACTED:aws-secret]/gI' \
     -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*[A-Za-z][A-Za-z0-9_-]*\)[[:space:]]\+[^\x01[:space:]]\+\([[:space:]]\+[A-Za-z0-9_-]\+=[^\x01[:space:]]\+\)*/\1 \x01REDACTED]/gI' \
     -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*\)[^\x01[:space:]]\+[[:space:]]*$/\1\x01REDACTED]/gI' \
@@ -170,17 +170,61 @@ SAFE_DETAILS=$(
     -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
     -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
     -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
+    -e 's/sk-ant-api[A-Za-z0-9_-]\{20,\}/\x01REDACTED:anthropic-key]/g' \
+    -e 's/sk-\(admin\|proj\|svcacct\)-[A-Za-z0-9_-]\{20,\}/\x01REDACTED:openai-key]/g' \
+    -e 's/sk-[A-Za-z0-9]\{48\}/\x01REDACTED:openai-key]/g' \
+    -e 's/xox[baprsu]-[A-Za-z0-9-]\{10,\}/\x01REDACTED:slack-token]/g' \
+    -e 's/sk_live_[A-Za-z0-9]\{24,\}/\x01REDACTED:stripe-key]/g' \
+    -e 's/rk_live_[A-Za-z0-9]\{24,\}/\x01REDACTED:stripe-key]/g' \
+    -e 's/hf_[A-Za-z0-9]\{20,\}/\x01REDACTED:huggingface-token]/g' \
+    -e 's/tvly-[A-Za-z0-9_-]\{20,\}/\x01REDACTED:tavily-key]/g' \
+    -e 's/pplx-[A-Za-z0-9_-]\{40,\}/\x01REDACTED:perplexity-key]/g' \
+    -e 's/sgp_[A-Za-z0-9]\{20,\}/\x01REDACTED:semgrep-token]/g' \
+    -e 's/\(^\|[^[:alnum:]_]\)\([Bb][Aa][Ss][Ii][Cc]\)[[:space:]]\+\([A-Za-z0-9+/]\{2,\}=\{1,2\}\|[A-Za-z]*[0-9+/][A-Za-z0-9+/]\{6,\}\|[A-Za-z0-9+/]\{7,\}[0-9+/][A-Za-z0-9+/]*\|[A-Za-z]\{6,\}[a-z][A-Z][A-Za-z]*\|[A-Za-z]*[a-z][A-Z][A-Za-z]\{6,\}\)/\1\2 \x01REDACTED]/g' \
     -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"\(\\.\|[^"\\]\)*"/\1=\x01REDACTED:quoted]/gI' \
     -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'\(\\\\.\\|[^'\\\\]\)*'/\1=\x01REDACTED:quoted]/gI" \
     -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1\2=\x01REDACTED:quoted]/gI' \
     -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1\2=\x01REDACTED:quoted]/gI" \
     -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1-p \x01REDACTED:quoted]/gI' \
     -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1-p \x01REDACTED:quoted]/gI" \
+    -e 's,\(https\?\)://[^:[:space:]]\+:[^@[:space:]]\+@,\1://\x01REDACTED:basic-auth]@,g' \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
     -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\x01[:space:]][^[:space:]]\{7,\}/\1=[REDACTED]/gI' \
     -e 's/\x01REDACTED/[REDACTED/g' \
+    | awk '
+      function cred(t,    n, i, a, b, p, v, nb, fc, lead) {
+        n = length(t); if (n < 4 || n % 4 == 1) return 0
+        a = 0; b = 0; nb = 0; fc = 0; lead = 0
+        for (i = 1; i <= n; i++) {
+          a = a * 64 + index(B64, substr(t, i, 1)) - 1; b += 6
+          if (b < 8) continue
+          b -= 8; p = (b == 4) ? 16 : (b == 2) ? 4 : 1
+          v = int(a / p); a = a % p; nb++
+          if (v < 32 || v == 127) return 0
+          if (v == 58 && nb == 1) lead = 1
+          if (v == 58 && nb > 1 && !fc) fc = nb
+        }
+        return (fc && fc < nb) || (lead && nb >= 17)
+      }
+      BEGIN { B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" }
+      {
+        out = ""; r = $0; pv = ""
+        while (match(r, /[Bb][Aa][Ss][Ii][Cc][ \t]+[A-Za-z0-9+\/]+=*/)) {
+          m = substr(r, RSTART, RLENGTH); t = m
+          bf = (RSTART > 1) ? substr(r, RSTART - 1, 1) : pv
+          sub(/^[A-Za-z]+[ \t]+/, "", t); sub(/=+$/, "", t)
+          if (bf !~ /[A-Za-z0-9_]/ && cred(t)) {
+            out = out substr(r, 1, RSTART + 4) " [REDACTED]"; pv = "]"
+            r = substr(r, RSTART + RLENGTH)
+          } else {
+            out = out substr(r, 1, RSTART + 4); pv = substr(m, 5, 1)
+            r = substr(r, RSTART + 5)
+          }
+        }
+        print out r
+      }' \
     | "$SED_CMD" -e 's/--- begin/[ESCAPED] begin/g' -e 's/--- end/[ESCAPED] end/g'
 )
 REDACT_STATUS=$?
@@ -243,7 +287,7 @@ else
   exit 1
 fi
 
-# Redact secrets in run metadata BEFORE fence-escaping — same 13+-pattern
+# Redact secrets in run metadata BEFORE fence-escaping — same 30+-pattern
 # pipeline 4a applies to log content (see 4a's comment for the
 # PROTECT/RESTORE provenance rationale; mirrors hooks/scripts/lib/redact.sh).
 # displayTitle, headBranch, and job/step names are user-authored strings that
@@ -258,7 +302,7 @@ SAFE_DETAILS=$(
     -e 's/ghr_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/ghu_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/\x01REDACTED:github-pat]/g' \
-    -e 's/AKIA[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
+    -e 's/\(AKIA\|ASIA\|ABIA\|ACCA\)[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
     -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=\x01REDACTED:aws-secret]/gI' \
     -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*[A-Za-z][A-Za-z0-9_-]*\)[[:space:]]\+[^\x01[:space:]]\+\([[:space:]]\+[A-Za-z0-9_-]\+=[^\x01[:space:]]\+\)*/\1 \x01REDACTED]/gI' \
     -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*\)[^\x01[:space:]]\+[[:space:]]*$/\1\x01REDACTED]/gI' \
@@ -267,17 +311,61 @@ SAFE_DETAILS=$(
     -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
     -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
     -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
+    -e 's/sk-ant-api[A-Za-z0-9_-]\{20,\}/\x01REDACTED:anthropic-key]/g' \
+    -e 's/sk-\(admin\|proj\|svcacct\)-[A-Za-z0-9_-]\{20,\}/\x01REDACTED:openai-key]/g' \
+    -e 's/sk-[A-Za-z0-9]\{48\}/\x01REDACTED:openai-key]/g' \
+    -e 's/xox[baprsu]-[A-Za-z0-9-]\{10,\}/\x01REDACTED:slack-token]/g' \
+    -e 's/sk_live_[A-Za-z0-9]\{24,\}/\x01REDACTED:stripe-key]/g' \
+    -e 's/rk_live_[A-Za-z0-9]\{24,\}/\x01REDACTED:stripe-key]/g' \
+    -e 's/hf_[A-Za-z0-9]\{20,\}/\x01REDACTED:huggingface-token]/g' \
+    -e 's/tvly-[A-Za-z0-9_-]\{20,\}/\x01REDACTED:tavily-key]/g' \
+    -e 's/pplx-[A-Za-z0-9_-]\{40,\}/\x01REDACTED:perplexity-key]/g' \
+    -e 's/sgp_[A-Za-z0-9]\{20,\}/\x01REDACTED:semgrep-token]/g' \
+    -e 's/\(^\|[^[:alnum:]_]\)\([Bb][Aa][Ss][Ii][Cc]\)[[:space:]]\+\([A-Za-z0-9+/]\{2,\}=\{1,2\}\|[A-Za-z]*[0-9+/][A-Za-z0-9+/]\{6,\}\|[A-Za-z0-9+/]\{7,\}[0-9+/][A-Za-z0-9+/]*\|[A-Za-z]\{6,\}[a-z][A-Z][A-Za-z]*\|[A-Za-z]*[a-z][A-Z][A-Za-z]\{6,\}\)/\1\2 \x01REDACTED]/g' \
     -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"\(\\.\|[^"\\]\)*"/\1=\x01REDACTED:quoted]/gI' \
     -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'\(\\\\.\\|[^'\\\\]\)*'/\1=\x01REDACTED:quoted]/gI" \
     -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1\2=\x01REDACTED:quoted]/gI' \
     -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1\2=\x01REDACTED:quoted]/gI" \
     -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1-p \x01REDACTED:quoted]/gI' \
     -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1-p \x01REDACTED:quoted]/gI" \
+    -e 's,\(https\?\)://[^:[:space:]]\+:[^@[:space:]]\+@,\1://\x01REDACTED:basic-auth]@,g' \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
     -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\x01[:space:]][^[:space:]]\{7,\}/\1=[REDACTED]/gI' \
     -e 's/\x01REDACTED/[REDACTED/g' \
+    | awk '
+      function cred(t,    n, i, a, b, p, v, nb, fc, lead) {
+        n = length(t); if (n < 4 || n % 4 == 1) return 0
+        a = 0; b = 0; nb = 0; fc = 0; lead = 0
+        for (i = 1; i <= n; i++) {
+          a = a * 64 + index(B64, substr(t, i, 1)) - 1; b += 6
+          if (b < 8) continue
+          b -= 8; p = (b == 4) ? 16 : (b == 2) ? 4 : 1
+          v = int(a / p); a = a % p; nb++
+          if (v < 32 || v == 127) return 0
+          if (v == 58 && nb == 1) lead = 1
+          if (v == 58 && nb > 1 && !fc) fc = nb
+        }
+        return (fc && fc < nb) || (lead && nb >= 17)
+      }
+      BEGIN { B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" }
+      {
+        out = ""; r = $0; pv = ""
+        while (match(r, /[Bb][Aa][Ss][Ii][Cc][ \t]+[A-Za-z0-9+\/]+=*/)) {
+          m = substr(r, RSTART, RLENGTH); t = m
+          bf = (RSTART > 1) ? substr(r, RSTART - 1, 1) : pv
+          sub(/^[A-Za-z]+[ \t]+/, "", t); sub(/=+$/, "", t)
+          if (bf !~ /[A-Za-z0-9_]/ && cred(t)) {
+            out = out substr(r, 1, RSTART + 4) " [REDACTED]"; pv = "]"
+            r = substr(r, RSTART + RLENGTH)
+          } else {
+            out = out substr(r, 1, RSTART + 4); pv = substr(m, 5, 1)
+            r = substr(r, RSTART + 5)
+          }
+        }
+        print out r
+      }' \
     | "$SED_CMD" -e 's/--- begin/[ESCAPED] begin/g' -e 's/--- end/[ESCAPED] end/g'
 )
 REDACT_STATUS=$?
@@ -303,7 +391,7 @@ validated exactly like the explicitly-passed one.
 they are user-authored strings (branch names, PR/commit-derived titles, job and
 step names) that can carry an accidentally-committed credential just as easily
 as a line of log content can. So the fetch above (folded into both Step 2 paths)
-checks `$DETAILS_STATUS`, then runs `$RUN_DETAILS` through the SAME 13+-pattern
+checks `$DETAILS_STATUS`, then runs `$RUN_DETAILS` through the SAME 30+-pattern
 secret redaction `4a` applies to log content, then escapes any embedded fence
 marker, and only then prints `$SAFE_DETAILS` inside a
 `--- begin run-details/end ---` fence — a bare command would emit those fields

@@ -4,24 +4,28 @@ Security rules, validation patterns, and redaction specifications for yellow-ci.
 
 ## Secret Redaction Patterns
 
-13+ regex patterns applied by `lib/redact.sh` before displaying any CI log
-content.
+30+ regex patterns applied by `lib/redact.sh` before displaying any CI log
+content. The credential shapes match yellow-core's `cs_redact_secrets`;
+`tests/integration/redaction-parity.test.ts` enforces it.
 
-| #   | Pattern                 | Regex                                                                        | Replacement                 |
-| --- | ----------------------- | ---------------------------------------------------------------------------- | --------------------------- |
-| 1   | GitHub classic PAT      | `gh[ps]_[A-Za-z0-9_]{36,255}`                                                | `[REDACTED:github-token]`   |
-| 2   | GitHub fine-grained PAT | `github_pat_[A-Za-z0-9_]{22,255}`                                            | `[REDACTED:github-pat]`     |
-| 3   | AWS access key          | `AKIA[0-9A-Z]{16}`                                                           | `[REDACTED:aws-access-key]` |
-| 4   | AWS secret key          | `(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY)\s*[=:]\s*[A-Za-z0-9/+=]{40}` | `[REDACTED:aws-secret]`     |
-| 5   | Authorization headers   | `(Proxy-)?Authorization:\s*<scheme>\s+<payload>` (any scheme, case-insensitive) plus standalone `Bearer\s+[A-Za-z0-9._-]{20,}` | `Authorization: <scheme> [REDACTED]` (header and scheme preserved); standalone form → `Bearer [REDACTED]` |
-| 6   | Docker Hub tokens       | `dckr_pat_[A-Za-z0-9_-]{32,}`                                                | `[REDACTED:docker-token]`   |
-| 7   | npm tokens              | `npm_[A-Za-z0-9]{36}`                                                        | `[REDACTED:npm-token]`      |
-| 8   | PyPI tokens             | `pypi-[A-Za-z0-9_-]{32,}`                                                    | `[REDACTED:pypi-token]`     |
-| 9   | JWTs                    | `eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`                       | `[REDACTED:jwt]`            |
-| 10  | URL query params        | `[?&](token\|api_key\|secret\|key\|password)=[^&\s]*`                        | `?[REDACTED:url-param]`     |
-| 11  | CI env vars             | `(AWS\|GITHUB\|NPM\|DOCKER)_[A-Z_]+=\S+`                                     | `\1_[REDACTED]`             |
-| 12  | Generic secrets         | `(password\|secret\|token\|key\|credential)\s*[=:]\s*\S{8,}`                 | `[REDACTED]`                |
-| 13  | SSH private keys        | `-----BEGIN.*PRIVATE KEY-----` through `-----END.*PRIVATE KEY-----`          | `[REDACTED:ssh-key]`        |
+| #   | Pattern                 | Regex                                                                                                                                              | Replacement                                                                                               |
+| --- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 1   | GitHub tokens           | `gh[psoru]_[A-Za-z0-9_]{36,255}`                                                                                                                   | `[REDACTED:github-token]`                                                                                 |
+| 2   | GitHub fine-grained PAT | `github_pat_[A-Za-z0-9_]{22,255}`                                                                                                                  | `[REDACTED:github-pat]`                                                                                   |
+| 3   | AWS access key          | `(AKIA\|ASIA\|ABIA\|ACCA)[0-9A-Z]{16}`                                                                                                             | `[REDACTED:aws-access-key]`                                                                               |
+| 4   | AWS secret key          | `(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY)\s*[=:]\s*[A-Za-z0-9/+=]{40}`                                                                       | `[REDACTED:aws-secret]`                                                                                   |
+| 5   | Authorization headers   | `(Proxy-)?Authorization:\s*<scheme>\s+<payload>` (any scheme, case-insensitive) plus standalone `Bearer\s+[A-Za-z0-9._-]{20,}`                     | `Authorization: <scheme> [REDACTED]` (header and scheme preserved); standalone form → `Bearer [REDACTED]` |
+| 6   | Docker Hub tokens       | `dckr_pat_[A-Za-z0-9_-]{32,}`                                                                                                                      | `[REDACTED:docker-token]`                                                                                 |
+| 7   | npm tokens              | `npm_[A-Za-z0-9]{36}`                                                                                                                              | `[REDACTED:npm-token]`                                                                                    |
+| 8   | PyPI tokens             | `pypi-[A-Za-z0-9_-]{32,}`                                                                                                                          | `[REDACTED:pypi-token]`                                                                                   |
+| 9   | JWTs                    | `eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`                                                                                             | `[REDACTED:jwt]`                                                                                          |
+| 10  | URL query params        | `[?&](token\|api_key\|secret\|key\|password)=[^&\s]*`                                                                                              | `?[REDACTED:url-param]`                                                                                   |
+| 11  | CI env vars             | `(AWS\|GITHUB\|NPM\|DOCKER)_[A-Z_]+=\S+`                                                                                                           | `\1_[REDACTED]`                                                                                           |
+| 12  | Generic secrets         | `(password\|secret\|token\|key\|credential)\s*[=:]\s*\S{8,}`                                                                                       | `[REDACTED]`                                                                                              |
+| 13  | SSH private keys        | `-----BEGIN.*PRIVATE KEY-----` through `-----END.*PRIVATE KEY-----`                                                                                | `[REDACTED:ssh-key]`                                                                                      |
+| 14  | Vendor API keys         | `sk-ant-api…`, `sk-(admin\|proj\|svcacct)-…`, `sk-[A-Za-z0-9]{48}`, `xox[baprsu]-…`, `sk_live_…`, `rk_live_…`, `hf_…`, `tvly-…`, `pplx-…`, `sgp_…` | `[REDACTED:<vendor>-key]` / `-token`                                                                      |
+| 15  | URL userinfo            | `https?://user:pass@`                                                                                                                              | `https://[REDACTED:basic-auth]@`                                                                          |
+| 16  | Bare Basic payload      | `Basic <base64>` outside a header, when the payload has padding, a digit/`+`/`/`, a camelCase hump, or decodes to `user:pass`                      | `Basic [REDACTED]`                                                                                        |
 
 ### Multi-layer Defense
 

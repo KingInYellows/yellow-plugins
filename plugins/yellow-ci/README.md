@@ -197,7 +197,7 @@ ssh-keyscan -H 192.168.1.50 >> ~/.ssh/known_hosts
 
 ## Security
 
-- All CI log content is redacted for secrets (13+ patterns) before display
+- All CI log content is redacted for secrets (30+ patterns) before display
 - SSH uses `StrictHostKeyChecking=accept-new` and `BatchMode=yes`
 - Cleanup operations always require explicit user confirmation
 - Runner state is re-checked after confirmation to prevent TOCTOU races

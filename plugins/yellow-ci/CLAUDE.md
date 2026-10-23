@@ -23,22 +23,26 @@ Three-layer plugin where each layer is independently useful:
 - **Runner name validation:** `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` (DNS-safe)
 - **SSH host validation:** Private IPv4 (192.168.x.x, 10.x.x.x) or FQDN only
 - **Secret redaction:** All CI log content must pass through `redact_secrets()`
-  before display (13+ patterns)
+  before display (30+ patterns). The pipeline is inlined in four skill
+  references and kept in parity with yellow-core's `cs_redact_secrets`; add a
+  new credential shape to all of them, or
+  `tests/integration/redaction-parity.test.ts` fails
 - **Prompt injection fencing:** Wrap all CI log excerpts in
   `--- begin/end ci-log ---` delimiters
 - **SSH security:** `StrictHostKeyChecking=accept-new`, `BatchMode=yes`,
   key-based only, no passwords
 - **Error logging:** Component-prefixed `[yellow-ci]`, never suppress with
   `|| true` or `2>/dev/null`
-- **PR creation:** Use the active stacked-PR provider (see `/stack:status`), not `gh pr create`
-- **Shell libraries and zsh:** Markdown blocks run under the user's shell,
-  often zsh. `hooks/scripts/lib/validate.sh` and `resolve-runner-targets.sh`
-  are bash-only: source them in a bash child
+- **PR creation:** Use the active stacked-PR provider (see `/stack:status`), not
+  `gh pr create`
+- **Shell libraries and zsh:** Markdown blocks run under the user's shell, often
+  zsh. `hooks/scripts/lib/validate.sh` and `resolve-runner-targets.sh` are
+  bash-only: source them in a bash child
   (`bash /dev/fd/3 3<<'__YELLOW_CI_BASH__'` … `__YELLOW_CI_BASH__`, or
-  `bash -c '. "$1" && fn "$2"' _ "$lib" '<value>'` for one call, with the
-  value single-quoted — reject any value containing a single quote first).
-  `redact.sh` is dual-shell (Tier 4) and may be sourced directly; keep it
-  that way — `tests/shell-compat/` runs it under bash and zsh.
+  `bash -c '. "$1" && fn "$2"' _ "$lib" '<value>'` for one call, with the value
+  single-quoted — reject any value containing a single quote first). `redact.sh`
+  is dual-shell (Tier 4) and may be sourced directly; keep it that way —
+  `tests/shell-compat/` runs it under bash and zsh.
 
 ## Plugin Components
 
@@ -95,7 +99,9 @@ reaches the skill directly), plus the two reference skills:
 
 ## When to Use What
 
-- **`/ci:setup`** — Verify prerequisites and configure runner SSH. Use when first installing, after adding runners, or when commands fail with auth/connectivity errors.
+- **`/ci:setup`** — Verify prerequisites and configure runner SSH. Use when
+  first installing, after adding runners, or when commands fail with
+  auth/connectivity errors.
 - **`/ci:diagnose`** — Manual CI failure diagnosis. Use when builds fail.
 - **`failure-analyst` agent** — Auto-triggers on "why did CI fail?", "what
   broke?", exit code questions.
@@ -231,13 +237,13 @@ runner-targets YAML.
 
 ## Codex Distribution
 
-The generated Codex manifest sets `commands: []` to prevent automatic
-conversion of Claude command wrappers into additional skills. Codex exposes
-only the skills selected by the catalog allowlist.
+The generated Codex manifest sets `commands: []` to prevent automatic conversion
+of Claude command wrappers into additional skills. Codex exposes only the skills
+selected by the catalog allowlist.
 
-`targets.codex.enabled: true` in `catalog/plugins/yellow-ci.json` — Codex-enabled
-in the canonical order `[gt-workflow, yellow-core, yellow-review, yellow-ci]`.
-See the canonical
+`targets.codex.enabled: true` in `catalog/plugins/yellow-ci.json` —
+Codex-enabled in the canonical order
+`[gt-workflow, yellow-core, yellow-review, yellow-ci]`. See the canonical
 [`docs/codex-distribution.md`](../../docs/codex-distribution.md).
 
 **8 allowlisted skills** (6 operational + 2 reference): `ci-setup`,
@@ -264,19 +270,20 @@ anchor on the global `~/.config/yellow-ci/` config and describe per-repo
 overrides in prose. The concrete `.claude/`-rooted config and env-var handling
 live in the non-linted layer (the command wrappers + bash libs + the Node hook).
 
-**SessionStart hook — Node port + cache (R34-R38):** the hook is a dependency-free
-Node runtime (`hooks/scripts/`), replicated per-plugin, verified byte/semantic
-parity against the deleted `session-start.sh` via `tests/hook-parity.bats`. Cache
-writes relocated to a plugin-data dir with a read-only legacy fallback (see
-"Cache Locations"). The hook is carried into `hooks/codex-hooks.json` (with a
-`commandWindows` twin). Codex 0.157.0 now verifies SessionStart execution
-after trusting only the disposable installed definition hash. Its untrusted
-control produces no hook events. The fixture uses an unauthenticated `gh`
-stub and proves lifecycle delivery/fail-open startup; live CI account/data
-behavior remains separate. The earlier 0.144.x inert observation is historical.
-See the [Phase 1 receipts](../../docs/research/codex-phase-1-2026-10-05/report.md).
+**SessionStart hook — Node port + cache (R34-R38):** the hook is a
+dependency-free Node runtime (`hooks/scripts/`), replicated per-plugin, verified
+byte/semantic parity against the deleted `session-start.sh` via
+`tests/hook-parity.bats`. Cache writes relocated to a plugin-data dir with a
+read-only legacy fallback (see "Cache Locations"). The hook is carried into
+`hooks/codex-hooks.json` (with a `commandWindows` twin). Codex 0.157.0 now
+verifies SessionStart execution after trusting only the disposable installed
+definition hash. Its untrusted control produces no hook events. The fixture uses
+an unauthenticated `gh` stub and proves lifecycle delivery/fail-open startup;
+live CI account/data behavior remains separate. The earlier 0.144.x inert
+observation is historical. See the
+[Phase 1 receipts](../../docs/research/codex-phase-1-2026-10-05/report.md).
 
-**`allow_implicit_invocation` deferral (A9):** on codex-cli 0.144.6 Codex *does*
+**`allow_implicit_invocation` deferral (A9):** on codex-cli 0.144.6 Codex _does_
 honor `skills/<name>/agents/openai.yaml` `policy.allow_implicit_invocation`
 (reversing the 0.144.1 finding), but shipping it is a sidecar blocked by this
 repo's SKILL.md-only generator. The two reference skills (`ci-conventions`,
