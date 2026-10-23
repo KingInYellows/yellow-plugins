@@ -2443,6 +2443,16 @@ rp_path_link_newer() {
     return 1
 }
 
+# rp_in_list <word> [item...]: succeeds when <word> equals one of the items.
+rp_in_list() {
+    local w="$1" x
+    shift
+    for x in "$@"; do
+        [ "$x" = "$w" ] && return 0
+    done
+    return 1
+}
+
 # rp_hooks_changed_since <marker> <hitsfile>: the hook files Git would run that
 # changed after <marker>, or the hooks directory itself when it is not the one
 # recorded in <marker> by `run-verify-command --mark-hooks`, for a hooks directory in the git directory
@@ -2521,7 +2531,12 @@ rp_hooks_changed_since() {
         # drops out of --show-origin, and nothing includes it. git var names
         # them on Git 2.42 and later; the defaults cover older ones. A device
         # such as GIT_CONFIG_GLOBAL=/dev/null holds no config.
-        local roots
+        local roots v
+        # A newline would split one name in two below: refuse control
+        # characters in every value the names come from.
+        for v in "${GIT_CONFIG_GLOBAL-}" "${GIT_CONFIG_SYSTEM-}" "${HOME-}" "${XDG_CONFIG_HOME-}"; do
+            case "$v" in *[[:cntrl:]]*) exit 2 ;; esac
+        done
         roots=$(
             yr_git var GIT_CONFIG_GLOBAL 2>/dev/null
             yr_git var GIT_CONFIG_SYSTEM 2>/dev/null
@@ -2558,7 +2573,7 @@ EOF_ROOTS
         while [ "$i" -lt "${#queue[@]}" ]; do
             c="${queue[$i]}"
             i=$((i + 1))
-            case " ${seen[*]-} " in *" $c "*) continue ;; esac
+            rp_in_list "$c" ${seen[@]+"${seen[@]}"} && continue
             seen+=("$c")
             if [ -f "$c" ]; then
                 d=$(dirname -- "$c") || exit 2
@@ -2584,7 +2599,7 @@ EOF_ROOTS
                 rp_path_link_newer "$c" "$marker" || rc=$?
                 case "$rc" in 0) ;; 1) continue ;; *) exit 2 ;; esac
             fi
-            case " ${cfgs[*]-} " in *" $c "*) continue ;; esac
+            rp_in_list "$c" ${cfgs[@]+"${cfgs[@]}"} && continue
             cfgs+=("$c")
         done
         # Any changed config counts, whatever it holds now: what it set or

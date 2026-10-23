@@ -2868,6 +2868,34 @@ mark_hooks() {
   done
 }
 
+@test "--ignored-since refuses a GIT_CONFIG_GLOBAL holding a newline" {
+  hooks_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/nl"$'\n'
+  run --separate-stderr env "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/nl"$'\n'"/g.cfg" "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+}
+
+@test "--ignored-since judges a dormant includeIf config whose name holds a space-joined pair of visited names" {
+  hooks_fixture
+  d="$BATS_TEST_TMPDIR/cfgs"
+  mkdir -p "$d"
+  printf '[user]\n\tname = x\n' >| "$d/a"
+  printf '[user]\n\tname = x\n' >| "$d/b"
+  mkdir -p "$(dirname -- "$d/a $d/b")"
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$d/a $d/b"
+  git config --add include.path "$d/a"
+  git config --add include.path "$d/b"
+  git config includeIf.onbranch:other.path "$d/a $d/b"
+  touch -t 201901010000 .git/config "$d/a" "$d/b" "$d/a $d/b"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  : >| "$d/a $d/b"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"$d/a $d/b"* ]]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample
