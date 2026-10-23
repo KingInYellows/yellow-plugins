@@ -2931,6 +2931,14 @@ mark_hooks() {
   [ "$status" -eq 0 ]
 }
 
+@test "--check-ignored and --mark-hooks refuse a relative HOME or XDG_CONFIG_HOME" {
+  hooks_fixture
+  run --separate-stderr env -u GIT_CONFIG_GLOBAL HOME=rel "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  run --separate-stderr env -u GIT_CONFIG_GLOBAL XDG_CONFIG_HOME=rel "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample

@@ -2471,6 +2471,12 @@ rp_config_paths() {
         for v in "${GIT_CONFIG_GLOBAL-}" "${GIT_CONFIG_SYSTEM-}" "${HOME-}" "${XDG_CONFIG_HOME-}"; do
             case "$v" in *[[:cntrl:]]*) exit 2 ;; esac
         done
+        # A relative HOME or XDG_CONFIG_HOME names a global file relative to
+        # each git call's directory, which the absolute-only list below
+        # would drop: refuse it.
+        for v in "${HOME-}" "${XDG_CONFIG_HOME-}"; do
+            case "$v" in ''|/*) ;; *) exit 2 ;; esac
+        done
         roots=$(
             yr_git var GIT_CONFIG_GLOBAL 2>/dev/null
             yr_git var GIT_CONFIG_SYSTEM 2>/dev/null
