@@ -110,7 +110,7 @@ all scripts), `stack-traversal` (shared by `/review:all` and
 `thermonuclear-reviewer`; the only Codex/Cursor-distributed skill). None is
 user-invocable.
 
-### Scripts (15)
+### Scripts (17)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
@@ -137,6 +137,9 @@ the resolve scripts: `references/resolve/dispositions.md`.
   place, reporting them instead of opening them
 - `head-ignore-probe`, `guard-local-config` — protect the ignored
   `yellow-plugins.local.md` for sweep and resolve-stack
+- `read-resolve-config` — the Step 1 config snapshot as JSON; never parse the
+  config in prose
+- `check-addressed-evidence` — the Step 5 `addressed` evidence rules
 - `file-line-counts` — base/head line counts for `thermonuclear-reviewer`
 
 ### Resolve references
@@ -283,11 +286,10 @@ set.
 ## Known Limitations
 
 - GraphQL scripts require `gh` and `jq` to be installed
-- The `PATH` screen (`yr_safe_path`) reads every entry of every `PATH`
-  directory at each script start and is not cached (a resolver runs as the
-  user and could forge a cache). On WSL2 with `appendWindowsPath = true` the
-  `/mnt/c` entries make that take ~90 s; README "Limitations" has the
-  `/etc/wsl.conf` fix
+- The `PATH` screen (`yr_safe_path`) reads every entry of every `PATH` directory
+  at each script start and is not cached (a resolver runs as the user and could
+  forge a cache). On WSL2 with `appendWindowsPath = true` the `/mnt/c` entries
+  make that take ~90 s; README "Limitations" has the `/etc/wsl.conf` fix
 - Cross-plugin agents require the `yellow-core` plugin to be installed
 - Very large PRs (1000+ lines) may cause agent context overflow — consider
   splitting

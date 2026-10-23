@@ -27,6 +27,8 @@
 #                                        the branch named main
 #   pr view                              MOCK_GH_{FAIL,PR_STATE,HEAD_OID,
 #                                        BASE_OID}
+#   */compare/*, repos/.../pulls/<n>     MOCK_GH_COMPARE_{FAIL,FIXTURE},
+#                                        MOCK_GH_PULL_{BASE,DEFAULT,HEAD}
 # The reply arms match bare thread-id substrings, so order matters: a new id
 # must not contain an earlier arm's id (PRRT_reply_rl also matches rl2).
 set -eu
@@ -153,6 +155,26 @@ case "$ALL_ARGS" in
       exit 1
     fi
     cat "$FIXTURE_DIR/${MOCK_GH_FILES_FIXTURE:-pr-files-response.json}"
+    exit 0
+    ;;
+  *"/compare/"*)
+    # Stack diff for pr-changed-ranges --stack. MOCK_GH_COMPARE_FAIL=1
+    # simulates an API failure; MOCK_GH_COMPARE_FIXTURE names the response.
+    if [ "${MOCK_GH_COMPARE_FAIL:-0}" = 1 ]; then
+      printf 'gh: Server Error (HTTP 500)\n' >&2
+      exit 1
+    fi
+    printf '%s\n' "$ALL_ARGS" >> "${PAGE_STATE_DIR}/mock_gh_compare_calls"
+    cat "$FIXTURE_DIR/${MOCK_GH_COMPARE_FIXTURE:-compare-response.json}"
+    exit 0
+    ;;
+  *"repos/{owner}/{repo}/pulls/"[0-9]*)
+    # PR metadata for pr-changed-ranges --stack: MOCK_GH_PULL_BASE,
+    # MOCK_GH_PULL_DEFAULT and MOCK_GH_PULL_HEAD (defaults: a PR on main).
+    MOCK_BODY=$(jq -nc --arg b "${MOCK_GH_PULL_BASE:-main}" --arg d "${MOCK_GH_PULL_DEFAULT:-main}" \
+      --arg h "${MOCK_GH_PULL_HEAD:-0123456789abcdef0123456789abcdef01234567}" \
+      '{base:{ref:$b, repo:{default_branch:$d}}, head:{sha:$h}}')
+    emit "$@"
     exit 0
     ;;
   *"FollowupIssues"*)

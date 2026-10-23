@@ -50,15 +50,15 @@ flags, exit codes, trust-boundary rules and library behavior.
   Ledger line and a `Merge:` row (not ready while P0-P2 ledger findings are
   pending) in its summary. Before `/review:pr` it snapshots
   `yellow-plugins.local.md` whenever this work tree does not track it (ignored
-  or unignored, present or absent), so a config created or edited during the
-  run is restored whatever ignore rule hides it. It judges the PR head first
-  (`head-ignore-probe`, read through `gh api` at `headRefOid`): a config
-  tracked here but ignored on the PR head, an existing untracked unignored file
-  there, or a head whose rules the probe cannot judge for that PR (its exit 4)
-  stops before the checkout with a `Sweep: skipped (...)` line; a probe exit 3
-  (rate limit, network, auth, a 403, this clone's own attributes) stops with no
-  skip line. After `/review:pr` it requires the checked-out branch to contain
-  the judged `headRefOid` (`Sweep: skipped (head-mismatch)` otherwise)
+  or unignored, present or absent), so a config created or edited during the run
+  is restored whatever ignore rule hides it. It judges the PR head first
+  (`head-ignore-probe`, read through `gh api` at `headRefOid`): a config tracked
+  here but ignored on the PR head, an existing untracked unignored file there,
+  or a head whose rules the probe cannot judge for that PR (its exit 4) stops
+  before the checkout with a `Sweep: skipped (...)` line; a probe exit 3 (rate
+  limit, network, auth, a 403, this clone's own attributes) stops with no skip
+  line. After `/review:pr` it requires the checked-out branch to contain the
+  judged `headRefOid` (`Sweep: skipped (head-mismatch)` otherwise)
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary (with `Blocking` and `Residual` pending/attention
@@ -67,12 +67,12 @@ flags, exit codes, trust-boundary rules and library behavior.
   end-of-loop compounding pass. A rate limit, an unreadable PR state, a dirty
   tree or a missing `Resolve:` contract line ends the batch and exits 1; the
   last line is a `SweepAll:` outcome line with the same fields as
-  `ResolveStack:` (a run without it failed); a
-  PR-specific stop (`Sweep: skipped`) is skipped and the batch continues. It
-  lists the ledgers of PRs missing from an all-authors open-PR query and deletes
-  them via `/review:triage --prune` only after the confirmation (a prune-only
-  prompt when there is nothing to sweep); it skips pruning when that query fails
-  or may be truncated
+  `ResolveStack:` (a run without it failed); a PR-specific stop
+  (`Sweep: skipped`) is skipped and the batch continues. It lists the ledgers of
+  PRs missing from an all-authors open-PR query and deletes them via
+  `/review:triage --prune` only after the confirmation (a prune-only prompt when
+  there is nothing to sweep); it skips pruning when that query fails or may be
+  truncated
 - `/review:triage` — Own the review-findings ledger's lifecycle for one PR:
   `reconcile` against the fetched head, then attended Apply / Dismiss (with
   `depends_on`) / Restore file / Skip. `--non-interactive` applies nothing and
@@ -177,13 +177,13 @@ flags, exit codes, trust-boundary rules and library behavior.
   timeout apply, enforced when `timeout(1)` or `gtimeout(1)` is installed
   (without either `gh` runs unbounded, so unattended calls can hang; see
   `references/resolve/dispositions.md`)
-- `apply-thread-actions [--issue-cap <n>] <owner/repo> <pr> <plan.jsonl>
-  <results.jsonl>` — Run `/review:resolve` Step 7 for one PR from a JSONL plan:
-  per thread `file-followup-issue`, `reply-pr-thread`, `resolve-pr-thread`
-  with the contract's fallbacks, one result row per thread. Exit 4 stops every
-  write and marks the rest `not-attempted`; exit 5 means the 540 s
-  `YELLOW_REVIEW_APPLY_BUDGET` ran out and a re-run with the same files
-  resumes (contract "Batch apply")
+- `apply-thread-actions [--issue-cap <n>] <owner/repo> <pr> <plan.jsonl> <results.jsonl>`
+  — Run `/review:resolve` Step 7 for one PR from a JSONL plan: per thread
+  `file-followup-issue`, `reply-pr-thread`, `resolve-pr-thread` with the
+  contract's fallbacks, one result row per thread. Exit 4 stops every write and
+  marks the rest `not-attempted`; exit 5 means the 540 s
+  `YELLOW_REVIEW_APPLY_BUDGET` ran out and a re-run with the same files resumes
+  (contract "Batch apply")
 - `resolve-pr-thread <PRRT_id>` — Resolve a single review thread via GitHub
   GraphQL mutation; exit 3 (`reason=permission|not-found`) and 4 (rate limit, or
   a timed-out `gh` call, which may have changed state; same for
@@ -199,7 +199,15 @@ flags, exit codes, trust-boundary rules and library behavior.
   a credential, or has an image, an `@` mention or a foreign URL (for text
   posted outside the resolve scripts); exits 6
 - `pr-changed-ranges <pr>` — The PR's changed files and new-side line ranges
-  from the files API (`/review:resolve` resolver envelope)
+  from the files API (`/review:resolve` resolver envelope); `--stack <pr>`
+  prints the same rows for the stack below and including the PR (compare API,
+  default branch to head) for the `addressed` check
+- `check-addressed-evidence --ranges-from <f> [--stack-ranges-from <f>] [--modified-from <f>] <proposals.jsonl>`
+  — Judge each `addressed` proposal's `path:line` evidence (`/review:resolve`
+  Step 5); one JSON verdict line per thread, with a fixed reason when refused
+- `read-resolve-config` — The `/review:resolve` config snapshot: every
+  `resolve_pr.*` key validated with defaults, plus whether git tracks
+  `yellow-plugins.local.md`, as one JSON object
 - `poll-new-threads --wait <s> [--fixed-anchors <file>] ...` — Step 8 re-pass
   poll for threads not yet seen this run; always fetches at least once and ends
   with per-new-thread counts (`p1`, `p2plus` from a Bot comment's P0-P3 badge,
@@ -231,17 +239,16 @@ flags, exit codes, trust-boundary rules and library behavior.
   trusted-config file) or `--no-ignored-guard`, and with `--dry-run` lists those
   paths (`pending`) and a `snapshot` digest without reverting, so an interactive
   `/review:resolve` can ask first and then revert with `--expect-snapshot`,
-  which refuses when the files, link hits or special-file hits changed since
-  the preview; a tracked
-  trusted-config symlink whose target was written since the marker (or, with
-  `--no-ignored-guard`, resolves outside the worktree, onto a directory, onto
-  anything but a tracked regular file with a plain `H` tag, or onto a target git
-  lists as modified unless that target is itself trusted-config) is reported
-  with `deniedClean: false` (a clean link is left alone; a redirected or
-  replaced one is restored and its HEAD target judged the same way), and a
-  verify run refuses on one; a tracked symlink with an ordinary name that
-  resolves to a directory outside the worktree is checked the same way for
-  trusted-config descendants (`cfg -> /elsewhere`, then a write to
+  which refuses when the files, link hits or special-file hits changed since the
+  preview; a tracked trusted-config symlink whose target was written since the
+  marker (or, with `--no-ignored-guard`, resolves outside the worktree, onto a
+  directory, onto anything but a tracked regular file with a plain `H` tag, or
+  onto a target git lists as modified unless that target is itself
+  trusted-config) is reported with `deniedClean: false` (a clean link is left
+  alone; a redirected or replaced one is restored and its HEAD target judged the
+  same way), and a verify run refuses on one; a tracked symlink with an ordinary
+  name that resolves to a directory outside the worktree is checked the same way
+  for trusted-config descendants (`cfg -> /elsewhere`, then a write to
   `cfg/.claude/settings.json`): it counts when such a file is newer than the
   marker (nested links followed, a loop or find error counts) or, with
   `--no-ignored-guard`, when one exists, and the walk counts after 50000
@@ -374,36 +381,36 @@ operand counts as entering, in the shell, batched and bootstrap checks alike. An
 executable these checks cannot read (mode `0111`) counts as entering too, since
 the kernel still reads its `#!` line, setuid and setgid files included (any user
 can `chmod 4111` a script of their own); only a root-owned one the user cannot
-write is left alone, since only root can make it (Fedora ships `sudo` as `4111` and `sudoreplay` as
-`0111`), and a missing `find` to check the owner fails closed. A
-short option's attached value in a `#!` line (`ssh -Fconfig`) is judged as a
-path in the batched scan as well. `env -S`/`--split-string` (attached or
-separate, also in a cluster such as `-vS`) and options with arguments (`-u`,
-`-C`, `-P`, `-a` and long forms) are parsed. Fail closed: an `env` line with a
-`NAME=value` operand before the utility (`PATH=tools` changes where it is looked
-up), or with a `$`, backslash or quote after `-S` (env expands and decodes
-them), with `-P` (env then searches another path than `PATH`), or with
-`-C`/`--chdir` (the utility is resolved elsewhere), or whose utility is itself
-`env` or another launcher (`env -S env PATH=tools evil`, `env nice evil`),
-counts as entering the worktree. So does a `#!` argument with expansion or glob
-syntax, or with a shell operator, redirection or parenthesis
+write is left alone, since only root can make it (Fedora ships `sudo` as `4111`
+and `sudoreplay` as `0111`), and a missing `find` to check the owner fails
+closed. A short option's attached value in a `#!` line (`ssh -Fconfig`) is
+judged as a path in the batched scan as well. `env -S`/`--split-string`
+(attached or separate, also in a cluster such as `-vS`) and options with
+arguments (`-u`, `-C`, `-P`, `-a` and long forms) are parsed. Fail closed: an
+`env` line with a `NAME=value` operand before the utility (`PATH=tools` changes
+where it is looked up), or with a `$`, backslash or quote after `-S` (env
+expands and decodes them), with `-P` (env then searches another path than
+`PATH`), or with `-C`/`--chdir` (the utility is resolved elsewhere), or whose
+utility is itself `env` or another launcher (`env -S env PATH=tools evil`,
+`env nice evil`), counts as entering the worktree. So does a `#!` argument with
+expansion or glob syntax, or with a shell operator, redirection or parenthesis
 (`#!/bin/sh -c PATH=tools:/usr/bin;evil`). `run-verify-command` still gives the
 verify command the caller's `PATH` (`YR_ORIG_PATH`). Both scripts, and
 `lib/resolve-paths.sh` (sourced before the screen), take their own directory by
 parameter expansion, not `dirname`.
 
 - `head-ignore-probe <PR#>` — `/review:sweep` Step 1b: prints
-  `head=tracked|ignored|unignored sha=<headRefOid>` for `yellow-plugins.local.md` on the PR head,
-  read through `gh api` at `headRefOid` (root listing, `.gitignore` and
-  `.gitattributes` blobs written as data to a temp work tree, judged with this
-  clone's git dir and an empty index). It refuses a symlinked `.gitignore` or
-  `.gitattributes`, a case-only alias of the three root names, and a
-  content-transforming attribute on `.gitignore`. Failures print
-  `error=<class>`: exit 3 is systemic (`rate-limited` tested before any 403,
-  `auth`, `forbidden` for a 403 or a tree/blob 404, `network`, `local`,
-  `local-attributes` when this clone's own attributes transform `.gitignore`
-  and the head does not clear them), exit 4
-  is this PR only (`not-found` from `gh pr view`, `unreadable`, `symlink`,
+  `head=tracked|ignored|unignored sha=<headRefOid>` for
+  `yellow-plugins.local.md` on the PR head, read through `gh api` at
+  `headRefOid` (root listing, `.gitignore` and `.gitattributes` blobs written as
+  data to a temp work tree, judged with this clone's git dir and an empty
+  index). It refuses a symlinked `.gitignore` or `.gitattributes`, a case-only
+  alias of the three root names, and a content-transforming attribute on
+  `.gitignore`. Failures print `error=<class>`: exit 3 is systemic
+  (`rate-limited` tested before any 403, `auth`, `forbidden` for a 403 or a
+  tree/blob 404, `network`, `local`, `local-attributes` when this clone's own
+  attributes transform `.gitignore` and the head does not clear them), exit 4 is
+  this PR only (`not-found` from `gh pr view`, `unreadable`, `symlink`,
   `case-alias`, `attributes`). The API host and repository come from the PR's
   URL, passed as `gh api --hostname`.
 - `guard-local-config snapshot | check <dir> <digest> | clear <dir>` — Snapshot
@@ -665,11 +672,12 @@ in the transcript (Ctrl-O) on a second `/review:pr` run within the hour.
 
 `bats tests/` from the plugin directory:
 
-- `apply-thread-actions.bats` — stub stage scripts beside a copy of the
-  script: order, fallbacks, exit 4 stop and budget resume
+- `apply-thread-actions.bats` — stub stage scripts beside a copy of the script:
+  order, fallbacks, exit 4 stop and budget resume
 - `get-pr-comments.bats`, `get-pr-blockers.bats`, `reply-pr-thread.bats`,
   `resolve-pr-thread.bats`, `file-followup-issue.bats`,
   `check-resolve-text.bats`, `pr-changed-ranges.bats`, `poll-new-threads.bats`,
+  `check-addressed-evidence.bats`, `read-resolve-config.bats`,
   `pr-review-delta.bats` — GraphQL fixtures in `tests/fixtures/`, fake `gh` in
   `tests/mocks/gh`
 - `commit-resolve-fixes.bats`, `run-verify-command.bats` — a throwaway

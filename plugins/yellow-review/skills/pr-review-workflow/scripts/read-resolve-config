@@ -1,0 +1,165 @@
+#!/bin/sh
+# Print the /review:resolve config snapshot: every resolve_pr.* key from the
+# repository root's yellow-plugins.local.md, validated, with defaults filled
+# in, plus whether git tracks the file. Callers use only this output, so an
+# edit to the file after the call changes nothing.
+# Usage: read-resolve-config
+# Stdout: one JSON object:
+#   {"file":"present|absent|refused","tracked":"tracked|untracked|unknown",
+#    "cluster_line_distance":10,"cluster_cap":20,"verify_command":null,
+#    "verify_unattended":false,"verify_timeout_seconds":540,
+#    "repass_wait_seconds":120,"repass_max_passes":5,
+#    "resolve_human_threads":"evidence","warnings":["..."]}
+#   Defaults and ranges follow yellow-core's local-config skill: an invalid
+#   value warns and uses the default (verify_timeout_seconds over 540 is
+#   capped, repass_max_passes outside 1-10 is clamped). verify_command is null
+#   when unset or empty. Each warning is also printed to stderr.
+#   tracked: only an `ls-files` exit 1 is untracked; any other git failure,
+#   or no work tree, is unknown, which callers treat as tracked.
+#   refused: a symlink, a non-regular file or a file over 64 KiB; every key
+#   takes its default.
+# Parsing: the YAML frontmatter between the first-line `---` and the next
+#   `---`, and only the block mapping under a column-0 `resolve_pr:` key. Each
+#   child is a scalar: plain, single-quoted ('' escapes ') or double-quoted
+#   (only \" and \\ escapes). Anything else under resolve_pr (a flow mapping,
+#   a nested block, an anchor, a tag, a block scalar, a key given twice) warns
+#   and that key takes its default. Booleans are true/false (also True/TRUE,
+#   False/FALSE) unquoted; integers are unquoted decimals; resolve_human_threads
+#   may be plain or quoted.
+# Exit codes: 0 snapshot printed (also when the file is absent or refused),
+#   1 jq missing or a jq failure, 2 usage.
+# Contract: references/resolve/dispositions.md ("Verify")
+
+set -eu
+
+[ $# -eq 0 ] || { printf 'Usage: read-resolve-config\n' >&2; exit 2; }
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
+
+NAME=yellow-plugins.local.md
+MAX_BYTES=65536
+
+TRACKED=unknown
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+if [ -n "$TOP" ]; then
+    rc=0
+    git -C "$TOP" ls-files --error-unmatch -- "$NAME" >/dev/null 2>&1 || rc=$?
+    case "$rc" in 0) TRACKED=tracked ;; 1) TRACKED=untracked ;; esac
+fi
+
+WORK=$(mktemp -d) || exit 1
+trap 'rm -rf "$WORK"' EXIT
+: >"$WORK/config"
+
+FILE=absent
+if [ -n "$TOP" ] && { [ -e "$TOP/$NAME" ] || [ -L "$TOP/$NAME" ]; }; then
+    if [ -L "$TOP/$NAME" ] || [ ! -f "$TOP/$NAME" ]; then
+        FILE=refused
+    else
+        head -c $((MAX_BYTES + 1)) -- "$TOP/$NAME" >"$WORK/config" 2>/dev/null || FILE=refused
+        if [ "$FILE" = absent ]; then
+            if [ "$(wc -c <"$WORK/config")" -gt "$MAX_BYTES" ]; then
+                FILE=refused
+                : >"$WORK/config"
+            else
+                FILE=present
+            fi
+        fi
+    fi
+fi
+
+jq -n -c --rawfile text "$WORK/config" --arg file "$FILE" --arg tracked "$TRACKED" '
+  def scalar:
+    if . == null or . == "" or startswith("#") then {kind: "empty"}
+    elif startswith("\"") then
+      ([capture("\\A\"(?<s>(?:[^\"\\\\]|\\\\[\"\\\\])*)\"[ \\t]*(?:#.*)?\\z")?] | first) as $m
+      | if $m == null then {kind: "bad"}
+        else {kind: "quoted", value: ($m.s | gsub("\\\\(?<c>[\"\\\\])"; .c))} end
+    elif startswith("\u0027") then
+      ([capture("\\A\u0027(?<s>(?:[^\u0027]|\u0027\u0027)*)\u0027[ \\t]*(?:#.*)?\\z")?] | first) as $m
+      | if $m == null then {kind: "bad"}
+        else {kind: "quoted", value: ($m.s | gsub("\u0027\u0027"; "\u0027"))} end
+    elif test("\\A[\\[{|>&*!%@`]") then {kind: "bad"}
+    else
+      (sub("[ \\t]+#.*\\z"; "") | sub("[ \\t]+\\z"; "")) as $v
+      | if $v == "" then {kind: "empty"} else {kind: "plain", value: $v} end
+    end;
+
+  ($text | split("\n") | map(sub("\r\\z"; ""))) as $lines
+  | (if $file != "present" then {fields: {}, warn: (if $file == "refused"
+        then ["yellow-plugins.local.md is a symlink, not a regular file or over 64 KiB; using defaults"]
+        else [] end)}
+     elif ($lines[0] // "") != "---" then {fields: {}, warn: []}
+     else
+       ([range(1; $lines | length) | select($lines[.] == "---")] | first) as $end
+       | if $end == null then {fields: {}, warn: ["frontmatter has no closing ---; using defaults"]}
+         else
+           $lines[1:$end] as $fm
+           | ([range(0; $fm | length) | select($fm[.] | test("\\Aresolve_pr:"))] | first) as $start
+           | if $start == null then {fields: {}, warn: []}
+             elif ($fm[$start] | test("\\Aresolve_pr:[ \\t]*(?:#.*)?\\z") | not) then
+               {fields: {}, warn: ["resolve_pr is not a block mapping; using defaults"]}
+             else
+               ($fm[$start + 1:]
+                | (map(test("\\A(?:[ \\t]*(?:#.*)?)?\\z") or test("\\A[ \\t]")) | index(false)) as $stop
+                | if $stop == null then . else .[0:$stop] end
+                | map(select(test("\\A[ \\t]*(?:#.*)?\\z") | not))) as $body
+               | ([($body[0] // "") | capture("\\A(?<i>[ \\t]+)")? | .i] | first // "") as $indent
+               | reduce $body[] as $l ({fields: {}, warn: [], last: null};
+                   ([$l | capture("\\A(?<i>[ \\t]+)(?<k>[A-Za-z0-9_]+):(?:[ \\t]+(?<v>.*))?\\z")?] | first) as $m
+                   | if $m != null and $m.i == $indent then
+                       ($m.v | scalar) as $s
+                       | if .fields[$m.k] != null then
+                           .fields[$m.k] = {kind: "bad"} | .warn += ["resolve_pr.\($m.k) is given more than once"]
+                         else .fields[$m.k] = $s end
+                       | .last = $m.k
+                     elif .last != null and ($l | startswith($indent)) then
+                       .fields[.last] = {kind: "bad"}
+                     else .warn += ["resolve_pr has a line that is not a key: value pair"] end)
+               | {fields, warn}
+             end
+         end
+     end) as $parsed
+  | $parsed.fields as $f
+  | def known: ["cluster_line_distance", "cluster_cap", "verify_command", "verify_unattended",
+                "verify_timeout_seconds", "repass_wait_seconds", "repass_max_passes",
+                "resolve_human_threads"];
+    def int($k):
+      if $f[$k].kind == "plain" and ($f[$k].value | test("\\A(?:0|[1-9][0-9]{0,5})\\z"))
+      then $f[$k].value | tonumber else null end;
+    def given($k): $f[$k] != null and $f[$k].kind != "empty";
+    def bad($k): "resolve_pr.\($k) is invalid; using the default";
+    reduce known[] as $k ({out: {}, warn: $parsed.warn};
+      if $k == "verify_command" then
+        if ($f[$k].kind == "quoted" or $f[$k].kind == "plain") and $f[$k].value != ""
+        then .out[$k] = $f[$k].value
+        else .out[$k] = null | if $f[$k].kind == "bad" then .warn += [bad($k)] else . end end
+      elif $k == "verify_unattended" then
+        ($f[$k].value // "") as $v
+        | if $f[$k].kind == "plain" and ($v | test("\\A(?:true|True|TRUE)\\z")) then .out[$k] = true
+          elif $f[$k].kind == "plain" and ($v | test("\\A(?:false|False|FALSE)\\z")) then .out[$k] = false
+          else .out[$k] = false | if given($k) then .warn += [bad($k)] else . end end
+      elif $k == "resolve_human_threads" then
+        if ($f[$k].kind == "plain" or $f[$k].kind == "quoted") and ($f[$k].value | IN("evidence", "never", "all"))
+        then .out[$k] = $f[$k].value
+        else .out[$k] = "evidence" | if given($k) then .warn += [bad($k)] else . end end
+      else
+        int($k) as $n
+        | {cluster_line_distance: 10, cluster_cap: 20, verify_timeout_seconds: 540,
+           repass_wait_seconds: 120, repass_max_passes: 5}[$k] as $d
+        | if given($k) | not then .out[$k] = $d
+          elif $n == null then .out[$k] = $d | .warn += [bad($k)]
+          elif $k == "verify_timeout_seconds" and $n > 540 then
+            .out[$k] = 540 | .warn += ["resolve_pr.verify_timeout_seconds is over 540; capped at 540"]
+          elif $k == "repass_max_passes" and ($n < 1 or $n > 10) then
+            .out[$k] = (if $n < 1 then 1 else 10 end) | .warn += ["resolve_pr.repass_max_passes is outside 1-10; clamped"]
+          elif ($k == "repass_wait_seconds" and $n > 480)
+               or ($k != "repass_wait_seconds" and $n < 1) then
+            .out[$k] = $d | .warn += [bad($k)]
+          else .out[$k] = $n end
+      end)
+  | .warn += [$f | keys[] | select(IN(known[]) | not) | "resolve_pr.\(.) is not a known key; ignored"]
+  | {file: $file, tracked: $tracked} + .out + {warnings: .warn}
+' >"$WORK/out" || { printf 'Error: could not read %s.\n' "$NAME" >&2; exit 1; }
+
+jq -r '.warnings[] | "[read-resolve-config] Warning: " + .' "$WORK/out" >&2 || true
+cat "$WORK/out"

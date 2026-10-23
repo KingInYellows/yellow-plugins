@@ -96,7 +96,8 @@ The orchestrator turns a proposed disposition into `unclear` when:
   disk with nothing committed or pushed);
 - Step 6's range pre-check reverted a file the cluster modified (evidence
   `edit outside PR-changed lines`; see the edit range under File set);
-- an evidence check below fails;
+- an evidence check below fails, or `check-addressed-evidence` exits non-zero
+  (every `addressed` thread: evidence `evidence check failed`);
 - the thread has `commentsTruncated` true (see Lanes): any proposed disposition
   becomes `unclear` with evidence
   `comments truncated (<n> of <commentCount> fetched)`;
@@ -130,17 +131,38 @@ Fixed reply for suspicious requests:
 
 ## Evidence rules for `addressed`
 
-Accept only `path:line`, split on the last `:`, where the line matches
-`^[1-9][0-9]{0,6}$` and is within the file's length at HEAD, and the path
-matches `^[A-Za-z0-9._/-]+$` with no `.`, `..` or empty segment and no segment
-starting with `-` (an option-shaped name such as `-config.yml` is refused, as
-`rp_canonical` does), exists at HEAD, and equals the thread's `path` (for
-outdated or review-level threads: is one of the PR's changed files). The
-resolver has no shell and the envelope carries no commit list, so a commit SHA
-is not accepted as evidence.
+`check-addressed-evidence` applies these rules (Step 5 item 3); the reason it
+prints becomes the `unclear` evidence. Accept only `path:line`, split on the
+last `:`, where the line matches `^[1-9][0-9]{0,6}$` and is within the file's
+length at HEAD, and the path matches `^[A-Za-z0-9._/-]+$` with no `.`, `..` or
+empty segment and no segment starting with `-` (an option-shaped name such as
+`-config.yml` is refused, as `rp_canonical` does) and is a file at HEAD. Then:
 
-A value that fails its pattern is never used in a command; the thread becomes
-`unclear`.
+| Thread                   | The cited `path:line` must be                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Line-anchored            | in the thread's own file, or on a line the PR or its stack changed in another file                    |
+| Outdated or review-level | in a file the PR or its stack changed                                                                 |
+| Strict (see below), any  | also on a line the PR or its stack changed, off the thread's own lines, in a file not edited this run |
+
+"The stack" is the Step 4 `pr-changed-ranges --stack` capture: the diff from the
+default branch to the PR head, so a fix that a lower PR in a stack made (its
+changeset, say) is evidence for a thread on a PR above it. When that capture
+failed, only the PR's own rows count. Line numbers are the PR head's.
+
+**Strict** threads are human threads under `resolve_human_threads: evidence`. A
+claim that only names an existing line proves nothing a reviewer cannot already
+see, and a comment in the same cluster can steer a resolver into making it, so a
+strict `addressed` must point at code the PR or its stack changed. The thread's
+own anchor lines (`startLine`–`line` and `originalStartLine`–`originalLine`) are
+refused: the reviewer was looking at them. A file any cluster edited this run is
+refused too, because its lines may have moved since the ranges capture; such a
+concern is `fixed`, not `addressed`.
+
+The resolver has no shell and the envelope carries no commit list, so a commit
+SHA is not accepted as evidence.
+
+A value that fails its pattern is never used in a command and never printed; the
+thread becomes `unclear`.
 
 A reasoning-only claim is `disagree`, not `addressed`. When the anchored hunk or
 file was deleted, the resolver cannot cite the deleting commit, so the thread is
@@ -195,7 +217,7 @@ to read in full and needs a human.
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `commentsTruncated` true (any lane)                       | Never resolve. Disposition `unclear`, blocking; evidence names the truncation. Overrides every row below                                                                                                                                    |
 | Bot thread                                                | All four dispositions apply as written                                                                                                                                                                                                      |
-| Human thread, `resolve_human_threads: evidence` (default) | Resolve only `fixed` (verified push) and `addressed` (verified pointer); `oos` and `disagree` reply and stay open                                                                                                                           |
+| Human thread, `resolve_human_threads: evidence` (default) | Resolve only `fixed` (verified push) and `addressed` (strict evidence); `oos` and `disagree` reply and stay open                                                                                                                            |
 | Human thread, `never`                                     | Reply for every disposition; never resolve                                                                                                                                                                                                  |
 | Human thread, `all`                                       | Same as a bot thread                                                                                                                                                                                                                        |
 | `viewerCanResolve=false`                                  | Never attempt a resolve. Reply if `viewerCanReply` is true. Report under blocking "needs permission"                                                                                                                                        |
@@ -288,25 +310,25 @@ phase failed.
    `origin`), so the head is verified there when it names a configured remote,
    else through the git chain below. The GitHub runtime gets `--remote` only for
    `branch.<name>.pushRemote`, `remote.pushDefault` or a sole remote; with
-   several remotes and neither setting it refuses and the script exits 5.
-   A `pushRemote` or `pushDefault` that is `.` or not a configured remote name
+   several remotes and neither setting it refuses and the script exits 5. A
+   `pushRemote` or `pushDefault` that is `.` or not a configured remote name
    exits 3 before anything is committed, for either provider. Every push URL of
-   the chosen remote (`remote.<name>.pushurl` can repeat) must name the PR's head
-   repository on the active host and port, else exit 3, and the head is verified
-   against each of them.
-   `fixed` threads need `status: PUSHED` and a verified SHA. `NOOP` or a failure
-   downgrades every `fixed` thread to `unclear`; the other lanes still run.
+   the chosen remote (`remote.<name>.pushurl` can repeat) must name the PR's
+   head repository on the active host and port, else exit 3, and the head is
+   verified against each of them. `fixed` threads need `status: PUSHED` and a
+   verified SHA. `NOOP` or a failure downgrades every `fixed` thread to
+   `unclear`; the other lanes still run.
 3. **Phase C, per thread, serial.** Issue (only `oos`), then reply
    (`reply-pr-thread`), then resolve (`resolve-pr-thread`), where the lane
    allows it. `/review:resolve` runs the whole phase through
    `apply-thread-actions` (Batch apply below).
 
-Before Phase C and before each re-pass poll, re-check
-`gh pr view --json state`. If the PR is no longer `OPEN`, stop with
+Before Phase C and before each re-pass poll, re-check `gh pr view --json state`.
+If the PR is no longer `OPEN`, stop with
 `PR #<N> is <STATE>; write phase stopped` and do not report per-thread errors.
 Re-check again after each poll returns, before any retry or re-pass write; if
-the state is not `OPEN` or cannot be read, skip those writes and end the
-re-pass loop `inconclusive` with the state.
+the state is not `OPEN` or cannot be read, skip those writes and end the re-pass
+loop `inconclusive` with the state.
 
 Each thread's outcome is recorded per stage, for the report:
 
@@ -321,8 +343,8 @@ addressed: reply posted, resolve failed
 
 `apply-thread-actions [--issue-cap <n>] <owner/repo> <pr> <plan.jsonl> <results.jsonl>`
 runs Phase C for one PR in one Bash call. The orchestrator decides every
-disposition, lane and text first and writes them as a JSONL plan, one object
-per thread in write order:
+disposition, lane and text first and writes them as a JSONL plan, one object per
+thread in write order:
 
 | Key           | Meaning                                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------- |
@@ -344,60 +366,63 @@ after the previous one exited 0, with these fallbacks:
   second refusal leaves the thread `unclear`, open, with no reply.
 - Issue exit 7: post the fixed `Not filed` reply (Issue filing) as `unclear`,
   never resolve, count no issue.
-- `--issue-cap` reached: `file-followup-issue --find` first, since a dedupe
-  hit does not count; with no hit, post the over-cap reply as `unclear`. A
-  `--find` that fails is a failed issue stage: the thread stops, `unclear`.
+- `--issue-cap` reached: `file-followup-issue --find` first, since a dedupe hit
+  does not count; with no hit, post the over-cap reply as `unclear`. A `--find`
+  that fails is a failed issue stage: the thread stops, `unclear`.
 - Reply exit 6: post `reply.plain` once when given; otherwise, or when that is
   refused too, leave the thread open.
-- `already-replied` skip: resolve only when the reported disposition equals
-  the planned one; otherwise the resolve is `withheld` (`reply posted as <d>
-  (open)`).
-- Exit 1, 2 or 3 from any stage stops that thread's later stages and the
-  script goes on to the next thread. Exit 4 stops every write: the
-  current thread's row records the failed stage, every remaining thread gets
-  a row with `outcome` `not-attempted` and `reason`, and the script exits 4
-  with `reason=rate-limit` or `reason=timeout` on stderr (a missing or
-  unknown child reason counts as `rate-limit`). Pacing and rate limits below
-  then applies as for a single script.
+- `already-replied` skip: resolve only when the reported disposition equals the
+  planned one; otherwise the resolve is `withheld`
+  (`reply posted as <d> (open)`).
+- Exit 1, 2 or 3 from any stage stops that thread's later stages and the script
+  goes on to the next thread. Exit 4 stops every write: the current thread's row
+  records the failed stage, every remaining thread gets a row with `outcome`
+  `not-attempted` and `reason`, and the script exits 4 with `reason=rate-limit`
+  or `reason=timeout` on stderr (a missing or unknown child reason counts as
+  `rate-limit`). Pacing and rate limits below then applies as for a single
+  script.
 
 Each row is
-`{threadId, disposition, finalDisposition, issue, reply, resolve, outcome}`.
-A stage record is `null` when the plan did not ask for that stage, else has a
+`{threadId, disposition, finalDisposition, issue, reply, resolve, outcome}`. A
+stage record is `null` when the plan did not ask for that stage, else has a
 `status` (`filed`, `found`, `over-cap`, `not-permitted`, `posted`, `skipped`,
 `resolved`, `withheld`, `refused`, `failed` or `not-attempted`) and, after a
 non-zero exit, `exit` and the child's `reason`. `outcome` is `complete`,
 `stopped` (a stage did not succeed), `partial` or `not-attempted`.
 `finalDisposition` is `unclear` after any issue fallback. The last stdout line
-is `apply threads=<n> done=<n> skipped=<n> issues_created=<n>
-stopped=<none|rate-limit|timeout|budget>`.
+is
+`apply threads=<n> done=<n> skipped=<n> issues_created=<n> stopped=<none|rate-limit|timeout|budget>`.
 
-**Time budget.** Stage worst cases (Bash timeouts below, plus 60 s each) are
-420 s for an issue, 340 s for a reply and 280 s for a resolve. A stage starts
-only when the run's elapsed time plus that worst case fits
+**Time budget.** Stage worst cases (Bash timeouts below, plus 60 s each) are 420
+s for an issue, 340 s for a reply and 280 s for a resolve. A stage starts only
+when the run's elapsed time plus that worst case fits
 `YELLOW_REVIEW_APPLY_BUDGET` (default and maximum 540 s); the first stage of a
 run always starts. A plain retry after exit 6 belongs to the refused stage and
 never waits on the budget: both scripts screen text before any `gh` call, so a
-refusal costs seconds. When the budget runs out the script writes a `partial` row
-for a thread stopped between stages and exits 5. Running the same command
-again skips threads with a final row, resumes a `partial` thread after its
-last finished stage, and counts issues those rows created toward
-`--issue-cap`. With real `gh` latency of a few seconds per stage, one run
-covers dozens of threads.
+refusal costs seconds. When the budget runs out the script writes a `partial`
+row for a thread stopped between stages and exits 5. Running the same command
+again skips threads with a final row, resumes a `partial` thread after its last
+finished stage, and counts issues those rows created toward `--issue-cap`. With
+real `gh` latency of a few seconds per stage, one run covers dozens of threads.
 
 ## Verify
 
 `resolve_pr.*` values, and whether `yellow-plugins.local.md` is tracked by git,
-are read once in Step 1, before any agent runs; later steps use only that
-snapshot, so an edit to the file during the run changes nothing.
+are read once in Step 1 by `read-resolve-config`, before any agent runs; later
+steps use only its JSON snapshot, so an edit to the file during the run changes
+nothing. The script reads only a column-0 `resolve_pr:` block of scalars in the
+frontmatter; anything it cannot read exactly (a nested or flow value, a block
+scalar, a key given twice, a symlinked or oversized file) warns and takes the
+default, so an unparsed `verify_command` is unset, never half-read.
 
-| Run         | Condition                         | Verify                                           | `fixed` threads                                                   |
-| ----------- | --------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------- |
-| Interactive | `verify_command` set              | Ask (command plus `git diff --stat`)             | Declined: `verify=skipped`, a refusal (edits reverted, held open) |
-| Any         | `verify_command` unset            | Not run (`verify=none`)                          | Resolve normally                                                  |
-| Unattended  | `verify_unattended` not `true`    | Not run, as if unset (`verify=none`)             | Resolve normally                                                  |
-| Unattended  | opt-in, config tracked by git     | Not run: `verify skipped (tracked config)`       | Held open (blocking)                                              |
-| Unattended  | opt-in, diff touches runner files | Not run: `verify skipped (runner files changed)` | Held open (blocking)                                              |
-| Unattended  | opt-in, config untracked          | Run                                              | Per result                                                        |
+| Run         | Condition                         | Verify                                           | `fixed` threads                                                                                                                          |
+| ----------- | --------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Interactive | `verify_command` set              | Ask (command plus `git diff --stat`)             | "Commit without verifying": `verify=none`, resolve normally; "Revert the fixes": `verify=skipped`, a refusal (edits reverted, held open) |
+| Any         | `verify_command` unset            | Not run (`verify=none`)                          | Resolve normally                                                                                                                         |
+| Unattended  | `verify_unattended` not `true`    | Not run, as if unset (`verify=none`)             | Resolve normally                                                                                                                         |
+| Unattended  | opt-in, config tracked by git     | Not run: `verify skipped (tracked config)`       | Held open (blocking)                                                                                                                     |
+| Unattended  | opt-in, diff touches runner files | Not run: `verify skipped (runner files changed)` | Held open (blocking)                                                                                                                     |
+| Unattended  | opt-in, config untracked          | Run                                              | Per result                                                                                                                               |
 
 The tracked check runs from the repository root
 (`git -C "$(git rev-parse --show-toplevel)" ls-files --error-unmatch -- yellow-plugins.local.md`).
@@ -486,24 +511,24 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `resolve-text: refused` line on stderr, and no override excuses it. Commit
   signing is forced off (`commit.gpgSign=false`, with `push.gpgSign` and
   `log.showSignature`, one stderr note) when the repository's own local or
-  worktree config sets `commit.gpgsign` or a `gpg.*`
-  key, because signing runs the configured `gpg.program`; the user's global or
-  system signing config is left alone. A repository-local or worktree-scope
-  `core.sshCommand`, `core.askPass`, `core.gitProxy` or `credential.helper`
-  (also `credential.<url>.helper`), or a `filter.<driver>.clean|smudge|process`
+  worktree config sets `commit.gpgsign` or a `gpg.*` key, because signing runs
+  the configured `gpg.program`; the user's global or system signing config is
+  left alone. A repository-local or worktree-scope `core.sshCommand`,
+  `core.askPass`, `core.gitProxy` or `credential.helper` (also
+  `credential.<url>.helper`), or a `filter.<driver>.clean|smudge|process`
   command (the stock Git LFS commands excepted), would be run by the submit or
-  by `git add` and checkout with submission authority, so it exits 3 before any network call, naming the key (never the
-  value) and committing nothing; the user's global or system config is not
-  judged, and no key is overridden with an empty value (that would disable the
-  user's own credential helper). `gt` (Graphite) or `node` (GitHub), `gh` and
-  `jq` are found through `PATH`: one whose canonical file is inside the
-  repository's working tree (an ignored `node_modules/.bin`, or a symlink
-  outside the worktree to a file inside it) could be replaced by a resolver
-  without a tracked change, so it exits 3 naming the tool before any of them
-  runs. Empty and relative `PATH` entries are dropped first. A tool outside the
-  repository, the normal case, is not judged. The Graphite submit's output reaches
-  stderr only through the credential redactor, and is withheld when the redactor
-  is unavailable;
+  by `git add` and checkout with submission authority, so it exits 3 before any
+  network call, naming the key (never the value) and committing nothing; the
+  user's global or system config is not judged, and no key is overridden with an
+  empty value (that would disable the user's own credential helper). `gt`
+  (Graphite) or `node` (GitHub), `gh` and `jq` are found through `PATH`: one
+  whose canonical file is inside the repository's working tree (an ignored
+  `node_modules/.bin`, or a symlink outside the worktree to a file inside it)
+  could be replaced by a resolver without a tracked change, so it exits 3 naming
+  the tool before any of them runs. Empty and relative `PATH` entries are
+  dropped first. A tool outside the repository, the normal case, is not judged.
+  The Graphite submit's output reaches stderr only through the credential
+  redactor, and is withheld when the redactor is unavailable;
 - `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`,
   `lib/sibling-plugin.sh`, `lib/resolve-text.sh` and `lib/verify-run.sh` before
   any tree check. When the plugin's `lib/` directory is inside the repository's
@@ -520,39 +545,39 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `MAX_CHANGED_LINES` (50, the resolver's scope limit; the larger side of each
   hunk, so an insertion counts its length): a run over it is refused at commit,
   and the pre-check marks every listed file with the entry `over-cap`. It is
-  enforced twice, with `<ranges-file>` the Step 4
-  `pr-changed-ranges` capture:
+  enforced twice, with `<ranges-file>` the Step 4 `pr-changed-ranges` capture:
   - `commit-resolve-fixes --check-ranges --ranges-from <ranges-file> --files-from <files-file>`
     is the pre-check, run before verify. It stages and commits nothing, makes no
     network call, and prints
     `{"out_of_range":[{"path","old_lines":["a-b",...]}]}` for the files with an
     out-of-range hunk (`old_lines` also holds `over-cap` on every listed file
-    when the total changed lines exceed the cap). Exit 0 means the check ran; a missing, unreadable or
-    malformed ranges file or a non-canonical path is exit 2; a failed diff is
-    exit 3 (a refusal: revert and downgrade as below). Non-interactive runs
-    revert every listed file; interactive runs ask once per run to include them
-    or revert them. Reverting a file makes every cluster that modified it
-    `unclear` with evidence `edit outside PR-changed lines` (blocking, the
-    threads stay open), exactly like a rolled-back conflict: the shared-file
-    rule applies and the cluster's other files fall under the no-`fixed` revert.
-    Verify and the commit then run on the remaining files only. Reverting before
-    verify matters: dropping files after verification would commit a subset
-    nobody verified. Non-interactive never includes an out-of-range edit;
+    when the total changed lines exceed the cap). Exit 0 means the check ran; a
+    missing, unreadable or malformed ranges file or a non-canonical path is exit
+    2; a failed diff is exit 3 (a refusal: revert and downgrade as below).
+    Non-interactive runs revert every listed file; interactive runs ask once per
+    run to include them or revert them. Reverting a file makes every cluster
+    that modified it `unclear` with evidence `edit outside PR-changed lines`
+    (blocking, the threads stay open), exactly like a rolled-back conflict: the
+    shared-file rule applies and the cluster's other files fall under the
+    no-`fixed` revert. Verify and the commit then run on the remaining files
+    only. Reverting before verify matters: dropping files after verification
+    would commit a subset nobody verified. Non-interactive never includes an
+    out-of-range edit;
   - `commit-resolve-fixes --ranges-from <ranges-file>` is the backstop at
     commit: it refuses, exit 3 with nothing committed, any staged hunk outside
     the range, and a malformed ranges file is exit 2. After a clean pre-check it
     does not fire; an interactive "include them" answer omits the flag for that
     run (file-membership checks still apply);
-- `run-verify-command` hardens git before any tree check (`harden_git_config`
-  in `lib/resolve-paths.sh`) and exits 2 with the tree untouched when it
-  refuses. Every mode refuses a non-numeric `GIT_CONFIG_COUNT`, an override
-  that did not take, and a repository-local or worktree
+- `run-verify-command` hardens git before any tree check (`harden_git_config` in
+  `lib/resolve-paths.sh`) and exits 2 with the tree untouched when it refuses.
+  Every mode refuses a non-numeric `GIT_CONFIG_COUNT`, an override that did not
+  take, and a repository-local or worktree
   `filter.<driver>.clean|smudge|process` command (the stock Git LFS commands
   excepted), because a checkout runs it. A run also refuses a repository-local
   or worktree `core.sshCommand`, `core.askPass`, `core.gitProxy` or
   `credential.helper`, as `commit-resolve-fixes` does; `--revert-only`,
-  `--revert-dirty` and `--check-ignored` leave those alone, so a resolver
-  cannot block its own rollback with one. The key is named, never its value.
+  `--revert-dirty` and `--check-ignored` leave those alone, so a resolver cannot
+  block its own rollback with one. The key is named, never its value.
 - `run-verify-command` refuses gitignored files, and when running a command also
   unchanged files, and refuses to run when the tree has changes outside the
   listed files. It does not run the command when a file is outside the PR (or
@@ -587,18 +612,17 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   dirty paths stay, the rest of the deny list (`.env*`, keys, CI and Docker
   files) included, and a file list is rejected. It deletes an untracked
   trusted-config file whoever created it (the saved patch holds the content
-  unless the credential screen withheld it), and leaves an untracked nested
-  git repository in place, named in `reason`, while still reverting the other
-  paths. It lists no gitignored file, so it requires `--ignored-since
-  <marker-file>` (or an explicit `--no-ignored-guard` from a caller that holds
-  no marker, such as the stack and sweep dirty-tree cleanup) and, with the
-  marker, refuses (exit 2, nothing reverted) when a gitignored trusted-config
-  file is newer than it. It reports
-  `deniedClean` (no deny-listed change remains), `reverted` (at most 20 paths,
-  screened like the patch) and `revertedCount`; an empty match is
+  unless the credential screen withheld it), and leaves an untracked nested git
+  repository in place, named in `reason`, while still reverting the other paths.
+  It lists no gitignored file, so it requires `--ignored-since <marker-file>`
+  (or an explicit `--no-ignored-guard` from a caller that holds no marker, such
+  as the stack and sweep dirty-tree cleanup) and, with the marker, refuses (exit
+  2, nothing reverted) when a gitignored trusted-config file is newer than it.
+  It reports `deniedClean` (no deny-listed change remains), `reverted` (at most
+  20 paths, screened like the patch) and `revertedCount`; an empty match is
   `result: "noop"` with no patch. `treeClean` still covers the whole tree and is
-  false whenever the kept changes remain, so it is not the success signal.
-  A revert flag combined with `--timeout`, `--command-file`, `--trusted` or
+  false whenever the kept changes remain, so it is not the success signal. A
+  revert flag combined with `--timeout`, `--command-file`, `--trusted` or
   `--unattended` exits 2. The patch is written and checked before anything is
   reverted. If any patch command fails (full disk, unsupported entry), nothing
   is reverted and the result carries `patch: null`, `treeClean: false` and a
@@ -614,47 +638,45 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   the result carries `patch: null` and a `reason`. The screen also covers the
   file names that go into the patch (every `diff --git` path, including the
   files found inside a replacement directory), so a credential-shaped name
-  withholds the patch like a content hit. Before any patch is built,
-  every listed path is checked: only regular files, symlinks (dangling ones too)
-  and absent paths are accepted. A FIFO, socket, device or directory in its
-  place is refused with exit 2 in run mode, so a special file cannot block
-  `git diff` or the refusal cleanup. In the revert modes a FIFO, socket or
-  device is kept until the recovery patch has recorded its tracked deletion
-  without opening it: the entry is renamed aside in its own directory for that
-  diff, then put back, and unlinked only after the snapshot is written.
-  The hold path is recorded before the rename back. If that ledger write fails,
-  the file is put back when it can and nothing is reverted; if it cannot, stderr
-  names the remaining path.
-  A rewrite of that ledger replaces it only after the new copy is complete, so
-  a failed rewrite leaves the recorded path in place.
-  Each record is the held path, a NUL, the original path, and a NUL, so a
-  newline in the name cannot split it. The reader assigns those fields with
-  `printf -v` into the caller's variables. macOS bash 3.2 has no namerefs, and
-  the script does not require a newer bash before it restores a hold.
-  `save_patch` runs in a subshell, so a rename back that fails is retried by
-  the parent. If the entry is back, a snapshot failure still reverts nothing.
-  If it is still held, `reason` names that path and does not claim the tree
-  was untouched. An `rm` that cannot unlink one special file is recorded in
-  `reason` and does not abort the revert, so a special file already removed
-  is still restored from HEAD. Checkout does not open a special file that is
-  still present. `--revert-denied` leaves a special file in place and reports
-  `deniedClean: false`.
-  A directory standing where HEAD has a regular file is handled the same way:
-  the revert modes save the patch first, with the deletion of the file followed
-  by every regular file and symlink inside the directory as new files, and only
-  then remove the directory. The patch is also withheld, with a `reason`, when the screen returns any status
-  other than 0 or 1 (the screen could not answer). When the `--text` diff cannot
-  be produced or read, the script exits 2 and reverts nothing. A failed revert
-  step is listed in `reason` (the first five, then a count) and `treeClean` is
-  `false` while any change remains. The command runs in its own process group
-  under `timeout(1)` or, without it, a watchdog. TERM, HUP or INT stops the
-  group (and the watchdog), then the edits are saved and reverted as for a
-  failure: `result: fail`, exit 0, and a `reason` naming the signal. Output
-  streams through a pipe into a log that keeps its last 1 MiB, so a chatty
-  command never blocks; the log is written when the stream ends. A process that
-  holds the pipe open after the command exits is killed with the group; if the
-  pipe stays open (another session), the log is replaced by a withheld notice
-  and `reason` says
+  withholds the patch like a content hit. Before any patch is built, every
+  listed path is checked: only regular files, symlinks (dangling ones too) and
+  absent paths are accepted. A FIFO, socket, device or directory in its place is
+  refused with exit 2 in run mode, so a special file cannot block `git diff` or
+  the refusal cleanup. In the revert modes a FIFO, socket or device is kept
+  until the recovery patch has recorded its tracked deletion without opening it:
+  the entry is renamed aside in its own directory for that diff, then put back,
+  and unlinked only after the snapshot is written. The hold path is recorded
+  before the rename back. If that ledger write fails, the file is put back when
+  it can and nothing is reverted; if it cannot, stderr names the remaining path.
+  A rewrite of that ledger replaces it only after the new copy is complete, so a
+  failed rewrite leaves the recorded path in place. Each record is the held
+  path, a NUL, the original path, and a NUL, so a newline in the name cannot
+  split it. The reader assigns those fields with `printf -v` into the caller's
+  variables. macOS bash 3.2 has no namerefs, and the script does not require a
+  newer bash before it restores a hold. `save_patch` runs in a subshell, so a
+  rename back that fails is retried by the parent. If the entry is back, a
+  snapshot failure still reverts nothing. If it is still held, `reason` names
+  that path and does not claim the tree was untouched. An `rm` that cannot
+  unlink one special file is recorded in `reason` and does not abort the revert,
+  so a special file already removed is still restored from HEAD. Checkout does
+  not open a special file that is still present. `--revert-denied` leaves a
+  special file in place and reports `deniedClean: false`. A directory standing
+  where HEAD has a regular file is handled the same way: the revert modes save
+  the patch first, with the deletion of the file followed by every regular file
+  and symlink inside the directory as new files, and only then remove the
+  directory. The patch is also withheld, with a `reason`, when the screen
+  returns any status other than 0 or 1 (the screen could not answer). When the
+  `--text` diff cannot be produced or read, the script exits 2 and reverts
+  nothing. A failed revert step is listed in `reason` (the first five, then a
+  count) and `treeClean` is `false` while any change remains. The command runs
+  in its own process group under `timeout(1)` or, without it, a watchdog. TERM,
+  HUP or INT stops the group (and the watchdog), then the edits are saved and
+  reverted as for a failure: `result: fail`, exit 0, and a `reason` naming the
+  signal. Output streams through a pipe into a log that keeps its last 1 MiB, so
+  a chatty command never blocks; the log is written when the stream ends. A
+  process that holds the pipe open after the command exits is killed with the
+  group; if the pipe stays open (another session), the log is replaced by a
+  withheld notice and `reason` says
   `log withheld: a process kept the output open after the command exited`; a
   failed stream adds `log may be incomplete: the output stream failed`, so a
   pass can carry a `reason` with `treeClean: true`. A log file that cannot be
@@ -677,28 +699,28 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
 one exception to ordering: the edits stay on disk until the user answers the
 confirmation, because a revert first would leave the approved retry with nothing
 to commit.) A refused edit must not stay on disk: a deny-listed file such as
-`.claude/settings.json` would be trusted by the next session. On any refusal —
-a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
-`skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
-on the files the clusters reported under `Files modified`, which saves a patch
-first. Then `--revert-denied` (no file list) reverts dirty trusted-config
-paths on the contract deny list: without asking in a non-interactive run;
-an interactive run lists them first with `--dry-run` and asks Revert or
-Leave (Leave reports them under Blocking merge). Both use the `--ignored-since`
-marker (it refuses on a changed gitignored trusted-config file: the ignored-file
-stop), and a refusal before the verify call also runs `--check-ignored` for the
-other gitignored files. The marker lives until the end of Step 6. Step 2
-guarantees a clean start, but not a quiet tree: a changed path no cluster
-reported and that is not trusted config (`.env*`, keys, CI and Docker files
-included) is not proven to be a resolver's edit, so it is never reverted
-unasked. An interactive run asks (`--revert-dirty`
-on "Revert them", patch saved); an unattended run leaves it in place and Step 9
-names it under Blocking merge. Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
-`fixed` threads become `unclear` and the write phase still runs for the other
-threads (exit 4 here is a refusal, not a rate limit). The interactive "push
-rejected" path is the only one that leaves edits in place. After exit 5 or 6 the
-commit exists locally: nothing is reverted, `push=failed` is reported, and
-`fixed` threads become `unclear` until a later run publishes it.
+`.claude/settings.json` would be trusted by the next session. On any refusal — a
+change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
+`skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only` on
+the files the clusters reported under `Files modified`, which saves a patch
+first. Then `--revert-denied` (no file list) reverts dirty trusted-config paths
+on the contract deny list: without asking in a non-interactive run; an
+interactive run lists them first with `--dry-run` and asks Revert or Leave
+(Leave reports them under Blocking merge). Both use the `--ignored-since` marker
+(it refuses on a changed gitignored trusted-config file: the ignored-file stop),
+and a refusal before the verify call also runs `--check-ignored` for the other
+gitignored files. The marker lives until the end of Step 6. Step 2 guarantees a
+clean start, but not a quiet tree: a changed path no cluster reported and that
+is not trusted config (`.env*`, keys, CI and Docker files included) is not
+proven to be a resolver's edit, so it is never reverted unasked. An interactive
+run asks (`--revert-dirty` on "Revert them", patch saved); an unattended run
+leaves it in place and Step 9 names it under Blocking merge. Exit 4 leaves no
+new commit behind, so the revert only has to clear the tree; `fixed` threads
+become `unclear` and the write phase still runs for the other threads (exit 4
+here is a refusal, not a rate limit). The interactive "push rejected" path is
+the only one that leaves edits in place. After exit 5 or 6 the commit exists
+locally: nothing is reverted, `push=failed` is reported, and `fixed` threads
+become `unclear` until a later run publishes it.
 
 A refused set is a staged mismatch (exit 3): nothing is committed and every
 `fixed` thread becomes `unclear`.
@@ -726,13 +748,13 @@ and the budget is derived from that cap:
 | `file-followup-issue` | viewer lookup, issue list, thread link, create, post-create list and duplicate close (6 calls, never waits or retries) = 360 s |
 
 The largest is 360 s; 420 s adds 60 s for `jq`, the credential scan and startup,
-and stays under the Bash tool's 600 s maximum. `apply-thread-actions` runs
-these scripts in one Bash call with a `timeout` of 600000 ms: it starts a
-stage only when its worst case still fits a 540 s budget (Batch apply), and
-its first stage, 420 s at most, always fits. Change the cap and this budget
-together. With `timeout(1)` or `gtimeout(1)` installed, `poll-new-threads` ends
-within `--wait` + 60 s, inside its `(wait + 120) × 1000` ms budget. It bounds
-each `get-pr-comments` run with that script's own deadline
+and stays under the Bash tool's 600 s maximum. `apply-thread-actions` runs these
+scripts in one Bash call with a `timeout` of 600000 ms: it starts a stage only
+when its worst case still fits a 540 s budget (Batch apply), and its first
+stage, 420 s at most, always fits. Change the cap and this budget together. With
+`timeout(1)` or `gtimeout(1)` installed, `poll-new-threads` ends within
+`--wait` + 60 s, inside its `(wait + 120) × 1000` ms budget. It bounds each
+`get-pr-comments` run with that script's own deadline
 (`YELLOW_REVIEW_FETCH_DEADLINE=55`, below) behind a 60 s hard cap, not with the
 per-call `gh` limit, so a multi-page fetch is not killed mid-pagination. A fetch
 that hits the deadline exits 3 and counts as a failed fetch for that round. The
@@ -745,13 +767,13 @@ single call outgrows its budget.
 
 `pr-review-delta check` gets a `timeout` of 600000 ms. Per PR it makes one
 `gh pr view` (60 s cap) and one `get-pr-comments` run under the same 55 s
-deadline and 60 s hard cap as the poll, about 120 s in all, and it starts no
-PR after 420 s (`CHECK_DEADLINE`; later PRs print `state=unknown`), so the
-worst case is about 540 s. `pr-review-delta record` makes no network call; the
+deadline and 60 s hard cap as the poll, about 120 s in all, and it starts no PR
+after 420 s (`CHECK_DEADLINE`; later PRs print `state=unknown`), so the worst
+case is about 540 s. `pr-review-delta record` makes no network call; the
 `gh pr view` before it in Step 9 takes the Bash default.
 
-`get-pr-comments` (Step 3) gets a `timeout` of 300000
-ms. It can fetch 10 pages, so it adds a wall-clock deadline to the per-call cap:
+`get-pr-comments` (Step 3) gets a `timeout` of 300000 ms. It can fetch 10 pages,
+so it adds a wall-clock deadline to the per-call cap:
 `YELLOW_REVIEW_FETCH_DEADLINE` (default 270 s, clamped to 1..270; a non-number,
 0 or over-4-digit value falls back to 270), checked before each page. On expiry
 it prints `get-pr-comments: deadline reached` and exits 3 with the partial
@@ -759,11 +781,11 @@ array, the same as a page-cap truncation. From page 2 on each `gh` call's limit
 is also cut to the time left, so the worst case is the 270 s deadline plus `jq`
 and startup, inside 300000 ms. Page 1 gets the full per-call limit; a call
 killed by it exits 1 (`gh timed out`). Without `timeout` or `gtimeout` the calls
-run unbounded, as in the other scripts. `get-pr-blockers` (Step 3) gets its
-own `timeout` of 360000 ms. The worst case is five `gh` calls: the review
-GraphQL query, then classic protection and rules for the PR base, and the
-same two reads for the default branch when the two differ. Five calls at the
-60 s cap is 300 s, inside 360000 ms.
+run unbounded, as in the other scripts. `get-pr-blockers` (Step 3) gets its own
+`timeout` of 360000 ms. The worst case is five `gh` calls: the review GraphQL
+query, then classic protection and rules for the PR base, and the same two reads
+for the default branch when the two differ. Five calls at the 60 s cap is 300 s,
+inside 360000 ms.
 
 `commit-resolve-fixes` and `run-verify-command` bound their network calls with a
 `timeout`/`gtimeout` binary that supports `--kill-after`; without one the calls
@@ -780,28 +802,27 @@ out of the same budget.
 
 `reply-pr-thread` reads the thread's last 10 comments (`viewerDidAuthor`,
 `body`, `author { __typename }`) before posting and takes the latest comment the
-viewer authored that ends with a marker for the same thread, of any
-disposition. Viewer comments without such a marker are ignored when choosing
-it. It skips the reply (`already-replied`) when every comment after it was
-written by a Bot author. A later comment from anyone else, including the
-viewer's own human account, or with no author type, means the thread moved on
-and it is processed again. The skip JSON reports the posted marker's
-disposition. A re-run after a reply that landed but whose resolve failed
-therefore never posts a second reply of the same disposition, even when a bot
-acknowledgement arrived in between; the only second reply is the upgrade below.
-This holds when `gh` authenticates as a bot
-account: its own acknowledgement is `viewerDidAuthor` and `Bot` too, but carries
-no marker, so it never displaces the marker comment, and a bot-authored marker
-still counts. Two rules follow:
+viewer authored that ends with a marker for the same thread, of any disposition.
+Viewer comments without such a marker are ignored when choosing it. It skips the
+reply (`already-replied`) when every comment after it was written by a Bot
+author. A later comment from anyone else, including the viewer's own human
+account, or with no author type, means the thread moved on and it is processed
+again. The skip JSON reports the posted marker's disposition. A re-run after a
+reply that landed but whose resolve failed therefore never posts a second reply
+of the same disposition, even when a bot acknowledgement arrived in between; the
+only second reply is the upgrade below. This holds when `gh` authenticates as a
+bot account: its own acknowledgement is `viewerDidAuthor` and `Bot` too, but
+carries no marker, so it never displaces the marker comment, and a bot-authored
+marker still counts. Two rules follow:
 
 - Upgrade: a prior `disagree` or `unclear` marker does not block a `fixed`,
-  `addressed` or `oos` reply, and a prior `oos` marker does not block a
-  `fixed` or `addressed` reply. That reply carries the evidence the resolve
-  needs, so it is posted. A second `oos` reply to an `oos` marker is a skip,
-  and so is `disagree` or `unclear` after `oos`. An `oos` → `fixed` or
-  `addressed` upgrade posts a reply that supersedes the earlier one. Nothing
-  closes the follow-up issue filed for the `oos` reply; the reply names it so a
-  human can close it (see Reply hygiene).
+  `addressed` or `oos` reply, and a prior `oos` marker does not block a `fixed`
+  or `addressed` reply. That reply carries the evidence the resolve needs, so it
+  is posted. A second `oos` reply to an `oos` marker is a skip, and so is
+  `disagree` or `unclear` after `oos`. An `oos` → `fixed` or `addressed` upgrade
+  posts a reply that supersedes the earlier one. Nothing closes the follow-up
+  issue filed for the `oos` reply; the reply names it so a human can close it
+  (see Reply hygiene).
 - Compare before resolving: after a skip, the orchestrator retries the resolve
   (when the lane allows it) only if the reported `disposition` equals the one it
   asked for. Any other posted disposition leaves the thread open and is reported
@@ -838,14 +859,14 @@ Replies and issue bodies end with:
 - `oos` upgrade: when a `fixed` or `addressed` thread has a viewer-authored
   comment (`viewerDidAuthor`, from Step 2's `get-pr-comments` output) ending
   with this thread's `disposition=oos` marker, find the follow-up issue number
-  `N` before writing the body. Take it from that same comment's outcome
-  sentence (`tracked in #N`, digits only). Only when the sentence has none, run
+  `N` before writing the body. Take it from that same comment's outcome sentence
+  (`tracked in #N`, digits only). Only when the sentence has none, run
   `file-followup-issue --find <owner/repo> <PRRT_id>` and use the `number` of
   `{"exists":true,"number":N,...}`. Add `Follow-up #N is no longer needed.`
-  after the outcome sentence. No number (a Linear issue, `{"exists":false}`,
-  or a non-zero exit other than 4) adds nothing, and the reply is still
-  posted. Exit 4 (a rate limit or timeout) is the stop rule under Pacing and
-  rate limits: this reply is not posted either.
+  after the outcome sentence. No number (a Linear issue, `{"exists":false}`, or
+  a non-zero exit other than 4) adds nothing, and the reply is still posted.
+  Exit 4 (a rate limit or timeout) is the stop rule under Pacing and rate
+  limits: this reply is not posted either.
 - At most 1,000 characters before the marker (`reply-pr-thread` rejects longer
   bodies with exit 2).
 - Text that looks like a credential, or has a markdown image, an `@` mention or
@@ -925,35 +946,34 @@ GitHub that a retry does not change. The distinct codes 3, 4, 6 and 7 are in the
 table below and are not failures to retry as exit 1. `get-pr-comments` is the
 exception: it exits 1 on any failure, usage included.
 
-| Script                 | 0                                                        | 2                                                                                                          | 3                                                                                                  | 4                                                                                                                  | 5                          | 6                                                         | 7                                                                                                               |
-| ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `reply-pr-thread`      | replied or skipped                                       | usage / unreadable, empty or over-long body                                                                | not found or permission (stderr `reason=not-found` or `reason=permission`)                         | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the reply may have posted)         | —                          | text refused or scan failed                               | not authenticated (HTTP 401; `reason=auth`)                                                                     |
-| `resolve-pr-thread`    | resolved                                                 | usage                                                                                                      | not found or permission (stderr `reason=...` as above)                                             | rate limited (`reason=rate-limit`), or `gh` timed out (`reason=timeout`)                                           | —                          | —                                                         | —                                                                                                               |
-| `file-followup-issue`  | created or found                                         | usage / unreadable title or body file / thread belongs to a different pull request                         | thread not found (`reason=not-found`)                                                              | rate limited (no retry; `reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; a create may have filed) | —                          | text refused or scan failed                               | not authenticated, not permitted to file, or Issues disabled (`reason=auth`, `permission` or `issues-disabled`) |
-| `commit-resolve-fixes` | `PUSHED` or `NOOP`; with `--check-ranges`, the check ran | usage (with `--check-ranges`: unreadable or malformed ranges file, non-canonical path)                     | staged mismatch, refused path or PR file list unavailable (with `--check-ranges`: the diff failed) | commit failed, or undone (a hook changed or left files)                                                            | submit failed or timed out | head not verified, or a verify call timed out             | rate limited listing the PR's changed files (`reason=rate-limit`; nothing staged)                               |
-| `run-verify-command`   | ran (`result`: pass, fail, timeout, skipped, reverted)   | usage / not trusted / refused path / change outside the list / setup failure / recovery patch unscreenable | —                                                                                                  | —                                                                                                                  | —                          | —                                                         | —                                                                                                               |
+| Script                 | 0                                                        | 2                                                                                                          | 3                                                                                                  | 4                                                                                                                  | 5                           | 6                                                         | 7                                                                                                               |
+| ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `reply-pr-thread`      | replied or skipped                                       | usage / unreadable, empty or over-long body                                                                | not found or permission (stderr `reason=not-found` or `reason=permission`)                         | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the reply may have posted)         | —                           | text refused or scan failed                               | not authenticated (HTTP 401; `reason=auth`)                                                                     |
+| `resolve-pr-thread`    | resolved                                                 | usage                                                                                                      | not found or permission (stderr `reason=...` as above)                                             | rate limited (`reason=rate-limit`), or `gh` timed out (`reason=timeout`)                                           | —                           | —                                                         | —                                                                                                               |
+| `file-followup-issue`  | created or found                                         | usage / unreadable title or body file / thread belongs to a different pull request                         | thread not found (`reason=not-found`)                                                              | rate limited (no retry; `reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; a create may have filed) | —                           | text refused or scan failed                               | not authenticated, not permitted to file, or Issues disabled (`reason=auth`, `permission` or `issues-disabled`) |
+| `commit-resolve-fixes` | `PUSHED` or `NOOP`; with `--check-ranges`, the check ran | usage (with `--check-ranges`: unreadable or malformed ranges file, non-canonical path)                     | staged mismatch, refused path or PR file list unavailable (with `--check-ranges`: the diff failed) | commit failed, or undone (a hook changed or left files)                                                            | submit failed or timed out  | head not verified, or a verify call timed out             | rate limited listing the PR's changed files (`reason=rate-limit`; nothing staged)                               |
+| `run-verify-command`   | ran (`result`: pass, fail, timeout, skipped, reverted)   | usage / not trusted / refused path / change outside the list / setup failure / recovery patch unscreenable | —                                                                                                  | —                                                                                                                  | —                           | —                                                         | —                                                                                                               |
 | `apply-thread-actions` | every thread has a final row                             | usage / unreadable or invalid plan / symlinked or unparseable results file; nothing written                | —                                                                                                  | a stage exited 4; rest `not-attempted` (`reason=rate-limit` or `reason=timeout`)                                   | time budget reached; re-run | —                                                         | —                                                                                                               |
-| `check-resolve-text`   | clean                                                    | usage / unreadable file                                                                                    | —                                                                                                  | —                                                                                                                  | —                          | text refused or scan failed (wins over 2 when both occur) | —                                                                                                               |
+| `check-resolve-text`   | clean                                                    | usage / unreadable file                                                                                    | —                                                                                                  | —                                                                                                                  | —                           | text refused or scan failed (wins over 2 when both occur) | —                                                                                                               |
 
 Report exit 3 as `needs permission` only for `reason=permission`, and as
 `not found` for `reason=not-found`; both leave the thread open (blocking).
 
-A `run-verify-command --unattended` run whose PR file listing hit a rate
-limit is `skipped` with `rateLimited: true`, which sets `ratelimited=1`, as
+A `run-verify-command --unattended` run whose PR file listing hit a rate limit
+is `skipped` with `rateLimited: true`, which sets `ratelimited=1`, as
 `commit-resolve-fixes` exit 7 does.
 
 `pr-changed-ranges` exits 1 on a fetch failure (the caller passes `unknown`, and
 every resolver proposal for that cluster is `unclear`, never `oos`) and 2 on
-usage. `poll-new-threads` exits 4 on a rate limit and 2 on usage (an
-unreadable seen-IDs or `--fixed-anchors` file included).
+usage. `poll-new-threads` exits 4 on a rate limit and 2 on usage (an unreadable
+seen-IDs or `--fixed-anchors` file included).
 
 `pr-review-delta` exits 0 when done (`check`: read each line's `state`; a
-failure is a `state=unknown` line, never `unchanged`), 1 when `record` could
-not write (a symlinked or foreign record path included) or read its IDs file,
-2 on usage or invalid input (a thread ID outside `^PRRT_[A-Za-z0-9_-]+$`, a
-head that is not 40 lowercase hex digits, an unsafe `owner/repo`), and 4 on a
-rate limit (stderr `reason=rate-limit`; that PR and the rest print
-`state=unknown`).
+failure is a `state=unknown` line, never `unchanged`), 1 when `record` could not
+write (a symlinked or foreign record path included) or read its IDs file, 2 on
+usage or invalid input (a thread ID outside `^PRRT_[A-Za-z0-9_-]+$`, a head that
+is not 40 lowercase hex digits, an unsafe `owner/repo`), and 4 on a rate limit
+(stderr `reason=rate-limit`; that PR and the rest print `state=unknown`).
 
 `get-pr-comments` exits 1 on any failure (usage included, and a `gh` call killed
 by the time limit) and 3 when the thread list is truncated by the page cap, a
@@ -1043,33 +1063,32 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   Repass: repasses=<k> end=<quiet|no-push|p2-only|fix-did-not-hold|bound-reached|inconclusive|rate-limited|timeout|skipped>
   ```
 
-  `k` counts the re-passes Step 8 ran (0 to `repass_max_passes`). `end` is
-  the hyphenated form of Step 8's end name: no new thread within the wait
-  (`quiet`); the last pass did not push (`no-push`); every new thread in the
-  last re-pass was P2 or lower (`p2-only`); a new thread landed on the path
-  and original line of a thread this run fixed (`fix-did-not-hold`); the bound
-  (`bound-reached`); no fetch succeeded or the PR left `OPEN`
-  (`inconclusive`); a rate limit (`rate-limited`); a write-phase `gh` timeout
-  (`timeout`); or Step 8 did not run (`skipped`: disabled, a dirty tree or a
-  write-phase stop). Stops that print only the `Resolve:` line print no
-  `Repass:` line. Callers that need the contract keep reading only the last
-  line.
+  `k` counts the re-passes Step 8 ran (0 to `repass_max_passes`). `end` is the
+  hyphenated form of Step 8's end name: no new thread within the wait (`quiet`);
+  the last pass did not push (`no-push`); every new thread in the last re-pass
+  was P2 or lower (`p2-only`); a new thread landed on the path and original line
+  of a thread this run fixed (`fix-did-not-hold`); the bound (`bound-reached`);
+  no fetch succeeded or the PR left `OPEN` (`inconclusive`); a rate limit
+  (`rate-limited`); a write-phase `gh` timeout (`timeout`); or Step 8 did not
+  run (`skipped`: disabled, a dirty tree or a write-phase stop). Stops that
+  print only the `Resolve:` line print no `Repass:` line. Callers that need the
+  contract keep reading only the last line.
 
 ## Change record
 
 Step 9 records which threads the run saw with `pr-review-delta record`, so a
 later `pr-review-delta check` spends no tokens on a PR where no thread has
 appeared since. The IDs are Step 8's `<seen-file>` (Step 3's threads plus each
-re-pass's), or Step 3's IDs when Step 8 did not run. A thread no pass handled
-is not in it, so it reads as new later.
+re-pass's), or Step 3's IDs when Step 8 did not run. A thread no pass handled is
+not in it, so it reads as new later.
 
-Record an empty set instead when work was left undone, so a later check
-reports every open thread as new: a cancel or a stop before Step 7 finished
-(the Step 5 conflict stops and the ignored-file stop included), a Step 7 write
-phase stopped by an exit 4 or a PR that left `OPEN`, a thread `not attempted`
-(cluster cap, rate limit or `gh` timeout), `push=failed`, `verify=fail` or
-`verify=skipped`. Skip the record when Step 3's fetch failed or was partial. A
-failed record is a Notes line (`review delta not recorded`), never a stop.
+Record an empty set instead when work was left undone, so a later check reports
+every open thread as new: a cancel or a stop before Step 7 finished (the Step 5
+conflict stops and the ignored-file stop included), a Step 7 write phase stopped
+by an exit 4 or a PR that left `OPEN`, a thread `not attempted` (cluster cap,
+rate limit or `gh` timeout), `push=failed`, `verify=fail` or `verify=skipped`.
+Skip the record when Step 3's fetch failed or was partial. A failed record is a
+Notes line (`review delta not recorded`), never a stop.
 
 Severity badges (`p1`/`p2plus` from `poll-new-threads`) are reviewer text and
 can be forged. They only decide whether Step 8 polls again; they never resolve,
@@ -1088,25 +1107,25 @@ skip or downgrade a thread. A thread without a Bot-authored badge counts as P1.
   own; `/review:resolve-stack` and `/review:sweep-all` read `verify=skipped` as
   the stop and end the walk or batch after that PR: restore the named files
   before running anything again.
-- The ignored-file guard skips four tool-owned paths it would otherwise
-  count on every run: yellow-ruvector's session log `.ruvector/coedit-sessions/`
-  and pair store `.ruvector/coedit.json` (its PostToolUse hook rewrites them on
-  resolver edits), its memory store `.ruvector/intelligence.json` (a linked
-  worktree shares it with the main checkout, so another session's MCP server
-  can save it mid-run), and vitest's run cache
-  `node_modules/.vite/vitest/results.json` at any depth. The three files are
-  skipped only while they are regular files (a symlink there is still judged by
-  its target). They are JSON data nothing executes; every other path under
-  `.ruvector/` or `node_modules/` still stops the run. A changed memory store is
-  not proven to be tool-written, so `run-verify-command` prints a
-  `Note: .ruvector/intelligence.json ...` line on stderr, and Step 9 reports
+- The ignored-file guard skips four tool-owned paths it would otherwise count on
+  every run: yellow-ruvector's session log `.ruvector/coedit-sessions/` and pair
+  store `.ruvector/coedit.json` (its PostToolUse hook rewrites them on resolver
+  edits), its memory store `.ruvector/intelligence.json` (a linked worktree
+  shares it with the main checkout, so another session's MCP server can save it
+  mid-run), and vitest's run cache `node_modules/.vite/vitest/results.json` at
+  any depth. The three files are skipped only while they are regular files (a
+  symlink there is still judged by its target). They are JSON data nothing
+  executes; every other path under `.ruvector/` or `node_modules/` still stops
+  the run. A changed memory store is not proven to be tool-written, so
+  `run-verify-command` prints a `Note: .ruvector/intelligence.json ...` line on
+  stderr, and Step 9 reports
   `shared ruvector store changed during the run (not judged)` as a note. It
   neither stops the run nor counts as blocking. Accepted residual: a resolver
   edit to the store is no longer a stop. Recall output stays fenced as
   untrusted, and the MCP server overwrites the file from memory at its next
-  save. Other test runs can
-  still write ignored files (coverage, `*.tsbuildinfo`, pre-bundled deps), so
-  run no project command between Step 3f's marker and Step 6's guard.
+  save. Other test runs can still write ignored files (coverage,
+  `*.tsbuildinfo`, pre-bundled deps), so run no project command between Step
+  3f's marker and Step 6's guard.
 - Issue dedupe follows every page of the viewer's issues, but the whole scan is
   one `gh` call under one `YELLOW_REVIEW_GH_TIMEOUT`. A viewer with a very large
   issue history can time it out (exit 4); raise the variable for that
@@ -1141,20 +1160,20 @@ skip or downgrade a thread. A thread without a Bot-authored badge counts as P1.
   (`core.hooksPath=/dev/null`, with a note on stderr) unless
   `YELLOW_REVIEW_COMMIT_HOOKS=1`: a tracked hook, even one equal to HEAD, is
   code the PR controls and would run with submission authority. Hook managers
-  (pre-commit, lefthook, husky) therefore do not lint or format resolve
-  commits; run the repository's own checks through `resolve_pr.verify_command`.
-  With the opt-in, the hooks directory is judged as before: untracked or
-  ignored in-tree hooks and a symlinked hooks path are refused, `.git/hooks`, an
-  out-of-tree directory or a tracked hook hidden from status (assume-unchanged,
+  (pre-commit, lefthook, husky) therefore do not lint or format resolve commits;
+  run the repository's own checks through `resolve_pr.verify_command`. With the
+  opt-in, the hooks directory is judged as before: untracked or ignored in-tree
+  hooks and a symlinked hooks path are refused, `.git/hooks`, an out-of-tree
+  directory or a tracked hook hidden from status (assume-unchanged,
   skip-worktree) still disable hooks, and a verified tracked in-tree hook runs
   on resolver-edited code.
-- `commit-resolve-fixes` covers signing through `commit.gpgSign`,
-  `push.gpgSign` and `log.showSignature`, and refuses a repository-local
-  `core.sshCommand`, `core.askPass`, `core.gitProxy`, `credential.helper` and
-  `filter.*` commands (the stock Git LFS ones excepted). Other repository-local
-  settings that run a program (a `url.<base>.insteadOf` pointing at a helper,
-  `http.*` options) are not neutralised; the file bound and the dirty-set checks are the controls there.
-  The `PATH` check judges the directory of each tool as found on `PATH`,
+- `commit-resolve-fixes` covers signing through `commit.gpgSign`, `push.gpgSign`
+  and `log.showSignature`, and refuses a repository-local `core.sshCommand`,
+  `core.askPass`, `core.gitProxy`, `credential.helper` and `filter.*` commands
+  (the stock Git LFS ones excepted). Other repository-local settings that run a
+  program (a `url.<base>.insteadOf` pointing at a helper, `http.*` options) are
+  not neutralised; the file bound and the dirty-set checks are the controls
+  there. The `PATH` check judges the directory of each tool as found on `PATH`,
   not a symlink inside a directory outside the repository that points into it.
 - `apply-thread-actions` cuts Step 7 to one Write and one Bash call per
   budget-sized slice, but the stages still run serially with pacing, so a PR
@@ -1177,3 +1196,11 @@ skip or downgrade a thread. A thread without a Bot-authored badge counts as P1.
   which has to be closed by hand.
 - Where branch protection does not require conversation resolution, an open
   thread is a convention, not a merge block. The report says which applies.
+- The stack capture is GitHub's compare of the default branch with the PR head.
+  A stack whose diff lists 300 files or more fails that call (GitHub may cut the
+  list short), so only the PR's own rows count as evidence. A stack based on a
+  branch other than the default branch counts that branch's own changes as the
+  stack's.
+- A strict `addressed` cannot cite a file this run edited, even when the concern
+  is handled elsewhere in it; the thread stays open as `unclear` for a human, or
+  the next run, after the push, judges it against the new head.

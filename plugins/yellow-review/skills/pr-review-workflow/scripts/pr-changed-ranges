@@ -3,6 +3,7 @@
 # API (works past GitHub's diff-size limits, unlike `gh pr diff`).
 # Usage: pr-changed-ranges <pr-number>
 #        pr-changed-ranges --previous <pr-number>
+#        pr-changed-ranges --stack <pr-number>
 # Output: one row per file on stdout: "<path> <ranges>" where <ranges> is
 #   "10-24,58-60" (new-side lines the PR added; context lines excluded), "none" (no new-side lines) or
 #   "unknown" (the API returned no patch: binary, rename or oversized file).
@@ -11,6 +12,13 @@
 #   validated path per line (nothing else). A value outside the allowlist, such
 #   as a name with a newline, fails the whole call (exit 1, no output): a
 #   forged record must never reach the caller.
+#   --stack prints the same rows for the whole stack below and including the
+#   PR: the compare API's diff from the repository's default branch to the PR
+#   head (the merge base of the two, so lower PRs in a stack are included).
+#   Line numbers are the PR head's, like the plain mode. A PR based on the
+#   default branch prints its own rows (the plain mode's call). A compare
+#   listing of 300 files or more may be cut short by GitHub and fails the call
+#   (exit 1), as does a base or default branch name outside the allowlist.
 # Each gh call runs under YELLOW_REVIEW_GH_TIMEOUT (default 30, max 60; needs
 #   timeout(1) or gtimeout(1)); a timeout is a fetch failure.
 # Exit codes: 0 ok (possibly no rows), 1 fetch, timeout or parse failure (the
@@ -20,8 +28,11 @@
 set -eu
 
 MODE=ranges
-if [ "${1:-}" = --previous ]; then MODE=previous; shift; fi
-[ $# -eq 1 ] || { printf 'Usage: pr-changed-ranges [--previous] <pr-number>\n' >&2; exit 2; }
+case "${1:-}" in
+    --previous) MODE=previous; shift ;;
+    --stack) MODE=stack; shift ;;
+esac
+[ $# -eq 1 ] || { printf 'Usage: pr-changed-ranges [--previous | --stack] <pr-number>\n' >&2; exit 2; }
 PR="$1"
 case "$PR" in
     ''|*[!0-9]*) printf 'Error: PR number must be numeric, got: %s\n' "$PR" >&2; exit 2 ;;
@@ -35,10 +46,48 @@ trap 'rm -rf "$WORK"' EXIT
 # shellcheck source=../../../lib/resolve-gh.sh
 . "$(dirname -- "$0")/../../../lib/resolve-gh.sh"
 
-rg_gh api --paginate "repos/{owner}/{repo}/pulls/$PR/files?per_page=100" >"$WORK/files" 2>"$WORK/err" || {
-    printf 'Error: could not list files of PR #%s: %s\n' "$PR" "$(cat "$WORK/err")" >&2
-    exit 1
-}
+FILES_FROM=pulls
+if [ "$MODE" = stack ]; then
+    MODE=ranges
+    rg_gh api "repos/{owner}/{repo}/pulls/$PR" >"$WORK/pull" 2>"$WORK/err" || {
+        printf 'Error: could not read PR #%s: %s\n' "$PR" "$(cat "$WORK/err")" >&2
+        exit 1
+    }
+    # One tab-separated line, every value checked before it reaches a URL.
+    PULL_ROW=$(jq -r '
+      [.base.ref, .base.repo.default_branch, .head.sha]
+      | if (.[0:2] | all(type == "string" and test("\\A[A-Za-z0-9._/-]+\\z") and (test("\\.\\.") | not)))
+           and (.[2] | type == "string" and test("\\A[0-9a-f]{40}\\z"))
+        then join("\t") else error("unsafe base, default branch or head") end
+    ' "$WORK/pull" 2>"$WORK/err") || {
+        printf 'Error: could not read the base of PR #%s: %s\n' "$PR" "$(cat "$WORK/err")" >&2
+        exit 1
+    }
+    TAB=$(printf '\t')
+    BASE_REF=${PULL_ROW%%"$TAB"*}
+    REST=${PULL_ROW#*"$TAB"}
+    DEFAULT_REF=${REST%%"$TAB"*}
+    HEAD_SHA=${REST#*"$TAB"}
+    if [ "$BASE_REF" != "$DEFAULT_REF" ]; then
+        FILES_FROM=compare
+        rg_gh api "repos/{owner}/{repo}/compare/$DEFAULT_REF...$HEAD_SHA" >"$WORK/compare" 2>"$WORK/err" || {
+            printf 'Error: could not compare %s with the head of PR #%s: %s\n' "$DEFAULT_REF" "$PR" "$(cat "$WORK/err")" >&2
+            exit 1
+        }
+        jq -e '.files | type == "array" and length < 300' "$WORK/compare" >/dev/null 2>&1 || {
+            printf 'Error: the stack diff of PR #%s has no file list or 300 files or more (GitHub may have cut it short)\n' "$PR" >&2
+            exit 1
+        }
+        jq '.files' "$WORK/compare" >"$WORK/files"
+    fi
+fi
+
+if [ "$FILES_FROM" = pulls ]; then
+    rg_gh api --paginate "repos/{owner}/{repo}/pulls/$PR/files?per_page=100" >"$WORK/files" 2>"$WORK/err" || {
+        printf 'Error: could not list files of PR #%s: %s\n' "$PR" "$(cat "$WORK/err")" >&2
+        exit 1
+    }
+fi
 
 if [ "$MODE" = previous ]; then
     # \A and \z anchor the whole string, so a trailing newline cannot slip

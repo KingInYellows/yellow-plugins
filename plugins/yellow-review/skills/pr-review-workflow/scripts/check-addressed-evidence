@@ -1,0 +1,163 @@
+#!/bin/sh
+# Judge the evidence of every `addressed` proposal for /review:resolve Step 5.
+# Usage: check-addressed-evidence --ranges-from <ranges-file>
+#          [--stack-ranges-from <stack-ranges-file>] [--modified-from <file>]
+#          <proposals.jsonl>
+#   proposals.jsonl: one JSON object per `addressed` thread, no thread twice:
+#     {"threadId":"PRRT_...","evidence":"<resolver's path:line>",
+#      "path":<string|null>,"line":<n|null>,"startLine":<n|null>,
+#      "originalLine":<n|null>,"originalStartLine":<n|null>,
+#      "isOutdated":<bool>,"strict":<bool>}
+#     The thread fields are copied from get-pr-comments. strict is true for a
+#     human thread under resolve_human_threads: evidence.
+#   --ranges-from: the Step 4 pr-changed-ranges capture.
+#   --stack-ranges-from: the `pr-changed-ranges --stack` capture; omitted when
+#     that call failed, so only the PR's own rows count.
+#   --modified-from: every path a cluster reported under Files modified, one
+#     per line (lines in those files may have moved since the ranges capture).
+# Rules (references/resolve/dispositions.md, "Evidence rules for addressed"):
+#   the evidence is `path:line` with a safe path that is a file at HEAD and a
+#   line within it. A line-anchored thread may cite its own file, or another
+#   file only on a line the PR or its stack changed. An outdated or
+#   review-level thread may cite any file the PR or its stack changed. A strict
+#   thread must cite a line the PR or its stack changed, outside the thread's
+#   own anchor lines, in a file no cluster edited this run.
+# Stdout: one JSON line per proposal, in input order:
+#   {"threadId":"...","ok":true,"basis":"thread-file|pr-file|stack-file|changed-line"}
+#   {"threadId":"...","ok":false,"reason":"<fixed text>"}
+#   reason is one of: evidence malformed, evidence path not at HEAD, evidence
+#   line past end of file, evidence path not this thread's file, evidence path
+#   not changed by this PR or its stack, evidence line not changed by this PR
+#   or its stack, evidence on the thread's own lines, evidence file edited this
+#   run. The evidence text itself is never printed.
+# Exit codes: 0 every proposal judged, 1 not in a git work tree or a git or jq
+#   failure, 2 usage or an unreadable or invalid input file (nothing printed).
+# Contract: references/resolve/dispositions.md
+
+set -eu
+
+usage() {
+    printf 'Usage: check-addressed-evidence --ranges-from <file> [--stack-ranges-from <file>] [--modified-from <file>] <proposals.jsonl>\n' >&2
+    exit 2
+}
+
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
+
+RANGES=""
+STACK=""
+MODIFIED=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --ranges-from) [ $# -ge 2 ] || usage; RANGES=$2; shift 2 ;;
+        --stack-ranges-from) [ $# -ge 2 ] || usage; STACK=$2; shift 2 ;;
+        --modified-from) [ $# -ge 2 ] || usage; MODIFIED=$2; shift 2 ;;
+        --) shift; break ;;
+        -*) usage ;;
+        *) break ;;
+    esac
+done
+[ $# -eq 1 ] || usage
+[ -n "$RANGES" ] || usage
+PROPOSALS=$1
+for f in "$PROPOSALS" "$RANGES" ${STACK:+"$STACK"} ${MODIFIED:+"$MODIFIED"}; do
+    [ -f "$f" ] && [ -r "$f" ] || { printf 'Error: input file not readable: %s\n' "$f" >&2; exit 2; }
+done
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+    printf 'Error: not inside a git work tree.\n' >&2
+    exit 1
+}
+
+WORK=$(mktemp -d) || exit 1
+trap 'rm -rf "$WORK"' EXIT
+: >"$WORK/empty"
+
+# Validate the whole input before judging any row: a bad row refuses the file.
+jq -s -e '
+  def line: . == null or (type == "number" and . >= 1 and . == floor);
+  length > 0
+  and all(.[];
+    type == "object"
+    and (.threadId | type == "string" and test("\\A[A-Za-z0-9_-]{1,128}\\z"))
+    and (.evidence | type == "string")
+    and (.path == null or (.path | type == "string"))
+    and (.line | line) and (.startLine | line)
+    and (.originalLine | line) and (.originalStartLine | line)
+    and (.isOutdated | type == "boolean")
+    and (.strict | type == "boolean"))
+  and ((map(.threadId) | unique | length) == length)
+' "$PROPOSALS" >/dev/null 2>&1 || {
+    printf 'Error: proposals file is empty, not JSON lines, has a thread twice or a row of the wrong shape: %s\n' "$PROPOSALS" >&2
+    exit 2
+}
+
+# The only evidence paths that may reach git: the allowlist, and no ., .., empty
+# or option-shaped segment (rp_canonical's rule).
+jq -r '
+  .evidence
+  | capture("\\A(?<p>[A-Za-z0-9._/-]+):(?<l>[1-9][0-9]{0,6})\\z")?
+  | .p
+  | select(split("/") | all(. != "" and . != "." and . != ".." and (startswith("-") | not)))
+' "$PROPOSALS" | sort -u >"$WORK/paths" || { printf 'Error: could not read the evidence paths.\n' >&2; exit 1; }
+
+# "<path> <line count>" for every evidence path that is a file at HEAD.
+: >"$WORK/counts"
+while IFS= read -r p; do
+    case "$p" in
+        ''|/*|-*|*[!A-Za-z0-9._/-]*) continue ;;
+    esac
+    [ "$(git cat-file -t "HEAD:$p" 2>/dev/null)" = blob ] || continue
+    n=$(git cat-file blob "HEAD:$p" | awk 'END { print NR }') || { printf 'Error: could not read %s at HEAD.\n' "$p" >&2; exit 1; }
+    printf '%s %s\n' "$p" "$n" >>"$WORK/counts"
+done <"$WORK/paths"
+
+jq -c \
+    --rawfile counts "$WORK/counts" \
+    --rawfile pr "$RANGES" \
+    --rawfile stack "${STACK:-$WORK/empty}" \
+    --rawfile modified "${MODIFIED:-$WORK/empty}" '
+  def table($t):
+    reduce ($t | split("\n")[] | capture("\\A(?<p>[A-Za-z0-9._/-]+) (?<v>[^ ]+)\\z")?) as $r
+      ({}; .[$r.p] = $r.v);
+  def in_ranges($v; $n):
+    $v != null and $v != "none" and $v != "unknown"
+    and ($v | split(",") | any(.[];
+      capture("\\A(?<a>[0-9]+)-(?<b>[0-9]+)\\z")? | (.a | tonumber) <= $n and $n <= (.b | tonumber)));
+  def within($a; $b; $n): $b != null and ($a // $b) <= $n and $n <= $b;
+  (table($counts)) as $count
+  | (table($pr)) as $prr
+  | (table($stack)) as $str
+  | ($modified | split("\n") | map(select(length > 0))) as $mod
+  | def no($r): {threadId, ok: false, reason: $r};
+    def yes($b): {threadId, ok: true, basis: $b};
+    ([.evidence | capture("\\A(?<p>[A-Za-z0-9._/-]+):(?<l>[1-9][0-9]{0,6})\\z")?] | first) as $ev
+    | if $ev == null
+         or ($ev.p | split("/") | any(. == "" or . == "." or . == ".." or startswith("-")))
+      then no("evidence malformed")
+      else
+        ($ev.p) as $p | ($ev.l | tonumber) as $n
+        | (in_ranges($prr[$p]; $n) or in_ranges($str[$p]; $n)) as $changed
+        | if $count[$p] == null then no("evidence path not at HEAD")
+          elif $n > ($count[$p] | tonumber) then no("evidence line past end of file")
+          else
+            (if .path != null and (.isOutdated | not) then
+               if $p == .path then "thread-file"
+               elif $changed then "changed-line"
+               else null end
+             elif $prr[$p] != null then "pr-file"
+             elif $str[$p] != null then "stack-file"
+             else null end) as $basis
+            | if $basis == null then
+                no(if .path != null and (.isOutdated | not)
+                   then "evidence path not this thread\u0027s file"
+                   else "evidence path not changed by this PR or its stack" end)
+              elif .strict | not then yes($basis)
+              elif ($mod | index([$p])) != null then no("evidence file edited this run")
+              elif $changed | not then no("evidence line not changed by this PR or its stack")
+              elif .path == $p
+                   and (within(.startLine; .line; $n) or within(.originalStartLine; .originalLine; $n))
+              then no("evidence on the thread\u0027s own lines")
+              else yes("changed-line") end
+          end
+      end
+' "$PROPOSALS" || { printf 'Error: could not judge the proposals.\n' >&2; exit 1; }
