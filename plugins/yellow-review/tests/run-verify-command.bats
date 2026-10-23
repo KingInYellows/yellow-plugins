@@ -2896,14 +2896,41 @@ mark_hooks() {
   [[ "$stderr" == *"$d/a $d/b"* ]]
 }
 
-@test "--check-ignored ends, refusing, on a dormant config that includes itself under a new spelling each pass" {
+@test "--check-ignored ends on a dormant config that includes itself under a new spelling each pass" {
   hooks_fixture
   mkdir -p "$BATS_TEST_TMPDIR/sub"
   printf '[include]\n\tpath = sub/../dormant.cfg\n' >| "$BATS_TEST_TMPDIR/dormant.cfg"
   git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/dormant.cfg"
   touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/dormant.cfg"
+  run --separate-stderr timeout 60 "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
+  touch -t 202001010000 "$IGN_MARKER"
   run --separate-stderr timeout 60 "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
-  [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
+  # Its includes are read once, so a later edit still counts.
+  printf '\n' >> "$BATS_TEST_TMPDIR/dormant.cfg"
+  run --separate-stderr timeout 60 "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"dormant.cfg"* ]]
+}
+
+@test "--mark-hooks accepts more than 64 sibling includes and still checks the last" {
+  hooks_fixture
+  local d="$BATS_TEST_TMPDIR/wide" k
+  mkdir -p "$d"
+  for k in $(seq 1 80); do
+    printf '[user]\n\tname = x\n' >| "$d/$k.cfg"
+    git config --add include.path "$d/$k.cfg"
+    touch -t 201901010000 "$d/$k.cfg"
+  done
+  touch -t 201901010000 .git/config
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '\n' >> "$d/80.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"80.cfg"* ]]
 }
 
 @test "--ignored-since refuses a dormant includeIf config deleted after --mark-hooks" {
