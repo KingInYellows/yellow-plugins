@@ -2455,9 +2455,8 @@ rp_path_link_newer() {
 # judged (by that target):
 # the tree listing and the ignored-file walk cover the rest. Every config file
 # Git reads (including included files, and conditional includes whose
-# condition is false now) counts as a hit when written after <marker> while
-# the effective directory holds a hook (a repointed core.hooksPath), or when
-# it sets core.hooksPath or an include path itself. Only the directory's
+# condition is false now) counts as a hit when written after <marker>,
+# whatever it holds now (a repointed or removed core.hooksPath). Only the directory's
 # top-level entries count, since those are what Git runs; a symlinked hook is
 # judged by its target (find -L) and by every link on its way
 # (rp_path_link_newer), as are the hooks directory and each config file, and a
@@ -2492,25 +2491,25 @@ rp_hooks_changed_since() {
             printf '%s\0' "$hp" >|"$hitsfile" || exit 2
             exit 1
         fi
-        # Git runs no hook from a path that is not a directory (/dev/null).
-        [ "$now" != none ] || exit 0
         # A symlink on the way to the hooks directory, retargeted at an older
         # directory of hooks, shows only in its own mtime.
         local rc=0
-        rp_path_link_newer "$hp" "$marker" || rc=$?
-        case "$rc" in
-            0) printf '%s\0' "$hp" >|"$hitsfile" || exit 2; exit 1 ;;
-            1) ;;
-            *) exit 2 ;;
-        esac
-        hp=$(cd -P -- "$hp" 2>/dev/null && pwd -P) || exit 2
+        if [ "$now" != none ]; then
+            rp_path_link_newer "$hp" "$marker" || rc=$?
+            case "$rc" in
+                0) printf '%s\0' "$hp" >|"$hitsfile" || exit 2; exit 1 ;;
+                1) ;;
+                *) exit 2 ;;
+            esac
+            hp=$(cd -P -- "$hp" 2>/dev/null && pwd -P) || exit 2
+        fi
         # A config edit can repoint core.hooksPath at a directory of hooks
         # older than the marker, which no hook mtime flags. Every config file
         # Git read (the repository's config and config.worktree, the global
         # and system files and any file they include) counts when written
-        # after the marker while the effective directory holds a hook Git
-        # would run. --show-origin -z prints origin NUL key-and-value NUL.
-        local c cfgs=() any origins rec n=0 links=""
+        # after the marker. --show-origin -z prints origin NUL key-and-value
+        # NUL.
+        local c cfgs=() origins rec n=0 links=""
         origins=$(mktemp) || exit 2
         trap 'rm -f -- "$origins" ${links:+"$links"}' EXIT
         yr_git config --list --show-origin --includes -z >|"$origins" 2>/dev/null || exit 2
@@ -2518,7 +2517,7 @@ rp_hooks_changed_since() {
             c=$(yr_git rev-parse --git-path "$c" 2>/dev/null) || exit 2
             printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
         done
-        local queue=() seen=() i=0 inc d strong=0
+        local queue=() seen=() i=0 inc d
         while IFS= read -r -d '' rec; do
             n=$((n + 1))
             [ $((n % 2)) = 1 ] || continue
@@ -2561,23 +2560,16 @@ rp_hooks_changed_since() {
             fi
             case " ${cfgs[*]-} " in *" $c "*) continue ;; esac
             cfgs+=("$c")
-            # A changed file that sets core.hooksPath or any include counts
-            # even while the current directory holds no hook: a branch switch
-            # in the verify command can make Git use it, or an older file it
-            # now includes.
-            if [ -f "$c" ]; then
-                rc=0
-                yr_git config --file "$c" --get-regexp '^(core\.hookspath|include(if\..*)?\.path)$' >/dev/null 2>&1 || rc=$?
-                case "$rc" in 0) strong=1 ;; 1) ;; *) exit 2 ;; esac
-            fi
         done
+        # Any changed config counts, whatever it holds now: what it set or
+        # included before the edit, or what a branch switch in the verify
+        # command makes Git read, decides which hooks run.
         if [ "${#cfgs[@]}" -gt 0 ]; then
-            any=$(find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -print -quit 2>/dev/null) || exit 2
-            if [ -n "$any" ] || [ "$strong" = 1 ]; then
-                printf '%s\0' "${cfgs[@]}" >|"$hitsfile" || exit 2
-                exit 1
-            fi
+            printf '%s\0' "${cfgs[@]}" >|"$hitsfile" || exit 2
+            exit 1
         fi
+        # Git runs no hook from a path that is not a directory (/dev/null).
+        [ "$now" != none ] || exit 0
         gitdir=$(yr_git rev-parse --git-common-dir 2>/dev/null) || exit 2
         gitdir=$(cd -P -- "$gitdir" 2>/dev/null && pwd -P) || exit 2
         case "$hp" in

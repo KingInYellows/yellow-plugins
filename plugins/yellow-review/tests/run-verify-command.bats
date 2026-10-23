@@ -30,6 +30,9 @@ STUB
   # The mtime marker --ignored-since compares against (every run needs it).
   IGN_MARKER="$BATS_TEST_TMPDIR/ignored-marker"
   touch "$IGN_MARKER"
+  # The repository's config predates a real run; the hooks guard counts a
+  # config written after the marker.
+  touch -t 201901010000 "$REPO/.git/config"
   unset VERIFY_NO_MARKER
 }
 
@@ -228,6 +231,7 @@ vr_ssh_fixture() {
   cp ignored/helper node_modules/.bin/ssh
   touch -t 201901010000 node_modules/.bin/ssh
   git config -f "$BATS_TEST_TMPDIR/user-gitconfig" core.sshCommand ssh
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/user-gitconfig"
   caller="$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH"
   run --separate-stderr env "PATH=$caller" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
   [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
@@ -1249,6 +1253,7 @@ assert_recreated_patch_restores() {
 @test "the saved patch ignores colour and prefix settings" {
   git config color.ui always
   git config diff.noprefix true
+  touch -t 201901010000 .git/config
   verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
   patch=$(printf '%s' "$output" | jq -r .patch)
   run ! grep -q $'\033' "$patch"
@@ -2840,8 +2845,25 @@ mark_hooks() {
   [ -e "$BATS_TEST_TMPDIR/ran" ]
   # core.hooksPath=/dev/null runs no hook, so there is nothing to judge.
   git config core.hooksPath /dev/null
+  touch -t 201901010000 .git/config
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
+}
+
+@test "--ignored-since refuses an emptied dormant includeIf config while hooks are off" {
+  hooks_fixture
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  git config core.hooksPath /dev/null
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/branch.cfg"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # Emptied: on the other branch the older .git/hooks would run.
+  : >| "$BATS_TEST_TMPDIR/branch.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"branch.cfg"* ]]
 }
 
 @test "--check-ignored refuses a payload edited behind a chain of two older nested symlinks" {
@@ -3092,6 +3114,7 @@ mark_hooks() {
   printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
   chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
   git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  touch -t 201901010000 .git/config
   run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
@@ -3103,6 +3126,7 @@ mark_hooks() {
   printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
   chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
   git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  touch -t 201901010000 .git/config
   verify 'exit 3' --timeout 5 --trusted -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
@@ -3115,6 +3139,7 @@ mark_hooks() {
   printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
   chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
   git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  touch -t 201901010000 .git/config
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
   [ ! -e "$marker" ]
@@ -4230,13 +4255,15 @@ sparse_hide_claude_md() {
     git update-index --skip-worktree CLAUDE.md
     rm -f CLAUDE.md
   fi
+  touch -t 201901010000 .git/config
+  [ ! -e .git/config.worktree ] || touch -t 201901010000 .git/config.worktree
 }
 
 @test "hidden flags: an absent skip-worktree trusted file in a sparse checkout does not refuse" {
   sparse_hide_claude_md sparse
   verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
   [[ "$stderr" != *'skip-worktree or assume-unchanged'* ]]
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 0 ] || { echo "$stderr" >&2; return 1; }
 }
 
 @test "hidden flags: a present skip-worktree trusted file in a sparse checkout still refuses" {
@@ -5337,6 +5364,7 @@ SH
   chmod +x node_modules/.bin/git-credential-foo
   touch -t 201901010000 node_modules/.bin/git-credential-foo
   git config -f "$BATS_TEST_TMPDIR/user-gitconfig" credential.helper foo
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/user-gitconfig"
   real_git=$(type -P git)
   printf '%s\n' "printf 'protocol=https\\nhost=example.invalid\\n\\n' | '$real_git' credential fill >/dev/null 2>&1 || true" >| "$CMD"
   printf '#!/bin/sh\ntouch "%s/good-ran"\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/goodbin/git-credential-foo"
@@ -5348,12 +5376,14 @@ SH
   # A ! helper runs on the screened PATH too.
   rm -f "$BATS_TEST_TMPDIR/good-ran"
   git config -f "$BATS_TEST_TMPDIR/user-gitconfig" credential.helper '!git-credential-foo'
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/user-gitconfig"
   run --separate-stderr env "PATH=$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" GIT_TERMINAL_PROMPT=0 "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
   [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
   [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ! helper did not run: $stderr" >&2; return 1; }
   # So does a bare program behind an absolute launcher.
   rm -f "$BATS_TEST_TMPDIR/good-ran"
   git config -f "$BATS_TEST_TMPDIR/user-gitconfig" credential.helper "$(type -P env) git-credential-foo"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/user-gitconfig"
   run --separate-stderr env "PATH=$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" GIT_TERMINAL_PROMPT=0 "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
   [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
   [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside absolute-launcher helper did not run: $stderr" >&2; return 1; }
