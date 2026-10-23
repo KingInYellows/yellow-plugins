@@ -724,7 +724,13 @@ rl_map_line() {
     printf 'unmapped\x1f0\x1f%s' "$np"
     return 0
   fi
-  awk -v L="$L" -v np="$np" '
+  rl_map_hunks "$dfile" "$L" "$np"
+}
+
+# rl_map_hunks <diff-file> <line> <newpath>: walk a -U0 diff's hunks and
+# print "<result>\x1f<line>\x1f<newpath>" as rl_map_line does.
+rl_map_hunks() {
+  awk -v L="$2" -v np="$3" '
     /^Binary files / { binary = 1 }
     /^@@ / {
       if (done) next
@@ -747,7 +753,7 @@ rl_map_line() {
       if (!done) res = L + delta
       kind = anchored ? "anchored" : (res == L ? "exact" : "shifted")
       printf "%s\037%d\037%s", kind, res, np
-    }' "$dfile"
+    }' "$1"
 }
 
 # --- scope verification (CLAUDE-49, P12) ------------------------------------
@@ -1375,7 +1381,7 @@ rl_build_candidate() {
     vres=$(rl_validate_path anchor "$H" "$file") || { printf 'REJECT path:%s' "$vres"; return 0; }
     rl_worktree_entry_ok "$root" "$file" || { printf 'REJECT path:worktree-entry'; return 0; }
     # one snapshot per path, so candidates on one file see the same text
-    content="$(rl_tmp)/wt-$(printf '%s' "$file" | rl_sha256)"
+    content=$(rl_wt_snapshot "$file")
     if [ ! -f "$content" ]; then
       cp -- "$root/$file" "$content.part" && mv -f -- "$content.part" "$content" ||
         { printf 'REJECT path:unreadable'; return 0; }
@@ -1467,12 +1473,68 @@ RL_CAND_ROW_JQ='
 
 # --- observe: matching and append (under the lock) --------------------------
 
-# The HEAD blob of a candidate's anchor file, for Pass D's scope checks.
-rl_candidate_content() {
+# Where rl_build_candidate keeps its worktree snapshot of <path>.
+rl_wt_snapshot() { printf '%s/wt-%s' "$(rl_tmp)" "$(printf '%s' "$1" | rl_sha256)"; }
+
+# The HEAD blob of <path> at the observed head.
+rl_head_content() {
   local vres oid
   vres=$(rl_validate_path anchor "$RL_O_HEAD" "$1") || return 1
   read -r _ oid _ <<<"$vres"
   rl_blob_file "$oid"
+}
+
+# The text a candidate's line was read from, for Pass D's scope checks:
+# the worktree snapshot under --anchor-source worktree, else the HEAD blob.
+rl_candidate_content() {
+  local wt
+  if [ "$RL_O_ASRC" = worktree ]; then
+    wt=$(rl_wt_snapshot "$1")
+    [ -f "$wt" ] || return 1
+    printf '%s' "$wt"
+    return 0
+  fi
+  rl_head_content "$1"
+}
+
+# rl_observe_map <from> <path> <line>
+# rl_map_line from <from> to the observed head. Under --anchor-source
+# worktree it goes on through the uncommitted edits into the worktree
+# snapshot the candidates were read from, so existing findings and
+# candidates compare in one frame (CLAUDE-179). Same output as rl_map_line.
+rl_observe_map() {
+  local res ln np res2 ln2 wt dfile head rc=0
+  IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$1" "$RL_O_HEAD" "$2" "$3")"
+  wt=$(rl_wt_snapshot "$np")
+  # no candidate was read from this path, so nothing compares against it
+  if [ "$RL_O_ASRC" != worktree ] || [ ! -f "$wt" ]; then
+    printf '%s\x1f%s\x1f%s' "$res" "$ln" "$np"
+    return 0
+  fi
+  case "$res" in
+    exact | shifted | anchored) ;;
+    *) printf '%s\x1f%s\x1f%s' "$res" "$ln" "$np"; return 0 ;;
+  esac
+  dfile="$wt.diff"
+  if [ ! -f "$dfile" ] && [ ! -e "$dfile.fail" ]; then
+    # git diff --no-index exits 1 when the files differ
+    head=$(rl_head_content "$np") && git diff --no-index "${RL_DIFF_FLAGS[@]}" -U0 -- "$head" "$wt" >|"$dfile" 2>/dev/null || rc=$?
+    if [ -z "$head" ] || [ "$rc" -gt 1 ]; then
+      rm -f -- "${dfile:?}"
+      : >|"$dfile.fail"
+    fi
+  fi
+  if [ -e "$dfile.fail" ]; then
+    printf 'unmapped\x1f0\x1f%s' "$np"
+    return 0
+  fi
+  IFS=$'\x1f' read -r res2 ln2 _ <<<"$(rl_map_hunks "$dfile" "$ln" "$np")"
+  case "$res2" in
+    unmapped) res=unmapped ln2=0 ;;
+    anchored) res=anchored ;;
+    *) [ "$res" = anchored ] || { if [ "$ln2" = "$3" ]; then res=exact; else res=shifted; fi; } ;;
+  esac
+  printf '%s\x1f%s\x1f%s' "$res" "$ln2" "$np"
 }
 
 # Globals set by cmd_observe: RL_O_DIR RL_O_PR RL_O_HEAD RL_O_BASE RL_O_RUN
@@ -1510,7 +1572,7 @@ rl_observe_locked() {
     if [ "$cdel" = true ]; then
       IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rbase" "$RL_O_BASE" "$rfile" "$rline")"
     else
-      IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"
+      IFS=$'\x1f' read -r res ln np <<<"$(rl_observe_map "$rhead" "$rfile" "$rline")"
     fi
     if [ "$res" = unverifiable ]; then
       unavail[$i]=1
@@ -1569,7 +1631,7 @@ rl_observe_locked() {
       # only a file renamed onto the candidate's path can hold its alias
       [ "$(rl_path_fate "$rhead" "$RL_O_HEAD" "$rfile")" = "R"$'\t'"$cfile" ] || continue
     fi
-    IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"
+    IFS=$'\x1f' read -r res ln np <<<"$(rl_observe_map "$rhead" "$rfile" "$rline")"
     [ "$res" = anchored ] && [ "$np" = "$cfile" ] || continue
     dist=$((ln - cline))
     dist=${dist#-}
@@ -1598,18 +1660,18 @@ rl_observe_locked() {
   # unscoped finding whose line maps unchanged into its scope span. Only a
   # sole qualifier merges, so identical code in two scopes, or twice in one
   # scope (an occurrence key on either side), stays separate.
-  # Off under --anchor-source worktree, and for findings recorded that way:
-  # their spans or lines are worktree coordinates while lines map by HEAD,
-  # and uncommitted edits make those disagree.
+  # Under --anchor-source worktree, scopes are checked on the worktree
+  # snapshot and existing lines map through the uncommitted edits into it.
+  # A finding recorded from a worktree is skipped: its line is in the
+  # frame of that run's worktree, not a coordinate in its head.
   local cocc css cend rskey rocc rsrc rdisp eid rest sv
   local -a quals qbad ccontent
-  [ "$RL_O_ASRC" = worktree ] || while IFS= read -r r; do
+  while IFS= read -r r; do
     i=${r%%$'\x1f'*}
     r=${r#*$'\x1f'}
     [ -n "${match[$i]:-}" ] && continue
     IFS=$'\x1f' read -r _ _ _ cskey _ _ cfile cline cocc _ _ _ css cend <<<"${crows[$i]}"
     IFS=$'\x1f' read -r rid _rstate rfile rline rhead _rbase _ _ _ rskey rss rocc _ rsrc _ _ _ _ rdisp <<<"$r"
-    # a worktree-anchored finding's line is not a coordinate in its head
     [ "$rsrc" = worktree ] && continue
     if [ "$cskey" = unscoped ] && [ "$rss" = verified ]; then
       if [ -z "${ccontent[$i]:-}" ]; then
@@ -1630,7 +1692,7 @@ rl_observe_locked() {
       [ "$sv" = verified ] || continue
       # the finding's own line must map unchanged into the same span: a
       # heading path can repeat, and the hash alone names no site
-      IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"
+      IFS=$'\x1f' read -r res ln np <<<"$(rl_observe_map "$rhead" "$rfile" "$rline")"
       case "$res" in exact | shifted) ;; *) continue ;; esac
       [ "$np" = "$cfile" ] && [ "$ln" -ge "$css" ] || continue
       [ "$cend" -eq 0 ] || [ "$ln" -le "$cend" ] || continue
@@ -1641,7 +1703,7 @@ rl_observe_locked() {
       fi
     elif [ "$cskey" != unscoped ] && [ "$rss" = unscoped ] && [ -n "$css" ]; then
       [ -z "$cocc" ] || continue
-      IFS=$'\x1f' read -r res ln np <<<"$(rl_map_line "$rhead" "$RL_O_HEAD" "$rfile" "$rline")"
+      IFS=$'\x1f' read -r res ln np <<<"$(rl_observe_map "$rhead" "$rfile" "$rline")"
       case "$res" in exact | shifted) ;; *) continue ;; esac
       [ "$np" = "$cfile" ] && [ "$ln" -ge "$css" ] || continue
       [ "$cend" -eq 0 ] || [ "$ln" -le "$cend" ] || continue

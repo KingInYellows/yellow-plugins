@@ -328,12 +328,36 @@ setup() {
   [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
 }
 
-@test "CLAUDE-88: worktree-anchored observations skip the scope pass" {
+@test "CLAUDE-179: a scopeless worktree re-observation below an uncommitted edit merges" {
   printf '# Doc\n## A\nflag one\n' >|w.md
   H=$(commit_all wt)
   observe "$H" "[$(finding w.md 3 '{"scope":"A","category":"docs","rule":"wrong-doc"}')]" >/dev/null
-  out=$(observe "$H" "[$(finding w.md 3 '{"category":"docs","rule":"wrong-doc"}')]" --step 8 --anchor-source worktree)
+  id=$(ids)
+  printf '# Doc\nintro\nmore intro\n## A\nflag one\n' >|w.md
+  out=$(observe "$H" "[$(finding w.md 5 '{"category":"docs","rule":"wrong-doc"}')]" --step 8 --anchor-source worktree)
+  [ "$(printf '%s' "$out" | jq '.merged')" -eq 1 ]
+  [ "$(printf '%s' "$out" | jq -r '.findings[0].finding_id')" = "$id" ]
+  [ "$(fold | jq -r '.findings[0].obs.scope')" = "Doc > A" ]
+}
+
+@test "CLAUDE-179: a worktree scope span is not matched against HEAD lines" {
+  # at HEAD the finding sits at line 3, inside the worktree's "## B" span
+  # (lines 3-4); in the worktree it moved to line 6, under "## A"
+  printf '# Doc\n## A\nflag one\n' >|s.md
+  H=$(commit_all span)
+  observe "$H" "[$(finding s.md 3 '{"category":"docs","rule":"wrong-doc"}')]" >/dev/null
+  printf '# Doc\n## B\nflag one\nb text\n## A\nflag one\n' >|s.md
+  out=$(observe "$H" "[$(finding s.md 3 '{"scope":"B","category":"docs","rule":"wrong-doc"}')]" --step 8 --anchor-source worktree)
   [ "$(printf '%s' "$out" | jq '.new')" -eq 1 ]
+}
+
+@test "CLAUDE-179: a worktree re-observation follows its finding past an uncommitted edit" {
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  id=$(ids)
+  { printf 'new %s\n' 1 2 3 4 5; cat a.sh; } >|a.x && mv a.x a.sh
+  out=$(observe "$BASE" "[$(finding a.sh 7)]" --step 8 --anchor-source worktree)
+  [ "$(printf '%s' "$out" | jq '.merged')" -eq 1 ]
+  [ "$(printf '%s' "$out" | jq -r '.findings[0].finding_id')" = "$id" ]
 }
 
 @test "CLAUDE-88: a heading path longer than the display copy still merges" {
