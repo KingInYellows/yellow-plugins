@@ -175,7 +175,7 @@ aggregation rules change there, propagate the same change here.
 2. **Fetch PR metadata + base branch** (mirrors review-pr.md Step 3 + 3a):
 
    ```bash
-   gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid
+   gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid,isCrossRepository
    git fetch origin "<baseRefName>" --no-tags
    ```
 
@@ -356,7 +356,8 @@ aggregation rules change there, propagate the same change here.
    high-confidence P2 tier exactly as `review-pr.md` Step 7 defines it (up
    to 5 P2 `safe_auto` findings owned by `review-fixer` at anchor 100, each
    having passed the quality gates above), after the same `--check-paths`
-pre-check. Other P2/P3 findings are not auto-applied
+   pre-check, and apply nothing on a fork PR (`isCrossRepository`), as that
+   step defines. Other P2/P3 findings are not auto-applied
    here — they go through the resolve-PR flow at Step 12 instead. Parity
    rule with `review-pr.md` Step 7. Record each applied fix with
    ledger.md "Step 7".

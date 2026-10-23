@@ -83,7 +83,7 @@ stash before running review." and stop.
 ### Step 3: Fetch PR Metadata and Checkout
 
 ```bash
-gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid
+gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName,headRefOid,baseRefOid,isCrossRepository
 ```
 
 Calculate gross line count (additions + deletions). `headRefName` is
@@ -1043,6 +1043,12 @@ change can outweigh the fix value. The ledger keeps them, and `/review:sweep`
 reports a PR with pending P0-P2 findings as not merge-ready. To auto-apply one
 of them, an orchestrator must promote it to P1 based on additional evidence;
 the default is human review.
+
+**Fork PRs.** When Step 3's `isCrossRepository` is true, apply nothing:
+`commit-resolve-fixes` only pushes to a head branch in the base repository, so
+Step 9 could not commit the edits. List every finding this step would apply
+under Residual Actionable Work with `fork PR: not auto-applied`, and skip the
+pre-check below and Step 9.
 
 **Path pre-check.** Before the first edit, write the file of every finding
 this step would apply (both tiers), one repo-root-relative path per line, to a

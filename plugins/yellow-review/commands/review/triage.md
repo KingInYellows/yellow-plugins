@@ -198,7 +198,9 @@ offered.
   the Write tool and run `review-pr.md` Step 7's `commit-resolve-fixes
   --check-paths` pre-check on it (`--unattended` in unattended mode); a refused
   path cannot be committed in Step 8, so offer Dismiss or Skip instead. Restore
-  file runs the same pre-check. Exit 3 means the id is unknown, the worktree is not
+  file runs the same pre-check. Neither is offered on a fork PR
+  (`gh pr view <PR#> --json isCrossRepository -q .isCrossRepository` prints
+  `true`): Step 8 cannot push to a fork. Exit 3 means the id is unknown, the worktree is not
   checked out at `headRefOid` (a stale local branch: the edit gate is closed
   again), or the stored path is unsafe at the head or in the worktree: tell the
   human and offer Dismiss or Skip, never the file name from the card. Exit 6

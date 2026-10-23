@@ -203,6 +203,8 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   printf '%s\n' "$step9" | grep -qF -- '`--unattended` in non-interactive mode'
   step7=$(sed -n '/^### Step 7: Apply Fixes/,/^### Step 8/p' "$REVIEW_PR")
   printf '%s\n' "$step7" | grep -qF 'commit-resolve-fixes" --check-paths --files-from "<paths-file>"'
+  printf '%s\n' "$step7" | grep -qF 'fork PR: not auto-applied'
+  grep -qF 'headRefOid,baseRefOid,isCrossRepository' "$REVIEW_PR"
   [ -z "$(printf '%s\n' "$step9" | grep -E 'gt modify( -m|$)|^git (add|commit)')" ]
 }
 
