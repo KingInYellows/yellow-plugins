@@ -2482,8 +2482,14 @@ rp_config_paths() {
             yr_git var GIT_CONFIG_SYSTEM 2>/dev/null
             if [ -n "${GIT_CONFIG_GLOBAL+x}" ]; then
                 printf '%s\n' "$GIT_CONFIG_GLOBAL"
-            elif [ -n "${HOME:-}" ]; then
-                printf '%s\n' "$HOME/.gitconfig" "${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
+            else
+                # Git reads the XDG file even with HOME unset.
+                [ -z "${HOME:-}" ] || printf '%s\n' "$HOME/.gitconfig"
+                if [ -n "${XDG_CONFIG_HOME:-}" ]; then
+                    printf '%s\n' "$XDG_CONFIG_HOME/git/config"
+                elif [ -n "${HOME:-}" ]; then
+                    printf '%s\n' "$HOME/.config/git/config"
+                fi
             fi
             case "${GIT_CONFIG_NOSYSTEM:-}" in
                 ''|0|false|no|off) printf '%s\n' "${GIT_CONFIG_SYSTEM:-/etc/gitconfig}" ;;

@@ -2955,6 +2955,19 @@ mark_hooks() {
   [ "$status" -eq 2 ]
 }
 
+@test "--ignored-since judges the XDG global config with HOME unset" {
+  hooks_fixture
+  x="$BATS_TEST_TMPDIR/xdg"
+  mkdir -p "$x/git"
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  git config -f "$x/git/config" includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 "$x/git/config" "$BATS_TEST_TMPDIR/branch.cfg"
+  : >| "$x/git/config"
+  run --separate-stderr env -u GIT_CONFIG_GLOBAL -u HOME "XDG_CONFIG_HOME=$x" "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"xdg/git/config"* ]]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample
