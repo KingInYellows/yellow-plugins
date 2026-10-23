@@ -31,7 +31,11 @@
 #             restore is staged beside the file and moved in with mv -f.
 #             The snapshot is authenticated by the digest the caller holds, so
 #             a tampered state, copy or hash is refused before the live config
-#             is touched.
+#             is touched. Every exit 4 ends with one `snapshot kept at` line
+#             the caller prints as is: after `restore failed:` it says to
+#             recover the config from the snapshot by hand; after
+#             `snapshot invalid:` it says to keep the snapshot for
+#             investigation only, since its bytes are not trusted.
 #   clear:    remove the snapshot directory.
 # Exit codes: 0 nothing changed, 3 something changed and every path was
 #   restored, 4 a path could not be restored or the snapshot failed validation
@@ -218,6 +222,12 @@ case "$CMD" in
         ;;
     check)
         [ $# -eq 3 ] || usage
+        # A snapshot that failed validation may be the tampered copy: never
+        # point the operator at it as a source to restore from.
+        kept_invalid() {
+            printf 'snapshot kept at %s for investigation only (it failed validation: do not restore from it; inspect yellow-plugins.local.md by hand, then run guard-local-config clear "%s")\n' "$SNAP" "$SNAP"
+            exit 4
+        }
         SNAP="$2"
         WANT_DIGEST="$3"
         case "$WANT_DIGEST" in
@@ -230,7 +240,7 @@ case "$CMD" in
         for rel in "${GUARDED[@]}"; do
             if ! valid_entry "$i"; then
                 printf 'snapshot invalid: %s\n' "$rel"
-                exit 4
+                kept_invalid
             fi
             i=$((i + 1))
         done
@@ -240,7 +250,7 @@ case "$CMD" in
         have_digest=$(compute_digest) || have_digest=""
         if [ -z "$have_digest" ] || [ "$have_digest" != "$WANT_DIGEST" ]; then
             printf 'snapshot invalid: digest mismatch\n'
-            exit 4
+            kept_invalid
         fi
         changed=0
         failed=0
@@ -258,7 +268,10 @@ case "$CMD" in
             fi
             i=$((i + 1))
         done
-        [ "$failed" = 0 ] || exit 4
+        if [ "$failed" = 1 ]; then
+            printf 'snapshot kept at %s (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "%s")\n' "$SNAP" "$SNAP"
+            exit 4
+        fi
         [ "$changed" = 0 ] || exit 3
         ;;
     clear)

@@ -2503,6 +2503,77 @@ ignored_fixture() {
   grep -q 'resolver edit' src/a.txt
 }
 
+# A hook in .git/hooks is in neither the tree listing nor the ignored-file
+# walk, and a rewritten one runs on the next git command (CLAUDE-60).
+hooks_fixture() {
+  ignored_fixture
+  mkdir -p .git/hooks
+  printf '#!/bin/sh\necho original\n' >| .git/hooks/post-checkout
+  chmod +x .git/hooks/post-checkout
+  touch -t 201901010000 .git/hooks/post-checkout
+}
+
+@test "--check-ignored refuses a .git/hooks hook rewritten after the marker and names it" {
+  hooks_fixture
+  printf '#!/bin/sh\necho pwned\n' >| .git/hooks/post-checkout
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  # The ignored-file wording routes the caller to its ignored-file stop.
+  [[ "$stderr" == *"gitignored files changed since the --ignored-since marker (git hooks"* ]]
+  [[ "$stderr" == *".git/hooks/post-checkout"* ]]
+  [[ "$stderr" != *pwned* ]]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--ignored-since refuses to run the command when a .git/hooks hook changed after the marker" {
+  hooks_fixture
+  printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/hooked"\n' >| .git/hooks/pre-commit
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored files changed since the --ignored-since marker (git hooks"* ]]
+  [[ "$stderr" == *"refusing to run"* ]]
+  [[ "$stderr" == *".git/hooks/pre-commit"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--ignored-since judges a symlinked .git/hooks hook by its target" {
+  hooks_fixture
+  printf '#!/bin/sh\necho original\n' >| "$BATS_TEST_TMPDIR/real-hook"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/real-hook"
+  ln -s "$BATS_TEST_TMPDIR/real-hook" .git/hooks/pre-push
+  touch -h -t 201901010000 .git/hooks/pre-push
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '#!/bin/sh\necho pwned\n' >| "$BATS_TEST_TMPDIR/real-hook"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *".git/hooks/pre-push"* ]]
+}
+
+@test "--ignored-since refuses a hook rewritten in a hooks directory outside the tree" {
+  hooks_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/ext-hooks"
+  git config core.hooksPath "$BATS_TEST_TMPDIR/ext-hooks"
+  printf '#!/bin/sh\necho pwned\n' >| "$BATS_TEST_TMPDIR/ext-hooks/pre-commit"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"ext-hooks/pre-commit"* ]]
+}
+
+@test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
+  hooks_fixture
+  printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ -e "$BATS_TEST_TMPDIR/ran" ]
+  # core.hooksPath=/dev/null runs no hook, so there is nothing to judge.
+  git config core.hooksPath /dev/null
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+}
+
 @test "--check-ignored refuses a payload edited behind a chain of two older nested symlinks" {
   ignored_fixture
   MID="$BATS_TEST_TMPDIR/mid"; EXT="$BATS_TEST_TMPDIR/payload-dir"

@@ -288,24 +288,24 @@ phase failed.
    `origin`), so the head is verified there when it names a configured remote,
    else through the git chain below. The GitHub runtime gets `--remote` only for
    `branch.<name>.pushRemote`, `remote.pushDefault` or a sole remote; with
-   several remotes and neither setting it refuses and the script exits 5.
-   A `pushRemote` or `pushDefault` that is `.` or not a configured remote name
+   several remotes and neither setting it refuses and the script exits 5. A
+   `pushRemote` or `pushDefault` that is `.` or not a configured remote name
    exits 3 before anything is committed, for either provider. Every push URL of
-   the chosen remote (`remote.<name>.pushurl` can repeat) must name the PR's head
-   repository on the active host and port, else exit 3, and the head is verified
-   against each of them.
-   `fixed` threads need `status: PUSHED` and a verified SHA. `NOOP` or a failure
-   downgrades every `fixed` thread to `unclear`; the other lanes still run.
+   the chosen remote (`remote.<name>.pushurl` can repeat) must name the PR's
+   head repository on the active host and port, else exit 3, and the head is
+   verified against each of them. `fixed` threads need `status: PUSHED` and a
+   verified SHA. `NOOP` or a failure downgrades every `fixed` thread to
+   `unclear`; the other lanes still run.
 3. **Phase C, per thread, serial.** Issue (only `oos`), then reply
    (`reply-pr-thread`), then resolve (`resolve-pr-thread`), where the lane
    allows it.
 
-Before Phase C and before each re-pass poll, re-check
-`gh pr view --json state`. If the PR is no longer `OPEN`, stop with
+Before Phase C and before each re-pass poll, re-check `gh pr view --json state`.
+If the PR is no longer `OPEN`, stop with
 `PR #<N> is <STATE>; write phase stopped` and do not report per-thread errors.
 Re-check again after each poll returns, before any retry or re-pass write; if
-the state is not `OPEN` or cannot be read, skip those writes and end the
-re-pass loop `inconclusive` with the state.
+the state is not `OPEN` or cannot be read, skip those writes and end the re-pass
+loop `inconclusive` with the state.
 
 Each thread's outcome is recorded per stage, for the report:
 
@@ -418,24 +418,24 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `resolve-text: refused` line on stderr, and no override excuses it. Commit
   signing is forced off (`commit.gpgSign=false`, with `push.gpgSign` and
   `log.showSignature`, one stderr note) when the repository's own local or
-  worktree config sets `commit.gpgsign` or a `gpg.*`
-  key, because signing runs the configured `gpg.program`; the user's global or
-  system signing config is left alone. A repository-local or worktree-scope
-  `core.sshCommand`, `core.askPass`, `core.gitProxy` or `credential.helper`
-  (also `credential.<url>.helper`), or a `filter.<driver>.clean|smudge|process`
+  worktree config sets `commit.gpgsign` or a `gpg.*` key, because signing runs
+  the configured `gpg.program`; the user's global or system signing config is
+  left alone. A repository-local or worktree-scope `core.sshCommand`,
+  `core.askPass`, `core.gitProxy` or `credential.helper` (also
+  `credential.<url>.helper`), or a `filter.<driver>.clean|smudge|process`
   command (the stock Git LFS commands excepted), would be run by the submit or
-  by `git add` and checkout with submission authority, so it exits 3 before any network call, naming the key (never the
-  value) and committing nothing; the user's global or system config is not
-  judged, and no key is overridden with an empty value (that would disable the
-  user's own credential helper). `gt` (Graphite) or `node` (GitHub), `gh` and
-  `jq` are found through `PATH`: one whose canonical file is inside the
-  repository's working tree (an ignored `node_modules/.bin`, or a symlink
-  outside the worktree to a file inside it) could be replaced by a resolver
-  without a tracked change, so it exits 3 naming the tool before any of them
-  runs. Empty and relative `PATH` entries are dropped first. A tool outside the
-  repository, the normal case, is not judged. The Graphite submit's output reaches
-  stderr only through the credential redactor, and is withheld when the redactor
-  is unavailable;
+  by `git add` and checkout with submission authority, so it exits 3 before any
+  network call, naming the key (never the value) and committing nothing; the
+  user's global or system config is not judged, and no key is overridden with an
+  empty value (that would disable the user's own credential helper). `gt`
+  (Graphite) or `node` (GitHub), `gh` and `jq` are found through `PATH`: one
+  whose canonical file is inside the repository's working tree (an ignored
+  `node_modules/.bin`, or a symlink outside the worktree to a file inside it)
+  could be replaced by a resolver without a tracked change, so it exits 3 naming
+  the tool before any of them runs. Empty and relative `PATH` entries are
+  dropped first. A tool outside the repository, the normal case, is not judged.
+  The Graphite submit's output reaches stderr only through the credential
+  redactor, and is withheld when the redactor is unavailable;
 - `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`,
   `lib/sibling-plugin.sh`, `lib/resolve-text.sh` and `lib/verify-run.sh` before
   any tree check. When the plugin's `lib/` directory is inside the repository's
@@ -452,39 +452,39 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `MAX_CHANGED_LINES` (50, the resolver's scope limit; the larger side of each
   hunk, so an insertion counts its length): a run over it is refused at commit,
   and the pre-check marks every listed file with the entry `over-cap`. It is
-  enforced twice, with `<ranges-file>` the Step 4
-  `pr-changed-ranges` capture:
+  enforced twice, with `<ranges-file>` the Step 4 `pr-changed-ranges` capture:
   - `commit-resolve-fixes --check-ranges --ranges-from <ranges-file> --files-from <files-file>`
     is the pre-check, run before verify. It stages and commits nothing, makes no
     network call, and prints
     `{"out_of_range":[{"path","old_lines":["a-b",...]}]}` for the files with an
     out-of-range hunk (`old_lines` also holds `over-cap` on every listed file
-    when the total changed lines exceed the cap). Exit 0 means the check ran; a missing, unreadable or
-    malformed ranges file or a non-canonical path is exit 2; a failed diff is
-    exit 3 (a refusal: revert and downgrade as below). Non-interactive runs
-    revert every listed file; interactive runs ask once per run to include them
-    or revert them. Reverting a file makes every cluster that modified it
-    `unclear` with evidence `edit outside PR-changed lines` (blocking, the
-    threads stay open), exactly like a rolled-back conflict: the shared-file
-    rule applies and the cluster's other files fall under the no-`fixed` revert.
-    Verify and the commit then run on the remaining files only. Reverting before
-    verify matters: dropping files after verification would commit a subset
-    nobody verified. Non-interactive never includes an out-of-range edit;
+    when the total changed lines exceed the cap). Exit 0 means the check ran; a
+    missing, unreadable or malformed ranges file or a non-canonical path is exit
+    2; a failed diff is exit 3 (a refusal: revert and downgrade as below).
+    Non-interactive runs revert every listed file; interactive runs ask once per
+    run to include them or revert them. Reverting a file makes every cluster
+    that modified it `unclear` with evidence `edit outside PR-changed lines`
+    (blocking, the threads stay open), exactly like a rolled-back conflict: the
+    shared-file rule applies and the cluster's other files fall under the
+    no-`fixed` revert. Verify and the commit then run on the remaining files
+    only. Reverting before verify matters: dropping files after verification
+    would commit a subset nobody verified. Non-interactive never includes an
+    out-of-range edit;
   - `commit-resolve-fixes --ranges-from <ranges-file>` is the backstop at
     commit: it refuses, exit 3 with nothing committed, any staged hunk outside
     the range, and a malformed ranges file is exit 2. After a clean pre-check it
     does not fire; an interactive "include them" answer omits the flag for that
     run (file-membership checks still apply);
-- `run-verify-command` hardens git before any tree check (`harden_git_config`
-  in `lib/resolve-paths.sh`) and exits 2 with the tree untouched when it
-  refuses. Every mode refuses a non-numeric `GIT_CONFIG_COUNT`, an override
-  that did not take, and a repository-local or worktree
+- `run-verify-command` hardens git before any tree check (`harden_git_config` in
+  `lib/resolve-paths.sh`) and exits 2 with the tree untouched when it refuses.
+  Every mode refuses a non-numeric `GIT_CONFIG_COUNT`, an override that did not
+  take, and a repository-local or worktree
   `filter.<driver>.clean|smudge|process` command (the stock Git LFS commands
   excepted), because a checkout runs it. A run also refuses a repository-local
   or worktree `core.sshCommand`, `core.askPass`, `core.gitProxy` or
   `credential.helper`, as `commit-resolve-fixes` does; `--revert-only`,
-  `--revert-dirty` and `--check-ignored` leave those alone, so a resolver
-  cannot block its own rollback with one. The key is named, never its value.
+  `--revert-dirty` and `--check-ignored` leave those alone, so a resolver cannot
+  block its own rollback with one. The key is named, never its value.
 - `run-verify-command` refuses gitignored files, and when running a command also
   unchanged files, and refuses to run when the tree has changes outside the
   listed files. It does not run the command when a file is outside the PR (or
@@ -509,28 +509,27 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   in `reason` (`skipped, no changes: <f>`), while a gitignored or unverifiable
   entry exits 2 with nothing reverted. It deletes a listed untracked,
   non-ignored file whoever created it; the saved patch holds the content unless
-  the credential screen withheld it (a pre-resolve baseline is tracked in #973).
-  `--revert-dirty` does the same for every change in the tree. It rejects a file
-  list: git itself lists the changes (`git diff --name-only HEAD` plus
-  `git ls-files --others --exclude-standard`), never resolver text.
-  `--revert-denied` uses that same listing and reverts only paths on the
-  resolver deny list that are trusted config (`rp_trusted_config`: agent
-  instruction and tool-config names, without `.claude/agent-memory/`); other
-  dirty paths stay, the rest of the deny list (`.env*`, keys, CI and Docker
-  files) included, and a file list is rejected. It deletes an untracked
+  the credential screen withheld it (the run starts on a clean tree, so `HEAD`
+  is the pre-resolve baseline). `--revert-dirty` does the same for every change
+  in the tree. It rejects a file list: git itself lists the changes
+  (`git diff --name-only HEAD` plus `git ls-files --others --exclude-standard`),
+  never resolver text. `--revert-denied` uses that same listing and reverts only
+  paths on the resolver deny list that are trusted config (`rp_trusted_config`:
+  agent instruction and tool-config names, without `.claude/agent-memory/`);
+  other dirty paths stay, the rest of the deny list (`.env*`, keys, CI and
+  Docker files) included, and a file list is rejected. It deletes an untracked
   trusted-config file whoever created it (the saved patch holds the content
-  unless the credential screen withheld it), and leaves an untracked nested
-  git repository in place, named in `reason`, while still reverting the other
-  paths. It lists no gitignored file, so it requires `--ignored-since
-  <marker-file>` (or an explicit `--no-ignored-guard` from a caller that holds
-  no marker, such as the stack and sweep dirty-tree cleanup) and, with the
-  marker, refuses (exit 2, nothing reverted) when a gitignored trusted-config
-  file is newer than it. It reports
-  `deniedClean` (no deny-listed change remains), `reverted` (at most 20 paths,
-  screened like the patch) and `revertedCount`; an empty match is
+  unless the credential screen withheld it), and leaves an untracked nested git
+  repository in place, named in `reason`, while still reverting the other paths.
+  It lists no gitignored file, so it requires `--ignored-since <marker-file>`
+  (or an explicit `--no-ignored-guard` from a caller that holds no marker, such
+  as the stack and sweep dirty-tree cleanup) and, with the marker, refuses (exit
+  2, nothing reverted) when a gitignored trusted-config file is newer than it.
+  It reports `deniedClean` (no deny-listed change remains), `reverted` (at most
+  20 paths, screened like the patch) and `revertedCount`; an empty match is
   `result: "noop"` with no patch. `treeClean` still covers the whole tree and is
-  false whenever the kept changes remain, so it is not the success signal.
-  A revert flag combined with `--timeout`, `--command-file`, `--trusted` or
+  false whenever the kept changes remain, so it is not the success signal. A
+  revert flag combined with `--timeout`, `--command-file`, `--trusted` or
   `--unattended` exits 2. The patch is written and checked before anything is
   reverted. If any patch command fails (full disk, unsupported entry), nothing
   is reverted and the result carries `patch: null`, `treeClean: false` and a
@@ -546,47 +545,45 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   the result carries `patch: null` and a `reason`. The screen also covers the
   file names that go into the patch (every `diff --git` path, including the
   files found inside a replacement directory), so a credential-shaped name
-  withholds the patch like a content hit. Before any patch is built,
-  every listed path is checked: only regular files, symlinks (dangling ones too)
-  and absent paths are accepted. A FIFO, socket, device or directory in its
-  place is refused with exit 2 in run mode, so a special file cannot block
-  `git diff` or the refusal cleanup. In the revert modes a FIFO, socket or
-  device is kept until the recovery patch has recorded its tracked deletion
-  without opening it: the entry is renamed aside in its own directory for that
-  diff, then put back, and unlinked only after the snapshot is written.
-  The hold path is recorded before the rename back. If that ledger write fails,
-  the file is put back when it can and nothing is reverted; if it cannot, stderr
-  names the remaining path.
-  A rewrite of that ledger replaces it only after the new copy is complete, so
-  a failed rewrite leaves the recorded path in place.
-  Each record is the held path, a NUL, the original path, and a NUL, so a
-  newline in the name cannot split it. The reader assigns those fields with
-  `printf -v` into the caller's variables. macOS bash 3.2 has no namerefs, and
-  the script does not require a newer bash before it restores a hold.
-  `save_patch` runs in a subshell, so a rename back that fails is retried by
-  the parent. If the entry is back, a snapshot failure still reverts nothing.
-  If it is still held, `reason` names that path and does not claim the tree
-  was untouched. An `rm` that cannot unlink one special file is recorded in
-  `reason` and does not abort the revert, so a special file already removed
-  is still restored from HEAD. Checkout does not open a special file that is
-  still present. `--revert-denied` leaves a special file in place and reports
-  `deniedClean: false`.
-  A directory standing where HEAD has a regular file is handled the same way:
-  the revert modes save the patch first, with the deletion of the file followed
-  by every regular file and symlink inside the directory as new files, and only
-  then remove the directory. The patch is also withheld, with a `reason`, when the screen returns any status
-  other than 0 or 1 (the screen could not answer). When the `--text` diff cannot
-  be produced or read, the script exits 2 and reverts nothing. A failed revert
-  step is listed in `reason` (the first five, then a count) and `treeClean` is
-  `false` while any change remains. The command runs in its own process group
-  under `timeout(1)` or, without it, a watchdog. TERM, HUP or INT stops the
-  group (and the watchdog), then the edits are saved and reverted as for a
-  failure: `result: fail`, exit 0, and a `reason` naming the signal. Output
-  streams through a pipe into a log that keeps its last 1 MiB, so a chatty
-  command never blocks; the log is written when the stream ends. A process that
-  holds the pipe open after the command exits is killed with the group; if the
-  pipe stays open (another session), the log is replaced by a withheld notice
-  and `reason` says
+  withholds the patch like a content hit. Before any patch is built, every
+  listed path is checked: only regular files, symlinks (dangling ones too) and
+  absent paths are accepted. A FIFO, socket, device or directory in its place is
+  refused with exit 2 in run mode, so a special file cannot block `git diff` or
+  the refusal cleanup. In the revert modes a FIFO, socket or device is kept
+  until the recovery patch has recorded its tracked deletion without opening it:
+  the entry is renamed aside in its own directory for that diff, then put back,
+  and unlinked only after the snapshot is written. The hold path is recorded
+  before the rename back. If that ledger write fails, the file is put back when
+  it can and nothing is reverted; if it cannot, stderr names the remaining path.
+  A rewrite of that ledger replaces it only after the new copy is complete, so a
+  failed rewrite leaves the recorded path in place. Each record is the held
+  path, a NUL, the original path, and a NUL, so a newline in the name cannot
+  split it. The reader assigns those fields with `printf -v` into the caller's
+  variables. macOS bash 3.2 has no namerefs, and the script does not require a
+  newer bash before it restores a hold. `save_patch` runs in a subshell, so a
+  rename back that fails is retried by the parent. If the entry is back, a
+  snapshot failure still reverts nothing. If it is still held, `reason` names
+  that path and does not claim the tree was untouched. An `rm` that cannot
+  unlink one special file is recorded in `reason` and does not abort the revert,
+  so a special file already removed is still restored from HEAD. Checkout does
+  not open a special file that is still present. `--revert-denied` leaves a
+  special file in place and reports `deniedClean: false`. A directory standing
+  where HEAD has a regular file is handled the same way: the revert modes save
+  the patch first, with the deletion of the file followed by every regular file
+  and symlink inside the directory as new files, and only then remove the
+  directory. The patch is also withheld, with a `reason`, when the screen
+  returns any status other than 0 or 1 (the screen could not answer). When the
+  `--text` diff cannot be produced or read, the script exits 2 and reverts
+  nothing. A failed revert step is listed in `reason` (the first five, then a
+  count) and `treeClean` is `false` while any change remains. The command runs
+  in its own process group under `timeout(1)` or, without it, a watchdog. TERM,
+  HUP or INT stops the group (and the watchdog), then the edits are saved and
+  reverted as for a failure: `result: fail`, exit 0, and a `reason` naming the
+  signal. Output streams through a pipe into a log that keeps its last 1 MiB, so
+  a chatty command never blocks; the log is written when the stream ends. A
+  process that holds the pipe open after the command exits is killed with the
+  group; if the pipe stays open (another session), the log is replaced by a
+  withheld notice and `reason` says
   `log withheld: a process kept the output open after the command exited`; a
   failed stream adds `log may be incomplete: the output stream failed`, so a
   pass can carry a `reason` with `treeClean: true`. A log file that cannot be
@@ -609,28 +606,28 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
 one exception to ordering: the edits stay on disk until the user answers the
 confirmation, because a revert first would leave the approved retry with nothing
 to commit.) A refused edit must not stay on disk: a deny-listed file such as
-`.claude/settings.json` would be trusted by the next session. On any refusal —
-a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
-`skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
-on the files the clusters reported under `Files modified`, which saves a patch
-first. Then `--revert-denied` (no file list) reverts dirty trusted-config
-paths on the contract deny list: without asking in a non-interactive run;
-an interactive run lists them first with `--dry-run` and asks Revert or
-Leave (Leave reports them under Blocking merge). Both use the `--ignored-since`
-marker (it refuses on a changed gitignored trusted-config file: the ignored-file
-stop), and a refusal before the verify call also runs `--check-ignored` for the
-other gitignored files. The marker lives until the end of Step 6. Step 2
-guarantees a clean start, but not a quiet tree: a changed path no cluster
-reported and that is not trusted config (`.env*`, keys, CI and Docker files
-included) is not proven to be a resolver's edit, so it is never reverted
-unasked. An interactive run asks (`--revert-dirty`
-on "Revert them", patch saved); an unattended run leaves it in place and Step 9
-names it under Blocking merge. Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
-`fixed` threads become `unclear` and the write phase still runs for the other
-threads (exit 4 here is a refusal, not a rate limit). The interactive "push
-rejected" path is the only one that leaves edits in place. After exit 5 or 6 the
-commit exists locally: nothing is reverted, `push=failed` is reported, and
-`fixed` threads become `unclear` until a later run publishes it.
+`.claude/settings.json` would be trusted by the next session. On any refusal — a
+change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
+`skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only` on
+the files the clusters reported under `Files modified`, which saves a patch
+first. Then `--revert-denied` (no file list) reverts dirty trusted-config paths
+on the contract deny list: without asking in a non-interactive run; an
+interactive run lists them first with `--dry-run` and asks Revert or Leave
+(Leave reports them under Blocking merge). Both use the `--ignored-since` marker
+(it refuses on a changed gitignored trusted-config file: the ignored-file stop),
+and a refusal before the verify call also runs `--check-ignored` for the other
+gitignored files. The marker lives until the end of Step 6. Step 2 guarantees a
+clean start, but not a quiet tree: a changed path no cluster reported and that
+is not trusted config (`.env*`, keys, CI and Docker files included) is not
+proven to be a resolver's edit, so it is never reverted unasked. An interactive
+run asks (`--revert-dirty` on "Revert them", patch saved); an unattended run
+leaves it in place and Step 9 names it under Blocking merge. Exit 4 leaves no
+new commit behind, so the revert only has to clear the tree; `fixed` threads
+become `unclear` and the write phase still runs for the other threads (exit 4
+here is a refusal, not a rate limit). The interactive "push rejected" path is
+the only one that leaves edits in place. After exit 5 or 6 the commit exists
+locally: nothing is reverted, `push=failed` is reported, and `fixed` threads
+become `unclear` until a later run publishes it.
 
 A refused set is a staged mismatch (exit 3): nothing is committed and every
 `fixed` thread becomes `unclear`.
@@ -674,13 +671,13 @@ single call outgrows its budget.
 
 `pr-review-delta check` gets a `timeout` of 600000 ms. Per PR it makes one
 `gh pr view` (60 s cap) and one `get-pr-comments` run under the same 55 s
-deadline and 60 s hard cap as the poll, about 120 s in all, and it starts no
-PR after 420 s (`CHECK_DEADLINE`; later PRs print `state=unknown`), so the
-worst case is about 540 s. `pr-review-delta record` makes no network call; the
+deadline and 60 s hard cap as the poll, about 120 s in all, and it starts no PR
+after 420 s (`CHECK_DEADLINE`; later PRs print `state=unknown`), so the worst
+case is about 540 s. `pr-review-delta record` makes no network call; the
 `gh pr view` before it in Step 9 takes the Bash default.
 
-`get-pr-comments` (Step 3) gets a `timeout` of 300000
-ms. It can fetch 10 pages, so it adds a wall-clock deadline to the per-call cap:
+`get-pr-comments` (Step 3) gets a `timeout` of 300000 ms. It can fetch 10 pages,
+so it adds a wall-clock deadline to the per-call cap:
 `YELLOW_REVIEW_FETCH_DEADLINE` (default 270 s, clamped to 1..270; a non-number,
 0 or over-4-digit value falls back to 270), checked before each page. On expiry
 it prints `get-pr-comments: deadline reached` and exits 3 with the partial
@@ -688,11 +685,11 @@ array, the same as a page-cap truncation. From page 2 on each `gh` call's limit
 is also cut to the time left, so the worst case is the 270 s deadline plus `jq`
 and startup, inside 300000 ms. Page 1 gets the full per-call limit; a call
 killed by it exits 1 (`gh timed out`). Without `timeout` or `gtimeout` the calls
-run unbounded, as in the other scripts. `get-pr-blockers` (Step 3) gets its
-own `timeout` of 360000 ms. The worst case is five `gh` calls: the review
-GraphQL query, then classic protection and rules for the PR base, and the
-same two reads for the default branch when the two differ. Five calls at the
-60 s cap is 300 s, inside 360000 ms.
+run unbounded, as in the other scripts. `get-pr-blockers` (Step 3) gets its own
+`timeout` of 360000 ms. The worst case is five `gh` calls: the review GraphQL
+query, then classic protection and rules for the PR base, and the same two reads
+for the default branch when the two differ. Five calls at the 60 s cap is 300 s,
+inside 360000 ms.
 
 `commit-resolve-fixes` and `run-verify-command` bound their network calls with a
 `timeout`/`gtimeout` binary that supports `--kill-after`; without one the calls
@@ -709,28 +706,27 @@ out of the same budget.
 
 `reply-pr-thread` reads the thread's last 10 comments (`viewerDidAuthor`,
 `body`, `author { __typename }`) before posting and takes the latest comment the
-viewer authored that ends with a marker for the same thread, of any
-disposition. Viewer comments without such a marker are ignored when choosing
-it. It skips the reply (`already-replied`) when every comment after it was
-written by a Bot author. A later comment from anyone else, including the
-viewer's own human account, or with no author type, means the thread moved on
-and it is processed again. The skip JSON reports the posted marker's
-disposition. A re-run after a reply that landed but whose resolve failed
-therefore never posts a second reply of the same disposition, even when a bot
-acknowledgement arrived in between; the only second reply is the upgrade below.
-This holds when `gh` authenticates as a bot
-account: its own acknowledgement is `viewerDidAuthor` and `Bot` too, but carries
-no marker, so it never displaces the marker comment, and a bot-authored marker
-still counts. Two rules follow:
+viewer authored that ends with a marker for the same thread, of any disposition.
+Viewer comments without such a marker are ignored when choosing it. It skips the
+reply (`already-replied`) when every comment after it was written by a Bot
+author. A later comment from anyone else, including the viewer's own human
+account, or with no author type, means the thread moved on and it is processed
+again. The skip JSON reports the posted marker's disposition. A re-run after a
+reply that landed but whose resolve failed therefore never posts a second reply
+of the same disposition, even when a bot acknowledgement arrived in between; the
+only second reply is the upgrade below. This holds when `gh` authenticates as a
+bot account: its own acknowledgement is `viewerDidAuthor` and `Bot` too, but
+carries no marker, so it never displaces the marker comment, and a bot-authored
+marker still counts. Two rules follow:
 
 - Upgrade: a prior `disagree` or `unclear` marker does not block a `fixed`,
-  `addressed` or `oos` reply, and a prior `oos` marker does not block a
-  `fixed` or `addressed` reply. That reply carries the evidence the resolve
-  needs, so it is posted. A second `oos` reply to an `oos` marker is a skip,
-  and so is `disagree` or `unclear` after `oos`. An `oos` → `fixed` or
-  `addressed` upgrade posts a reply that supersedes the earlier one. Nothing
-  closes the follow-up issue filed for the `oos` reply; the reply names it so a
-  human can close it (see Reply hygiene).
+  `addressed` or `oos` reply, and a prior `oos` marker does not block a `fixed`
+  or `addressed` reply. That reply carries the evidence the resolve needs, so it
+  is posted. A second `oos` reply to an `oos` marker is a skip, and so is
+  `disagree` or `unclear` after `oos`. An `oos` → `fixed` or `addressed` upgrade
+  posts a reply that supersedes the earlier one. Nothing closes the follow-up
+  issue filed for the `oos` reply; the reply names it so a human can close it
+  (see Reply hygiene).
 - Compare before resolving: after a skip, the orchestrator retries the resolve
   (when the lane allows it) only if the reported `disposition` equals the one it
   asked for. Any other posted disposition leaves the thread open and is reported
@@ -767,14 +763,14 @@ Replies and issue bodies end with:
 - `oos` upgrade: when a `fixed` or `addressed` thread has a viewer-authored
   comment (`viewerDidAuthor`, from Step 2's `get-pr-comments` output) ending
   with this thread's `disposition=oos` marker, find the follow-up issue number
-  `N` before writing the body. Take it from that same comment's outcome
-  sentence (`tracked in #N`, digits only). Only when the sentence has none, run
+  `N` before writing the body. Take it from that same comment's outcome sentence
+  (`tracked in #N`, digits only). Only when the sentence has none, run
   `file-followup-issue --find <owner/repo> <PRRT_id>` and use the `number` of
   `{"exists":true,"number":N,...}`. Add `Follow-up #N is no longer needed.`
-  after the outcome sentence. No number (a Linear issue, `{"exists":false}`,
-  or a non-zero exit other than 4) adds nothing, and the reply is still
-  posted. Exit 4 (a rate limit or timeout) is the stop rule under Pacing and
-  rate limits: this reply is not posted either.
+  after the outcome sentence. No number (a Linear issue, `{"exists":false}`, or
+  a non-zero exit other than 4) adds nothing, and the reply is still posted.
+  Exit 4 (a rate limit or timeout) is the stop rule under Pacing and rate
+  limits: this reply is not posted either.
 - At most 1,000 characters before the marker (`reply-pr-thread` rejects longer
   bodies with exit 2).
 - Text that looks like a credential, or has a markdown image, an `@` mention or
@@ -866,22 +862,21 @@ exception: it exits 1 on any failure, usage included.
 Report exit 3 as `needs permission` only for `reason=permission`, and as
 `not found` for `reason=not-found`; both leave the thread open (blocking).
 
-A `run-verify-command --unattended` run whose PR file listing hit a rate
-limit is `skipped` with `rateLimited: true`, which sets `ratelimited=1`, as
+A `run-verify-command --unattended` run whose PR file listing hit a rate limit
+is `skipped` with `rateLimited: true`, which sets `ratelimited=1`, as
 `commit-resolve-fixes` exit 7 does.
 
 `pr-changed-ranges` exits 1 on a fetch failure (the caller passes `unknown`, and
 every resolver proposal for that cluster is `unclear`, never `oos`) and 2 on
-usage. `poll-new-threads` exits 4 on a rate limit and 2 on usage (an
-unreadable seen-IDs or `--fixed-anchors` file included).
+usage. `poll-new-threads` exits 4 on a rate limit and 2 on usage (an unreadable
+seen-IDs or `--fixed-anchors` file included).
 
 `pr-review-delta` exits 0 when done (`check`: read each line's `state`; a
-failure is a `state=unknown` line, never `unchanged`), 1 when `record` could
-not write (a symlinked or foreign record path included) or read its IDs file,
-2 on usage or invalid input (a thread ID outside `^PRRT_[A-Za-z0-9_-]+$`, a
-head that is not 40 lowercase hex digits, an unsafe `owner/repo`), and 4 on a
-rate limit (stderr `reason=rate-limit`; that PR and the rest print
-`state=unknown`).
+failure is a `state=unknown` line, never `unchanged`), 1 when `record` could not
+write (a symlinked or foreign record path included) or read its IDs file, 2 on
+usage or invalid input (a thread ID outside `^PRRT_[A-Za-z0-9_-]+$`, a head that
+is not 40 lowercase hex digits, an unsafe `owner/repo`), and 4 on a rate limit
+(stderr `reason=rate-limit`; that PR and the rest print `state=unknown`).
 
 `get-pr-comments` exits 1 on any failure (usage included, and a `gh` call killed
 by the time limit) and 3 when the thread list is truncated by the page cap, a
@@ -971,33 +966,32 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   Repass: repasses=<k> end=<quiet|no-push|p2-only|fix-did-not-hold|bound-reached|inconclusive|rate-limited|timeout|skipped>
   ```
 
-  `k` counts the re-passes Step 8 ran (0 to `repass_max_passes`). `end` is
-  the hyphenated form of Step 8's end name: no new thread within the wait
-  (`quiet`); the last pass did not push (`no-push`); every new thread in the
-  last re-pass was P2 or lower (`p2-only`); a new thread landed on the path
-  and original line of a thread this run fixed (`fix-did-not-hold`); the bound
-  (`bound-reached`); no fetch succeeded or the PR left `OPEN`
-  (`inconclusive`); a rate limit (`rate-limited`); a write-phase `gh` timeout
-  (`timeout`); or Step 8 did not run (`skipped`: disabled, a dirty tree or a
-  write-phase stop). Stops that print only the `Resolve:` line print no
-  `Repass:` line. Callers that need the contract keep reading only the last
-  line.
+  `k` counts the re-passes Step 8 ran (0 to `repass_max_passes`). `end` is the
+  hyphenated form of Step 8's end name: no new thread within the wait (`quiet`);
+  the last pass did not push (`no-push`); every new thread in the last re-pass
+  was P2 or lower (`p2-only`); a new thread landed on the path and original line
+  of a thread this run fixed (`fix-did-not-hold`); the bound (`bound-reached`);
+  no fetch succeeded or the PR left `OPEN` (`inconclusive`); a rate limit
+  (`rate-limited`); a write-phase `gh` timeout (`timeout`); or Step 8 did not
+  run (`skipped`: disabled, a dirty tree or a write-phase stop). Stops that
+  print only the `Resolve:` line print no `Repass:` line. Callers that need the
+  contract keep reading only the last line.
 
 ## Change record
 
 Step 9 records which threads the run saw with `pr-review-delta record`, so a
 later `pr-review-delta check` spends no tokens on a PR where no thread has
 appeared since. The IDs are Step 8's `<seen-file>` (Step 3's threads plus each
-re-pass's), or Step 3's IDs when Step 8 did not run. A thread no pass handled
-is not in it, so it reads as new later.
+re-pass's), or Step 3's IDs when Step 8 did not run. A thread no pass handled is
+not in it, so it reads as new later.
 
-Record an empty set instead when work was left undone, so a later check
-reports every open thread as new: a cancel or a stop before Step 7 finished
-(the Step 5 conflict stops and the ignored-file stop included), a Step 7 write
-phase stopped by an exit 4 or a PR that left `OPEN`, a thread `not attempted`
-(cluster cap, rate limit or `gh` timeout), `push=failed`, `verify=fail` or
-`verify=skipped`. Skip the record when Step 3's fetch failed or was partial. A
-failed record is a Notes line (`review delta not recorded`), never a stop.
+Record an empty set instead when work was left undone, so a later check reports
+every open thread as new: a cancel or a stop before Step 7 finished (the Step 5
+conflict stops and the ignored-file stop included), a Step 7 write phase stopped
+by an exit 4 or a PR that left `OPEN`, a thread `not attempted` (cluster cap,
+rate limit or `gh` timeout), `push=failed`, `verify=fail` or `verify=skipped`.
+Skip the record when Step 3's fetch failed or was partial. A failed record is a
+Notes line (`review delta not recorded`), never a stop.
 
 Severity badges (`p1`/`p2plus` from `poll-new-threads`) are reviewer text and
 can be forged. They only decide whether Step 8 polls again; they never resolve,
@@ -1016,25 +1010,25 @@ skip or downgrade a thread. A thread without a Bot-authored badge counts as P1.
   own; `/review:resolve-stack` and `/review:sweep-all` read `verify=skipped` as
   the stop and end the walk or batch after that PR: restore the named files
   before running anything again.
-- The ignored-file guard skips four tool-owned paths it would otherwise
-  count on every run: yellow-ruvector's session log `.ruvector/coedit-sessions/`
-  and pair store `.ruvector/coedit.json` (its PostToolUse hook rewrites them on
-  resolver edits), its memory store `.ruvector/intelligence.json` (a linked
-  worktree shares it with the main checkout, so another session's MCP server
-  can save it mid-run), and vitest's run cache
-  `node_modules/.vite/vitest/results.json` at any depth. The three files are
-  skipped only while they are regular files (a symlink there is still judged by
-  its target). They are JSON data nothing executes; every other path under
-  `.ruvector/` or `node_modules/` still stops the run. A changed memory store is
-  not proven to be tool-written, so `run-verify-command` prints a
-  `Note: .ruvector/intelligence.json ...` line on stderr, and Step 9 reports
+- The ignored-file guard skips four tool-owned paths it would otherwise count on
+  every run: yellow-ruvector's session log `.ruvector/coedit-sessions/` and pair
+  store `.ruvector/coedit.json` (its PostToolUse hook rewrites them on resolver
+  edits), its memory store `.ruvector/intelligence.json` (a linked worktree
+  shares it with the main checkout, so another session's MCP server can save it
+  mid-run), and vitest's run cache `node_modules/.vite/vitest/results.json` at
+  any depth. The three files are skipped only while they are regular files (a
+  symlink there is still judged by its target). They are JSON data nothing
+  executes; every other path under `.ruvector/` or `node_modules/` still stops
+  the run. A changed memory store is not proven to be tool-written, so
+  `run-verify-command` prints a `Note: .ruvector/intelligence.json ...` line on
+  stderr, and Step 9 reports
   `shared ruvector store changed during the run (not judged)` as a note. It
   neither stops the run nor counts as blocking. Accepted residual: a resolver
   edit to the store is no longer a stop. Recall output stays fenced as
   untrusted, and the MCP server overwrites the file from memory at its next
-  save. Other test runs can
-  still write ignored files (coverage, `*.tsbuildinfo`, pre-bundled deps), so
-  run no project command between Step 3f's marker and Step 6's guard.
+  save. Other test runs can still write ignored files (coverage,
+  `*.tsbuildinfo`, pre-bundled deps), so run no project command between Step
+  3f's marker and Step 6's guard.
 - Issue dedupe follows every page of the viewer's issues, but the whole scan is
   one `gh` call under one `YELLOW_REVIEW_GH_TIMEOUT`. A viewer with a very large
   issue history can time it out (exit 4); raise the variable for that
@@ -1069,20 +1063,20 @@ skip or downgrade a thread. A thread without a Bot-authored badge counts as P1.
   (`core.hooksPath=/dev/null`, with a note on stderr) unless
   `YELLOW_REVIEW_COMMIT_HOOKS=1`: a tracked hook, even one equal to HEAD, is
   code the PR controls and would run with submission authority. Hook managers
-  (pre-commit, lefthook, husky) therefore do not lint or format resolve
-  commits; run the repository's own checks through `resolve_pr.verify_command`.
-  With the opt-in, the hooks directory is judged as before: untracked or
-  ignored in-tree hooks and a symlinked hooks path are refused, `.git/hooks`, an
-  out-of-tree directory or a tracked hook hidden from status (assume-unchanged,
+  (pre-commit, lefthook, husky) therefore do not lint or format resolve commits;
+  run the repository's own checks through `resolve_pr.verify_command`. With the
+  opt-in, the hooks directory is judged as before: untracked or ignored in-tree
+  hooks and a symlinked hooks path are refused, `.git/hooks`, an out-of-tree
+  directory or a tracked hook hidden from status (assume-unchanged,
   skip-worktree) still disable hooks, and a verified tracked in-tree hook runs
   on resolver-edited code.
-- `commit-resolve-fixes` covers signing through `commit.gpgSign`,
-  `push.gpgSign` and `log.showSignature`, and refuses a repository-local
-  `core.sshCommand`, `core.askPass`, `core.gitProxy`, `credential.helper` and
-  `filter.*` commands (the stock Git LFS ones excepted). Other repository-local
-  settings that run a program (a `url.<base>.insteadOf` pointing at a helper,
-  `http.*` options) are not neutralised; the file bound and the dirty-set checks are the controls there.
-  The `PATH` check judges the directory of each tool as found on `PATH`,
+- `commit-resolve-fixes` covers signing through `commit.gpgSign`, `push.gpgSign`
+  and `log.showSignature`, and refuses a repository-local `core.sshCommand`,
+  `core.askPass`, `core.gitProxy`, `credential.helper` and `filter.*` commands
+  (the stock Git LFS ones excepted). Other repository-local settings that run a
+  program (a `url.<base>.insteadOf` pointing at a helper, `http.*` options) are
+  not neutralised; the file bound and the dirty-set checks are the controls
+  there. The `PATH` check judges the directory of each tool as found on `PATH`,
   not a symlink inside a directory outside the repository that points into it.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds of
   threads) are slow. A batch apply script would help and is not written.

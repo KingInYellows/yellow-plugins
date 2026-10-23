@@ -648,7 +648,14 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   # The clear is conditional on exit 0 or 3; exit 4 keeps and names the snapshot.
   [[ "$text" == *'Only when the check exited `0` (unchanged) or `3` (changed and restored)'* ]]
   [[ "$text" == *'On exit `4` or any other non-zero exit, do not clear'* ]]
-  [[ "$text" == *'snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")'* ]]
+  # Exit 4's advice comes from the script (restore failed vs snapshot invalid,
+  # CLAUDE-69); only a non-4 exit gets the caller's own not-validated line.
+  [[ "$text" == *'exit `4` ends with its own `snapshot kept at` line'* ]]
+  [[ "$text" == *'snapshot kept at <guard-dir> (not validated: inspect it before any restore)'* ]]
+  [[ "$text" != *'recover yellow-plugins.local.md from it by hand'* ]]
+  sweep=$(flat "$SWEEP")
+  [[ "$sweep" == *'snapshot kept at <guard-dir> (not validated: inspect it before any restore)'* ]]
+  [[ "$sweep" != *'recover yellow-plugins.local.md from it by hand'* ]]
 }
 
 @test "resolve-stack: a restack that changes a branch is published before the next PR" {
@@ -828,7 +835,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -q 'revert incomplete' "$DIRTY_REF"
   grep -q 'unrecognized changes left in place' "$DIRTY_REF"
   grep -q 'exits non-zero' "$DIRTY_REF"
-  grep -q '#973' "$DIRTY_REF"
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'the pre-resolve state of every path is `HEAD`'
   # renames: the owned set includes previous_filename; an entry needs both paths owned
   grep -qF 'previous_filename' "$DIRTY_REF"
   grep -qF 'each file'"'"'s `filename` plus its' "$DIRTY_REF"

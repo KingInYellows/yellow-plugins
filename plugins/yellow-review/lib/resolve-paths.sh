@@ -2381,6 +2381,49 @@ rp_hooks_untracked() {
     )
 }
 
+# rp_hooks_changed_since <marker> <hitsfile>: the hook files Git would run that
+# changed after <marker>, for a hooks directory in the git directory
+# (.git/hooks) or outside the working tree. Neither the tree listing nor
+# rp_ignored_changed_since looks there, a resolver's Edit can rewrite an
+# existing executable hook, and the verify command's own git calls (a checkout
+# or commit in its tests) run hooks; the commit step disables them instead
+# (rp_hooks_untracked returns 4). An in-tree hooks directory is skipped: the
+# tree listing and the ignored-file walk already cover it. Only the directory's
+# top-level entries count, since those are what Git runs; a symlinked hook is
+# judged by its target (find -L), and a *.sample is never run. Writes one
+# NUL-terminated absolute path per hit to <hitsfile>. Returns 0 when nothing
+# changed, 1 on a hit, 2 when the check cannot tell (fail closed), matching
+# rp_ignored_changed_since.
+rp_hooks_changed_since() {
+    local marker="$1" hitsfile="$2" safe
+    [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
+    safe=$(yr_walk_path) || return 2
+    (
+        PATH=$safe
+        hash -r 2>/dev/null || true
+        local top hp gitdir
+        : >|"$hitsfile" || exit 2
+        top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
+        cd -- "$top" 2>/dev/null || exit 2
+        top=$(pwd -P) || exit 2
+        hp=$(yr_git rev-parse --git-path hooks 2>/dev/null) || exit 2
+        [ -n "$hp" ] || exit 2
+        [ -e "$hp" ] || [ -L "$hp" ] || exit 0
+        # Git runs no hook from a path that is not a directory (/dev/null).
+        [ -d "$hp" ] || exit 0
+        hp=$(cd -P -- "$hp" 2>/dev/null && pwd -P) || exit 2
+        gitdir=$(yr_git rev-parse --git-common-dir 2>/dev/null) || exit 2
+        gitdir=$(cd -P -- "$gitdir" 2>/dev/null && pwd -P) || exit 2
+        case "$hp" in
+            "$gitdir"|"$gitdir"/*) ;;
+            "$top"|"$top"/*) exit 0 ;;
+        esac
+        find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -newer "$marker" -print0 >|"$hitsfile" 2>/dev/null || exit 2
+        [ -s "$hitsfile" ] && exit 1
+        exit 0
+    )
+}
+
 # rp_assert_only_listed <changes-file> [path...]: succeeds when every path in
 # the NUL-delimited <changes-file> is one of the listed paths. Otherwise
 # prints the first unlisted path and returns 1.
