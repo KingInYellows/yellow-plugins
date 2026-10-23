@@ -2586,6 +2586,7 @@ hooks_fixture() {
   touch -t 201901010000 "$BATS_TEST_TMPDIR/shared-hook"
   mkdir -p .githooks
   ln -s "$BATS_TEST_TMPDIR/shared-hook" .githooks/pre-commit
+  touch -h -t 201901010000 .githooks/pre-commit
   git add .githooks/pre-commit
   git commit -q -m 'tracked hook link' -- .githooks/pre-commit
   git config core.hooksPath .githooks
@@ -2668,6 +2669,52 @@ hooks_fixture() {
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
   ln -sfn "$BATS_TEST_TMPDIR/evil.cfg" "$BATS_TEST_TMPDIR/inc.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"inc.cfg"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
+}
+
+# Two directories of older hooks: the good one and the one a link is moved to.
+old_hook_dirs() {
+  local d
+  for d in good-hooks evil-hooks; do
+    mkdir -p "$BATS_TEST_TMPDIR/$d"
+    printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/hooked"\n' >| "$BATS_TEST_TMPDIR/$d/pre-commit"
+    chmod +x "$BATS_TEST_TMPDIR/$d/pre-commit"
+    touch -t 201901010000 "$BATS_TEST_TMPDIR/$d/pre-commit" "$BATS_TEST_TMPDIR/$d"
+  done
+}
+
+@test "--ignored-since refuses a hooks-directory link retargeted after the marker at older hooks" {
+  hooks_fixture
+  old_hook_dirs
+  ln -s "$BATS_TEST_TMPDIR/good-hooks" "$BATS_TEST_TMPDIR/hooks-link"
+  touch -h -t 201901010000 "$BATS_TEST_TMPDIR/hooks-link"
+  git config core.hooksPath "$BATS_TEST_TMPDIR/hooks-link"
+  touch -t 201901010000 .git/config
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  ln -sfn "$BATS_TEST_TMPDIR/evil-hooks" "$BATS_TEST_TMPDIR/hooks-link"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"hooks-link"* ]]
+}
+
+@test "--ignored-since refuses an included config reached through a directory link retargeted after the marker" {
+  hooks_fixture
+  old_hook_dirs
+  mkdir -p "$BATS_TEST_TMPDIR/cfg-a" "$BATS_TEST_TMPDIR/cfg-b"
+  printf '[user]\n\tname = x\n' >| "$BATS_TEST_TMPDIR/cfg-a/inc.cfg"
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/evil-hooks" >| "$BATS_TEST_TMPDIR/cfg-b/inc.cfg"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/cfg-a/inc.cfg" "$BATS_TEST_TMPDIR/cfg-b/inc.cfg"
+  ln -s "$BATS_TEST_TMPDIR/cfg-a" "$BATS_TEST_TMPDIR/cfg"
+  touch -h -t 201901010000 "$BATS_TEST_TMPDIR/cfg"
+  git config include.path "$BATS_TEST_TMPDIR/cfg/inc.cfg"
+  touch -t 201901010000 .git/config
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  ln -sfn "$BATS_TEST_TMPDIR/cfg-b" "$BATS_TEST_TMPDIR/cfg"
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"inc.cfg"* ]]

@@ -2381,6 +2381,41 @@ rp_hooks_untracked() {
     )
 }
 
+# rp_path_link_newer <path> <marker>: resolves <path> one component at a time,
+# following each symlink, and returns 0 when any symlink met on the way (a
+# component, the final name or a link inside a link's target) has its own
+# mtime newer than <marker>. A link retargeted after the marker at an older
+# file or directory leaves every target time unchanged, so only the link's
+# time shows it. Returns 1 when none is, 2 when it cannot tell (an unreadable
+# link, or more than 40 links: a loop). Missing trailing components are fine.
+rp_path_link_newer() {
+    local p="$1" marker="$2" cur rest c next t v n=0
+    case "$p" in /*) ;; *) p="$(pwd -P)/$p" || return 2 ;; esac
+    cur=/
+    rest="${p#/}"
+    while [ -n "$rest" ]; do
+        c="${rest%%/*}"
+        if [ "$c" = "$rest" ]; then rest=""; else rest="${rest#*/}"; fi
+        case "$c" in
+            ''|.) continue ;;
+            ..) cur=$(dirname -- "$cur") || return 2; continue ;;
+        esac
+        next="${cur%/}/$c"
+        if [ -L "$next" ]; then
+            n=$((n + 1))
+            [ "$n" -le 40 ] || return 2
+            v=$(find -P "$next" -prune -newer "$marker" -print 2>/dev/null) || return 2
+            [ -z "$v" ] || return 0
+            t=$(readlink -- "$next") || return 2
+            case "$t" in /*) cur=/ ;; esac
+            rest="${t#/}${rest:+/$rest}"
+            continue
+        fi
+        cur="$next"
+    done
+    return 1
+}
+
 # rp_hooks_changed_since <marker> <hitsfile>: the hook files Git would run that
 # changed after <marker>, for a hooks directory in the git directory
 # (.git/hooks) or outside the working tree. Neither the tree listing nor
@@ -2395,7 +2430,8 @@ rp_hooks_untracked() {
 # <marker> while the effective directory holds a hook (a repointed
 # core.hooksPath). Only the directory's
 # top-level entries count, since those are what Git runs; a symlinked hook is
-# judged by its target (find -L) and by the link itself (find -P), and a
+# judged by its target (find -L) and by every link on its way
+# (rp_path_link_newer), as are the hooks directory and each config file, and a
 # *.sample is never run. Writes one
 # NUL-terminated absolute path per hit to <hitsfile>. Returns 0 when nothing
 # changed, 1 on a hit, 2 when the check cannot tell (fail closed), matching
@@ -2417,6 +2453,15 @@ rp_hooks_changed_since() {
         [ -e "$hp" ] || [ -L "$hp" ] || exit 0
         # Git runs no hook from a path that is not a directory (/dev/null).
         [ -d "$hp" ] || exit 0
+        # A symlink on the way to the hooks directory, retargeted at an older
+        # directory of hooks, shows only in its own mtime.
+        local rc=0
+        rp_path_link_newer "$hp" "$marker" || rc=$?
+        case "$rc" in
+            0) printf '%s\0' "$hp" >|"$hitsfile" || exit 2; exit 1 ;;
+            1) ;;
+            *) exit 2 ;;
+        esac
         hp=$(cd -P -- "$hp" 2>/dev/null && pwd -P) || exit 2
         # A config edit can repoint core.hooksPath at a directory of hooks
         # older than the marker, which no hook mtime flags. Every config file
@@ -2437,13 +2482,12 @@ rp_hooks_changed_since() {
             [ $((n % 2)) = 1 ] || continue
             case "$rec" in file:*) c="${rec#file:}" ;; *) continue ;; esac
             case "$c" in /*) ;; *) c="$top/$c" ;; esac
-            [ -e "$c" ] || [ -L "$c" ] || continue
-            # A symlinked config counts by the link too: one retargeted at
-            # an older file leaves the target's time unchanged.
-            if ! [ "$c" -nt "$marker" ]; then
-                [ -L "$c" ] || continue
-                any=$(find -P "$c" -prune -newer "$marker" -print 2>/dev/null) || exit 2
-                [ -n "$any" ] || continue
+            # A symlink on the way to the config counts by its own mtime too:
+            # one retargeted at an older file leaves the target's unchanged.
+            if ! { [ -e "$c" ] && [ "$c" -nt "$marker" ]; }; then
+                rc=0
+                rp_path_link_newer "$c" "$marker" || rc=$?
+                case "$rc" in 0) ;; 1) continue ;; *) exit 2 ;; esac
             fi
             case " ${cfgs[*]-} " in *" $c "*) continue ;; esac
             cfgs+=("$c")
@@ -2475,6 +2519,13 @@ rp_hooks_changed_since() {
                         "$gitdir"|"$gitdir"/*) ;;
                         *) yr_inside_root "$t" "$top" && continue ;;
                     esac
+                    rc=0
+                    rp_path_link_newer "$l" "$marker" || rc=$?
+                    case "$rc" in
+                        0) printf '%s\0' "$l" >>"$hitsfile"; continue ;;
+                        1) ;;
+                        *) exit 2 ;;
+                    esac
                     [ -e "$t" ] || continue
                     [ "$t" -nt "$marker" ] && printf '%s\0' "$l" >>"$hitsfile"
                 done <"$links"
@@ -2482,11 +2533,21 @@ rp_hooks_changed_since() {
                 exit 0
                 ;;
         esac
-        # A symlinked hook counts when its target or the link itself is newer:
-        # a link retargeted at an older executable leaves the target's time
-        # unchanged.
-        { find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -newer "$marker" -print0 \
-            && find -P "$hp" -mindepth 1 -maxdepth 1 -type l ! -name '*.sample' -newer "$marker" -print0; } >|"$hitsfile" 2>/dev/null || exit 2
+        find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -newer "$marker" -print0 >|"$hitsfile" 2>/dev/null || exit 2
+        # A symlinked hook also counts when a link on its way is newer: one
+        # retargeted at an older executable leaves the target's time unchanged.
+        local l
+        links=$(mktemp) || exit 2
+        find -P "$hp" -mindepth 1 -maxdepth 1 -type l ! -name '*.sample' -print0 >|"$links" 2>/dev/null || exit 2
+        while IFS= read -r -d '' l; do
+            rc=0
+            rp_path_link_newer "$l" "$marker" || rc=$?
+            case "$rc" in
+                0) printf '%s\0' "$l" >>"$hitsfile" ;;
+                1) ;;
+                *) exit 2 ;;
+            esac
+        done <"$links"
         [ -s "$hitsfile" ] && exit 1
         exit 0
     )
