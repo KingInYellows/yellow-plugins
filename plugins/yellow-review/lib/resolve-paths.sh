@@ -2535,6 +2535,8 @@ rp_hooks_changed_since() {
             esac
         )
         while IFS= read -r c; do
+            # yr_check_git_env has already refused a relative
+            # GIT_CONFIG_GLOBAL or GIT_CONFIG_SYSTEM.
             case "$c" in /*) ;; *) continue ;; esac
             [ ! -e "$c" ] || [ -f "$c" ] || continue
             printf 'file:%s\0\0' "$c" >>"$origins" || exit 2

@@ -2730,7 +2730,7 @@ old_hook_dirs() {
 # the marker's pre-resolver mtime meaning; restore that mtime after it.
 mark_hooks() {
   run --separate-stderr "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 0 ] || { echo "$stderr" >&2; return 1; }
   touch -t 202001010000 "$IGN_MARKER"
 }
 
@@ -2852,6 +2852,20 @@ mark_hooks() {
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"user-gitconfig"* ]]
+}
+
+@test "--check-ignored and --mark-hooks refuse a relative GIT_CONFIG_GLOBAL or GIT_CONFIG_SYSTEM" {
+  hooks_fixture
+  # The hooks guard names the global and system files only by absolute path;
+  # the environment check refuses a relative one first.
+  : >| "$BATS_TEST_TMPDIR/rel.gitconfig"
+  for name in GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
+    run --separate-stderr env "$name=../rel.gitconfig" "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+    [ "$status" -eq 2 ]
+    [[ "$stderr" == *"$name points inside the repository"* ]]
+    run --separate-stderr env "$name=../rel.gitconfig" "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
+    [ "$status" -eq 2 ]
+  done
 }
 
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
