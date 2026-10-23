@@ -2562,6 +2562,25 @@ hooks_fixture() {
   [[ "$stderr" == *"ext-hooks/pre-commit"* ]]
 }
 
+@test "--ignored-since judges a tracked in-tree hook symlink by its target outside the tree" {
+  hooks_fixture
+  printf '#!/bin/sh\necho original\n' >| "$BATS_TEST_TMPDIR/shared-hook"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/shared-hook"
+  mkdir -p .githooks
+  ln -s "$BATS_TEST_TMPDIR/shared-hook" .githooks/pre-commit
+  git add .githooks/pre-commit
+  git commit -q -m 'tracked hook link' -- .githooks/pre-commit
+  git config core.hooksPath .githooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # A write through the link leaves the tracked link itself unchanged.
+  printf '#!/bin/sh\necho pwned\n' >| "$BATS_TEST_TMPDIR/shared-hook"
+  [ -z "$(git status --porcelain -- .githooks)" ]
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *".githooks/pre-commit"* ]]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample

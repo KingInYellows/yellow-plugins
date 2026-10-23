@@ -131,13 +131,14 @@ zero exit.
 
 `--revert-dirty` and `--revert-denied` delete an untracked, non-ignored file
 they revert, whoever created it. No per-path baseline is needed: each PR starts
-on a clean tree (pre-flight, then this check after every PR), so the pre-resolve
-state of every path is `HEAD` and the file appeared during the run, from a
-resolver or from an editor or build running alongside it; the recovery patch
-holds its content either way. Neither lists or reverts a gitignored file:
-`--revert-denied` with a marker refuses when a gitignored trusted-config file
-changed after it, and `--no-ignored-guard` leaves such an edit on disk
-unreported (`--revert-dirty` never checks, hence the follow-up call above).
+on a clean tree (pre-flight, then this check after every PR), so every tracked
+path matched `HEAD` and no untracked, non-ignored path existed. An untracked
+file found later appeared during the run, from a resolver or from an editor or
+build running alongside it; the recovery patch holds its content either way.
+Neither lists or reverts a gitignored file: `--revert-denied` with a marker
+refuses when a gitignored trusted-config file changed after it, and
+`--no-ignored-guard` leaves such an edit on disk unreported (`--revert-dirty`
+never checks, hence the follow-up call above).
 
 The caller says what to do with the outcome: the patch path,
 `revert incomplete`, and `unrecognized changes left in place` all feed its

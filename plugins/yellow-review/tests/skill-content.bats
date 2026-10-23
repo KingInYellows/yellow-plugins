@@ -835,7 +835,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -q 'revert incomplete' "$DIRTY_REF"
   grep -q 'unrecognized changes left in place' "$DIRTY_REF"
   grep -q 'exits non-zero' "$DIRTY_REF"
-  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'the pre-resolve state of every path is `HEAD`'
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'every tracked path matched `HEAD` and no untracked, non-ignored path existed'
   # renames: the owned set includes previous_filename; an entry needs both paths owned
   grep -qF 'previous_filename' "$DIRTY_REF"
   grep -qF 'each file'"'"'s `filename` plus its' "$DIRTY_REF"

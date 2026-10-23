@@ -2387,8 +2387,9 @@ rp_hooks_untracked() {
 # rp_ignored_changed_since looks there, a resolver's Edit can rewrite an
 # existing executable hook, and the verify command's own git calls (a checkout
 # or commit in its tests) run hooks; the commit step disables them instead
-# (rp_hooks_untracked returns 4). An in-tree hooks directory is skipped: the
-# tree listing and the ignored-file walk already cover it. Only the directory's
+# (rp_hooks_untracked returns 4). In an in-tree hooks directory only a
+# symlinked hook whose target lies outside the tree is judged (by that target):
+# the tree listing and the ignored-file walk cover the rest. Only the directory's
 # top-level entries count, since those are what Git runs; a symlinked hook is
 # judged by its target (find -L), and a *.sample is never run. Writes one
 # NUL-terminated absolute path per hit to <hitsfile>. Returns 0 when nothing
@@ -2416,7 +2417,24 @@ rp_hooks_changed_since() {
         gitdir=$(cd -P -- "$gitdir" 2>/dev/null && pwd -P) || exit 2
         case "$hp" in
             "$gitdir"|"$gitdir"/*) ;;
-            "$top"|"$top"/*) exit 0 ;;
+            "$top"|"$top"/*)
+                # In-tree files are covered by the tree listing and the
+                # ignored-file walk, but a tracked symlinked hook whose target
+                # lies outside the tree is not: an edit through it leaves the
+                # link unchanged. Judge only those targets.
+                local links l t
+                links=$(mktemp) || exit 2
+                trap 'rm -f -- "$links"' EXIT
+                find -P "$hp" -mindepth 1 -maxdepth 1 -type l ! -name '*.sample' -print0 >|"$links" 2>/dev/null || exit 2
+                while IFS= read -r -d '' l; do
+                    t=$(yr_canon_path "$l") || exit 2
+                    yr_inside_root "$t" "$top" && continue
+                    [ -e "$t" ] || continue
+                    [ "$t" -nt "$marker" ] && printf '%s\0' "$l" >>"$hitsfile"
+                done <"$links"
+                [ -s "$hitsfile" ] && exit 1
+                exit 0
+                ;;
         esac
         find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -newer "$marker" -print0 >|"$hitsfile" 2>/dev/null || exit 2
         [ -s "$hitsfile" ] && exit 1
