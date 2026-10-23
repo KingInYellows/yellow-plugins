@@ -2721,6 +2721,53 @@ old_hook_dirs() {
   [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
 }
 
+# --mark-hooks writes the effective hooks directory into the marker, keeping
+# the marker's pre-resolver mtime meaning; restore that mtime after it.
+mark_hooks() {
+  run --separate-stderr "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  touch -t 202001010000 "$IGN_MARKER"
+}
+
+@test "--mark-hooks records the hooks directory and a clean run passes" {
+  hooks_fixture
+  mark_hooks
+  [ "$(head -1 "$IGN_MARKER")" = yellow-review-hooks-v1 ]
+  [ "$(sed -n 2p "$IGN_MARKER")" = "$(cd -P .git/hooks && pwd -P)" ]
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+}
+
+@test "--ignored-since refuses when an emptied included config moves hooks back to an older .git/hooks" {
+  hooks_fixture
+  old_hook_dirs
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/good-hooks" >| "$BATS_TEST_TMPDIR/inc.cfg"
+  git config include.path "$BATS_TEST_TMPDIR/inc.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/inc.cfg"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # Emptied: git no longer lists it as an origin, and .git/hooks is older.
+  : >| "$BATS_TEST_TMPDIR/inc.cfg"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/inc.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored files changed since the --ignored-since marker (git hooks"* ]]
+  [[ "$stderr" == *".git/hooks"* ]]
+}
+
+@test "--mark-hooks and the guard refuse a core.hooksPath ending in a newline" {
+  hooks_fixture
+  old_hook_dirs
+  mkdir -p "$BATS_TEST_TMPDIR/nl"$'\n'
+  git config core.hooksPath "$BATS_TEST_TMPDIR/nl"$'\n'
+  touch -t 201901010000 .git/config
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  run --separate-stderr "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample

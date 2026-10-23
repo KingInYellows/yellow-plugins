@@ -2381,6 +2381,33 @@ rp_hooks_untracked() {
     )
 }
 
+# rp_hooks_dir_state: run from the working tree root. Prints the effective
+# hooks directory Git would run hooks from, canonical (physical), or `none`
+# when that path is not a directory (core.hooksPath=/dev/null). Returns 2 when
+# it cannot tell, including a configured core.hooksPath or a resolved path that
+# holds a control character: command substitution drops a trailing newline Git
+# keeps, so the path checked would not be the one Git uses.
+rp_hooks_dir_state() {
+    local v hp c
+    while IFS= read -r -d '' v; do
+        [[ "$v" =~ [[:cntrl:]] ]] && return 2
+    done < <(yr_git config -z --get-all core.hooksPath 2>/dev/null)
+    hp=$(yr_git rev-parse --git-path hooks 2>/dev/null && printf x) || return 2
+    hp="${hp%x}"
+    hp="${hp%$'\n'}"
+    [ -n "$hp" ] || return 2
+    [[ "$hp" =~ [[:cntrl:]] ]] && return 2
+    if [ -d "$hp" ]; then
+        c=$(cd -P -- "$hp" 2>/dev/null && pwd -P && printf x) || return 2
+        c="${c%x}"
+        c="${c%$'\n'}"
+        [[ "$c" =~ [[:cntrl:]] ]] && return 2
+        printf '%s\n' "$c"
+    else
+        printf 'none\n'
+    fi
+}
+
 # rp_path_link_newer <path> <marker>: resolves <path> one component at a time,
 # following each symlink, and returns 0 when any symlink met on the way (a
 # component, the final name or a link inside a link's target) has its own
@@ -2417,7 +2444,8 @@ rp_path_link_newer() {
 }
 
 # rp_hooks_changed_since <marker> <hitsfile>: the hook files Git would run that
-# changed after <marker>, for a hooks directory in the git directory
+# changed after <marker>, or the hooks directory itself when it is not the one
+# recorded in <marker> by `run-verify-command --mark-hooks`, for a hooks directory in the git directory
 # (.git/hooks) or outside the working tree. Neither the tree listing nor
 # rp_ignored_changed_since looks there, a resolver's Edit can rewrite an
 # existing executable hook, and the verify command's own git calls (a checkout
@@ -2448,11 +2476,23 @@ rp_hooks_changed_since() {
         top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         top=$(pwd -P) || exit 2
-        hp=$(yr_git rev-parse --git-path hooks 2>/dev/null) || exit 2
+        hp=$(yr_git rev-parse --git-path hooks 2>/dev/null && printf x) || exit 2
+        hp="${hp%x}"
+        hp="${hp%$'\n'}"
         [ -n "$hp" ] || exit 2
-        [ -e "$hp" ] || [ -L "$hp" ] || exit 0
+        # The effective directory, compared with the one --mark-hooks wrote
+        # into the marker when the run started (a config edit, an emptied
+        # include or a retargeted link all change it). A marker without the
+        # record falls back to the mtime checks below.
+        local now tag want
+        now=$(rp_hooks_dir_state) || exit 2
+        { IFS= read -r tag && IFS= read -r want; } <"$marker" 2>/dev/null || tag=""
+        if [ "$tag" = yellow-review-hooks-v1 ] && [ "$now" != "$want" ]; then
+            printf '%s\0' "$hp" >|"$hitsfile" || exit 2
+            exit 1
+        fi
         # Git runs no hook from a path that is not a directory (/dev/null).
-        [ -d "$hp" ] || exit 0
+        [ "$now" != none ] || exit 0
         # A symlink on the way to the hooks directory, retargeted at an older
         # directory of hooks, shows only in its own mtime.
         local rc=0

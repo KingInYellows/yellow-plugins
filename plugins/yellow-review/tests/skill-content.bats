@@ -1280,10 +1280,15 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 @test "resolve-pr: the marker mint strips a trailing slash from TMPDIR so Step 6 accepts the path" {
   step3f=$(sed -n '/^### Step 3f/,/^### Step 4/p' "$RESOLVE_PR")
   block=$(printf '%s\n' "$step3f" | sed -n '/^```bash$/,/^```$/p' | sed '1d;$d')
-  mkdir -p "$BATS_TEST_TMPDIR/tmp"
-  TMPDIR="$BATS_TEST_TMPDIR/tmp/" run bash -c "$block"
+  block="${block//<PR#>/7}"
+  mkdir -p "$BATS_TEST_TMPDIR/tmp" "$BATS_TEST_TMPDIR/repo"
+  git -C "$BATS_TEST_TMPDIR/repo" init -q
+  cd "$BATS_TEST_TMPDIR/repo"
+  CLAUDE_PLUGIN_ROOT="$BATS_TEST_DIRNAME/.." TMPDIR="$BATS_TEST_TMPDIR/tmp/" run --separate-stderr bash -c "$block"
   [ "$status" -eq 0 ]
   [[ "$output" == "$BATS_TEST_TMPDIR/tmp/resolve-marker."* ]]
+  # --mark-hooks recorded the hooks directory in the marker.
+  [ "$(head -1 "$output/ignored-marker")" = yellow-review-hooks-v1 ]
   [[ "$output" != *"//"* ]]
   [ -f "$output/ignored-marker" ]
   # The same prefix strip Step 6 applies must leave a plain resolve-marker.* name.

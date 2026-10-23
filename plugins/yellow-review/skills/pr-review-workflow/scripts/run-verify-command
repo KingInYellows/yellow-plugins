@@ -9,6 +9,7 @@
 #        run-verify-command --pr <N> --revert-dirty
 #        run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run | --expect-snapshot <hex>]
 #        run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>
+#        run-verify-command --pr <N> --mark-hooks --ignored-since <marker-file>
 #   --trusted:     required to run a command. The caller sets it only after
 #                  confirming the command came from an untracked config file
 #                  (unattended) or after the user approved it (interactive).
@@ -54,6 +55,13 @@
 #                  dirty-tree check) and exits 0 when no ignored file is
 #                  newer than the marker; otherwise exits 2 as --ignored-since
 #                  does, and the caller reverts and downgrades `fixed` threads.
+#   --mark-hooks:  run right after touching the marker, before any resolver
+#                  starts: write the effective git hooks directory into the
+#                  marker. The --ignored-since guard then refuses when the
+#                  directory Git would run hooks from is a different one (an
+#                  edited or emptied config, a retargeted link). Prints nothing
+#                  and exits 0, or 2 when the directory cannot be judged (a
+#                  control character in core.hooksPath).
 #   --revert-only: run nothing; save the patch and revert the listed files
 #                  (result "reverted"). Deny-listed paths may be reverted. A
 #                  listed file without changes is skipped and named in
@@ -772,6 +780,7 @@ usage() {
     printf '       run-verify-command --pr <N> --revert-dirty\n' >&2
     printf '       run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run | --expect-snapshot <hex>]\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
+    printf '       run-verify-command --pr <N> --mark-hooks --ignored-since <marker-file>\n' >&2
     printf '  exactly one of --revert-only, --revert-dirty, --revert-denied and --check-ignored may be given; --revert-dirty and --revert-denied take no file list\n' >&2
     printf '  --dry-run: only with --revert-denied; print result "dry-run" with pending/pendingCount and linkHits/linkHitCount, and change nothing\n' >&2
     printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run and for --revert-denied (or --no-ignored-guard); --revert-only and --revert-dirty ignore it\n' >&2
@@ -787,7 +796,7 @@ MODE=run
 MODE_FLAG=""
 set_mode() {
     if [ -n "$MODE_FLAG" ] && [ "$MODE_FLAG" != "$1" ]; then
-        die 2 "$MODE_FLAG and $1 cannot be combined; pass exactly one of --revert-only, --revert-dirty, --revert-denied and --check-ignored"
+        die 2 "$MODE_FLAG and $1 cannot be combined; pass exactly one of --revert-only, --revert-dirty, --revert-denied, --check-ignored and --mark-hooks"
     fi
     MODE_FLAG="$1"
     MODE="$2"
@@ -816,6 +825,7 @@ while [ $# -gt 0 ]; do
         --revert-dirty) set_mode --revert-dirty revert-dirty; shift ;;
         --revert-denied) set_mode --revert-denied revert-denied; shift ;;
         --check-ignored) set_mode --check-ignored check-ignored; shift ;;
+        --mark-hooks) set_mode --mark-hooks mark-hooks; shift ;;
         --files-from)
             [ $# -ge 2 ] || usage
             rp_read_file_list "$2" || die 2 "--files-from not readable: $2"
@@ -851,6 +861,10 @@ if [ "$MODE" = check-ignored ]; then
     [ -n "$IGNORED_SINCE" ] || die 2 "--check-ignored requires --ignored-since <marker-file>"
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--check-ignored takes no file list"
 fi
+if [ "$MODE" = mark-hooks ]; then
+    [ -n "$IGNORED_SINCE" ] || die 2 "--mark-hooks requires --ignored-since <marker-file>"
+    [ "${#FILES[@]}" -eq 0 ] || die 2 "--mark-hooks takes no file list"
+fi
 if [ "$MODE" = run ]; then
     [ "$TRUSTED" = 1 ] || die 2 "refusing to run an untrusted verify command (pass --trusted only after the tracked-file check or user approval)"
     [[ "$TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "--timeout must be a positive integer (seconds)"
@@ -872,7 +886,7 @@ if [ "$MODE" = run ]; then
 fi
 # The marker is validated and resolved once for every mode that uses it; the
 # script changes directory below.
-if [ "$MODE" = check-ignored ] || [ "$MODE" = run ] || { [ "$MODE" = revert-denied ] && [ -n "$IGNORED_SINCE" ]; }; then
+if [ "$MODE" = check-ignored ] || [ "$MODE" = mark-hooks ] || [ "$MODE" = run ] || { [ "$MODE" = revert-denied ] && [ -n "$IGNORED_SINCE" ]; }; then
     [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
         || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
     IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
@@ -1054,6 +1068,12 @@ check_hooks_since_marker() {
         *) die 2 "cannot check the git hooks directory against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 }
+
+if [ "$MODE" = mark-hooks ]; then
+    HOOKS_STATE=$(rp_hooks_dir_state) || die 2 "cannot judge the git hooks directory (a control character in core.hooksPath?); refusing to mark"
+    printf 'yellow-review-hooks-v1\n%s\n' "$HOOKS_STATE" >|"$IGNORED_SINCE" || die 2 "cannot write the marker: $IGNORED_SINCE"
+    exit 0
+fi
 
 if [ "$MODE" = check-ignored ]; then
     IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"

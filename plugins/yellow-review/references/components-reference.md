@@ -239,7 +239,9 @@ flags, exit codes, trust-boundary rules and library behavior.
   marker (nested links followed, a loop or find error counts) or, with
   `--no-ignored-guard`, when one exists, and the walk counts after 50000
   entries; `--check-ignored --ignored-since <marker-file>` runs only the
-  gitignored-file guard, for a resolve with no verify command.
+  gitignored-file guard, for a resolve with no verify command;
+  `--mark-hooks --ignored-since <marker-file>` writes the effective git hooks
+  directory into a fresh marker, so the guard refuses when it changes.
   `/review:resolve-stack` and `/review:sweep-all` run it after a dirty resolve
   only when every dirty path is owned by the run (a PR file or trusted-config
   path); otherwise they run `--revert-denied --no-ignored-guard`, which reverts
