@@ -2558,7 +2558,7 @@ rp_hooks_changed_since() {
         done <<EOF_ROOTS
 $roots
 EOF_ROOTS
-        local queue=() seen=() i=0 inc d
+        local queue=() seen=() i=0 inc d nin=0
         while IFS= read -r -d '' rec; do
             n=$((n + 1))
             [ $((n % 2)) = 1 ] || continue
@@ -2590,6 +2590,11 @@ EOF_ROOTS
                         *) inc="$d/$inc" ;;
                     esac
                     queue+=("$inc")
+                    # Spelling a self-include differently each pass
+                    # (sub/../x.cfg) would loop forever: past Git's own
+                    # include depth (10) and breadth the walk cannot tell.
+                    nin=$((nin + 1))
+                    [ "$nin" -le 64 ] || exit 2
                 done <"$origins"
             fi
             # A symlink on the way to the config counts by its own mtime too:
