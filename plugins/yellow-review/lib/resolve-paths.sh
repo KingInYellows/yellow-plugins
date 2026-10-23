@@ -2388,7 +2388,8 @@ rp_hooks_untracked() {
 # existing executable hook, and the verify command's own git calls (a checkout
 # or commit in its tests) run hooks; the commit step disables them instead
 # (rp_hooks_untracked returns 4). In an in-tree hooks directory only a
-# symlinked hook whose target lies outside the tree is judged (by that target):
+# symlinked hook whose target lies outside the tree or in the git directory is
+# judged (by that target):
 # the tree listing and the ignored-file walk cover the rest. Only the directory's
 # top-level entries count, since those are what Git runs; a symlinked hook is
 # judged by its target (find -L), and a *.sample is never run. Writes one
@@ -2428,7 +2429,12 @@ rp_hooks_changed_since() {
                 find -P "$hp" -mindepth 1 -maxdepth 1 -type l ! -name '*.sample' -print0 >|"$links" 2>/dev/null || exit 2
                 while IFS= read -r -d '' l; do
                     t=$(yr_canon_path "$l") || exit 2
-                    yr_inside_root "$t" "$top" && continue
+                    # The git directory counts as outside: neither listing
+                    # looks there.
+                    case "$t" in
+                        "$gitdir"|"$gitdir"/*) ;;
+                        *) yr_inside_root "$t" "$top" && continue ;;
+                    esac
                     [ -e "$t" ] || continue
                     [ "$t" -nt "$marker" ] && printf '%s\0' "$l" >>"$hitsfile"
                 done <"$links"

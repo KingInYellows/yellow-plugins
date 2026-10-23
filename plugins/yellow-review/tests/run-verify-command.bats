@@ -2581,6 +2581,23 @@ hooks_fixture() {
   [[ "$stderr" == *".githooks/pre-commit"* ]]
 }
 
+@test "--ignored-since judges a tracked in-tree hook symlink whose target is in the git directory" {
+  hooks_fixture
+  mkdir -p .githooks
+  ln -s ../.git/hooks/post-checkout .githooks/post-checkout
+  touch -h -t 201901010000 .githooks/post-checkout
+  git add .githooks/post-checkout
+  git commit -q -m 'tracked hook link into .git' -- .githooks/post-checkout
+  git config core.hooksPath .githooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '#!/bin/sh\necho pwned\n' >| .git/hooks/post-checkout
+  [ -z "$(git status --porcelain -- .githooks)" ]
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *".githooks/post-checkout"* ]]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample
