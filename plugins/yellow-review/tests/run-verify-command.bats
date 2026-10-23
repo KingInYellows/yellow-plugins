@@ -2768,6 +2768,40 @@ mark_hooks() {
   [ "$status" -eq 2 ]
 }
 
+@test "--ignored-since refuses a dormant includeIf.onbranch config rewritten after the marker" {
+  hooks_fixture
+  old_hook_dirs
+  printf '[user]\n\tname = x\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/branch.cfg"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # Inactive on this branch, so git lists no origin for it and the
+  # effective hooks directory is unchanged.
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/evil-hooks" >| "$BATS_TEST_TMPDIR/branch.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"branch.cfg"* ]]
+}
+
+@test "--ignored-since refuses an includeIf added after the marker while .git/hooks holds only samples" {
+  hooks_fixture
+  old_hook_dirs
+  rm -f .git/hooks/post-checkout
+  printf '#!/bin/sh\n' >| .git/hooks/pre-commit.sample
+  touch -t 201901010000 .git/hooks/pre-commit.sample
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/evil-hooks" >| "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/branch.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *".git/config"* ]]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample

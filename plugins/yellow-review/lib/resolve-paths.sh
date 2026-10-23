@@ -2454,9 +2454,10 @@ rp_path_link_newer() {
 # symlinked hook whose target lies outside the tree or in the git directory is
 # judged (by that target):
 # the tree listing and the ignored-file walk cover the rest. Every config file
-# Git reads (including included files) counts as a hit when written after
-# <marker> while the effective directory holds a hook (a repointed
-# core.hooksPath). Only the directory's
+# Git reads (including included files, and conditional includes whose
+# condition is false now) counts as a hit when written after <marker> while
+# the effective directory holds a hook (a repointed core.hooksPath), or when
+# it sets core.hooksPath or an includeIf path itself. Only the directory's
 # top-level entries count, since those are what Git runs; a symlinked hook is
 # judged by its target (find -L) and by every link on its way
 # (rp_path_link_newer), as are the hooks directory and each config file, and a
@@ -2517,11 +2518,41 @@ rp_hooks_changed_since() {
             c=$(yr_git rev-parse --git-path "$c" 2>/dev/null) || exit 2
             printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
         done
+        local queue=() seen=() i=0 inc d strong=0
         while IFS= read -r -d '' rec; do
             n=$((n + 1))
             [ $((n % 2)) = 1 ] || continue
             case "$rec" in file:*) c="${rec#file:}" ;; *) continue ;; esac
             case "$c" in /*) ;; *) c="$top/$c" ;; esac
+            queue+=("$c")
+        done <"$origins"
+        # An include whose condition is false now (includeIf.onbranch) is
+        # not in --show-origin, but a verify command that switches branches
+        # makes Git read it: walk every include.path and includeIf.*.path of
+        # each file, active or not.
+        while [ "$i" -lt "${#queue[@]}" ]; do
+            c="${queue[$i]}"
+            i=$((i + 1))
+            case " ${seen[*]-} " in *" $c "*) continue ;; esac
+            seen+=("$c")
+            if [ -f "$c" ]; then
+                d=$(dirname -- "$c") || exit 2
+                yr_git config --file "$c" -z --get-regexp '^include(if\..*)?\.path$' >|"$origins" 2>/dev/null
+                rc=$?
+                [ "$rc" = 0 ] || [ "$rc" = 1 ] || exit 2
+                while IFS= read -r -d '' rec; do
+                    inc="${rec#*$'\n'}"
+                    [ "$inc" != "$rec" ] && [ -n "$inc" ] || continue
+                    case "$inc" in
+                        *[[:cntrl:]]*|%\(*) exit 2 ;;
+                        "~/"*) inc="${HOME:?}/${inc#\~/}" ;;
+                        "~"*) exit 2 ;;
+                        /*) ;;
+                        *) inc="$d/$inc" ;;
+                    esac
+                    queue+=("$inc")
+                done <"$origins"
+            fi
             # A symlink on the way to the config counts by its own mtime too:
             # one retargeted at an older file leaves the target's unchanged.
             if ! { [ -e "$c" ] && [ "$c" -nt "$marker" ]; }; then
@@ -2531,10 +2562,18 @@ rp_hooks_changed_since() {
             fi
             case " ${cfgs[*]-} " in *" $c "*) continue ;; esac
             cfgs+=("$c")
-        done <"$origins"
+            # A changed file that sets core.hooksPath or a conditional
+            # include counts even while the current directory holds no hook:
+            # a branch switch in the verify command can make Git use it.
+            if [ -f "$c" ]; then
+                rc=0
+                yr_git config --file "$c" --get-regexp '^(core\.hookspath|includeif\..*\.path)$' >/dev/null 2>&1 || rc=$?
+                case "$rc" in 0) strong=1 ;; 1) ;; *) exit 2 ;; esac
+            fi
+        done
         if [ "${#cfgs[@]}" -gt 0 ]; then
             any=$(find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -print -quit 2>/dev/null) || exit 2
-            if [ -n "$any" ]; then
+            if [ -n "$any" ] || [ "$strong" = 1 ]; then
                 printf '%s\0' "${cfgs[@]}" >|"$hitsfile" || exit 2
                 exit 1
             fi
