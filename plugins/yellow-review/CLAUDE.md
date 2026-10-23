@@ -109,7 +109,7 @@ all scripts), `stack-traversal` (shared by `/review:all` and
 `thermonuclear-reviewer`; the only Codex/Cursor-distributed skill). None is
 user-invocable.
 
-### Scripts (15)
+### Scripts (17)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for

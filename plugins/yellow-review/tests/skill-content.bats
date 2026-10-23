@@ -477,9 +477,9 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
 @test "sweep-all: the summary table carries a Residual column from the ledger" {
   grep -q 'review-ledger.sh" summary --all' "$SWEEP_ALL"
   grep -q '^| PR# | Title .*| Outcome   | Residual |' "$SWEEP_ALL"
-  grep -q 'emits `"<PR#>": null` for that' "$SWEEP_ALL"
-  grep -q '`?` when its entry is `null` (fold' "$SWEEP_ALL"
-  grep -q 'Exclude any `?` row from the pending' "$SWEEP_ALL"
+  [[ "$(flat "$SWEEP_ALL")" == *'emits `"<PR#>": null` for that'* ]]
+  [[ "$(flat "$SWEEP_ALL")" == *'`?` when its entry is `null` (fold'* ]]
+  [[ "$(flat "$SWEEP_ALL")" == *'Exclude any `?` row from the pending'* ]]
 }
 
 @test "sweep-all: the summary table carries a Blocking column from the Resolve line" {
@@ -544,7 +544,7 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
 @test "resolve-pr: only a PUSHED result keeps fixed threads fixed; refusals revert" {
   grep -q '`PUSHED` → `push=ok`' "$RESOLVE_PR"
   grep -q 'Only `PUSHED`' "$RESOLVE_PR"
-  grep -q 'a refused edit must not stay' "$RESOLVE_PR"
+  [[ "$(flat "$RESOLVE_PR")" == *'a refused edit must not stay'* ]]
   grep -q 'never substitute `git rev-parse`' "$RESOLVE_PR"
 }
 
@@ -1055,11 +1055,11 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 
 @test "sweep-all: an early stop exits 1 after the summary, even with zero attempts" {
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
-  [ "$(grep -c 'Record `pending-exit-1`' <<<"$step4")" -eq 4 ]
+  [ "$(tr '\n' ' ' <<<"$step4" | tr -s ' ' | grep -o 'Record `pending-exit-1`' | wc -l)" -eq 4 ]
   # Item 1b records it too, in lowercase, for the rate-limit and unreadable-state stops.
-  [ "$(grep -ci 'record `pending-exit-1`' <<<"$step4")" -ge 6 ]
+  [ "$(tr '\n' ' ' <<<"$step4" | tr -s ' ' | grep -oi 'record `pending-exit-1`' | wc -l)" -ge 6 ]
   grep -qF '**Final exit (every path, including zero attempts):** read `pending-exit-1`.' "$SWEEP_ALL"
-  grep -qF 'If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.' "$SWEEP_ALL"
+  [[ "$(flat "$SWEEP_ALL")" == *'If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.'* ]]
 }
 
 @test "sweep-all: Step 4 Reads its resolve-contract.md before the loop so the ratelimited and no-contract rules are loaded" {
@@ -1637,7 +1637,8 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   [[ "$lc" == *'a value outside 1–10 warns and is clamped to the nearer bound'* ]]
   sa=$(flat "$SWEEP_ALL")
   [[ "$sa" == *'Re-pass wait: up to <N> × <P> × <W>s'* ]]
-  [[ "$sa" == *'`P` is `resolve_pr.repass_max_passes`'* ]]
+  [[ "$sa" == *'`P` is `repass_max_passes` from the JSON'* ]]
+  [[ "$sa" == *'scripts/read-resolve-config'* ]]
 }
 
 @test "scripts lists name pr-review-delta and the script count matches the directory" {
@@ -1646,7 +1647,7 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   n=$(find "$scripts" -maxdepth 1 -type f | wc -l | tr -d ' ')
   grep -qF "### Scripts ($n)" "$BATS_TEST_DIRNAME/../CLAUDE.md"
   grep -qF '`pr-review-delta check' "$BATS_TEST_DIRNAME/../CLAUDE.md"
-  grep -qF '| `pr-review-delta` |' "$BATS_TEST_DIRNAME/../README.md"
+  grep -qE '^\| `pr-review-delta` +\|' "$BATS_TEST_DIRNAME/../README.md"
   grep -qF '**pr-review-delta**' "$BATS_TEST_DIRNAME/../skills/pr-review-workflow/SKILL.md"
 }
 

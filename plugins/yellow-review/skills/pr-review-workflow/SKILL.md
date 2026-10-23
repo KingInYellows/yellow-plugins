@@ -453,13 +453,6 @@ Located at `skills/pr-review-workflow/scripts/`:
   resolver's `PR-changed lines` and `PR files` from it. `--stack` prints the
   rows for the whole stack below and including the PR (default branch to head),
   for Step 5's `addressed` check.
-- **check-addressed-evidence**
-  `--ranges-from <f> [--stack-ranges-from <f>] [--modified-from <f>] <proposals.jsonl>`
-  — Judges each `addressed` proposal's evidence and prints one JSON verdict per
-  thread (`ok`, `basis` or `reason`); exit 2 refuses a bad input file whole.
-- **read-resolve-config** — Prints the `/review:resolve` config snapshot as one
-  JSON object (validated `resolve_pr.*` keys with defaults, `tracked`,
-  `warnings`).
 - **poll-new-threads**
   `--wait <s> [--fixed-anchors <file>] <owner/repo> <pr> <seen-ids-file> <out-file>`
   — The Step 8 re-pass poll: fetches at least once (`--wait 0` fetches once with
