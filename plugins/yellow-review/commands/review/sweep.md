@@ -322,8 +322,10 @@ esac
   with the script's `changed:` / `restore failed:` lines, and stop. Exit `4`
   (restore failed, or the snapshot failed its digest check) or any other exit:
   do not clear; print the same abort message plus
-  `inspect yellow-plugins.local.md before any further run` and
-  `snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")`,
+  `inspect yellow-plugins.local.md before any further run` and the script's
+  `snapshot kept at` line (exit `4`: it says to recover from the snapshot only
+  after `restore failed:`) or, on any other exit,
+  `snapshot kept at <guard-dir> (not validated: inspect it before any restore)`,
   and stop. Every stop here skips `/review:resolve` and, except the skip-line
   case, prints no `Sweep:` or `Resolve:` line (`no contract` stops the batch).
 
@@ -372,10 +374,9 @@ intact copy of the config.
 
 Exit `0`: continue. Exit `3`, `4` or any other exit: print
 `[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve`
-with the script's lines (on exit `4` or any other exit, add
-`snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")`)
-and stop. Skip Step 3b and print no `Resolve:` or `Sweep:` line (`no contract`
-stops the batch).
+with the script's lines (exit `4` ends with its `snapshot kept at` line; any
+other exit adds Step 2b's `not validated` line) and stop. Skip Step 3b and print
+no `Resolve:` or `Sweep:` line (`no contract` stops the batch).
 
 ### Step 3b: Reconcile the review-findings ledger
 

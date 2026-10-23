@@ -344,15 +344,15 @@ and the remaining PRs `not attempted (config changed)`, and goes to
    failed validation or its digest check, leaving the live config untouched, or
    a restore failed, which may leave the change live): print this PR's row, then
    `[review:resolve-stack] aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve`
-   with the script's `changed:` / `restore failed:` lines. On exit `4`, add
-   `snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")`.
+   with the script's lines (exit `4` ends with its own `snapshot kept at` line).
    List the PR under Needs manual attention as
    `ignored config changed (restored)` or
    `ignored config tampered (restore failed: inspect yellow-plugins.local.md before any further run)`,
    mark the remaining PRs `not attempted (config changed)`, run the dirty-tree
    check below only for its revert, and go to
    `### Step 4: Final aggregate summary` (exit `1`). Any other exit is treated
-   as exit `4`.
+   as exit `4`, adding
+   `snapshot kept at <guard-dir> (not validated: inspect it before any restore)`.
 
    Then the status check:
 

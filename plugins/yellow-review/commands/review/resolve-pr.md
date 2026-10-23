@@ -256,8 +256,13 @@ when this call exits, before Step 6 uses the directory):
 TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
 MARK_DIR=$(mktemp -d "$TMP_ROOT/resolve-marker.XXXXXX") || exit 1
 touch "$MARK_DIR/ignored-marker" || { rm -rf -- "$MARK_DIR"; exit 1; }
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --mark-hooks --ignored-since "$MARK_DIR/ignored-marker" || { rm -rf -- "$MARK_DIR"; exit 1; }
 printf '%s\n' "$MARK_DIR"
 ```
+
+`--mark-hooks` records the git hooks directory and the git config files in the
+marker, so the guard refuses when a resolver changed which directory Git runs
+hooks from or deleted a config file.
 
 The trailing `/` is stripped first (macOS sets `TMPDIR` with one), so the
 printed path has the single-slash prefix Step 6 checks. Keep the printed path as

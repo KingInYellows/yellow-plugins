@@ -602,15 +602,15 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   in `reason` (`skipped, no changes: <f>`), while a gitignored or unverifiable
   entry exits 2 with nothing reverted. It deletes a listed untracked,
   non-ignored file whoever created it; the saved patch holds the content unless
-  the credential screen withheld it (a pre-resolve baseline is tracked in #973).
-  `--revert-dirty` does the same for every change in the tree. It rejects a file
-  list: git itself lists the changes (`git diff --name-only HEAD` plus
-  `git ls-files --others --exclude-standard`), never resolver text.
-  `--revert-denied` uses that same listing and reverts only paths on the
-  resolver deny list that are trusted config (`rp_trusted_config`: agent
-  instruction and tool-config names, without `.claude/agent-memory/`); other
-  dirty paths stay, the rest of the deny list (`.env*`, keys, CI and Docker
-  files) included, and a file list is rejected. It deletes an untracked
+  the credential screen withheld it (the run starts on a clean tree, so `HEAD`
+  is the pre-resolve baseline). `--revert-dirty` does the same for every change
+  in the tree. It rejects a file list: git itself lists the changes
+  (`git diff --name-only HEAD` plus `git ls-files --others --exclude-standard`),
+  never resolver text. `--revert-denied` uses that same listing and reverts only
+  paths on the resolver deny list that are trusted config (`rp_trusted_config`:
+  agent instruction and tool-config names, without `.claude/agent-memory/`);
+  other dirty paths stay, the rest of the deny list (`.env*`, keys, CI and
+  Docker files) included, and a file list is rejected. It deletes an untracked
   trusted-config file whoever created it (the saved patch holds the content
   unless the credential screen withheld it), and leaves an untracked nested git
   repository in place, named in `reason`, while still reverting the other paths.

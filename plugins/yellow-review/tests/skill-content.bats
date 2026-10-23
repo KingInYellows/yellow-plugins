@@ -682,7 +682,14 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   # The clear is conditional on exit 0 or 3; exit 4 keeps and names the snapshot.
   [[ "$text" == *'Only when the check exited `0` (unchanged) or `3` (changed and restored)'* ]]
   [[ "$text" == *'On exit `4` or any other non-zero exit, do not clear'* ]]
-  [[ "$text" == *'snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")'* ]]
+  # Exit 4's advice comes from the script (restore failed vs snapshot invalid,
+  # CLAUDE-69); only a non-4 exit gets the caller's own not-validated line.
+  [[ "$text" == *'exit `4` ends with its own `snapshot kept at` line'* ]]
+  [[ "$text" == *'snapshot kept at <guard-dir> (not validated: inspect it before any restore)'* ]]
+  [[ "$text" != *'recover yellow-plugins.local.md from it by hand'* ]]
+  sweep=$(flat "$SWEEP")
+  [[ "$sweep" == *'snapshot kept at <guard-dir> (not validated: inspect it before any restore)'* ]]
+  [[ "$sweep" != *'recover yellow-plugins.local.md from it by hand'* ]]
 }
 
 @test "resolve-stack: a restack that changes a branch is published before the next PR" {
@@ -862,7 +869,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -q 'revert incomplete' "$DIRTY_REF"
   grep -q 'unrecognized changes left in place' "$DIRTY_REF"
   grep -q 'exits non-zero' "$DIRTY_REF"
-  grep -q '#973' "$DIRTY_REF"
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'every tracked path matched `HEAD` and no untracked, non-ignored path existed'
   # renames: the owned set includes previous_filename; an entry needs both paths owned
   grep -qF 'previous_filename' "$DIRTY_REF"
   grep -qF 'each file'"'"'s `filename` plus its' "$DIRTY_REF"
@@ -1307,10 +1314,15 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 @test "resolve-pr: the marker mint strips a trailing slash from TMPDIR so Step 6 accepts the path" {
   step3f=$(sed -n '/^### Step 3f/,/^### Step 4/p' "$RESOLVE_PR")
   block=$(printf '%s\n' "$step3f" | sed -n '/^```bash$/,/^```$/p' | sed '1d;$d')
-  mkdir -p "$BATS_TEST_TMPDIR/tmp"
-  TMPDIR="$BATS_TEST_TMPDIR/tmp/" run bash -c "$block"
+  block="${block//<PR#>/7}"
+  mkdir -p "$BATS_TEST_TMPDIR/tmp" "$BATS_TEST_TMPDIR/repo"
+  git -C "$BATS_TEST_TMPDIR/repo" init -q
+  cd "$BATS_TEST_TMPDIR/repo"
+  CLAUDE_PLUGIN_ROOT="$BATS_TEST_DIRNAME/.." TMPDIR="$BATS_TEST_TMPDIR/tmp/" run --separate-stderr bash -c "$block"
   [ "$status" -eq 0 ]
   [[ "$output" == "$BATS_TEST_TMPDIR/tmp/resolve-marker."* ]]
+  # --mark-hooks recorded the hooks directory in the marker.
+  [ "$(head -1 "$output/ignored-marker")" = yellow-review-hooks-v1 ]
   [[ "$output" != *"//"* ]]
   [ -f "$output/ignored-marker" ]
   # The same prefix strip Step 6 applies must leave a plain resolve-marker.* name.

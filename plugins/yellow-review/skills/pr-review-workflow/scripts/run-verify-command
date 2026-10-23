@@ -9,6 +9,7 @@
 #        run-verify-command --pr <N> --revert-dirty
 #        run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run | --expect-snapshot <hex>]
 #        run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>
+#        run-verify-command --pr <N> --mark-hooks --ignored-since <marker-file>
 #   --trusted:     required to run a command. The caller sets it only after
 #                  confirming the command came from an untracked config file
 #                  (unattended) or after the user approved it (interactive).
@@ -40,7 +41,11 @@
 #                  it). --revert-only and --revert-dirty ignore it;
 #                  --revert-denied uses it (below). Ignored changes are refused,
 #                  never reported as a clean tree: treeClean covers tracked and
-#                  untracked-unignored files.
+#                  untracked-unignored files. The guard also covers the hooks
+#                  directory when it is in the git directory or outside the
+#                  tree (rp_hooks_changed_since): a hook newer than the marker
+#                  refuses with the same "gitignored files changed since"
+#                  wording, so callers take the same ignored-file stop.
 #   --check-ignored: run nothing and revert nothing; only the --ignored-since
 #                  guard, for a resolve run that has no verify command (the
 #                  commit still runs hooks, and an ignored file edited by a
@@ -50,14 +55,24 @@
 #                  dirty-tree check) and exits 0 when no ignored file is
 #                  newer than the marker; otherwise exits 2 as --ignored-since
 #                  does, and the caller reverts and downgrades `fixed` threads.
+#   --mark-hooks:  run right after touching the marker, before any resolver
+#                  starts: write the effective git hooks directory into the
+#                  marker. The --ignored-since guard then refuses when the
+#                  directory Git would run hooks from is a different one (an
+#                  edited or emptied config, a retargeted link), and it lists
+#                  the git config files that exist, so the guard refuses when
+#                  one is deleted. Prints nothing and exits 0, or 2 when the
+#                  directory or the files cannot be judged (a control
+#                  character in core.hooksPath or a config name).
 #   --revert-only: run nothing; save the patch and revert the listed files
 #                  (result "reverted"). Deny-listed paths may be reverted. A
 #                  listed file without changes is skipped and named in
 #                  "reason"; a gitignored or unverifiable one still aborts the
 #                  whole call (exit 2, nothing reverted). Reverting deletes a
 #                  listed file that is untracked and not ignored, whoever
-#                  created it: the pre-resolve state is not recorded (issue
-#                  #973), so pass only files a resolver edited. The patch saved
+#                  created it: every caller starts from a clean tree, so the
+#                  file appeared during the run; pass only files a resolver
+#                  edited. The patch saved
 #                  first holds its content unless the credential screen
 #                  withheld the patch. The screen also reads the file names in
 #                  the patch, so a credential-shaped name withholds it too.
@@ -767,6 +782,7 @@ usage() {
     printf '       run-verify-command --pr <N> --revert-dirty\n' >&2
     printf '       run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run | --expect-snapshot <hex>]\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
+    printf '       run-verify-command --pr <N> --mark-hooks --ignored-since <marker-file>\n' >&2
     printf '  exactly one of --revert-only, --revert-dirty, --revert-denied and --check-ignored may be given; --revert-dirty and --revert-denied take no file list\n' >&2
     printf '  --dry-run: only with --revert-denied; print result "dry-run" with pending/pendingCount and linkHits/linkHitCount, and change nothing\n' >&2
     printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run and for --revert-denied (or --no-ignored-guard); --revert-only and --revert-dirty ignore it\n' >&2
@@ -782,7 +798,7 @@ MODE=run
 MODE_FLAG=""
 set_mode() {
     if [ -n "$MODE_FLAG" ] && [ "$MODE_FLAG" != "$1" ]; then
-        die 2 "$MODE_FLAG and $1 cannot be combined; pass exactly one of --revert-only, --revert-dirty, --revert-denied and --check-ignored"
+        die 2 "$MODE_FLAG and $1 cannot be combined; pass exactly one of --revert-only, --revert-dirty, --revert-denied, --check-ignored and --mark-hooks"
     fi
     MODE_FLAG="$1"
     MODE="$2"
@@ -811,6 +827,7 @@ while [ $# -gt 0 ]; do
         --revert-dirty) set_mode --revert-dirty revert-dirty; shift ;;
         --revert-denied) set_mode --revert-denied revert-denied; shift ;;
         --check-ignored) set_mode --check-ignored check-ignored; shift ;;
+        --mark-hooks) set_mode --mark-hooks mark-hooks; shift ;;
         --files-from)
             [ $# -ge 2 ] || usage
             rp_read_file_list "$2" || die 2 "--files-from not readable: $2"
@@ -846,6 +863,10 @@ if [ "$MODE" = check-ignored ]; then
     [ -n "$IGNORED_SINCE" ] || die 2 "--check-ignored requires --ignored-since <marker-file>"
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--check-ignored takes no file list"
 fi
+if [ "$MODE" = mark-hooks ]; then
+    [ -n "$IGNORED_SINCE" ] || die 2 "--mark-hooks requires --ignored-since <marker-file>"
+    [ "${#FILES[@]}" -eq 0 ] || die 2 "--mark-hooks takes no file list"
+fi
 if [ "$MODE" = run ]; then
     [ "$TRUSTED" = 1 ] || die 2 "refusing to run an untrusted verify command (pass --trusted only after the tracked-file check or user approval)"
     [[ "$TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "--timeout must be a positive integer (seconds)"
@@ -867,7 +888,7 @@ if [ "$MODE" = run ]; then
 fi
 # The marker is validated and resolved once for every mode that uses it; the
 # script changes directory below.
-if [ "$MODE" = check-ignored ] || [ "$MODE" = run ] || { [ "$MODE" = revert-denied ] && [ -n "$IGNORED_SINCE" ]; }; then
+if [ "$MODE" = check-ignored ] || [ "$MODE" = mark-hooks ] || [ "$MODE" = run ] || { [ "$MODE" = revert-denied ] && [ -n "$IGNORED_SINCE" ]; }; then
     [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
         || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
     IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
@@ -1034,6 +1055,39 @@ note_shared_store() {
     fi
 }
 
+# The hooks directory in .git (or outside the tree) and the repository's git
+# config are not in either listing, and a hook a resolver rewrote or pointed
+# core.hooksPath at runs on the next git command (CLAUDE-60). The
+# refusal reuses the ignored-file wording, so callers route it to the same
+# ignored-file stop: neither has a HEAD copy to restore.
+check_hooks_since_marker() {
+    local hits rc=0
+    hits=$(mktemp) || die 2 "mktemp failed"
+    rp_hooks_changed_since "$IGNORED_SINCE" "$hits" || rc=$?
+    case "$rc" in
+        0) rm -f -- "$hits" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (git hooks or git config outside the tracked tree; a resolver may have edited a hook or repointed core.hooksPath)$1: $(safe_path_list_z <"$hits")" ;;
+        *) die 2 "cannot check the git hooks directory against the --ignored-since marker: $IGNORED_SINCE" ;;
+    esac
+}
+
+if [ "$MODE" = mark-hooks ]; then
+    HOOKS_STATE=$(rp_hooks_dir_state) || die 2 "cannot judge the git hooks directory (a control character in core.hooksPath?); refusing to mark"
+    # The config files that exist now, so the guard can tell a deleted one
+    # from an include that was never there.
+    MARK_TOP=$(yr_git rev-parse --show-toplevel 2>/dev/null) || die 2 "cannot find the repository's top directory; refusing to mark"
+    MARK_CFGS=$(mktemp) || die 2 "mktemp failed"
+    ( cd -- "$MARK_TOP" && rp_config_paths "$(pwd -P)" ) >|"$MARK_CFGS" || { rm -f -- "$MARK_CFGS"; die 2 "cannot list the git config files (a control character in a name, or more than 64 includes?); refusing to mark"; }
+    {
+        printf 'yellow-review-hooks-v1\n%s\n' "$HOOKS_STATE"
+        while IFS= read -r -d '' c; do
+            if [ -e "$c" ]; then printf '%s\n' "$c" || exit 1; fi
+        done <"$MARK_CFGS"
+    } >|"$IGNORED_SINCE" || { rm -f -- "$MARK_CFGS"; die 2 "cannot write the marker: $IGNORED_SINCE"; }
+    rm -f -- "$MARK_CFGS"
+    exit 0
+fi
+
 if [ "$MODE" = check-ignored ]; then
     IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
     IGNORED_HITS=$(mktemp) || die 2 "mktemp failed"
@@ -1044,7 +1098,7 @@ if [ "$MODE" = check-ignored ]; then
         # No treeClean: this guard never looks at tracked or untracked-unignored
         # changes (the resolver edits are in the tree by design), so claiming
         # a clean tree would let the caller skip its own dirty-tree stop.
-        0) jq -nc '{result: "clean", patch: null, log: null}'; exit 0 ;;
+        0) check_hooks_since_marker ""; jq -nc '{result: "clean", patch: null, log: null}'; exit 0 ;;
         1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): $(safe_path_list_z <"$IGNORED_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
@@ -1623,6 +1677,7 @@ if [ "$MODE" = run ]; then
         1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: $(safe_path_list_z <"$IGNORED_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
+    check_hooks_since_marker "; refusing to run"
 
     # The same for a tracked trusted-config symlink whose target was written.
     check_trusted_links

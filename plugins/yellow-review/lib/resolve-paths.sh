@@ -2381,6 +2381,332 @@ rp_hooks_untracked() {
     )
 }
 
+# rp_hooks_dir_state: run from the working tree root. Prints the effective
+# hooks directory Git would run hooks from, canonical (physical), or `none`
+# when that path is not a directory (core.hooksPath=/dev/null). Returns 2 when
+# it cannot tell, including a configured core.hooksPath or a resolved path that
+# holds a control character: command substitution drops a trailing newline Git
+# keeps, so the path checked would not be the one Git uses.
+rp_hooks_dir_state() {
+    local v hp c
+    while IFS= read -r -d '' v; do
+        [[ "$v" =~ [[:cntrl:]] ]] && return 2
+    done < <(yr_git config -z --get-all core.hooksPath 2>/dev/null)
+    hp=$(yr_git rev-parse --git-path hooks 2>/dev/null && printf x) || return 2
+    hp="${hp%x}"
+    hp="${hp%$'\n'}"
+    [ -n "$hp" ] || return 2
+    [[ "$hp" =~ [[:cntrl:]] ]] && return 2
+    if [ -d "$hp" ]; then
+        c=$(cd -P -- "$hp" 2>/dev/null && pwd -P && printf x) || return 2
+        c="${c%x}"
+        c="${c%$'\n'}"
+        [[ "$c" =~ [[:cntrl:]] ]] && return 2
+        printf '%s\n' "$c"
+    else
+        printf 'none\n'
+    fi
+}
+
+# rp_path_link_newer <path> <marker>: resolves <path> one component at a time,
+# following each symlink, and returns 0 when any symlink met on the way (a
+# component, the final name or a link inside a link's target) has its own
+# mtime newer than <marker>. A link retargeted after the marker at an older
+# file or directory leaves every target time unchanged, so only the link's
+# time shows it. Returns 1 when none is, 2 when it cannot tell (an unreadable
+# link, or more than 40 links: a loop). Missing trailing components are fine.
+rp_path_link_newer() {
+    local p="$1" marker="$2" cur rest c next t v n=0
+    case "$p" in /*) ;; *) p="$(pwd -P)/$p" || return 2 ;; esac
+    cur=/
+    rest="${p#/}"
+    while [ -n "$rest" ]; do
+        c="${rest%%/*}"
+        if [ "$c" = "$rest" ]; then rest=""; else rest="${rest#*/}"; fi
+        case "$c" in
+            ''|.) continue ;;
+            ..) cur=$(dirname -- "$cur") || return 2; continue ;;
+        esac
+        next="${cur%/}/$c"
+        if [ -L "$next" ]; then
+            n=$((n + 1))
+            [ "$n" -le 40 ] || return 2
+            v=$(find -P "$next" -prune -newer "$marker" -print 2>/dev/null) || return 2
+            [ -z "$v" ] || return 0
+            t=$(readlink -- "$next") || return 2
+            case "$t" in /*) cur=/ ;; esac
+            rest="${t#/}${rest:+/$rest}"
+            continue
+        fi
+        cur="$next"
+    done
+    return 1
+}
+
+# rp_config_paths <top>: every config file Git could read here, one
+# NUL-terminated absolute path each, missing ones included: the repository's
+# config and config.worktree, the global and system files, every file
+# --show-origin names, and every include.path and includeIf.*.path reached
+# from those, whether its condition holds now or not (a verify command that
+# switches branches makes Git read it). Returns 2 when it cannot tell (a
+# control character in a name, a git failure, or more than 64 includes).
+rp_config_paths() {
+    local top="$1"
+    (
+        local c origins rec n=0 rc
+        origins=$(mktemp) || exit 2
+        trap 'rm -f -- "$origins"' EXIT
+        yr_git config --list --show-origin --includes -z >|"$origins" 2>/dev/null || exit 2
+        for c in config config.worktree; do
+            c=$(yr_git rev-parse --git-path "$c" 2>/dev/null) || exit 2
+            printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
+        done
+        # The global and system files too: one emptied of a dormant includeIf
+        # drops out of --show-origin, and nothing includes it. git var names
+        # them on Git 2.42 and later; the defaults cover older ones. A device
+        # such as GIT_CONFIG_GLOBAL=/dev/null holds no config.
+        local roots v
+        # A newline would split one name in two below: refuse control
+        # characters in every value the names come from.
+        for v in "${GIT_CONFIG_GLOBAL-}" "${GIT_CONFIG_SYSTEM-}" "${HOME-}" "${XDG_CONFIG_HOME-}"; do
+            case "$v" in *[[:cntrl:]]*) exit 2 ;; esac
+        done
+        # A relative HOME or XDG_CONFIG_HOME names a global file relative to
+        # each git call's directory, which the absolute-only list below
+        # would drop: refuse it.
+        for v in "${HOME-}" "${XDG_CONFIG_HOME-}"; do
+            case "$v" in ''|/*) ;; *) exit 2 ;; esac
+        done
+        roots=$(
+            yr_git var GIT_CONFIG_GLOBAL 2>/dev/null
+            yr_git var GIT_CONFIG_SYSTEM 2>/dev/null
+            if [ -n "${GIT_CONFIG_GLOBAL+x}" ]; then
+                printf '%s\n' "$GIT_CONFIG_GLOBAL"
+            else
+                # Git reads the XDG file even with HOME unset.
+                [ -z "${HOME:-}" ] || printf '%s\n' "$HOME/.gitconfig"
+                if [ -n "${XDG_CONFIG_HOME:-}" ]; then
+                    printf '%s\n' "$XDG_CONFIG_HOME/git/config"
+                elif [ -n "${HOME:-}" ]; then
+                    printf '%s\n' "$HOME/.config/git/config"
+                fi
+            fi
+            case "${GIT_CONFIG_NOSYSTEM:-}" in
+                ''|0|false|no|off) printf '%s\n' "${GIT_CONFIG_SYSTEM:-/etc/gitconfig}" ;;
+            esac
+        )
+        while IFS= read -r c; do
+            # yr_check_git_env has already refused a relative
+            # GIT_CONFIG_GLOBAL or GIT_CONFIG_SYSTEM.
+            case "$c" in /*) ;; *) continue ;; esac
+            [ ! -e "$c" ] || [ -f "$c" ] || continue
+            printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
+        done <<EOF_ROOTS
+$roots
+EOF_ROOTS
+        local queue=() seen=() i=0 inc d nin=0
+        while IFS= read -r -d '' rec; do
+            n=$((n + 1))
+            [ $((n % 2)) = 1 ] || continue
+            case "$rec" in file:*) c="${rec#file:}" ;; *) continue ;; esac
+            case "$c" in /*) ;; *) c="$top/$c" ;; esac
+            queue+=("$c")
+        done <"$origins"
+        while [ "$i" -lt "${#queue[@]}" ]; do
+            c="${queue[$i]}"
+            i=$((i + 1))
+            rp_in_list "$c" ${seen[@]+"${seen[@]}"} && continue
+            seen+=("$c")
+            if [ -f "$c" ]; then
+                d=$(dirname -- "$c") || exit 2
+                yr_git config --file "$c" -z --type=path --get-regexp '^include(if\..*)?\.path$' >|"$origins" 2>/dev/null
+                rc=$?
+                [ "$rc" = 0 ] || [ "$rc" = 1 ] || exit 2
+                while IFS= read -r -d '' rec; do
+                    inc="${rec#*$'\n'}"
+                    [ "$inc" != "$rec" ] && [ -n "$inc" ] || continue
+                    # --type=path has expanded ~/, ~user/ and %(prefix)/.
+                    case "$inc" in
+                        *[[:cntrl:]]*) exit 2 ;;
+                        /*) ;;
+                        *) inc="$d/$inc" ;;
+                    esac
+                    queue+=("$inc")
+                    # Spelling a self-include differently each pass
+                    # (sub/../x.cfg) would loop forever: past Git's own
+                    # include depth (10) and breadth the walk cannot tell.
+                    nin=$((nin + 1))
+                    [ "$nin" -le 64 ] || exit 2
+                done <"$origins"
+            fi
+            case "$c" in *[[:cntrl:]]*) exit 2 ;; esac
+            printf '%s\0' "$c" || exit 2
+        done
+    )
+}
+
+# rp_in_list <word> [item...]: succeeds when <word> equals one of the items.
+rp_in_list() {
+    local w="$1" x
+    shift
+    for x in "$@"; do
+        [ "$x" = "$w" ] && return 0
+    done
+    return 1
+}
+
+# rp_hooks_changed_since <marker> <hitsfile>: the hook files Git would run that
+# changed after <marker>, or the hooks directory itself when it is not the one
+# recorded in <marker> by `run-verify-command --mark-hooks`, for a hooks directory in the git directory
+# (.git/hooks) or outside the working tree. Neither the tree listing nor
+# rp_ignored_changed_since looks there, a resolver's Edit can rewrite an
+# existing executable hook, and the verify command's own git calls (a checkout
+# or commit in its tests) run hooks; the commit step disables them instead
+# (rp_hooks_untracked returns 4). In an in-tree hooks directory only a
+# symlinked hook whose target lies outside the tree or in the git directory is
+# judged (by that target):
+# the tree listing and the ignored-file walk cover the rest. Every config file
+# Git reads (including included files, and conditional includes whose
+# condition is false now) counts as a hit when written after <marker>,
+# whatever it holds now (a repointed or removed core.hooksPath). Only the directory's
+# top-level entries count, since those are what Git runs; a symlinked hook is
+# judged by its target (find -L) and by every link on its way
+# (rp_path_link_newer), as are the hooks directory and each config file, and a
+# *.sample is never run. Writes one
+# NUL-terminated absolute path per hit to <hitsfile>. Returns 0 when nothing
+# changed, 1 on a hit, 2 when the check cannot tell (fail closed), matching
+# rp_ignored_changed_since.
+rp_hooks_changed_since() {
+    local marker="$1" hitsfile="$2" safe
+    [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
+    safe=$(yr_walk_path) || return 2
+    (
+        PATH=$safe
+        hash -r 2>/dev/null || true
+        local top hp gitdir
+        : >|"$hitsfile" || exit 2
+        top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
+        cd -- "$top" 2>/dev/null || exit 2
+        top=$(pwd -P) || exit 2
+        hp=$(yr_git rev-parse --git-path hooks 2>/dev/null && printf x) || exit 2
+        hp="${hp%x}"
+        hp="${hp%$'\n'}"
+        [ -n "$hp" ] || exit 2
+        # The effective directory, compared with the one --mark-hooks wrote
+        # into the marker when the run started (a config edit, an emptied
+        # include or a retargeted link all change it). A marker without the
+        # record falls back to the mtime checks below.
+        local now tag want
+        now=$(rp_hooks_dir_state) || exit 2
+        { IFS= read -r tag && IFS= read -r want; } <"$marker" 2>/dev/null || tag=""
+        if [ "$tag" = yellow-review-hooks-v1 ] && [ "$now" != "$want" ]; then
+            printf '%s\0' "$hp" >|"$hitsfile" || exit 2
+            exit 1
+        fi
+        # A symlink on the way to the hooks directory, retargeted at an older
+        # directory of hooks, shows only in its own mtime.
+        local rc=0
+        if [ "$now" != none ]; then
+            rp_path_link_newer "$hp" "$marker" || rc=$?
+            case "$rc" in
+                0) printf '%s\0' "$hp" >|"$hitsfile" || exit 2; exit 1 ;;
+                1) ;;
+                *) exit 2 ;;
+            esac
+            hp=$(cd -P -- "$hp" 2>/dev/null && pwd -P) || exit 2
+        fi
+        # A config edit can repoint core.hooksPath at a directory of hooks
+        # older than the marker, which no hook mtime flags. Every config file
+        # Git could read (rp_config_paths) counts when written after the
+        # marker, and one --mark-hooks saw that is gone now counts too: Git
+        # skips a missing include, so a deleted dormant includeIf target
+        # moves hooks after a branch switch.
+        local c cfgs=() paths links=""
+        paths=$(mktemp) || exit 2
+        trap 'rm -f -- "$paths" ${links:+"$links"}' EXIT
+        rp_config_paths "$top" >|"$paths" || exit 2
+        local line=0
+        while IFS= read -r c; do
+            line=$((line + 1))
+            [ "$line" -gt 2 ] || continue
+            [ "$tag" = yellow-review-hooks-v1 ] || break
+            # A dangling link counts as gone: Git skips it like a missing file.
+            [ -e "$c" ] || cfgs+=("$c")
+        done <"$marker"
+        while IFS= read -r -d '' c; do
+            # A symlink on the way to the config counts by its own mtime too:
+            # one retargeted at an older file leaves the target's unchanged.
+            if ! { [ -e "$c" ] && [ "$c" -nt "$marker" ]; }; then
+                rc=0
+                rp_path_link_newer "$c" "$marker" || rc=$?
+                case "$rc" in 0) ;; 1) continue ;; *) exit 2 ;; esac
+            fi
+            rp_in_list "$c" ${cfgs[@]+"${cfgs[@]}"} && continue
+            cfgs+=("$c")
+        done <"$paths"
+        # Any changed config counts, whatever it holds now: what it set or
+        # included before the edit, or what a branch switch in the verify
+        # command makes Git read, decides which hooks run.
+        if [ "${#cfgs[@]}" -gt 0 ]; then
+            printf '%s\0' "${cfgs[@]}" >|"$hitsfile" || exit 2
+            exit 1
+        fi
+        # Git runs no hook from a path that is not a directory (/dev/null).
+        [ "$now" != none ] || exit 0
+        gitdir=$(yr_git rev-parse --git-common-dir 2>/dev/null) || exit 2
+        gitdir=$(cd -P -- "$gitdir" 2>/dev/null && pwd -P) || exit 2
+        case "$hp" in
+            "$gitdir"|"$gitdir"/*) ;;
+            "$top"|"$top"/*)
+                # In-tree files are covered by the tree listing and the
+                # ignored-file walk, but a tracked symlinked hook whose target
+                # lies outside the tree is not: an edit through it leaves the
+                # link unchanged. Judge only those targets.
+                local l t
+                links=$(mktemp) || exit 2
+                find -P "$hp" -mindepth 1 -maxdepth 1 -type l ! -name '*.sample' -print0 >|"$links" 2>/dev/null || exit 2
+                while IFS= read -r -d '' l; do
+                    t=$(yr_canon_path "$l") || exit 2
+                    # The git directory counts as outside: neither listing
+                    # looks there.
+                    case "$t" in
+                        "$gitdir"|"$gitdir"/*) ;;
+                        *) yr_inside_root "$t" "$top" && continue ;;
+                    esac
+                    rc=0
+                    rp_path_link_newer "$l" "$marker" || rc=$?
+                    case "$rc" in
+                        0) printf '%s\0' "$l" >>"$hitsfile"; continue ;;
+                        1) ;;
+                        *) exit 2 ;;
+                    esac
+                    [ -e "$t" ] || continue
+                    [ "$t" -nt "$marker" ] && printf '%s\0' "$l" >>"$hitsfile"
+                done <"$links"
+                [ -s "$hitsfile" ] && exit 1
+                exit 0
+                ;;
+        esac
+        find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -newer "$marker" -print0 >|"$hitsfile" 2>/dev/null || exit 2
+        # A symlinked hook also counts when a link on its way is newer: one
+        # retargeted at an older executable leaves the target's time unchanged.
+        local l
+        links=$(mktemp) || exit 2
+        find -P "$hp" -mindepth 1 -maxdepth 1 -type l ! -name '*.sample' -print0 >|"$links" 2>/dev/null || exit 2
+        while IFS= read -r -d '' l; do
+            rc=0
+            rp_path_link_newer "$l" "$marker" || rc=$?
+            case "$rc" in
+                0) printf '%s\0' "$l" >>"$hitsfile" ;;
+                1) ;;
+                *) exit 2 ;;
+            esac
+        done <"$links"
+        [ -s "$hitsfile" ] && exit 1
+        exit 0
+    )
+}
+
 # rp_assert_only_listed <changes-file> [path...]: succeeds when every path in
 # the NUL-delimited <changes-file> is one of the listed paths. Otherwise
 # prints the first unlisted path and returns 1.
