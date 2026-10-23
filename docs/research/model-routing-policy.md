@@ -70,6 +70,18 @@ how to check what actually ran, and how to roll a choice back.
 | `yellow-council` claude-reviewer | inherit | Stands for the lead session's model lineage in the council |
 | `yellow-devin` devin-orchestrator | inherit | Plan, implement and review loop that acts for the lead session |
 
+Phase 2 verdicts (CLAUDE-163; replay eval on 2026-10-22 with
+`scripts/eval/model-swap/fixtures/2026-10-22-haiku-phase2.json`):
+
+| Agent | Model / effort | Reason |
+| --- | --- | --- |
+| `yellow-review` comment-analyzer | haiku / medium | 8/8 planted comment defects, same as Sonnet. At `low` it missed a planted P1 and vouched for it |
+| `yellow-review` project-standards-reviewer | haiku / medium | 8/8 planted standards violations against Sonnet's 6/8, and found three real doc errors Sonnet missed |
+| `yellow-debt` complexity-scanner | haiku / low | Same golden recall as Sonnet (10/18) with no false positives, at about a tenth of the cost |
+
+Haiku took 3–4× the turns, about 2.5× the wall time. Both reviewers run in the
+background during `/review:pr`, so check review latency on the first real runs.
+
 Non-agent pins:
 
 - **Compound drain:** the SessionStart drain runs `claude -p --model haiku`.
@@ -81,7 +93,7 @@ Non-agent pins:
 - **CI:** both claude-code-action workflows pass `claude_args: '--model
   sonnet'`. The action's `model:` input is deprecated.
 
-The 36 sonnet agents that still pin a model without `effort:` (V5's current
+The 34 sonnet agents that still pin a model without `effort:` (V5's current
 output) are a Phase 2 sweep. `knowledge-compounder` is allowlisted:
 orchestration only, with the heavy work in its sub-agents.
 
@@ -212,8 +224,9 @@ PRs and against a lizard golden set for scanners. Candidates:
 
 - **Sonnet → Haiku:**
   - scan-verifier, after `/semgrep:fix` handles a refused verifier.
-  - comment-analyzer, project-standards-reviewer, git-history-analyzer.
-  - The complexity, duplication and ai-pattern scanners.
+  - git-history-analyzer (comment-analyzer and project-standards-reviewer
+    passed; see "Phase 2 verdicts").
+  - The duplication and ai-pattern scanners (complexity-scanner passed).
   - staging-promoter.
   - test-runner.
   - codex-reviewer and codex-analyst, after 5 of 5 contract checks and the

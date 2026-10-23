@@ -1,7 +1,8 @@
 ---
 name: comment-analyzer
 description: "Conditional code-review persona, selected when the diff contains doc-comment markers (/**, triple-quoted docstrings, doc annotations) or modifies .md documentation. Verifies comments accurately reflect the code they describe and flags comment rot."
-model: sonnet
+model: haiku
+effort: medium
 background: true
 memory: project
 tools:
