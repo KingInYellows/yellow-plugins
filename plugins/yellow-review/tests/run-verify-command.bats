@@ -2906,6 +2906,31 @@ mark_hooks() {
   [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
 }
 
+@test "--ignored-since refuses a dormant includeIf config deleted after --mark-hooks" {
+  hooks_fixture
+  printf '[core]\n\thooksPath = /dev/null\n' >| "$BATS_TEST_TMPDIR/branch.cfg"
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/branch.cfg"
+  touch -t 201901010000 .git/config "$BATS_TEST_TMPDIR/branch.cfg"
+  mark_hooks
+  grep -qxF "$BATS_TEST_TMPDIR/branch.cfg" "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  # Git skips a missing include, so the other branch would run .git/hooks.
+  rm -f "$BATS_TEST_TMPDIR/branch.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"branch.cfg"* ]]
+}
+
+@test "--ignored-since passes an include that was already missing at --mark-hooks" {
+  hooks_fixture
+  git config includeIf.onbranch:other.path "$BATS_TEST_TMPDIR/never.cfg"
+  touch -t 201901010000 .git/config
+  mark_hooks
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+}
+
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {
   hooks_fixture
   printf '#!/bin/sh\n' >| .git/hooks/pre-rebase.sample

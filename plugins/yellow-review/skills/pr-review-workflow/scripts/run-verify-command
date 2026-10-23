@@ -59,9 +59,11 @@
 #                  starts: write the effective git hooks directory into the
 #                  marker. The --ignored-since guard then refuses when the
 #                  directory Git would run hooks from is a different one (an
-#                  edited or emptied config, a retargeted link). Prints nothing
-#                  and exits 0, or 2 when the directory cannot be judged (a
-#                  control character in core.hooksPath).
+#                  edited or emptied config, a retargeted link), and it lists
+#                  the git config files that exist, so the guard refuses when
+#                  one is deleted. Prints nothing and exits 0, or 2 when the
+#                  directory or the files cannot be judged (a control
+#                  character in core.hooksPath or a config name).
 #   --revert-only: run nothing; save the patch and revert the listed files
 #                  (result "reverted"). Deny-listed paths may be reverted. A
 #                  listed file without changes is skipped and named in
@@ -1071,7 +1073,18 @@ check_hooks_since_marker() {
 
 if [ "$MODE" = mark-hooks ]; then
     HOOKS_STATE=$(rp_hooks_dir_state) || die 2 "cannot judge the git hooks directory (a control character in core.hooksPath?); refusing to mark"
-    printf 'yellow-review-hooks-v1\n%s\n' "$HOOKS_STATE" >|"$IGNORED_SINCE" || die 2 "cannot write the marker: $IGNORED_SINCE"
+    # The config files that exist now, so the guard can tell a deleted one
+    # from an include that was never there.
+    MARK_TOP=$(yr_git rev-parse --show-toplevel 2>/dev/null) || die 2 "cannot find the repository's top directory; refusing to mark"
+    MARK_CFGS=$(mktemp) || die 2 "mktemp failed"
+    ( cd -- "$MARK_TOP" && rp_config_paths "$(pwd -P)" ) >|"$MARK_CFGS" || { rm -f -- "$MARK_CFGS"; die 2 "cannot list the git config files (a control character in a name, or more than 64 includes?); refusing to mark"; }
+    {
+        printf 'yellow-review-hooks-v1\n%s\n' "$HOOKS_STATE"
+        while IFS= read -r -d '' c; do
+            if [ -e "$c" ]; then printf '%s\n' "$c" || exit 1; fi
+        done <"$MARK_CFGS"
+    } >|"$IGNORED_SINCE" || { rm -f -- "$MARK_CFGS"; die 2 "cannot write the marker: $IGNORED_SINCE"; }
+    rm -f -- "$MARK_CFGS"
     exit 0
 fi
 

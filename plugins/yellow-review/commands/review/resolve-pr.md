@@ -256,8 +256,9 @@ touch "$MARK_DIR/ignored-marker" || { rm -rf -- "$MARK_DIR"; exit 1; }
 printf '%s\n' "$MARK_DIR"
 ```
 
-`--mark-hooks` records the git hooks directory in the marker, so the guard
-refuses when a resolver changed which directory Git runs hooks from.
+`--mark-hooks` records the git hooks directory and the git config files in the
+marker, so the guard refuses when a resolver changed which directory Git runs
+hooks from or deleted a config file.
 
 The trailing `/` is stripped first (macOS sets `TMPDIR` with one), so the
 printed path has the single-slash prefix Step 6 checks.

@@ -241,7 +241,8 @@ flags, exit codes, trust-boundary rules and library behavior.
   entries; `--check-ignored --ignored-since <marker-file>` runs only the
   gitignored-file guard, for a resolve with no verify command;
   `--mark-hooks --ignored-since <marker-file>` writes the effective git hooks
-  directory into a fresh marker, so the guard refuses when it changes.
+  directory and the git config files that exist into a fresh marker, so the
+  guard refuses when the directory changes or one of those files is deleted.
   `/review:resolve-stack` and `/review:sweep-all` run it after a dirty resolve
   only when every dirty path is owned by the run (a PR file or trusted-config
   path); otherwise they run `--revert-denied --no-ignored-guard`, which reverts

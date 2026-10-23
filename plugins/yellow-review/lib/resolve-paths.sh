@@ -2443,6 +2443,96 @@ rp_path_link_newer() {
     return 1
 }
 
+# rp_config_paths <top>: every config file Git could read here, one
+# NUL-terminated absolute path each, missing ones included: the repository's
+# config and config.worktree, the global and system files, every file
+# --show-origin names, and every include.path and includeIf.*.path reached
+# from those, whether its condition holds now or not (a verify command that
+# switches branches makes Git read it). Returns 2 when it cannot tell (a
+# control character in a name, a git failure, or more than 64 includes).
+rp_config_paths() {
+    local top="$1"
+    (
+        local c origins rec n=0 rc
+        origins=$(mktemp) || exit 2
+        trap 'rm -f -- "$origins"' EXIT
+        yr_git config --list --show-origin --includes -z >|"$origins" 2>/dev/null || exit 2
+        for c in config config.worktree; do
+            c=$(yr_git rev-parse --git-path "$c" 2>/dev/null) || exit 2
+            printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
+        done
+        # The global and system files too: one emptied of a dormant includeIf
+        # drops out of --show-origin, and nothing includes it. git var names
+        # them on Git 2.42 and later; the defaults cover older ones. A device
+        # such as GIT_CONFIG_GLOBAL=/dev/null holds no config.
+        local roots v
+        # A newline would split one name in two below: refuse control
+        # characters in every value the names come from.
+        for v in "${GIT_CONFIG_GLOBAL-}" "${GIT_CONFIG_SYSTEM-}" "${HOME-}" "${XDG_CONFIG_HOME-}"; do
+            case "$v" in *[[:cntrl:]]*) exit 2 ;; esac
+        done
+        roots=$(
+            yr_git var GIT_CONFIG_GLOBAL 2>/dev/null
+            yr_git var GIT_CONFIG_SYSTEM 2>/dev/null
+            if [ -n "${GIT_CONFIG_GLOBAL+x}" ]; then
+                printf '%s\n' "$GIT_CONFIG_GLOBAL"
+            elif [ -n "${HOME:-}" ]; then
+                printf '%s\n' "$HOME/.gitconfig" "${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
+            fi
+            case "${GIT_CONFIG_NOSYSTEM:-}" in
+                ''|0|false|no|off) printf '%s\n' "${GIT_CONFIG_SYSTEM:-/etc/gitconfig}" ;;
+            esac
+        )
+        while IFS= read -r c; do
+            # yr_check_git_env has already refused a relative
+            # GIT_CONFIG_GLOBAL or GIT_CONFIG_SYSTEM.
+            case "$c" in /*) ;; *) continue ;; esac
+            [ ! -e "$c" ] || [ -f "$c" ] || continue
+            printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
+        done <<EOF_ROOTS
+$roots
+EOF_ROOTS
+        local queue=() seen=() i=0 inc d nin=0
+        while IFS= read -r -d '' rec; do
+            n=$((n + 1))
+            [ $((n % 2)) = 1 ] || continue
+            case "$rec" in file:*) c="${rec#file:}" ;; *) continue ;; esac
+            case "$c" in /*) ;; *) c="$top/$c" ;; esac
+            queue+=("$c")
+        done <"$origins"
+        while [ "$i" -lt "${#queue[@]}" ]; do
+            c="${queue[$i]}"
+            i=$((i + 1))
+            rp_in_list "$c" ${seen[@]+"${seen[@]}"} && continue
+            seen+=("$c")
+            if [ -f "$c" ]; then
+                d=$(dirname -- "$c") || exit 2
+                yr_git config --file "$c" -z --type=path --get-regexp '^include(if\..*)?\.path$' >|"$origins" 2>/dev/null
+                rc=$?
+                [ "$rc" = 0 ] || [ "$rc" = 1 ] || exit 2
+                while IFS= read -r -d '' rec; do
+                    inc="${rec#*$'\n'}"
+                    [ "$inc" != "$rec" ] && [ -n "$inc" ] || continue
+                    # --type=path has expanded ~/, ~user/ and %(prefix)/.
+                    case "$inc" in
+                        *[[:cntrl:]]*) exit 2 ;;
+                        /*) ;;
+                        *) inc="$d/$inc" ;;
+                    esac
+                    queue+=("$inc")
+                    # Spelling a self-include differently each pass
+                    # (sub/../x.cfg) would loop forever: past Git's own
+                    # include depth (10) and breadth the walk cannot tell.
+                    nin=$((nin + 1))
+                    [ "$nin" -le 64 ] || exit 2
+                done <"$origins"
+            fi
+            case "$c" in *[[:cntrl:]]*) exit 2 ;; esac
+            printf '%s\0' "$c" || exit 2
+        done
+    )
+}
+
 # rp_in_list <word> [item...]: succeeds when <word> equals one of the items.
 rp_in_list() {
     local w="$1" x
@@ -2515,88 +2605,22 @@ rp_hooks_changed_since() {
         fi
         # A config edit can repoint core.hooksPath at a directory of hooks
         # older than the marker, which no hook mtime flags. Every config file
-        # Git read (the repository's config and config.worktree, the global
-        # and system files and any file they include) counts when written
-        # after the marker. --show-origin -z prints origin NUL key-and-value
-        # NUL.
-        local c cfgs=() origins rec n=0 links=""
-        origins=$(mktemp) || exit 2
-        trap 'rm -f -- "$origins" ${links:+"$links"}' EXIT
-        yr_git config --list --show-origin --includes -z >|"$origins" 2>/dev/null || exit 2
-        for c in config config.worktree; do
-            c=$(yr_git rev-parse --git-path "$c" 2>/dev/null) || exit 2
-            printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
-        done
-        # The global and system files too: one emptied of a dormant includeIf
-        # drops out of --show-origin, and nothing includes it. git var names
-        # them on Git 2.42 and later; the defaults cover older ones. A device
-        # such as GIT_CONFIG_GLOBAL=/dev/null holds no config.
-        local roots v
-        # A newline would split one name in two below: refuse control
-        # characters in every value the names come from.
-        for v in "${GIT_CONFIG_GLOBAL-}" "${GIT_CONFIG_SYSTEM-}" "${HOME-}" "${XDG_CONFIG_HOME-}"; do
-            case "$v" in *[[:cntrl:]]*) exit 2 ;; esac
-        done
-        roots=$(
-            yr_git var GIT_CONFIG_GLOBAL 2>/dev/null
-            yr_git var GIT_CONFIG_SYSTEM 2>/dev/null
-            if [ -n "${GIT_CONFIG_GLOBAL+x}" ]; then
-                printf '%s\n' "$GIT_CONFIG_GLOBAL"
-            elif [ -n "${HOME:-}" ]; then
-                printf '%s\n' "$HOME/.gitconfig" "${XDG_CONFIG_HOME:-$HOME/.config}/git/config"
-            fi
-            case "${GIT_CONFIG_NOSYSTEM:-}" in
-                ''|0|false|no|off) printf '%s\n' "${GIT_CONFIG_SYSTEM:-/etc/gitconfig}" ;;
-            esac
-        )
+        # Git could read (rp_config_paths) counts when written after the
+        # marker, and one --mark-hooks saw that is gone now counts too: Git
+        # skips a missing include, so a deleted dormant includeIf target
+        # moves hooks after a branch switch.
+        local c cfgs=() paths links=""
+        paths=$(mktemp) || exit 2
+        trap 'rm -f -- "$paths" ${links:+"$links"}' EXIT
+        rp_config_paths "$top" >|"$paths" || exit 2
+        local line=0
         while IFS= read -r c; do
-            # yr_check_git_env has already refused a relative
-            # GIT_CONFIG_GLOBAL or GIT_CONFIG_SYSTEM.
-            case "$c" in /*) ;; *) continue ;; esac
-            [ ! -e "$c" ] || [ -f "$c" ] || continue
-            printf 'file:%s\0\0' "$c" >>"$origins" || exit 2
-        done <<EOF_ROOTS
-$roots
-EOF_ROOTS
-        local queue=() seen=() i=0 inc d nin=0
-        while IFS= read -r -d '' rec; do
-            n=$((n + 1))
-            [ $((n % 2)) = 1 ] || continue
-            case "$rec" in file:*) c="${rec#file:}" ;; *) continue ;; esac
-            case "$c" in /*) ;; *) c="$top/$c" ;; esac
-            queue+=("$c")
-        done <"$origins"
-        # An include whose condition is false now (includeIf.onbranch) is
-        # not in --show-origin, but a verify command that switches branches
-        # makes Git read it: walk every include.path and includeIf.*.path of
-        # each file, active or not.
-        while [ "$i" -lt "${#queue[@]}" ]; do
-            c="${queue[$i]}"
-            i=$((i + 1))
-            rp_in_list "$c" ${seen[@]+"${seen[@]}"} && continue
-            seen+=("$c")
-            if [ -f "$c" ]; then
-                d=$(dirname -- "$c") || exit 2
-                yr_git config --file "$c" -z --type=path --get-regexp '^include(if\..*)?\.path$' >|"$origins" 2>/dev/null
-                rc=$?
-                [ "$rc" = 0 ] || [ "$rc" = 1 ] || exit 2
-                while IFS= read -r -d '' rec; do
-                    inc="${rec#*$'\n'}"
-                    [ "$inc" != "$rec" ] && [ -n "$inc" ] || continue
-                    # --type=path has expanded ~/, ~user/ and %(prefix)/.
-                    case "$inc" in
-                        *[[:cntrl:]]*) exit 2 ;;
-                        /*) ;;
-                        *) inc="$d/$inc" ;;
-                    esac
-                    queue+=("$inc")
-                    # Spelling a self-include differently each pass
-                    # (sub/../x.cfg) would loop forever: past Git's own
-                    # include depth (10) and breadth the walk cannot tell.
-                    nin=$((nin + 1))
-                    [ "$nin" -le 64 ] || exit 2
-                done <"$origins"
-            fi
+            line=$((line + 1))
+            [ "$line" -gt 2 ] || continue
+            [ "$tag" = yellow-review-hooks-v1 ] || break
+            [ -e "$c" ] || [ -L "$c" ] || cfgs+=("$c")
+        done <"$marker"
+        while IFS= read -r -d '' c; do
             # A symlink on the way to the config counts by its own mtime too:
             # one retargeted at an older file leaves the target's unchanged.
             if ! { [ -e "$c" ] && [ "$c" -nt "$marker" ]; }; then
@@ -2606,7 +2630,7 @@ EOF_ROOTS
             fi
             rp_in_list "$c" ${cfgs[@]+"${cfgs[@]}"} && continue
             cfgs+=("$c")
-        done
+        done <"$paths"
         # Any changed config counts, whatever it holds now: what it set or
         # included before the edit, or what a branch switch in the verify
         # command makes Git read, decides which hooks run.
