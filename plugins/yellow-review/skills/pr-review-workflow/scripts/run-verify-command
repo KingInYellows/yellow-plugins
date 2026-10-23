@@ -1039,8 +1039,9 @@ note_shared_store() {
     fi
 }
 
-# The hooks directory in .git (or outside the tree) is not in either listing,
-# and a hook a resolver rewrote runs on the next git command (CLAUDE-60). The
+# The hooks directory in .git (or outside the tree) and the repository's git
+# config are not in either listing, and a hook a resolver rewrote or pointed
+# core.hooksPath at runs on the next git command (CLAUDE-60). The
 # refusal reuses the ignored-file wording, so callers route it to the same
 # ignored-file stop: neither has a HEAD copy to restore.
 check_hooks_since_marker() {
@@ -1049,7 +1050,7 @@ check_hooks_since_marker() {
     rp_hooks_changed_since "$IGNORED_SINCE" "$hits" || rc=$?
     case "$rc" in
         0) rm -f -- "$hits" ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (git hooks outside the tracked tree; a resolver may have edited a hook)$1: $(safe_path_list_z <"$hits")" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (git hooks or git config outside the tracked tree; a resolver may have edited a hook or repointed core.hooksPath)$1: $(safe_path_list_z <"$hits")" ;;
         *) die 2 "cannot check the git hooks directory against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 }

@@ -33,7 +33,9 @@
 #             a tampered state, copy or hash is refused before the live config
 #             is touched. Every exit 4 ends with one `snapshot kept at` line
 #             the caller prints as is: after `restore failed:` it says to
-#             recover the config from the snapshot by hand; after
+#             recover the config from the snapshot by hand (or, when the
+#             config did not exist at snapshot time, to move aside what now
+#             stands there); after
 #             `snapshot invalid:` it says to keep the snapshot for
 #             investigation only, since its bytes are not trusted.
 #   clear:    remove the snapshot directory.
@@ -254,6 +256,7 @@ case "$CMD" in
         fi
         changed=0
         failed=0
+        failed_copy=0
         i=0
         for rel in "${GUARDED[@]}"; do
             p="$TOP/$rel"
@@ -263,13 +266,20 @@ case "$CMD" in
                 restore_entry "$i" "$p"
                 if ! same_as_snapshot "$i" "$p"; then
                     failed=1
+                    [ "$(cat -- "$SNAP/state.$i")" = absent ] || failed_copy=1
                     printf 'restore failed: %s\n' "$rel"
                 fi
             fi
             i=$((i + 1))
         done
         if [ "$failed" = 1 ]; then
-            printf 'snapshot kept at %s (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "%s")\n' "$SNAP" "$SNAP"
+            # An absent snapshot holds no copy to recover from: the path did
+            # not exist before the run.
+            if [ "$failed_copy" = 1 ]; then
+                printf 'snapshot kept at %s (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "%s")\n' "$SNAP" "$SNAP"
+            else
+                printf 'snapshot kept at %s (yellow-plugins.local.md did not exist before the run: move aside what now stands there by hand, then run guard-local-config clear "%s")\n' "$SNAP" "$SNAP"
+            fi
             exit 4
         fi
         [ "$changed" = 0 ] || exit 3

@@ -324,6 +324,8 @@ snap() {
   [ "$(cat "$CFG/work/notes.txt")" = precious ]
   # the snapshot stays, so a later run can still recover
   [ -d "$SNAP" ]
+  # The config was absent at snapshot time, so there is no copy to recover.
+  [ "${lines[-1]}" = "snapshot kept at $SNAP (yellow-plugins.local.md did not exist before the run: move aside what now stands there by hand, then run guard-local-config clear \"$SNAP\")" ]
 }
 
 @test "a directory replacing a snapshotted config is kept too, and the snapshot copy is untouched" {

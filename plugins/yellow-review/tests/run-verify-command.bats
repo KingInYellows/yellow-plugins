@@ -2511,6 +2511,8 @@ hooks_fixture() {
   printf '#!/bin/sh\necho original\n' >| .git/hooks/post-checkout
   chmod +x .git/hooks/post-checkout
   touch -t 201901010000 .git/hooks/post-checkout
+  # The repository's config predates the run, as in a real one.
+  touch -t 201901010000 .git/config
 }
 
 @test "--check-ignored refuses a .git/hooks hook rewritten after the marker and names it" {
@@ -2552,10 +2554,26 @@ hooks_fixture() {
   [[ "$stderr" == *".git/hooks/pre-push"* ]]
 }
 
+@test "--ignored-since refuses a .git/hooks link retargeted at an older executable" {
+  hooks_fixture
+  printf '#!/bin/sh\necho original\n' >| "$BATS_TEST_TMPDIR/hook-a"
+  printf '#!/bin/sh\necho pwned\n' >| "$BATS_TEST_TMPDIR/hook-b"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/hook-a" "$BATS_TEST_TMPDIR/hook-b"
+  ln -s "$BATS_TEST_TMPDIR/hook-a" .git/hooks/pre-push
+  touch -h -t 201901010000 .git/hooks/pre-push
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  ln -sfn "$BATS_TEST_TMPDIR/hook-b" .git/hooks/pre-push
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *".git/hooks/pre-push"* ]]
+}
+
 @test "--ignored-since refuses a hook rewritten in a hooks directory outside the tree" {
   hooks_fixture
   mkdir -p "$BATS_TEST_TMPDIR/ext-hooks"
   git config core.hooksPath "$BATS_TEST_TMPDIR/ext-hooks"
+  touch -t 201901010000 .git/config
   printf '#!/bin/sh\necho pwned\n' >| "$BATS_TEST_TMPDIR/ext-hooks/pre-commit"
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 2 ]
@@ -2571,6 +2589,7 @@ hooks_fixture() {
   git add .githooks/pre-commit
   git commit -q -m 'tracked hook link' -- .githooks/pre-commit
   git config core.hooksPath .githooks
+  touch -t 201901010000 .git/config
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
   # A write through the link leaves the tracked link itself unchanged.
@@ -2589,6 +2608,7 @@ hooks_fixture() {
   git add .githooks/post-checkout
   git commit -q -m 'tracked hook link into .git' -- .githooks/post-checkout
   git config core.hooksPath .githooks
+  touch -t 201901010000 .git/config
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
   printf '#!/bin/sh\necho pwned\n' >| .git/hooks/post-checkout
@@ -2596,6 +2616,23 @@ hooks_fixture() {
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *".githooks/post-checkout"* ]]
+}
+
+@test "--ignored-since refuses a core.hooksPath repointed after the marker at older hooks" {
+  hooks_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/old-hooks"
+  printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/hooked"\n' >| "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  chmod +x "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/old-hooks/pre-commit"
+  git config core.hooksPath "$BATS_TEST_TMPDIR/old-hooks"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored files changed since the --ignored-since marker (git hooks"* ]]
+  [[ "$stderr" == *".git/config"* ]]
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/hooked" ]
 }
 
 @test "--ignored-since passes older hooks, newer .sample files and a non-directory hooks path" {

@@ -2390,9 +2390,12 @@ rp_hooks_untracked() {
 # (rp_hooks_untracked returns 4). In an in-tree hooks directory only a
 # symlinked hook whose target lies outside the tree or in the git directory is
 # judged (by that target):
-# the tree listing and the ignored-file walk cover the rest. Only the directory's
+# the tree listing and the ignored-file walk cover the rest. The repository's
+# config and config.worktree count as hits when written after <marker> while
+# the effective directory holds a hook (a repointed core.hooksPath). Only the directory's
 # top-level entries count, since those are what Git runs; a symlinked hook is
-# judged by its target (find -L), and a *.sample is never run. Writes one
+# judged by its target (find -L) and by the link itself (find -P), and a
+# *.sample is never run. Writes one
 # NUL-terminated absolute path per hit to <hitsfile>. Returns 0 when nothing
 # changed, 1 on a hit, 2 when the check cannot tell (fail closed), matching
 # rp_ignored_changed_since.
@@ -2414,6 +2417,23 @@ rp_hooks_changed_since() {
         # Git runs no hook from a path that is not a directory (/dev/null).
         [ -d "$hp" ] || exit 0
         hp=$(cd -P -- "$hp" 2>/dev/null && pwd -P) || exit 2
+        # An edit to the repository's own config can repoint core.hooksPath
+        # at a directory of hooks older than the marker, which no hook mtime
+        # flags. A config written after the marker counts when the effective
+        # directory holds a hook Git would run.
+        local c cfgs=() any
+        for c in config config.worktree; do
+            c=$(yr_git rev-parse --git-path "$c" 2>/dev/null) || exit 2
+            case "$c" in /*) ;; *) c="$top/$c" ;; esac
+            [ -e "$c" ] && [ "$c" -nt "$marker" ] && cfgs+=("$c")
+        done
+        if [ "${#cfgs[@]}" -gt 0 ]; then
+            any=$(find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -print -quit 2>/dev/null) || exit 2
+            if [ -n "$any" ]; then
+                printf '%s\0' "${cfgs[@]}" >|"$hitsfile" || exit 2
+                exit 1
+            fi
+        fi
         gitdir=$(yr_git rev-parse --git-common-dir 2>/dev/null) || exit 2
         gitdir=$(cd -P -- "$gitdir" 2>/dev/null && pwd -P) || exit 2
         case "$hp" in
@@ -2442,7 +2462,11 @@ rp_hooks_changed_since() {
                 exit 0
                 ;;
         esac
-        find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -newer "$marker" -print0 >|"$hitsfile" 2>/dev/null || exit 2
+        # A symlinked hook counts when its target or the link itself is newer:
+        # a link retargeted at an older executable leaves the target's time
+        # unchanged.
+        { find -L "$hp" -mindepth 1 -maxdepth 1 ! -type d ! -name '*.sample' -newer "$marker" -print0 \
+            && find -P "$hp" -mindepth 1 -maxdepth 1 -type l ! -name '*.sample' -newer "$marker" -print0; } >|"$hitsfile" 2>/dev/null || exit 2
         [ -s "$hitsfile" ] && exit 1
         exit 0
     )
