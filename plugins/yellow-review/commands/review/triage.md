@@ -257,13 +257,14 @@ offered.
 
 If any Apply or Restore changed files, commit and submit exactly as
 `review-pr.md` Step 9 does: the push confirmation, the
-`stack-provider-router` resolution, the provider's own commit and submit
-commands, and the commit message
-`fix: address review-ledger findings for PR #<n>`. Around those commands,
+`stack-provider-router` resolution, the `commit-resolve-fixes` call (with the
+files Apply or Restore changed, `--unattended` in unattended mode) and its
+result handling, and the commit message
+`fix: address review-ledger findings for PR #<n>`. Around that call,
 Read `${CLAUDE_PLUGIN_ROOT}/references/review-pr/ledger.md` and run its
-"Step 9" items 1 and 2 with `--actor triage`: `--fix-sha` after the commit,
-then `remote-head`, `--published-head` and `settle` once submission
-succeeds. If the Read fails, stop and report the path. A declined or failed
+"Step 9" items 1 and 2 with `--actor triage`: `--fix-sha` once the commit
+exists, then `remote-head`, `--published-head` and `settle` once it reports
+`PUSHED`. If the Read fails, stop and report the path. A declined or failed
 push leaves the fixes `applied`, which still counts as pending.
 
 ## Step 9: Report

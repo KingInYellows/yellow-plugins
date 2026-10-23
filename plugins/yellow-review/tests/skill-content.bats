@@ -192,6 +192,32 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   grep -q 'headRefOid,baseRefOid' "$REVIEW_ALL"
 }
 
+# --- staged new-commit fixes (CLAUDE-54) --------------------------------------
+# `gt modify -m` amends and renames the branch's last commit and silently skips
+# unstaged edits, so every review command commits through commit-resolve-fixes.
+
+@test "review-pr Step 9 commits through commit-resolve-fixes, never an amend" {
+  step9=$(sed -n '/^### Step 9: Commit and Push/,/^### Steps 9a + 9b/p' "$REVIEW_PR")
+  printf '%s\n' "$step9" | grep -qF 'skills/pr-review-workflow/scripts/commit-resolve-fixes" --provider "<graphite|github>" --pr "<PR#>"'
+  printf '%s\n' "$step9" | grep -qF -- '--files-from "<files-file>"'
+  printf '%s\n' "$step9" | grep -qF -- '`--unattended` in non-interactive mode'
+  [ -z "$(printf '%s\n' "$step9" | grep -E 'gt modify( -m|$)|^git (add|commit)')" ]
+}
+
+@test "review-all and triage reuse review-pr's commit-resolve-fixes call" {
+  step11=$(sed -n '/^11\. \*\*Commit + submit\*\*/,/^12\. \*\*Resolve\*\*/p' "$REVIEW_ALL")
+  printf '%s\n' "$step11" | grep -qF 'run `commit-resolve-fixes`'
+  [ -z "$(printf '%s\n' "$step11" | grep -E 'gt modify|git commit')" ]
+  TRIAGE="$COMMANDS_DIR/triage.md"
+  grep -qF 'the `commit-resolve-fixes` call' "$TRIAGE"
+}
+
+@test "ledger Step 9 records the fix SHA from the script result" {
+  step9=$(sed -n '/^## Step 9 — fix SHA/,/^## Step 10/p' "$LEDGER_REF")
+  printf '%s\n' "$step9" | grep -qF -- '--fix-sha "<FIX_SHA>"'
+  printf '%s\n' "$step9" | grep -qF 'exits 5 or 6'
+}
+
 @test "ledger: the dismissed block is injected unchanged and skipped in legacy mode" {
   grep -q '^8\. The dismissed-findings block from Step 3e' "$REVIEW_PR"
   tr '\n' ' ' <"$LEDGER_REF" | grep -q 'Do not rebuild or reformat the block'
