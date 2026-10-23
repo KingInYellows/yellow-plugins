@@ -216,6 +216,7 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   grep -qF 'the `commit-resolve-fixes` call' "$TRIAGE"
   grep -qF -- '--check-paths` pre-check' "$TRIAGE"
   grep -qF 'refuses a detached HEAD' "$TRIAGE"
+  grep -qF '[ "$cur_ref" = "$head_ref" ]' "$TRIAGE"
   grep -qF -- 'same `--check-paths`' "$REVIEW_ALL"
 }
 
