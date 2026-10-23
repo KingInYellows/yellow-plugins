@@ -85,8 +85,8 @@ That refusal is the control: the owner, not the agent, widens what the agent may
 do. `/jules:authorize --list` shows grants and what each has used;
 `--revoke <grant-id>` ends one immediately.
 
-Revocation, expiry and outside activity are honoured up to the moment a write
-is dispatched: they are re-checked immediately before the vendor call, but not
+Revocation, expiry and outside activity are honoured up to the moment a write is
+dispatched: they are re-checked immediately before the vendor call, but not
 after it, and a change landing in the instant between that check and the call
 does not stop it.
 
@@ -104,8 +104,14 @@ decision — `no-change`, `check-failed`, `pass-aborted`, `needs-plan-review`,
 may make at most one `reply` or `approve`, under the grant. A user message that
 is none of the plugin's own, or a plan that changed under an evaluation,
 **pauses** the session until you clear it on your terminal
-(`supervise --clear-pause`). Local verification of a finished patch is not
-available yet, so a completed session is never accepted automatically.
+(`supervise --clear-pause`). A recorded policy deviation (an unrequested PR, a
+PR outside the grant's repository, an approval that landed on another plan)
+blocks every write on the session and under its grant until you run `status`,
+inspect the session, and acknowledge it on your terminal
+(`supervise --clear-deviation`). Acknowledging a PR outside the grant's
+repository also revokes the grant, so further work needs a new one from
+`/jules:authorize`. Local verification of a finished patch is not available yet,
+so a completed session is never accepted automatically.
 
 ## Codex
 

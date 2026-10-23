@@ -41,7 +41,7 @@ import * as runtime from './runtime.js';
 import type { RuntimeDeps } from './runtime.js';
 import { JulesSdkAdapter, type SdkModule } from './sdk-adapter.js';
 import { resolveSdk } from './sdk-resolver.js';
-import { clearPause, superviseOnce } from './supervise.js';
+import { clearDeviation, clearPause, superviseOnce } from './supervise.js';
 import { getTestTransport } from './test-seam.js';
 import { validatePositiveInt } from './validate.js';
 
@@ -146,7 +146,8 @@ type OperationResult =
   | Awaited<ReturnType<typeof approve>>
   | Awaited<ReturnType<typeof abandon>>
   | Awaited<ReturnType<typeof superviseOnce>>
-  | Awaited<ReturnType<typeof clearPause>>;
+  | Awaited<ReturnType<typeof clearPause>>
+  | Awaited<ReturnType<typeof clearDeviation>>;
 
 async function dispatch(
   operation: string,
@@ -398,11 +399,30 @@ async function dispatch(
           session: { type: 'string' },
           'grant-id': { type: 'string' },
           'clear-pause': { type: 'boolean', default: false },
+          'clear-deviation': { type: 'boolean', default: false },
           ...deadline,
         },
         strict: true,
         allowPositionals: false,
       });
+      if (
+        values['clear-pause'] === true &&
+        values['clear-deviation'] === true
+      ) {
+        throw new UsageError(
+          '--clear-pause and --clear-deviation are separate confirmations; run one at a time'
+        );
+      }
+      if (values['clear-deviation'] === true) {
+        if (typeof values['grant-id'] === 'string') {
+          throw new UsageError(
+            '--clear-deviation takes only --session; it is confirmed on the terminal, not by a grant'
+          );
+        }
+        return clearDeviation(deps, {
+          session: requireString(values.session, '--session'),
+        });
+      }
       if (values['clear-pause'] === true) {
         if (typeof values['grant-id'] === 'string') {
           throw new UsageError(

@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadGrants } from '../src/authority.js';
 import { authorizeTakeOver } from '../src/authorize.js';
 import { resolveGrantsPath } from '../src/config.js';
-import { controllerFilePath } from '../src/controller.js';
+import {
+  controllerFilePath,
+  takeOverController,
+  takeOverEpoch,
+} from '../src/controller.js';
 import { AdapterError, AppErrorException } from '../src/errors.js';
 import { approve, delegate, reply } from '../src/mutations.js';
 import { approvedPlanVerdict } from '../src/reconcile.js';
@@ -461,6 +465,125 @@ describe('a reservation from an earlier controller epoch', () => {
       reconcile: true,
     });
     expect(later.reconciled?.[0]?.reason ?? '').not.toContain('in flight');
+  });
+});
+
+describe('the take-over marker', () => {
+  async function reserveReply(requestId: string): Promise<void> {
+    const session = await delegateOk(h, grantId);
+    await reserveUnderGrant(h.deps, {
+      grantId,
+      ownerRequestId: session.localRequestId,
+      authority: {
+        repository: 'acme/widgets',
+        sourceResource: 'sources/github/acme/widgets',
+        branch: 'scratch/one',
+        taskRef: 't1',
+        operation: 'reply',
+      },
+      reservation: {
+        localRequestId: requestId,
+        localId: `jl-${'e'.repeat(32)}`,
+        sessionResource: session.sessionResource,
+        promptDigest: 'd'.repeat(64),
+      },
+    });
+  }
+
+  async function setMarker(
+    marker: { at: string; seq: number; epoch?: number } | undefined
+  ): Promise<void> {
+    await withJournalLock(h.dataDir, async () => {
+      const { controllerTakeover: _drop, ...journal } = await readJournal(
+        h.dataDir
+      );
+      await writeJournal(h.dataDir, {
+        ...journal,
+        ...(marker !== undefined ? { controllerTakeover: marker } : {}),
+      });
+    });
+  }
+
+  it('names the epoch the grants are rebound to', async () => {
+    await authorizeTakeOver(h.deps);
+    const epoch = loadGrants(h.dataDir).grants[grantId]?.epochRef.epoch;
+    expect(epoch).toBe(2);
+    expect((await readJournal(h.dataDir)).controllerTakeover?.epoch).toBe(
+      epoch
+    );
+  });
+
+  it('refuses to write a stale epoch when the authority advanced mid take-over', () => {
+    const ctx = { controllerDir: h.controllerDir, controllerId: 'testhost' };
+    const grants = loadGrants(h.dataDir);
+    const epoch = takeOverEpoch(ctx, grants);
+    // Another data directory's take-over advances the shared authority file.
+    const file = controllerFilePath(h.controllerDir, 'testhost');
+    const authority = JSON.parse(fs.readFileSync(file, 'utf8'));
+    fs.writeFileSync(file, JSON.stringify({ ...authority, epoch: epoch + 3 }), {
+      mode: 0o600,
+    });
+    expect(() => takeOverController(ctx, h.dataDir, grants, epoch)).toThrow(
+      /changed during the take-over/
+    );
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).epoch).toBe(epoch + 3);
+  });
+
+  it('a grant rebound without a marker leaves its reservations unaged', async () => {
+    await reserveReply('unmarked-reply');
+    await authorizeTakeOver(h.deps);
+    // A crash in an older runtime: grants rebound, marker never written.
+    await setMarker(undefined);
+    h.deps.clock.time += 60 * 60_000;
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled).toEqual([
+      expect.objectContaining({
+        localRequestId: 'unmarked-reply',
+        outcome: 'not-reached',
+        reason: expect.stringContaining('take-over marker'),
+      }),
+    ]);
+    expect(
+      (await readJournal(h.dataDir)).operations['unmarked-reply']?.status
+    ).toBe('reserved');
+  });
+
+  it('a marker for an earlier epoch than the grant counts as missing', async () => {
+    await reserveReply('stale-marker-reply');
+    await authorizeTakeOver(h.deps);
+    const marker = (await readJournal(h.dataDir)).controllerTakeover!;
+    await setMarker({ ...marker, epoch: 1 });
+    h.deps.clock.time += 60 * 60_000;
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]).toMatchObject({
+      outcome: 'not-reached',
+      reason: expect.stringContaining('take-over marker'),
+    });
+  });
+
+  it('a marker from before epochs were recorded is still honoured', async () => {
+    await reserveReply('legacy-marker-reply');
+    await authorizeTakeOver(h.deps);
+    const { epoch: _epoch, ...legacy } = (await readJournal(h.dataDir))
+      .controllerTakeover!;
+    await setMarker(legacy);
+    h.deps.clock.time += 60 * 60_000;
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]?.reason ?? '').not.toContain(
+      'take-over marker'
+    );
+  });
+
+  it('re-running the take-over restores aging', async () => {
+    await reserveReply('rerun-reply');
+    await authorizeTakeOver(h.deps);
+    await setMarker(undefined);
+    await authorizeTakeOver(h.deps);
+    h.deps.clock.time += 60 * 60_000;
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]?.reason ?? '').not.toContain(
+      'take-over marker'
+    );
   });
 });
 
@@ -1074,6 +1197,63 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect(ops[session.localRequestId]?.deviations).toHaveLength(1);
   });
 
+  it('an acknowledged ambiguous approve stays acknowledged across reconciles; another approve blocks again', async () => {
+    const session = await strandedApprove();
+    const now = h.deps.clock.now();
+    for (const [i, planId] of ['plan-2', 'plan-3'].entries()) {
+      addActivity(h, session.sessionResource, {
+        type: 'planApproved',
+        approvedPlanId: planId,
+        createTime: new Date(now + 1_000 + i * 1_000).toISOString(),
+      });
+    }
+    const owner = session.localRequestId;
+    // Another approve's deviation with the same reason, still open, does not
+    // cover this approve.
+    await updateJournal(h.dataDir, (operations) => {
+      const record = operations[owner]!;
+      operations[owner] = {
+        ...record,
+        deviations: [
+          {
+            kind: 'policy-deviation',
+            reason:
+              'a different plan was approved after an unresolved approve was sent, and it cannot be attributed to that approve',
+            sourceRequestId: 'approve-0',
+            observedAt: new Date(now).toISOString(),
+            reconciled: false,
+          },
+        ],
+      };
+    });
+    await status(h.deps, { session: session.localId, reconcile: true });
+    let deviations = (await readJournal(h.dataDir)).operations[owner]
+      ?.deviations;
+    expect(deviations).toHaveLength(2);
+    expect(deviations?.[1]).toMatchObject({
+      sourceRequestId: 'approve-1',
+      reconciled: false,
+    });
+    await updateJournal(h.dataDir, (operations) => {
+      const record = operations[owner]!;
+      operations[owner] = {
+        ...record,
+        deviations: record.deviations.map((d) => ({ ...d, reconciled: true })),
+      };
+    });
+    const again = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(again.reconciled?.[0]).toMatchObject({
+      localRequestId: 'approve-1',
+      outcome: 'ambiguous-reconcile',
+    });
+    deviations = (await readJournal(h.dataDir)).operations[owner]?.deviations;
+    expect(deviations).toHaveLength(2);
+    expect(deviations?.every((d) => d.reconciled)).toBe(true);
+  });
+
   it('an unordered same-plan match plus a later approval of another plan is ambiguous and still records a blocking deviation', async () => {
     const session = await strandedApprove();
     const floor = (await readJournal(h.dataDir)).operations['approve-1']
@@ -1340,20 +1520,62 @@ describe('active-session slots follow the vendor state', () => {
     ).toHaveLength(1);
   });
 
-  it('the reconcile release path skips the slot on a host without controller authority', async () => {
+  it('a host without controller authority records no bind and keeps the slot', async () => {
     await lostResponse('scratch/done', 'lost-done');
     const [listed] = [...h.adapter.sessions.values()];
     setVendorState(h, listed!.sessionResource, 'completed');
     fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    const before = (await readJournal(h.dataDir)).operations['lost-done'];
     const result = await status(h.deps, { reconcile: true });
     expect(result.reconciled?.[0]).toMatchObject({
       localRequestId: 'lost-done',
-      outcome: 'bound',
-      slotReleaseSkipped: true,
+      outcome: 'not-reached',
+      reason: expect.stringContaining("not the grant's controller"),
     });
+    expect((await readJournal(h.dataDir)).operations['lost-done']).toEqual(
+      before
+    );
     expect(
       loadGrants(h.dataDir).grants[grantId]?.usage.activeSessionRefs
     ).toHaveLength(1);
+  });
+
+  it('a copied data directory on a host without controller authority never marks a create failed', async () => {
+    await lostResponse('scratch/a', 'lost-a', false);
+    await confirmArchiveVisibility();
+    fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled).toEqual([
+      expect.objectContaining({
+        localRequestId: 'lost-a',
+        outcome: 'not-reached',
+        reason: expect.stringContaining('reconcile from the controlling host'),
+      }),
+    ]);
+    const record = (await readJournal(h.dataDir)).operations['lost-a'];
+    expect(record?.status).toBe('unknown-outcome');
+    expect(record?.lastReconcile).toBeUndefined();
+    expect(
+      loadGrants(h.dataDir).grants[grantId]?.usage.activeSessionRefs
+    ).toEqual(['lost-a']);
+  });
+
+  it('a stale controller epoch is refused the same way', async () => {
+    await lostResponse('scratch/a', 'lost-a', false);
+    await confirmArchiveVisibility();
+    const file = controllerFilePath(h.controllerDir, 'testhost');
+    const authority = JSON.parse(fs.readFileSync(file, 'utf8'));
+    fs.writeFileSync(file, JSON.stringify({ ...authority, epoch: 9 }), {
+      mode: 0o600,
+    });
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]).toMatchObject({
+      outcome: 'not-reached',
+      reason: expect.stringContaining('does not match the grant'),
+    });
+    expect((await readJournal(h.dataDir)).operations['lost-a']?.status).toBe(
+      'unknown-outcome'
+    );
   });
 
   it('a failed session frees its slot too, and repeating the observation is harmless', async () => {

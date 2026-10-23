@@ -101,7 +101,7 @@ const CODE_TABLE = {
     },
     JULES_POLICY_DEVIATION: {
         retryable: false,
-        recoveryAction: 'A vendor PR, plan change, or repository mismatch was observed; reconcile before any further write.',
+        recoveryAction: 'A vendor PR, plan change, or repository mismatch was observed. Run status for the session, inspect it, then acknowledge it with supervise --clear-deviation in a terminal (a scope violation also revokes the grant).',
     },
     JULES_DEADLINE_EXCEEDED: {
         retryable: false,

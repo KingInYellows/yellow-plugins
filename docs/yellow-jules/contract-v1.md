@@ -511,17 +511,18 @@ transient failure from an undetermined one.
   sessions walk: one `info()` plus the activity walk, looking for a
   `userMessaged` activity whose message digest equals the reservation's payload
   digest, or a `planApproved` whose `planId` equals the reservation's observed
-  plan id, in either case with a `createTime` at or after the record's `dispatchedAt`
-  stamp minus a 30-second clock-skew tolerance — an older match predates the
-  POST and is a prior send, never this one. A record with no `dispatchedAt`
-  (reserved before the stamp existed) is never bound: a match at or after the
-  reservation time minus the 5-minute overlap window is `ambiguous-reconcile`
-  with `reason: "dispatch-time-unknown"`. The status walk's own-echo claim
-  applies the same lower bound. Exactly one qualifying match binds; more than one is
-  `ambiguous-reconcile` with `reason: "multiple-candidates"`; none after a
-  complete walk leaves `unknown-outcome`, and a partial walk leaves
-  `not-reached`. Operations the deadline prevented from being checked are
-  reported as `not-reached`, never as resolved.
+  plan id, in either case with a `createTime` at or after the record's
+  `dispatchedAt` stamp minus a 30-second clock-skew tolerance — an older match
+  predates the POST and is a prior send, never this one. A record with no
+  `dispatchedAt` (reserved before the stamp existed) is never bound: a match at
+  or after the reservation time minus the 5-minute overlap window is
+  `ambiguous-reconcile` with `reason: "dispatch-time-unknown"`. The status
+  walk's own-echo claim applies the same lower bound. Exactly one qualifying
+  match binds; more than one is `ambiguous-reconcile` with
+  `reason: "multiple-candidates"`; none after a complete walk leaves
+  `unknown-outcome`, and a partial walk leaves `not-reached`. Operations the
+  deadline prevented from being checked are reported as `not-reached`, never as
+  resolved.
 - `reply --session <ref> --message <text> [--correction] [--reply-kind question|plan|other] [--expect-activity-id <id> --expect-question-digest <hex> | --expect-plan-id <id> --expect-plan-digest <hex>] [--request-id <id>] [--dry-run] [--grant-id <id>]`
   → `{ localRequestId, localId, sessionResource, sent: true }`. `--dry-run`
   validates, performs one `info()`, and returns the same fields with
@@ -535,13 +536,13 @@ transient failure from an undetermined one.
   `JULES_QUESTION_CHANGED` unless the session still awaits a reply and its
   newest agent message has that id and digest. `--expect-plan-id` and
   `--expect-plan-digest` (the `needs-plan-review` plan id and the sha256 of the
-  compact JSON `[planId, [[title, description], ...]]` plus a newline, as `approve.md` prints
-  it) do the same for a pending plan and cannot be combined with the question
-  pair. Like approve's plan check, the read narrows the race without closing it.
-  `--reply-kind` (what `supervise` sends) makes the pair mandatory: `question`
-  needs the question pair, `plan` the plan pair, and `other` refuses both, each
-  failing with `JULES_INVALID_INPUT` before any read. Omitted, the pairs stay
-  optional.
+  compact JSON `[planId, [[title, description], ...]]` plus a newline, as
+  `approve.md` prints it) do the same for a pending plan and cannot be combined
+  with the question pair. Like approve's plan check, the read narrows the race
+  without closing it. `--reply-kind` (what `supervise` sends) makes the pair
+  mandatory: `question` needs the question pair, `plan` the plan pair, and
+  `other` refuses both, each failing with `JULES_INVALID_INPUT` before any read.
+  Omitted, the pairs stay optional.
 - `approve --session <ref> --plan-id <evaluated plan id> --expect-plan-digest <hex> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   →
   `{ localRequestId, localId, sessionResource, approvedPlanId, observedPlanIdAfter: string | null, verificationDeferred: bool, verification: { pages: n, partialPagination: bool }, policyDeviation? }`.
@@ -569,21 +570,20 @@ transient failure from an undetermined one.
   differs from `--plan-id`, or whose `planDigest` (the same sha256 `reply`
   takes) differs from `--expect-plan-digest`, fails closed with
   `JULES_POLICY_DEVIATION`, so text changed under the same plan id is never
-  approved. The digest is required for a real call (missing or not 64
-  lowercase hex is `JULES_INVALID_INPUT`, before any vendor call, but after the
-  grant check); on `--dry-run` it is optional and a mismatch reports
-  `planChanged`. A real call also refuses a newest plan whose text redaction
-  would change (a credential-shaped value hidden from the review) with
-  `JULES_INVALID_STATE`, because the digest hashes the redacted text and could
-  not tell two such plans apart. Only then
-  does it issue the POST (the endpoint takes no plan id), then re-read from the
-  same start point within the remaining budget and record a deviation on
-  mismatch (R34). If the post-POST re-read is partial for any reason (page cap,
-  page failure, deadline after the POST was answered `2xx`), the result is
-  `ok: true` with `approvedPlanId` set, `observedPlanIdAfter: null`,
-  `verificationDeferred: true`, and `verification.partialPagination: true`
-  (recovery: run `status`), never a failure envelope and never
-  `JULES_UNKNOWN_OUTCOME`.
+  approved. The digest is required for a real call (missing or not 64 lowercase
+  hex is `JULES_INVALID_INPUT`, before any vendor call, but after the grant
+  check); on `--dry-run` it is optional and a mismatch reports `planChanged`. A
+  real call also refuses a newest plan whose text redaction would change (a
+  credential-shaped value hidden from the review) with `JULES_INVALID_STATE`,
+  because the digest hashes the redacted text and could not tell two such plans
+  apart. Only then does it issue the POST (the endpoint takes no plan id), then
+  re-read from the same start point within the remaining budget and record a
+  deviation on mismatch (R34). If the post-POST re-read is partial for any
+  reason (page cap, page failure, deadline after the POST was answered `2xx`),
+  the result is `ok: true` with `approvedPlanId` set,
+  `observedPlanIdAfter: null`, `verificationDeferred: true`, and
+  `verification.partialPagination: true` (recovery: run `status`), never a
+  failure envelope and never `JULES_UNKNOWN_OUTCOME`.
 - `collect --session <ref>` →
   `{ localId, sessionResource, artifacts: [{ kind: "patch" | "pr-ref" | "generated-file", path?, sha256?, baseCommit?, prUrl?, vendorPath?, secretShapedContent: bool, verification: "unverified" }], skipped: [{ kind, reason: "aggregate-cap-reached", bytes? }], activities: { pages: n, partialPagination: bool, unmappedActivity: bool }, partialStaging: bool, noSupportedArtifact: bool, policyDeviation? }`.
   One `info()` (for `outputs[]` and `generatedFiles`) plus the activity walk
@@ -619,8 +619,14 @@ transient failure from an undetermined one.
   grant is never created or widened from inside a supervised session.
 - `authorize --take-over` → `{ controllerId, epoch, dataDir, grantsRebound }`.
   The R38 handoff (see "Local state"), standalone: it takes no grant flags and
-  is TTY-confirmed. It writes epoch+1 for this host and the canonical data-dir
-  path, then rewrites every grant's controller id and epoch reference.
+  is TTY-confirmed. Under the journal lock it first stamps the journal's
+  `controllerTakeover` marker (this host's clock, the journal sequence, and the
+  new epoch), then writes epoch+1 for this host and the canonical data-dir path,
+  then rewrites every grant's controller id and epoch reference. A crash after
+  the marker leaves the grants on the old epoch (writes fail closed until the
+  take-over is re-run); a grant on a later epoch than the marker names has no
+  trustworthy reservation age, so `status --reconcile` leaves its `reserved`
+  rows `not-reached` until the take-over is run again.
 - `authorize --list` →
   `{ grants: [{ grantId, repository, sourceResource, branchPattern, taskRefs, operations, limits, usage, expiresAt, expired, revoked, unreconciledDeviation }] }`.
   `unreconciledDeviation` is true when a session under the grant carries an
@@ -639,17 +645,34 @@ transient failure from an undetermined one.
   permitted verdicts are correction or escalate, never accept. An
   `awaiting-approval` session whose plan could not be read is `escalate` with
   `reason: "awaiting-approval-without-plan"` and attention `planUnavailable`.
-  When another session under the grant carries an unreconciled policy
-  deviation (R13), every write under it is denied, so an `awaiting-approval` or
-  `awaiting-reply` session is `escalate` with `reason: "grant-policy-deviation"`,
-  attention `policyDeviation`, and no `approve`, `reply`, or `repair-delegate`
-  in `allowedActions`.
+  When another session under the grant carries an unreconciled policy deviation
+  (R13), every write under it is denied, so an `awaiting-approval` or
+  `awaiting-reply` session is `escalate` with
+  `reason: "grant-policy-deviation"`, attention `policyDeviation`, and no
+  `approve`, `reply`, or `repair-delegate` in `allowedActions`.
 - `supervise --clear-pause --session <ref>` →
   `{ operation, localId, sessionResource, cleared: true }`. TTY-confirmed;
   requires a complete `status` walk since the pause, otherwise
   `JULES_INVALID_STATE` with recovery "run `status` first". The prompt lists any
   recorded outside activity (clearing forgets it), and the clear is refused if
   the pause or that activity changed while the prompt was open.
+- `supervise --clear-deviation --session <ref>` →
+  `{ operation, localId, sessionResource, acknowledged: [reason, ...], revokedGrantId? }`.
+  The R13 recovery path. TTY-confirmed and checked against the owning grant's
+  controller authority (before the prompt and again under the journal lock);
+  requires a complete `status` walk that began after the newest open deviation,
+  otherwise `JULES_INVALID_STATE`. It marks every open deviation on the session
+  `reconciled` with `reconciledAt`, so grant-backed writes on the session and
+  under its grant resume. A pull request reference that failed validation puts
+  the session outside its grant's scope: acknowledging it also revokes the
+  owning grant, so further writes need a fresh grant. The acknowledgement is
+  refused if the open deviations changed while the prompt was open. Evidence
+  that every walk re-reads (the same PR, or the same unresolved approve's
+  ambiguity on a later reconcile) is not recorded again; a one-off event (an
+  approval that landed on another plan) recorded after the acknowledgement
+  blocks again. A create whose tagged session is on another repository or branch
+  never binds, so it has no session to acknowledge: revoke its grant and
+  authorize a new one.
 - `abandon --request-id <id>` →
   `{ localRequestId, localId, abandoned: true, released: {...} }`.
   TTY-confirmed. Accepts only an operation whose last reconcile outcome was
@@ -674,9 +697,9 @@ prompt: the agent's Bash tool, the Codex sandbox, the engine's closed-stdin
 process interface (R59), and CI all fail with `JULES_CONFIRMATION_REQUIRED`.
 Whether stdin is a TTY is never consulted. The challenge code never appears in
 any envelope, argv, journal record, or log; the prompt is written to the TTY
-only. The same TTY gate guards `abandon`, `supervise --clear-pause`, and
-`authorize --take-over`, because each widens effective authority.
-`authorize --list` and `authorize --revoke` need no TTY.
+only. The same TTY gate guards `abandon`, `supervise --clear-pause`,
+`supervise --clear-deviation`, and `authorize --take-over`, because each widens
+effective authority. `authorize --list` and `authorize --revoke` need no TTY.
 
 The Claude wrappers keep an AskUserQuestion preview before using a grant (R8's
 UX gate), but enforcement is the grant, never the wrapper. Host hooks, prompt
@@ -730,14 +753,14 @@ exit code stays 0, see "Exit codes"): `partialPagination`, `unmappedActivity`,
 are the flag names, or `reconciled:<outcome>` for reconcile results. Each
 reconcile outcome has one disposition:
 
-| `outcome`             | Reservation     | Envelope                                                                       | Caller action                                        |
-| --------------------- | --------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| `bound`               | resolved        | no attention entry                                                             | none                                                 |
-| `released`            | terminal failed | no attention entry                                                             | none; the repository and branch are free             |
-| `ambiguous-reconcile` | kept            | `attention`, `reason`                                                          | inspect the candidates; `abandon` (PR3) if warranted |
-| `policy-deviation`    | kept            | `attention`, top-level `policyDeviation: true`; `supervise` stops acting (R33) | reconcile by hand before any further write           |
-| `unknown-outcome`     | kept            | `attention`                                                                    | rerun `status --reconcile` later                     |
-| `not-reached`         | kept            | `attention`                                                                    | rerun with a larger `--deadline-ms`                  |
+| `outcome`             | Reservation     | Envelope                                                                       | Caller action                                                  |
+| --------------------- | --------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `bound`               | resolved        | no attention entry                                                             | none                                                           |
+| `released`            | terminal failed | no attention entry                                                             | none; the repository and branch are free                       |
+| `ambiguous-reconcile` | kept            | `attention`, `reason`                                                          | inspect the candidates; `abandon` (PR3) if warranted           |
+| `policy-deviation`    | kept            | `attention`, top-level `policyDeviation: true`; `supervise` stops acting (R33) | inspect, then `supervise --clear-deviation` (or a fresh grant) |
+| `unknown-outcome`     | kept            | `attention`                                                                    | rerun `status --reconcile` later                               |
+| `not-reached`         | kept            | `attention`                                                                    | rerun with a larger `--deadline-ms`                            |
 
 `details` appears on a few mutating failures and is structured data, never
 prose: `runningSessions: ["sessions/<id>", ...]` on `JULES_GRANT_EXPIRED` (the
@@ -806,7 +829,7 @@ not the only permitted text. `sdk-adapter.ts` classifies SDK errors by
 | `JULES_CONFIRMATION_REQUIRED`  | false     | pass `--grant-id` from a grant written by `authorize`, or run the named `authorize` command yourself in a terminal (R29)                     |
 | `JULES_AUTHORITY_DENIED`       | false     | the grant does not cover this operation, repo, branch, or limit (R31)                                                                        |
 | `JULES_GRANT_EXPIRED`          | false     | the grant expired; remote work may still run; contain out of band: vendor console stop, source-connection revocation, API-key rotation (R39) |
-| `JULES_POLICY_DEVIATION`       | false     | a vendor PR, plan change, or repository mismatch was observed; reconcile before further writes (R13)                                         |
+| `JULES_POLICY_DEVIATION`       | false     | a vendor PR, plan change, or repository mismatch was observed; run `status`, then `supervise --clear-deviation` in a terminal (R13)          |
 | `JULES_DEADLINE_EXCEEDED`      | false     | the absolute operation deadline fired before any write was dispatched; no verdict recorded (R14, R33)                                        |
 | `JULES_STALE_LOCK`             | false     | a lock from a crashed process exists; remove by hand after inspection (R38)                                                                  |
 | `JULES_NO_PROGRESS`            | false     | two consecutive activity walks restarted from the watermark without advancing; run `status` later, and re-verify the SDK pin if it recurs    |
@@ -969,9 +992,10 @@ as remote termination (R39).
 
 - **A grant is required** for every real mutation (`delegate`, `reply`,
   `approve`, and `supervise`'s writes) (R29). `authorize`, `abandon`,
-  `supervise --clear-pause`, and `authorize --take-over` are TTY-confirmed by
-  the runtime (see "Confirmation token"). Host hooks, prompt wording, and
-  sandbox settings are never the sole enforcement layer (R31).
+  `supervise --clear-pause`, `supervise --clear-deviation`, and
+  `authorize --take-over` are TTY-confirmed by the runtime (see "Confirmation
+  token"). Host hooks, prompt wording, and sandbox settings are never the sole
+  enforcement layer (R31).
 - **Grants** (R30, PR3): grant id, repository and source resource, branch or
   pattern, task/goal identifiers, permitted operations (subset of `create`,
   `reply`, `approve`, `collect`), max active sessions, max total tasks, max

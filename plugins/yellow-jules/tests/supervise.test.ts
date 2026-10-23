@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadGrants, revokeGrant } from '../src/authority.js';
+import { resolveGrantsPath } from '../src/config.js';
 import { controllerFilePath } from '../src/controller.js';
 import {
   AdapterError,
@@ -17,11 +18,13 @@ import { status } from '../src/runtime.js';
 import {
   messageDigest,
   readJournal,
+  recordDeviation,
   updateJournal,
   upsertReadState,
 } from '../src/state.js';
 import {
   BACKOFF_CAP_SECONDS,
+  clearDeviation,
   clearPause,
   superviseOnce,
   type SuperviseResult,
@@ -1160,6 +1163,162 @@ describe('an expired grant', () => {
         superviseOnce(h.deps, { session: session.localId, grantId: other })
       )
     ).toBe('JULES_AUTHORITY_DENIED');
+  });
+});
+
+describe('--clear-deviation', () => {
+  const PLAN_DEVIATION =
+    'the plan approved by the vendor differs from the plan evaluated before approval';
+  const SCOPE_DEVIATION =
+    'vendor pull request reference failed validation: repository mismatch';
+
+  async function deviate(reason: string): Promise<void> {
+    await recordDeviation(
+      h.dataDir,
+      session.localRequestId,
+      { kind: 'policy-deviation', reason },
+      () => new Date(h.deps.clock.now())
+    );
+    h.deps.clock.time += 60_000;
+  }
+
+  function clear(deps = h.deps) {
+    return clearDeviation(deps, { session: session.localId });
+  }
+
+  it('blocks grant-backed writes until acknowledged, and the grant stays usable', async () => {
+    await deviate(PLAN_DEVIATION);
+    setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+    expect((await sup()).reason).toBe('policy-deviation');
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const result = await clear();
+    expect(result).toEqual({
+      operation: 'supervise',
+      localId: session.localId,
+      sessionResource: session.sessionResource,
+      acknowledged: [PLAN_DEVIATION],
+    });
+    const owner = await ownerRecord();
+    expect(owner?.deviations).toEqual([
+      expect.objectContaining({
+        reason: PLAN_DEVIATION,
+        reconciled: true,
+        reconciledAt: expect.any(String),
+      }),
+    ]);
+    expect(loadGrants(h.dataDir).grants[grantId]?.revokedAt).toBeUndefined();
+    expect((await sup()).reason ?? '').not.toMatch(/policy-deviation/);
+  });
+
+  it('a scope violation revokes the owning grant with the acknowledgement', async () => {
+    await deviate(SCOPE_DEVIATION);
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const result = await clear();
+    expect(result.revokedGrantId).toBe(grantId);
+    expect(loadGrants(h.dataDir).grants[grantId]?.revokedAt).toBeDefined();
+    expect((await ownerRecord())?.deviations[0]?.reconciled).toBe(true);
+  });
+
+  it('needs a complete status walk after the newest deviation', async () => {
+    await status(h.deps, { session: session.localId, reconcile: false });
+    await deviate(PLAN_DEVIATION);
+    const err = (await clear().catch((e: unknown) => e)) as AppErrorException;
+    expect(err.appError.code).toBe('JULES_INVALID_STATE');
+    expect(err.appError.recoveryAction).toContain('status');
+    expect((await ownerRecord())?.deviations[0]?.reconciled).toBe(false);
+  });
+
+  it('refuses when nothing is open', async () => {
+    expect(await codeOf(() => clear())).toBe('JULES_INVALID_STATE');
+  });
+
+  it('without a terminal nothing is acknowledged', async () => {
+    await deviate(PLAN_DEVIATION);
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const noTty = { ...h.deps, openTty: makeHarness('no-tty').tty.openTty };
+    expect(await codeOf(() => clear(noTty))).toBe(
+      'JULES_CONFIRMATION_REQUIRED'
+    );
+    expect((await ownerRecord())?.deviations[0]?.reconciled).toBe(false);
+  });
+
+  it('a host without controller authority cannot acknowledge', async () => {
+    await deviate(PLAN_DEVIATION);
+    await status(h.deps, { session: session.localId, reconcile: false });
+    fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    expect(await codeOf(() => clear())).toBe('JULES_CONTROLLER_MISMATCH');
+    expect((await ownerRecord())?.deviations[0]?.reconciled).toBe(false);
+  });
+
+  it('a grant missing from grants.json fails closed', async () => {
+    await deviate(PLAN_DEVIATION);
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const file = resolveGrantsPath(h.dataDir);
+    const grants = JSON.parse(fs.readFileSync(file, 'utf8'));
+    delete grants.grants[grantId];
+    fs.writeFileSync(file, JSON.stringify(grants), { mode: 0o600 });
+    expect(await codeOf(() => clear())).toBe('JULES_CONTROLLER_MISMATCH');
+    expect((await ownerRecord())?.deviations[0]?.reconciled).toBe(false);
+  });
+
+  it('does not acknowledge a deviation recorded while the confirmation was open', async () => {
+    await deviate(PLAN_DEVIATION);
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const racing = {
+      ...h.deps,
+      openTty: () => {
+        const file = path.join(h.dataDir, 'state', 'journal.json');
+        const journal = JSON.parse(fs.readFileSync(file, 'utf8'));
+        journal.operations[session.localRequestId].deviations.push({
+          kind: 'policy-deviation',
+          reason: SCOPE_DEVIATION,
+          observedAt: new Date(h.deps.clock.now() - 1).toISOString(),
+          reconciled: false,
+        });
+        fs.writeFileSync(file, JSON.stringify(journal), { mode: 0o600 });
+        return h.tty.openTty();
+      },
+    };
+    expect(await codeOf(() => clear(racing))).toBe('JULES_INVALID_STATE');
+    expect((await ownerRecord())?.deviations.every((d) => !d.reconciled)).toBe(
+      true
+    );
+    expect(loadGrants(h.dataDir).grants[grantId]?.revokedAt).toBeUndefined();
+  });
+
+  it('an approval mismatch after the acknowledgement blocks again; a re-read PR does not', async () => {
+    const now = () => new Date(h.deps.clock.now());
+    await recordDeviation(
+      h.dataDir,
+      session.localRequestId,
+      {
+        kind: 'policy-deviation',
+        reason:
+          'vendor pull request observed on a session created with autoPr: false',
+        prUrl: 'https://github.com/acme/widgets/pull/1',
+      },
+      now
+    );
+    await deviate(PLAN_DEVIATION);
+    await status(h.deps, { session: session.localId, reconcile: false });
+    await clear();
+    await recordDeviation(h.dataDir, session.localRequestId, {
+      kind: 'policy-deviation',
+      reason:
+        'vendor pull request observed on a session created with autoPr: false',
+      prUrl: 'https://github.com/acme/widgets/pull/1',
+    });
+    expect((await ownerRecord())?.deviations.every((d) => d.reconciled)).toBe(
+      true
+    );
+    await recordDeviation(h.dataDir, session.localRequestId, {
+      kind: 'policy-deviation',
+      reason: PLAN_DEVIATION,
+      recurAfterAck: true,
+    });
+    const open = (await ownerRecord())?.deviations.filter((d) => !d.reconciled);
+    expect(open?.map((d) => d.reason)).toEqual([PLAN_DEVIATION]);
+    expect(open?.[0]).not.toHaveProperty('recurAfterAck');
   });
 });
 

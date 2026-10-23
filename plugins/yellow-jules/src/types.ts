@@ -233,8 +233,12 @@ export interface DeviationRecord {
   readonly reason: string;
   /** External PR reference (R13); present only when it passed validatePullRequestUrl. */
   readonly prUrl?: string;
+  /** The operation whose reconcile recorded it on its session's owner. */
+  readonly sourceRequestId?: string;
   readonly observedAt: string;
   readonly reconciled: boolean;
+  /** When the owner acknowledged it with `supervise --clear-deviation`. */
+  readonly reconciledAt?: string;
 }
 
 export interface PendingPlan {
@@ -481,9 +485,16 @@ export interface Journal {
    * clock with the journal sequence at that moment. A reservation created
    * before it (by sequence, or without one) came from an earlier controller
    * epoch: its `createdAt` is another host's clock, so reconcile ages it from
-   * `at` instead.
+   * `at` instead. `epoch` is the controller epoch the take-over rebinds the
+   * grants to; it is written before the rebind, so a grant on a later epoch
+   * than the marker names was rebound by a take-over the journal never saw
+   * (absent in markers written before it was recorded).
    */
-  controllerTakeover?: { readonly at: string; readonly seq: number };
+  controllerTakeover?: {
+    readonly at: string;
+    readonly seq: number;
+    readonly epoch?: number;
+  };
   /** Keyed by localRequestId; built with Object.create(null). */
   readonly operations: Record<string, OperationRecord>;
 }

@@ -48,6 +48,8 @@ exports.controllerFilePath = controllerFilePath;
 exports.readControllerAuthority = readControllerAuthority;
 exports.initControllerAuthority = initControllerAuthority;
 exports.assertControllerAuthority = assertControllerAuthority;
+exports.assertHostControlsDataDir = assertHostControlsDataDir;
+exports.takeOverEpoch = takeOverEpoch;
 exports.takeOverController = takeOverController;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
@@ -185,23 +187,50 @@ function assertControllerAuthority(controllerDir, dataDir, epochRef, hostControl
     return authority;
 }
 /**
+ * For a write that names no grant: this host must hold a controller authority
+ * for this canonical data directory. Same failure as `assertControllerAuthority`.
+ */
+function assertHostControlsDataDir(controllerDir, dataDir, controllerId) {
+    const authority = readControllerAuthority(controllerDir, controllerId);
+    if (authority === undefined) {
+        return mismatch(`no controller authority for ${controllerId} on this host`);
+    }
+    if (authority.dataDir !== (0, config_js_1.canonicalPath)(dataDir)) {
+        return mismatch('this data directory is not the one the controller authority authorizes');
+    }
+    return authority;
+}
+/**
  * Handoff (R38): writes epoch+1 for this host and data-directory path, then
  * rewrites every grant's `controllerId` and `epochRef` to it. The new epoch is
  * above both any existing authority file and every epoch the copied grants
- * still reference. The controller file is written first: a crash before the
- * grants are rewritten leaves grants pointing at an old epoch, so writes fail
- * closed until `--take-over` is run again. Runs only inside a TTY-confirmed
- * `authorize --take-over`, under the journal lock.
+ * still reference (`takeOverEpoch`). The controller file is written first: a
+ * crash before the grants are rewritten leaves grants pointing at an old epoch,
+ * so writes fail closed until `--take-over` is run again. Runs only inside a
+ * TTY-confirmed `authorize --take-over`, under the journal lock, after the
+ * journal's take-over marker for the same epoch is written.
  */
-function takeOverController(ctx, dataDir, grants) {
+function takeOverEpoch(ctx, grants) {
     const existing = readControllerAuthority(ctx.controllerDir, ctx.controllerId);
     let highest = existing?.epoch ?? 0;
     for (const grant of Object.values(grants.grants)) {
         highest = Math.max(highest, grant.epochRef.epoch);
     }
+    return highest + 1;
+}
+function takeOverController(ctx, dataDir, grants, 
+/** The epoch the journal marker already names; computed here when absent. */
+epoch = takeOverEpoch(ctx, grants)) {
+    // Re-read just before the write: a take-over of another data directory on
+    // this host shares the authority file but not this journal lock. Writing a
+    // stale epoch would roll that authority back, so refuse; the grants stay on
+    // their old epoch (writes fail closed) until the take-over is run again.
+    if (takeOverEpoch(ctx, grants) !== epoch) {
+        return mismatch('the controller authority changed during the take-over; run authorize --take-over again');
+    }
     const authority = {
         controllerId: ctx.controllerId,
-        epoch: highest + 1,
+        epoch,
         dataDir: (0, config_js_1.canonicalPath)(dataDir),
         updatedAt: nowIso(ctx),
     };

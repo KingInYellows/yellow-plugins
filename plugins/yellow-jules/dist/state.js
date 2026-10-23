@@ -242,7 +242,7 @@ function isValidDeviation(value) {
         return false;
     return (value['kind'] === 'policy-deviation' &&
         typeof value['reason'] === 'string' &&
-        hasOptionalStrings(value, ['prUrl']) &&
+        hasOptionalStrings(value, ['prUrl', 'reconciledAt', 'sourceRequestId']) &&
         typeof value['observedAt'] === 'string' &&
         typeof value['reconciled'] === 'boolean');
 }
@@ -454,7 +454,9 @@ function parseJournal(raw) {
         !((0, shape_js_1.isPlainObject)(takeover) &&
             typeof takeover['at'] === 'string' &&
             !Number.isNaN(Date.parse(takeover['at'])) &&
-            (0, shape_js_1.isNonNegativeInt)(takeover['seq'])))
+            (0, shape_js_1.isNonNegativeInt)(takeover['seq']) &&
+            (takeover['epoch'] === undefined ||
+                ((0, shape_js_1.isNonNegativeInt)(takeover['epoch']) && takeover['epoch'] >= 1))))
         return undefined;
     const ops = parsed['operations'];
     if (!(0, shape_js_1.isPlainObject)(ops))
@@ -474,6 +476,9 @@ function parseJournal(raw) {
                 controllerTakeover: {
                     at: takeover['at'],
                     seq: takeover['seq'],
+                    ...(takeover['epoch'] !== undefined
+                        ? { epoch: takeover['epoch'] }
+                        : {}),
                 },
             }
             : {}),
@@ -1111,17 +1116,24 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
                         : winner;
             }
             else if (current.lastActivityCreateTime !== undefined &&
-                current.lastActivityId !== undefined &&
-                (0, activity_walk_js_1.compareStamp)({
-                    createTime: update.pendingPlan.activityCreateTime,
-                    activityId: update.pendingPlan.activityId,
-                }, {
-                    createTime: current.lastActivityCreateTime,
-                    activityId: current.lastActivityId,
-                }) <= 0) {
+                current.lastActivityId !== undefined) {
                 // No plan is stored, and a concurrent walk already advanced past
                 // this one: it saw the plan and its approval, so do not resurrect it.
-                pendingPlan = undefined;
+                // Only time orders the two: ids at one createTime are opaque, so a
+                // watermark at the plan's own time (another activity) proves nothing
+                // about the plan; it is kept, flagged unknown.
+                const order = (0, activity_walk_js_1.compareStamp)({
+                    createTime: update.pendingPlan.activityCreateTime,
+                    activityId: '',
+                }, { createTime: current.lastActivityCreateTime, activityId: '' });
+                if (order < 0 ||
+                    (order === 0 &&
+                        update.pendingPlan.activityId === current.lastActivityId)) {
+                    pendingPlan = undefined;
+                }
+                else if (order === 0) {
+                    pendingPlan = { ...update.pendingPlan, ambiguous: true };
+                }
             }
             if (watermark !== undefined &&
                 current.lastActivityCreateTime !== undefined &&
@@ -1283,11 +1295,20 @@ async function recordArtifacts(dataDir, localRequestId, artifacts, now = () => n
         return next;
     }, config);
 }
-/** R13: record a policy deviation once per distinct reason + PR reference. */
+/**
+ * R13: record a policy deviation once per distinct reason + PR reference.
+ * Evidence every status walk re-reads (a PR on the session) is recorded once
+ * even after the owner acknowledged it, or the acknowledgement could never
+ * hold. A one-off event (`recurAfterAck`, an approval that landed on another
+ * plan) is a new deviation each time it happens after an acknowledgement.
+ */
 async function recordDeviation(dataDir, localRequestId, deviation, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
+    const { recurAfterAck, ...record } = deviation;
     return updateJournal(dataDir, (operations) => {
         const current = requireRecord(operations, localRequestId);
-        const duplicate = current.deviations.some((d) => d.reason === deviation.reason && d.prUrl === deviation.prUrl);
+        const duplicate = current.deviations.some((d) => d.reason === record.reason &&
+            d.prUrl === record.prUrl &&
+            (recurAfterAck !== true || !d.reconciled));
         if (duplicate)
             return current;
         const nowIso = now().toISOString();
@@ -1295,7 +1316,7 @@ async function recordDeviation(dataDir, localRequestId, deviation, now = () => n
             ...current,
             deviations: [
                 ...current.deviations,
-                { ...deviation, observedAt: nowIso, reconciled: false },
+                { ...record, observedAt: nowIso, reconciled: false },
             ],
             updatedAt: nowIso,
         };

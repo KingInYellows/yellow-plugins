@@ -351,11 +351,24 @@ async function dispatch(operation, rest, deps) {
                     session: { type: 'string' },
                     'grant-id': { type: 'string' },
                     'clear-pause': { type: 'boolean', default: false },
+                    'clear-deviation': { type: 'boolean', default: false },
                     ...deadline,
                 },
                 strict: true,
                 allowPositionals: false,
             });
+            if (values['clear-pause'] === true &&
+                values['clear-deviation'] === true) {
+                throw new UsageError('--clear-pause and --clear-deviation are separate confirmations; run one at a time');
+            }
+            if (values['clear-deviation'] === true) {
+                if (typeof values['grant-id'] === 'string') {
+                    throw new UsageError('--clear-deviation takes only --session; it is confirmed on the terminal, not by a grant');
+                }
+                return (0, supervise_js_1.clearDeviation)(deps, {
+                    session: requireString(values.session, '--session'),
+                });
+            }
             if (values['clear-pause'] === true) {
                 if (typeof values['grant-id'] === 'string') {
                     throw new UsageError('--clear-pause takes only --session; it is confirmed on the terminal, not by a grant');

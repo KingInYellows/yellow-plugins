@@ -28,7 +28,7 @@ plugins/yellow-jules/
     mutations.ts        # delegate / reply / approve (one POST each, never retried) and abandon (local settle, no vendor call)
     write-gate.ts       # the R31 authority critical section and the settle helpers
     reconcile.ts        # status --reconcile: one shared sessions walk, per-session resolution
-    supervise.ts        # one bounded supervision pass; --clear-pause
+    supervise.ts        # one bounded supervision pass; --clear-pause; --clear-deviation
     authorize.ts        # create / list / revoke grants; --take-over
     authority.ts        # grants.json, evaluateAuthority (pure), counters
     controller.ts       # R38 authority file outside the data dir, epoch, takeover
@@ -122,15 +122,15 @@ data-directory path this host may write from.
   sandbox, a closed-stdin engine, CI — is refused with
   `JULES_CONFIRMATION_REQUIRED`. Whether stdin is a TTY is never consulted, and
   the code appears in no envelope, argv, journal, or log. `abandon`,
-  `supervise --clear-pause`, and `authorize --take-over` are gated the same way,
-  because each widens effective authority. `authorize --list` and `--revoke`
-  need no terminal.
+  `supervise --clear-pause`, `--clear-deviation`, and `authorize --take-over`
+  are gated the same way, because each widens effective authority.
+  `authorize --list` and `--revoke` need no terminal.
 - **The Claude wrappers add a preview, not the enforcement.** Each wrapper shows
   a fenced preview and asks via `AskUserQuestion` before using a grant (R8), but
-  the enforcement is the grant. The `authorize`, `abandon`, and `--clear-pause`
-  wrappers only print the command for the owner to run in a separate terminal
-  window; running it through Claude Code would put the TUI between the owner and
-  the prompt.
+  the enforcement is the grant. The `authorize`, `abandon`, `--clear-pause`, and
+  `--clear-deviation` wrappers only print the command for the owner to run in a
+  separate terminal window; running it through Claude Code would put the TUI
+  between the owner and the prompt.
 - **Counters (R31).** Reserved and unknown-outcome operations count. A `create`
   takes an active-session slot (freed when the session is observed terminal, or
   by reconcile `released`, `abandon`, or a clean rejection) and, unless it is a
@@ -244,18 +244,18 @@ carrying that stamp can claim a vendor activity as its own echo, so a teammate
 repeating a still-undispatched message is classified as outside activity.
 
 A reply or approve also records a vendor floor at that stamp: just before the
-POST the controller reads the session's newest activity (`createTime`, id;
-the stored status watermark plus a walk from it) and stores it as
+POST the controller reads the session's newest activity (`createTime`, id; the
+stored status watermark plus a walk from it) and stores it as
 `vendorFloorCreateTime` / `vendorFloorActivityId`, or `vendorFloorEmpty` when
 the session had no activities. A failed or partial read refuses the write before
 the POST (`JULES_SERVICE_UNAVAILABLE`, retryable; the reservation settles
 `failed` and nothing is dispatched). An echo, in `status --reconcile` and in
 `claimOwnEchoes`, must be strictly newer than the floor by vendor `createTime`.
 Older (or the floor activity itself) is not an echo; an equal `createTime`, a
-record with no floor (legacy), or a missing `createTime` cannot be ordered, so reconcile reports
-`ambiguous-reconcile` (`dispatch-time-unknown`) and `status` treats the message
-as outside activity. No local time is compared with a vendor time for this. A
-create is exempt: its session did not exist before the POST.
+record with no floor (legacy), or a missing `createTime` cannot be ordered, so
+reconcile reports `ambiguous-reconcile` (`dispatch-time-unknown`) and `status`
+treats the message as outside activity. No local time is compared with a vendor
+time for this. A create is exempt: its session did not exist before the POST.
 
 `status --reconcile` carries a bound reply's echo `createTime` with its id
 (`echoCreateTime`), because a later walk sees the id as already claimed and
@@ -274,53 +274,74 @@ plans decide nothing), the post-approve verifier (an approval at the reviewed
 plan's own time is kept, not discarded), the surplus split of same-text
 messages, and the resume marker. Watermarks and the dedup ring still use id
 order as a cursor only. After a lost approve response, `status --reconcile`
-treats a `planApproved` that names a different plan as a candidate: a single
-one proven after dispatch binds as a changed-plan deviation, anything less
-certain stays `ambiguous-reconcile` (`approval-of-another-plan`); both record a
+treats a `planApproved` that names a different plan as a candidate: a single one
+proven after dispatch binds as a changed-plan deviation, anything less certain
+stays `ambiguous-reconcile` (`approval-of-another-plan`); both record a
 deviation on the session's owner, so grant-backed writes stay blocked.
 
 A `planApproved` and a `planGenerated` that share a `createTime` are unordered
 (ids carry no order). The approval clears the plan only when it names that
 plan's id (a resumed walk carries it as `resumeApproval.approvedPlanId`; markers
-without it stay ambiguous); a different plan stays pending, marked `ambiguous`, so `supervise`
-offers no action and `approve` / plan-bound `reply` refuse.
+without it stay ambiguous); a different plan stays pending, marked `ambiguous`,
+so `supervise` offers no action and `approve` / plan-bound `reply` refuse.
 
 Same-text echoes are matched as a vendor-time-ordered batch, not in arrival
 order: with several writes sharing a digest, the oldest echo goes to the
 oldest-dispatched write (by dispatch sequence, else `dispatchedAt`), checked per
 position: each echo must be eligible for its paired write, so differing vendor
-floors do not make the batch order-dependent. Equal or
-missing vendor times, unorderable dispatches, or a different number of echoes
-and writes make the batch ambiguous: the messages are recorded as outside
-activity (pause) and its unresolved writes are marked `echoAmbiguous`.
-The pre-dispatch vendor-floor walk of a `reply` or `approve` classifies the user
-messages it sees with the same own-echo / outside-activity logic as `status`
-(`claimOwnEchoes`). A teammate's message that arrived since the last status, or
-between preflight and the floor read, is recorded as outside activity and the
-write is refused (`JULES_SUPERVISION_PAUSED`) before the POST; a message only an
-in-flight write could explain refuses too. An approval rebase never clears a
-fresh pending plan stored as `ambiguous`.
+floors do not make the batch order-dependent. Equal or missing vendor times,
+unorderable dispatches, or a different number of echoes and writes make the
+batch ambiguous: the messages are recorded as outside activity (pause) and its
+unresolved writes are marked `echoAmbiguous`. The pre-dispatch vendor-floor walk
+of a `reply` or `approve` classifies the user messages it sees with the same
+own-echo / outside-activity logic as `status` (`claimOwnEchoes`). A teammate's
+message that arrived since the last status, or between preflight and the floor
+read, is recorded as outside activity and the write is refused
+(`JULES_SUPERVISION_PAUSED`) before the POST; a message only an in-flight write
+could explain refuses too. An approval rebase never clears a fresh pending plan
+stored as `ambiguous`.
 
 A tie of different plans at the newest vendor time is kept in the retained
 generated-plan state (`lastGeneratedPlan.ambiguous`), so a later approval that
 clears `pendingPlan` cannot hide it: the next `supervise` pass treats it as an
-unexplained replacement and pauses. Create reconciliation walks sessions
-without a `create_time` filter, since a floor derived from the controller's
-clock would hide the tagged session when that clock runs ahead of the service's;
-a walk cut short by the page cap is `not-reached`, never a release. Untagged
-candidates have no create-time floor either: an unowned same-repo/branch session
-in a complete walk leaves the create `ambiguous-reconcile`
-(`untagged-candidate`). The final floor walk of `reply` and `approve` also
-re-validates the target on that same complete read: the pending plan must still
-be the reviewed one and not ambiguous (approve: `JULES_POLICY_DEVIATION`;
-guarded reply: `JULES_QUESTION_CHANGED`), and a guarded question must have no
-newer or tied agent message; a mismatch settles as a clean failure before the POST.
+unexplained replacement and pauses. Create reconciliation walks sessions without
+a `create_time` filter, since a floor derived from the controller's clock would
+hide the tagged session when that clock runs ahead of the service's; a walk cut
+short by the page cap is `not-reached`, never a release. Untagged candidates
+have no create-time floor either: an unowned same-repo/branch session in a
+complete walk leaves the create `ambiguous-reconcile` (`untagged-candidate`).
+The final floor walk of `reply` and `approve` also re-validates the target on
+that same complete read: the pending plan must still be the reviewed one and not
+ambiguous (approve: `JULES_POLICY_DEVIATION`; guarded reply:
+`JULES_QUESTION_CHANGED`), and a guarded question must have no newer or tied
+agent message; a mismatch settles as a clean failure before the POST.
 
-`authorize --take-over` stamps the journal with `controllerTakeover` (the new host's
-clock and a sequence). Reconcile ages a `reserved` row created before it (by
-sequence, or without one) from that stamp, not from its own `createdAt`, which
-is the earlier controller's clock: the row stays in flight for the settle
-interval after the take-over.
+`authorize --take-over` stamps the journal with `controllerTakeover` (the new
+host's clock, a sequence, and the new epoch) before it rebinds anything.
+Reconcile ages a `reserved` row created before it (by sequence, or without one)
+from that stamp, not from its own `createdAt`, which is the earlier controller's
+clock: the row stays in flight for the settle interval after the take-over. A
+grant on a later epoch than the marker names (a take-over the journal never
+recorded) leaves its `reserved` rows `not-reached` until `--take-over` runs
+again.
+
+`status --reconcile` writes nothing for a record under a grant unless this host
+is that grant's controller; such a record is reported `not-reached` with the
+controller reason, so a copied data directory can never settle a create as
+`failed`. A record from before grants has no controller to check.
+
+`supervise --clear-deviation --session <ref>` is the R13 recovery path:
+TTY-confirmed, controller-checked, after a complete `status` walk newer than the
+newest open deviation. It marks the session's open deviations reconciled. A PR
+reference that failed validation (scope escape) also revokes the owning grant in
+the same locked step; the rest leave the grant usable. Deviations a walk
+re-reads are recorded once, and so is the deviation an unresolved approve's
+reconcile records on its owner (keyed by `sourceRequestId`); approval-mismatch
+events from another approve record again after an acknowledgement.
+
+The pending-plan rebase orders a plan against a concurrent walk's watermark by
+`createTime` only: an older plan is dropped, the watermark's own activity is
+dropped, and an equal-time plan under a different id is kept as `ambiguous`.
 
 `authorize` (create) refuses under the lock when any existing grant is bound to
 another controller id or epoch (for example after another host's take-over): a
@@ -333,24 +354,24 @@ controller authority under the journal lock like the terminal and reconcile
 releases: after a take-over during the POST the slot stays held
 (`slotReleased: false`).
 
-Every `ambiguous-reconcile` on an `approve` also records a blocking deviation
-on the session's owner (fail closed), whatever the reason. One vendor activity
-is credited to at most one record: same-plan and foreign approvals count as
-owners alongside reply echoes, so two unresolved approves never both claim one
+Every `ambiguous-reconcile` on an `approve` also records a blocking deviation on
+the session's owner (fail closed), whatever the reason. One vendor activity is
+credited to at most one record: same-plan and foreign approvals count as owners
+alongside reply echoes, so two unresolved approves never both claim one
 approval. A bound approve persists the consumed activity id (`echoActivityId`),
 so a later pass cannot reuse it. A same-digest message with more than one
-eligible writer and no proven pairing is never assigned to the latest
-dispatch: it is outside activity, whatever the batch size.
-A bound approve that landed on a changed plan carries `policyDeviation: true` on
-its reconciled entry, so a sessionless `status --reconcile` sets
-`policyDeviation` and `requiresAttention`. Terminal-session slot release (in
-`status` and the reconcile path) asserts the grant's controller authority under
-the journal lock; on a host without it the slot stays held, `grants.json` is
-untouched, status still succeeds, and the output flags `slotReleaseSkipped`.
-`authorize --revoke` needs no terminal but asserts the grant's controller
-authority under the journal lock; a host without it is refused
-(`JULES_CONTROLLER_MISMATCH`, recovery: revoke from the controlling host, or
-`authorize --take-over` there if it lost its authority file).
+eligible writer and no proven pairing is never assigned to the latest dispatch:
+it is outside activity, whatever the batch size. A bound approve that landed on
+a changed plan carries `policyDeviation: true` on its reconciled entry, so a
+sessionless `status --reconcile` sets `policyDeviation` and `requiresAttention`.
+Terminal-session slot release (in `status` and the reconcile path) asserts the
+grant's controller authority under the journal lock; on a host without it the
+slot stays held, `grants.json` is untouched, status still succeeds, and the
+output flags `slotReleaseSkipped`. `authorize --revoke` needs no terminal but
+asserts the grant's controller authority under the journal lock; a host without
+it is refused (`JULES_CONTROLLER_MISMATCH`, recovery: revoke from the
+controlling host, or `authorize --take-over` there if it lost its authority
+file).
 
 A dispatched reservation proves only that the POST began, not that it landed. A
 message that only such a still-`reserved` reply (inside its settle window) could
@@ -422,28 +443,28 @@ the reviewed plan that is not a claimed echo refuses the approval
 (`JULES_INVALID_STATE`; a dry run reports `planChanged`). A plan-bound `reply`
 applies the same rule. For these freshness checks an equal `createTime` counts
 as after, because opaque activity ids carry no order. When plans with differing
-digests share the newest `createTime`, the current plan cannot be told: `approve`
-and a plan-bound `reply` refuse (`JULES_POLICY_DEVIATION` / `JULES_QUESTION_CHANGED`)
-instead of picking one by id. After the POST, the newest plan generated before
-the recorded approval must match the reviewed digest, and an equal-time tie
-there counts as changed, and so does any differing plan stamped at the approval's
-own `createTime` (it cannot be ordered against the approval); the same id with
-other steps is reported as a policy deviation. Two different agent questions at
-the newest `createTime` withhold the `reply` action in `supervise` and make a
-question-bound `reply` refuse with `JULES_QUESTION_CHANGED`.
+digests share the newest `createTime`, the current plan cannot be told:
+`approve` and a plan-bound `reply` refuse (`JULES_POLICY_DEVIATION` /
+`JULES_QUESTION_CHANGED`) instead of picking one by id. After the POST, the
+newest plan generated before the recorded approval must match the reviewed
+digest, and an equal-time tie there counts as changed, and so does any differing
+plan stamped at the approval's own `createTime` (it cannot be ordered against
+the approval); the same id with other steps is reported as a policy deviation.
+Two different agent questions at the newest `createTime` withhold the `reply`
+action in `supervise` and make a question-bound `reply` refuse with
+`JULES_QUESTION_CHANGED`.
 
 Same-text messages are classified as a batch: when a settled write and an
 unresolved one share a digest and a walk holds more such messages than settled
 writes, the settled writes take the earliest messages, the unresolved write gets
 no landing evidence, and the surplus is consumed (not held, so no later walk can
 reclassify it as the unresolved write's echo) and recorded as possible outside
-activity. The unresolved write is
-also marked `echoAmbiguous` on its journal record: no later walk, even one that
-re-reads the surplus message, may give it an `echoActivityId`; only reconcile or
-abandon settles it. Older records without the field parse unchanged.
-Only writes that could own a message of the batch count: those dispatched before
-the walk began, not after the message was first read, and whose echo is proven
-newer than the write's vendor floor (below).
+activity. The unresolved write is also marked `echoAmbiguous` on its journal
+record: no later walk, even one that re-reads the surplus message, may give it
+an `echoActivityId`; only reconcile or abandon settles it. Older records without
+the field parse unchanged. Only writes that could own a message of the batch
+count: those dispatched before the walk began, not after the message was first
+read, and whose echo is proven newer than the write's vendor floor (below).
 
 A swap pause in `supervise` is suppressed by our own reply only when that reply
 has positive landing evidence and its echo's vendor `createTime` (recorded as
@@ -466,10 +487,10 @@ it resolved the session (`JULES_SUPERVISION_PAUSED` if that state already
 recorded outside activity, else `JULES_INVALID_STATE`).
 
 A scratch-tripwire failure when the adapter closes after `delegate`, `reply` or
-`approve` dispatched never replaces the write's result: a success keeps its
-body and gains `cleanupViolation` plus the `adapterCleanupViolation` attention
-flag, and `JULES_UNKNOWN_OUTCOME` stays `JULES_UNKNOWN_OUTCOME` (the violation
-goes to stderr), so a caller does not retry a write that may have landed.
+`approve` dispatched never replaces the write's result: a success keeps its body
+and gains `cleanupViolation` plus the `adapterCleanupViolation` attention flag,
+and `JULES_UNKNOWN_OUTCOME` stays `JULES_UNKNOWN_OUTCOME` (the violation goes to
+stderr), so a caller does not retry a write that may have landed.
 
 Activity ids are stored without their session, so every claimed-echo lookup
 (`claimOwnEchoes`, the reply and approve freshness checks, reconcile) is scoped

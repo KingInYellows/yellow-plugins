@@ -26,6 +26,7 @@ import {
   initControllerAuthority,
   readControllerAuthority,
   takeOverController,
+  takeOverEpoch,
 } from './controller.js';
 import { DEFAULT_READ_DEADLINE_MS, deadlineIn } from './deadline.js';
 import { AppErrorException, throwAppError } from './errors.js';
@@ -405,16 +406,23 @@ export async function authorizeTakeOver(
   );
   return withJournalLock(deps.dataDir, async () => {
     const grants = loadGrants(deps.dataDir);
-    const result = takeOverController(ctx, deps.dataDir, grants);
-    writeGrants(deps.dataDir, result.grants);
     // Reservations from the earlier epoch carry the old host's clock; reconcile
-    // ages them from this moment on this host's clock.
+    // ages them from this moment on this host's clock. The marker is written
+    // before anything is rebound: a crash after it leaves grants on the old
+    // epoch (writes fail closed until the take-over is re-run, which writes a
+    // newer marker), never rebound grants without a marker.
     const journal = await readJournal(deps.dataDir);
     const seq = nextSeq(journal);
+    // Computed once: a take-over of another data directory on this host
+    // shares the authority file but not this lock, so a recomputed epoch
+    // could differ from the one the marker names.
+    const epoch = takeOverEpoch(ctx, grants);
     await writeJournal(deps.dataDir, {
       ...journal,
-      controllerTakeover: { at: nowFn(deps)().toISOString(), seq },
+      controllerTakeover: { at: nowFn(deps)().toISOString(), seq, epoch },
     });
+    const result = takeOverController(ctx, deps.dataDir, grants, epoch);
+    writeGrants(deps.dataDir, result.grants);
     return {
       operation: 'authorize' as const,
       controllerId: result.authority.controllerId,

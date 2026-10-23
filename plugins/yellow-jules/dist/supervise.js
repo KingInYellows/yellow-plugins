@@ -24,6 +24,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BACKOFF_CAP_SECONDS = void 0;
 exports.superviseOnce = superviseOnce;
 exports.clearPause = clearPause;
+exports.deviationNeedsFreshGrant = deviationNeedsFreshGrant;
+exports.clearDeviation = clearDeviation;
 const activity_walk_js_1 = require("./activity-walk.js");
 const authority_js_1 = require("./authority.js");
 const controller_js_1 = require("./controller.js");
@@ -801,5 +803,113 @@ async function clearPause(deps, args) {
         localId: owner.localId,
         sessionResource,
         cleared: true,
+    };
+}
+/**
+ * Deviations whose evidence puts the session outside its grant's scope (a pull
+ * request reference that is not the grant's repository, or no known source).
+ * Acknowledging one revokes the owning grant: work on the session continues
+ * only under a grant the owner authorizes afresh. Every other deviation (an
+ * unrequested PR, an approval that landed on a different plan) is the owner's
+ * call to accept once they have looked, and the grant stays as it is.
+ */
+const FRESH_GRANT_DEVIATION_PREFIX = 'vendor pull request reference failed validation';
+function deviationNeedsFreshGrant(reason) {
+    return reason.startsWith(FRESH_GRANT_DEVIATION_PREFIX);
+}
+/** The controller check for an acknowledgement: the grant's epoch, or this host's hold on the data directory when the owner has no grant. */
+function assertDeviationControllerAuthority(deps, grantId) {
+    const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
+    if (grantId === undefined) {
+        (0, controller_js_1.assertHostControlsDataDir)(ctx.controllerDir, deps.dataDir, ctx.controllerId);
+        return;
+    }
+    // A grant the record names but grants.json lacks (a partial restore) proves
+    // nothing about this host: refuse rather than skip the check.
+    const grant = (0, authority_js_1.loadGrants)(deps.dataDir).grants[grantId];
+    if (grant === undefined) {
+        (0, errors_js_1.throwAppError)('JULES_CONTROLLER_MISMATCH', `the session's grant ${grantId} is not in grants.json, so this host's controller authority cannot be checked`);
+    }
+    (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId);
+}
+/** Order-sensitive fingerprint of the unreconciled deviations, so a newer one recorded during the confirmation is never acknowledged unseen. */
+function openDeviationKey(record) {
+    return JSON.stringify(record.deviations
+        .filter((d) => !d.reconciled)
+        .map((d) => [d.reason, d.prUrl ?? null, d.observedAt]));
+}
+/**
+ * R13 recovery: acknowledges every unreconciled policy deviation on a session
+ * this plugin created, so grant-backed writes can resume. TTY-confirmed, like
+ * `--clear-pause`, and only after a COMPLETE `status` walk that began after the
+ * newest deviation, so the owner has looked at the session as it is now. A
+ * deviation that needs a fresh grant (see `deviationNeedsFreshGrant`) revokes
+ * the owning grant in the same journal-locked step.
+ */
+async function clearDeviation(deps, args) {
+    (0, runtime_support_js_1.refuseInsideSupervisedSession)(deps.env, 'supervise --clear-deviation');
+    (0, runtime_support_js_1.prepare)(deps);
+    const journal = await (0, state_js_1.readJournal)(deps.dataDir);
+    const sessionResource = (0, runtime_support_js_1.resolveSessionResource)(journal, args.session);
+    const owner = owns(journal, sessionResource);
+    const open = owner.deviations.filter((d) => !d.reconciled);
+    if (open.length === 0) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'this session has no unreconciled policy deviation', { recoveryAction: 'Nothing to clear.' });
+    }
+    const newest = open.reduce((a, d) => (d.observedAt > a ? d.observedAt : a), '');
+    if (owner.lastCompleteWalkAt === undefined ||
+        owner.lastCompleteWalkAt <= newest) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'no complete status walk has run since the newest policy deviation', {
+            recoveryAction: 'Run status for this session first, inspect it, then retry.',
+        });
+    }
+    assertDeviationControllerAuthority(deps, owner.grantId);
+    const freshGrant = open.some((d) => deviationNeedsFreshGrant(d.reason));
+    const revoke = freshGrant ? owner.grantId : undefined;
+    await (0, runtime_support_js_1.confirmOwner)(deps, [
+        'yellow-jules: ACKNOWLEDGE POLICY DEVIATION',
+        `  session:     ${sessionResource}`,
+        ...open.map((d) => `  deviation:   ${d.reason} (seen ${d.observedAt})${deviationNeedsFreshGrant(d.reason) ? ' - needs a fresh grant' : ''}`),
+        '',
+        revoke !== undefined
+            ? `Grant ${revoke} is REVOKED. Further writes on this session need a new grant from authorize.`
+            : 'Grant-backed writes resume for this session and its grant.',
+    ].join('\n'));
+    const nowIso = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
+    const key = openDeviationKey(owner);
+    await (0, state_js_1.updateJournal)(deps.dataDir, (operations) => {
+        // Rechecked under the journal lock: the controller may have changed while
+        // the confirmation was open.
+        assertDeviationControllerAuthority(deps, owner.grantId);
+        const current = operations[owner.localRequestId];
+        if (current === undefined ||
+            openDeviationKey(current) !== key ||
+            current.lastCompleteWalkAt === undefined ||
+            current.lastCompleteWalkAt <= newest) {
+            return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the session deviations changed while the confirmation was open; nothing was acknowledged', {
+                recoveryAction: 'Run status for this session, inspect it, then retry.',
+            });
+        }
+        // The grant is revoked before the journal is written: a failure between
+        // the two leaves the deviation open under a revoked grant (stricter).
+        if (revoke !== undefined) {
+            const file = (0, authority_js_1.loadGrants)(deps.dataDir);
+            if (file.grants[revoke] !== undefined &&
+                file.grants[revoke].revokedAt === undefined) {
+                (0, authority_js_1.writeGrants)(deps.dataDir, (0, authority_js_1.updateGrant)(file, revoke, (g) => ({ ...g, revokedAt: nowIso })));
+            }
+        }
+        operations[owner.localRequestId] = {
+            ...current,
+            deviations: current.deviations.map((d) => d.reconciled ? d : { ...d, reconciled: true, reconciledAt: nowIso }),
+            updatedAt: nowIso,
+        };
+    });
+    return {
+        operation: 'supervise',
+        localId: owner.localId,
+        sessionResource,
+        acknowledged: open.map((d) => d.reason),
+        ...(revoke !== undefined ? { revokedGrantId: revoke } : {}),
     };
 }

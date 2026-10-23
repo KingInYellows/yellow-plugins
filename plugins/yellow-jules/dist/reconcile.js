@@ -18,6 +18,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.approvedPlanVerdict = approvedPlanVerdict;
 exports.reconcile = reconcile;
 const activity_walk_js_1 = require("./activity-walk.js");
+const authority_js_1 = require("./authority.js");
+const controller_js_1 = require("./controller.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
 const redact_js_1 = require("./redact.js");
@@ -386,19 +388,63 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
         return { record, outcome: 'unknown-outcome' };
     });
 }
-// ---------------------------------------------------------------------------
-// persistence
-// ---------------------------------------------------------------------------
+/**
+ * Why this host may not write the reconciliation of `record`, or `undefined`
+ * when it may: the record's grant must name this host's controller epoch for
+ * this data directory. Any failure to tell is a refusal (fail closed). A record
+ * without a grant predates grants and has no controller to check.
+ */
+function controllerRefusal(deps, grants, record) {
+    if (record.grantId === undefined)
+        return undefined;
+    try {
+        if (grants instanceof Error)
+            throw grants;
+        const grant = grants.grants[record.grantId];
+        if (grant === undefined) {
+            return `its grant ${record.grantId} is not in grants.json`;
+        }
+        const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
+        (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId);
+        return undefined;
+    }
+    catch (err) {
+        return err instanceof errors_js_1.AppErrorException &&
+            err.appError.code === 'JULES_CONTROLLER_MISMATCH'
+            ? err.appError.message
+            : (0, errors_js_1.errorLabel)(err);
+    }
+}
 async function persist(deps, resolutions) {
     const now = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
     // The requests this pass actually moved to `failed`: only those give up a slot.
     const released = new Set();
     const refused = new Map();
     await (0, state_js_1.updateJournal)(deps.dataDir, (operations) => {
+        // Read under the journal lock, which every grants.json writer also holds.
+        let grants;
+        try {
+            grants = (0, authority_js_1.loadGrants)(deps.dataDir);
+        }
+        catch (err) {
+            grants = err instanceof Error ? err : new Error(String(err));
+        }
         for (const r of resolutions) {
             const current = operations[r.record.localRequestId];
             // Another process may have settled it since this pass read the journal.
             if (current === undefined || !state_js_1.UNRESOLVED_STATUSES.has(current.status)) {
+                continue;
+            }
+            // A copied or shared data directory on a host without the controller
+            // authority must not settle anything: a `failed` written here would make
+            // the create abandonable while the controller's POST may still land.
+            const refusal = controllerRefusal(deps, grants, current);
+            if (refusal !== undefined) {
+                refused.set(current.localRequestId, {
+                    record: r.record,
+                    outcome: 'not-reached',
+                    reason: `not recorded: this host is not the grant's controller (${refusal}); reconcile from the controlling host`,
+                });
                 continue;
             }
             // A second create owning the same session would leave two owners, and
@@ -466,6 +512,9 @@ async function persist(deps, resolutions) {
             }
             else if (r.outcome === 'policy-deviation' &&
                 r.deviation !== undefined) {
+                // Every reconcile re-reads this unresolved record's evidence, so an
+                // acknowledged deviation still suppresses it, or the acknowledgement
+                // could never hold.
                 const known = current.deviations.some((d) => d.reason === r.deviation);
                 if (!known) {
                     next = {
@@ -489,8 +538,14 @@ async function persist(deps, resolutions) {
                 (r.outcome === 'bound' || r.outcome === 'ambiguous-reconcile') &&
                 next.sessionResource !== undefined) {
                 const owner = Object.values(operations).find((o) => (0, state_js_1.ownsSession)(o) && o.sessionResource === next.sessionResource);
+                // Each reconcile re-reads an unresolved approve, so one recorded for
+                // this approve, open or acknowledged, is not recorded again. Another
+                // approve with the same fate is its own event and gets its own entry.
+                // A legacy entry with no source still suppresses while it is open.
                 if (owner !== undefined &&
-                    !owner.deviations.some((d) => d.reason === r.deviation)) {
+                    !owner.deviations.some((d) => d.reason === r.deviation &&
+                        (d.sourceRequestId === current.localRequestId ||
+                            (d.sourceRequestId === undefined && !d.reconciled)))) {
                     operations[owner.localRequestId] = {
                         ...owner,
                         deviations: [
@@ -498,6 +553,7 @@ async function persist(deps, resolutions) {
                             {
                                 kind: 'policy-deviation',
                                 reason: r.deviation,
+                                sourceRequestId: current.localRequestId,
                                 observedAt: now,
                                 reconciled: false,
                             },
@@ -543,9 +599,38 @@ async function reconcile(deps, journal, sessionResource, deadline) {
         (r.createSeq === undefined || r.createSeq < takeover.seq)
         ? takeoverMs
         : Date.parse(r.createdAt);
-    const inFlight = targets.filter((r) => r.status === 'reserved' && nowMs - ageStartMs(r) < activity_walk_js_1.RESERVATION_SETTLE_MS);
-    const settled = targets.filter((r) => !inFlight.includes(r));
-    const early = inFlight.map((record) => notReached(record, 'the reservation may still be in flight; try again shortly'));
+    // A grant on an epoch the marker does not cover was rebound by a take-over
+    // the journal never recorded (a crash between the two in an older runtime):
+    // its reservations have no trustworthy age start, so none is aged at all.
+    // Epoch 1 is the first authorize; every take-over writes a later one.
+    let grants;
+    try {
+        grants = (0, authority_js_1.loadGrants)(deps.dataDir);
+    }
+    catch {
+        // Unreadable grants: persist refuses every write anyway.
+    }
+    const unmarked = (r) => {
+        const epoch = r.grantId !== undefined
+            ? grants?.grants[r.grantId]?.epochRef.epoch
+            : undefined;
+        return (epoch !== undefined &&
+            epoch > 1 &&
+            (takeover === undefined ||
+                (takeover.epoch !== undefined && takeover.epoch < epoch)));
+    };
+    const early = [];
+    for (const r of targets) {
+        if (r.status !== 'reserved')
+            continue;
+        if (unmarked(r)) {
+            early.push(notReached(r, 'its grant was rebound to a new controller epoch without a take-over marker in the journal, so the reservation cannot be aged; run authorize --take-over again'));
+        }
+        else if (nowMs - ageStartMs(r) < activity_walk_js_1.RESERVATION_SETTLE_MS) {
+            early.push(notReached(r, 'the reservation may still be in flight; try again shortly'));
+        }
+    }
+    const settled = targets.filter((r) => !early.some((e) => e.record === r));
     const creates = settled.filter((r) => r.kind === 'create');
     const others = settled.filter((r) => r.kind === 'reply' || r.kind === 'approve');
     const resolutions = [
