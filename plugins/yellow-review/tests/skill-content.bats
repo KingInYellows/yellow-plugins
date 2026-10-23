@@ -201,6 +201,8 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   printf '%s\n' "$step9" | grep -qF 'skills/pr-review-workflow/scripts/commit-resolve-fixes" --provider "<graphite|github>" --pr "<PR#>"'
   printf '%s\n' "$step9" | grep -qF -- '--files-from "<files-file>"'
   printf '%s\n' "$step9" | grep -qF -- '`--unattended` in non-interactive mode'
+  step7=$(sed -n '/^### Step 7: Apply Fixes/,/^### Step 8/p' "$REVIEW_PR")
+  printf '%s\n' "$step7" | grep -qF 'commit-resolve-fixes" --check-paths --files-from "<paths-file>"'
   [ -z "$(printf '%s\n' "$step9" | grep -E 'gt modify( -m|$)|^git (add|commit)')" ]
 }
 
@@ -210,6 +212,8 @@ LEDGER_REF="$BATS_TEST_DIRNAME/../references/review-pr/ledger.md"
   [ -z "$(printf '%s\n' "$step11" | grep -E 'gt modify|git commit')" ]
   TRIAGE="$COMMANDS_DIR/triage.md"
   grep -qF 'the `commit-resolve-fixes` call' "$TRIAGE"
+  grep -qF -- '--check-paths` pre-check' "$TRIAGE"
+  grep -qF -- 'same `--check-paths`' "$REVIEW_ALL"
 }
 
 @test "ledger Step 9 records the fix SHA from the script result" {

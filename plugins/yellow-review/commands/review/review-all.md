@@ -355,7 +355,8 @@ aggregation rules change there, propagate the same change here.
    concrete `suggested_fix`, apply sequentially via Edit. Then apply the
    high-confidence P2 tier exactly as `review-pr.md` Step 7 defines it (up
    to 5 P2 `safe_auto` findings owned by `review-fixer` at anchor 100, each
-   having passed the quality gates above). Other P2/P3 findings are not auto-applied
+   having passed the quality gates above), after the same `--check-paths`
+pre-check. Other P2/P3 findings are not auto-applied
    here — they go through the resolve-PR flow at Step 12 instead. Parity
    rule with `review-pr.md` Step 7. Record each applied fix with
    ledger.md "Step 7".

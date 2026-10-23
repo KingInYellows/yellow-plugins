@@ -1044,6 +1044,21 @@ reports a PR with pending P0-P2 findings as not merge-ready. To auto-apply one
 of them, an orchestrator must promote it to P1 based on additional evidence;
 the default is human review.
 
+**Path pre-check.** Before the first edit, write the file of every finding
+this step would apply (both tiers), one repo-root-relative path per line, to a
+`mktemp` file with the Write tool, and run (add `--unattended` in
+non-interactive mode):
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --check-paths --files-from "<paths-file>"
+```
+
+It prints `{"refused":[{"path","reason"}]}`: paths Step 9's commit refuses
+whatever the edit (deny-listed CI, agent-config and secret files, and runner
+files when unattended). Do not apply a finding on a refused path; list it under
+Residual Actionable Work with `commit helper refuses <reason> path`. A
+non-zero exit applies nothing and reports the stderr.
+
 For `gated_auto`/`manual` findings: do not apply automatically. List in
 the Residual Actionable Work section of the report.
 

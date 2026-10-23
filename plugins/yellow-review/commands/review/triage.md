@@ -194,7 +194,11 @@ offered.
   ```
 
   It re-validates the stored path at the PR head and in the worktree and prints
-  `{"file", "path"}`. Exit 3 means the id is unknown, the worktree is not
+  `{"file", "path"}`. Before editing, write that `file` to a `mktemp` file with
+  the Write tool and run `review-pr.md` Step 7's `commit-resolve-fixes
+  --check-paths` pre-check on it (`--unattended` in unattended mode); a refused
+  path cannot be committed in Step 8, so offer Dismiss or Skip instead. Restore
+  file runs the same pre-check. Exit 3 means the id is unknown, the worktree is not
   checked out at `headRefOid` (a stale local branch: the edit gate is closed
   again), or the stored path is unsafe at the head or in the worktree: tell the
   human and offer Dismiss or Skip, never the file name from the card. Exit 6
