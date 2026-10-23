@@ -29,11 +29,12 @@ yellow-core integration before reviewing real PRs.
 
 ### github-workflow (GitHub-native stacks)
 
-Under `READY_GITHUB`, `/review:pr`, `/review:all`, `/review:resolve-stack` and the
-stack-traversal skill run github-workflow's `lib/github-stack-runtime.js` through
-this plugin's `lib/run-github-stack-runtime.js`, which finds it in a source checkout
-or the active installed version (the newest cached one when that is unknown). Without it they report `RUNTIME_NOT_FOUND` and tell
-you to install it or run `/stack:select`.
+Under `READY_GITHUB`, `/review:pr`, `/review:all`, `/review:resolve-stack` and
+the stack-traversal skill run github-workflow's `lib/github-stack-runtime.js`
+through this plugin's `lib/run-github-stack-runtime.js`, which finds it in a
+source checkout or the active installed version (the newest cached one when that
+is unknown). Without it they report `RUNTIME_NOT_FOUND` and tell you to install
+it or run `/stack:select`.
 
 ### yellow-linear (follow-up issues)
 
@@ -46,12 +47,12 @@ from the ID prefix. That means running `/review:resolve` may write to Linear
 through the yellow-linear MCP server (`https://mcp.linear.app/mcp`, OAuth
 browser login on first use; see the yellow-linear README).
 
-- **Dedupe:** every candidate is checked first with `file-followup-issue
-  --find`, so an issue an earlier run filed on GitHub is found. For Linear the
-  command then looks for the thread's marker in the thread's last
-  viewer-authored comment or with a Linear text search, and reuses a hit only
-  when its identifier, URL and marker match. Linear dedupe is best effort; see
-  "Known limits" in `references/resolve/dispositions.md`.
+- **Dedupe:** every candidate is checked first with
+  `file-followup-issue --find`, so an issue an earlier run filed on GitHub is
+  found. For Linear the command then looks for the thread's marker in the
+  thread's last viewer-authored comment or with a Linear text search, and reuses
+  a hit only when its identifier, URL and marker match. Linear dedupe is best
+  effort; see "Known limits" in `references/resolve/dispositions.md`.
 - **Fallback:** a Linear failure, a response that fails those checks, or an
   unresolvable team falls back to GitHub once and is reported as
   `tracker=github (linear unavailable)`.
@@ -64,96 +65,94 @@ Linear.
 
 ## Commands
 
-| Command                 | Description                                                               |
-| ----------------------- | ------------------------------------------------------------------------- |
-| `/review:setup`         | Validate review prerequisites and optional yellow-core integration        |
-| `/review:pr`            | Adaptive multi-agent review of a single PR with automatic fix application |
-| `/review:resolve`       | Resolve every unresolved review thread (outdated included): fix, reply, resolve, file follow-up issues, and report what still blocks merge |
-| `/review:resolve-stack` | Walk a Graphite stack bottom-up and run `/review:resolve` on every open PR autonomously; stops on a dirty tree, exits 1 when anything blocks; ends with a `ResolveStack:` outcome line |
-| `/review:all`           | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
-| `/review:sweep`         | Run `/review:pr --non-interactive` then `/review:resolve --non-interactive` on the same PR in one unattended pass |
+| Command                 | Description                                                                                                                                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/review:setup`         | Validate review prerequisites and optional yellow-core integration                                                                                                                                                                                   |
+| `/review:pr`            | Adaptive multi-agent review of a single PR with automatic fix application                                                                                                                                                                            |
+| `/review:resolve`       | Resolve every unresolved review thread (outdated included): fix, reply, resolve, file follow-up issues, and report what still blocks merge                                                                                                           |
+| `/review:resolve-stack` | Walk a Graphite stack bottom-up and run `/review:resolve` on every open PR autonomously; stops on a dirty tree, exits 1 when anything blocks; ends with a `ResolveStack:` outcome line                                                               |
+| `/review:all`           | Sequential review of multiple PRs (Graphite stack, all open, or single)                                                                                                                                                                              |
+| `/review:sweep`         | Run `/review:pr --non-interactive` then `/review:resolve --non-interactive` on the same PR in one unattended pass                                                                                                                                    |
 | `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation; stops and exits 1 on a rate limit, an unreadable PR state, a dirty tree or a missing `Resolve:` line; ends with a `SweepAll:` outcome line |
-| `/review:triage`        | Re-verify a PR's review-findings ledger, then fix, dismiss, restore or skip each residual finding (`--non-interactive`, `--prune <PR#>`) |
+| `/review:triage`        | Re-verify a PR's review-findings ledger, then fix, dismiss, restore or skip each residual finding (`--non-interactive`, `--prune <PR#>`)                                                                                                             |
 
 ### Dispositions
 
-`/review:resolve` ends every unresolved thread with one of five
-dispositions, and never resolves a thread before its reply has posted (bare
-LGTM / thanks / nit threads are the one exception: they are resolved with no
-reply):
+`/review:resolve` ends every unresolved thread with one of five dispositions,
+and never resolves a thread before its reply has posted (bare LGTM / thanks /
+nit threads are the one exception: they are resolved with no reply):
 
-| Disposition | What happens |
-| --- | --- |
-| `fixed` | New commit pushed and verified; reply cites the SHA; thread resolved |
-| `addressed` | Already handled at HEAD; reply cites checked `path:line` evidence; thread resolved |
-| `oos` | Out of this PR's scope; follow-up issue filed (GitHub, or Linear when the branch has a Linear ID); reply links it; thread resolved |
-| `disagree` / `unclear` | Reply explains; thread stays open and is listed as blocking merge |
+| Disposition            | What happens                                                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `fixed`                | New commit pushed and verified; reply cites the SHA; thread resolved                                                               |
+| `addressed`            | Already handled at HEAD; reply cites checked `path:line` evidence; thread resolved                                                 |
+| `oos`                  | Out of this PR's scope; follow-up issue filed (GitHub, or Linear when the branch has a Linear ID); reply links it; thread resolved |
+| `disagree` / `unclear` | Reply explains; thread stays open and is listed as blocking merge                                                                  |
 
 When a thread `/review:resolve` earlier marked `oos` is later `fixed` or
 `addressed`, the new reply names the GitHub follow-up issue
 (`Follow-up #N is no longer needed.`) so a human can close it; nothing closes it
 automatically. A Linear follow-up, or one the lookup cannot find, is not named.
 
-Human-reviewer threads resolve only on hard evidence by default; others are
-held open (`resolve_pr.resolve_human_threads` in `yellow-plugins.local.md`).
-Unattended runs file at most 3 issues per PR. Replies and issues carry a
-hidden marker, so a re-run skips replies and issues it already posted on
-GitHub. This is not a guarantee: a later reviewer comment can make a
-held-open thread eligible for another reply, and Linear issue deduplication
-is best-effort. The last output line is a machine summary:
+Human-reviewer threads resolve only on hard evidence by default; others are held
+open (`resolve_pr.resolve_human_threads` in `yellow-plugins.local.md`).
+Unattended runs file at most 3 issues per PR. Replies and issues carry a hidden
+marker, so a re-run skips replies and issues it already posted on GitHub. This
+is not a guarantee: a later reviewer comment can make a held-open thread
+eligible for another reply, and Linear issue deduplication is best-effort. The
+last output line is a machine summary:
 
 ```text
 Resolve: 5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped, ratelimited=0
 ```
 
 After a push, `/review:resolve` waits for reviewers to post again
-(`resolve_pr.repass_wait_seconds`) and re-passes on the new threads, for as
-long as the bot keeps posting P1 findings: it stops when no new thread
-arrives, a pass pushes nothing, a re-pass sees only P2-or-lower threads, a new
-thread lands on a line it already fixed, or after
-`resolve_pr.repass_max_passes` re-passes (default 5). A thread with no
-severity badge counts as P1. The line before `Resolve:` says how the loop
-ended (`Repass: repasses=2 end=quiet`), and the run records the threads it
-saw so `pr-review-delta check` can tell later, with no model call, whether
-anything new has been posted.
+(`resolve_pr.repass_wait_seconds`) and re-passes on the new threads, for as long
+as the bot keeps posting P1 findings: it stops when no new thread arrives, a
+pass pushes nothing, a re-pass sees only P2-or-lower threads, a new thread lands
+on a line it already fixed, or after `resolve_pr.repass_max_passes` re-passes
+(default 5). A thread with no severity badge counts as P1. The line before
+`Resolve:` says how the loop ended (`Repass: repasses=2 end=quiet`), and the run
+records the threads it saw so `pr-review-delta check` can tell later, with no
+model call, whether anything new has been posted.
 
-Optional `resolve_pr.verify_command` runs before the commit. Interactive
-runs ask first; unattended runs need `resolve_pr.verify_unattended: true`,
-an untracked `yellow-plugins.local.md`, and no runner files in the fix.
-Keep that file ignored as well as untracked (add it to `.git/info/exclude`),
-or the clean-tree check stops the run. If verify fails, the fixes are saved
-as a patch under the git common dir and reverted. The full contract is
+Optional `resolve_pr.verify_command` runs before the commit. Interactive runs
+ask first; unattended runs need `resolve_pr.verify_unattended: true`, an
+untracked `yellow-plugins.local.md`, and no runner files in the fix. Keep that
+file ignored as well as untracked (add it to `.git/info/exclude`), or the
+clean-tree check stops the run. If verify fails, the fixes are saved as a patch
+under the git common dir and reverted. The full contract is
 `references/resolve/dispositions.md`.
 
 Unattended `/review:pr` runs stage up to five P0–P2 findings for yellow-core's
 background compounding drain instead of starting an interactive compounding
 agent. Each finding retains its outcome label; staging never claims test
 verification. `/review:sweep-all` relies on this per-PR staging and has no
-end-of-loop compounding pass. Entries use the main checkout's project slug
-and become eligible for draining at later sessions there, subject to the
-drain thresholds; interactive review behavior is unchanged.
+end-of-loop compounding pass. Entries use the main checkout's project slug and
+become eligible for draining at later sessions there, subject to the drain
+thresholds; interactive review behavior is unchanged.
 
 ## Agents
 
 ### Review (16)
 
-| Agent                          | Description                                                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `project-compliance-reviewer`  | CLAUDE.md/AGENTS.md compliance, naming, project-pattern adherence (always selected; renamed from code-reviewer in Wave 2) |
-| `correctness-reviewer`         | Logic errors, edge cases, state bugs (always selected; new in Wave 2)                                        |
-| `maintainability-reviewer`     | Premature abstraction, dead code, coupling, naming (always selected; new in Wave 2)                          |
-| `reliability-reviewer`         | Production reliability: error handling, retries, timeouts, cascades (conditional; new in Wave 2)             |
-| `project-standards-reviewer`   | Frontmatter, references, cross-platform portability (always selected; new in Wave 2)                         |
-| `adversarial-reviewer`         | Constructed failure scenarios across boundaries (conditional; new in Wave 2)                                 |
-| `plugin-contract-reviewer`     | Breaking changes to plugin public surface — subagent_type / command / skill / MCP-tool renames, manifest field changes, hook contract changes (conditional; new in Wave 3) |
-| `cli-readiness-reviewer`       | CLI agent-readiness for autonomous invocation — non-interactive bypass, structured output, actionable errors, safe retries, bounded output, pipeline composability (conditional; new in Wave 3) |
-| `agent-cli-readiness-reviewer` | 7-principle Blocker/Friction/Optimization rubric for CLI agent-optimization — deeper than `cli-readiness-reviewer`, suited for design-doc audits (conditional; new in Wave 3) |
-| `agent-native-reviewer`        | Action parity, context parity, shared workspace, primitives over workflows, dynamic context injection (conditional; new in Wave 3) |
-| `pr-test-analyzer`             | Test coverage and behavioral completeness                                                                    |
-| `comment-analyzer`             | Comment accuracy and rot detection                                                                           |
-| `code-simplifier`              | Simplification preserving functionality (final pass)                                                         |
-| `type-design-analyzer`         | Type design, encapsulation, invariants                                                                       |
-| `silent-failure-hunter`        | Silent failure and error handling analysis                                                                   |
+| Agent                          | Description                                                                                                                                                                                                                                                    |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `project-compliance-reviewer`  | CLAUDE.md/AGENTS.md compliance, naming, project-pattern adherence (always selected; renamed from code-reviewer in Wave 2)                                                                                                                                      |
+| `correctness-reviewer`         | Logic errors, edge cases, state bugs (always selected; new in Wave 2)                                                                                                                                                                                          |
+| `maintainability-reviewer`     | Premature abstraction, dead code, coupling, naming (always selected; new in Wave 2)                                                                                                                                                                            |
+| `reliability-reviewer`         | Production reliability: error handling, retries, timeouts, cascades (conditional; new in Wave 2)                                                                                                                                                               |
+| `project-standards-reviewer`   | Frontmatter, references, cross-platform portability (always selected; new in Wave 2)                                                                                                                                                                           |
+| `adversarial-reviewer`         | Constructed failure scenarios across boundaries (conditional; new in Wave 2)                                                                                                                                                                                   |
+| `plugin-contract-reviewer`     | Breaking changes to plugin public surface — subagent_type / command / skill / MCP-tool renames, manifest field changes, hook contract changes (conditional; new in Wave 3)                                                                                     |
+| `cli-readiness-reviewer`       | CLI agent-readiness for autonomous invocation — non-interactive bypass, structured output, actionable errors, safe retries, bounded output, pipeline composability (conditional; new in Wave 3)                                                                |
+| `agent-cli-readiness-reviewer` | 7-principle Blocker/Friction/Optimization rubric for CLI agent-optimization — deeper than `cli-readiness-reviewer`, suited for design-doc audits (conditional; new in Wave 3)                                                                                  |
+| `agent-native-reviewer`        | Action parity, context parity, shared workspace, primitives over workflows, dynamic context injection (conditional; new in Wave 3)                                                                                                                             |
+| `pr-test-analyzer`             | Test coverage and behavioral completeness                                                                                                                                                                                                                      |
+| `comment-analyzer`             | Comment accuracy and rot detection                                                                                                                                                                                                                             |
+| `code-simplifier`              | Simplification preserving functionality (final pass)                                                                                                                                                                                                           |
+| `type-design-analyzer`         | Type design, encapsulation, invariants                                                                                                                                                                                                                         |
+| `silent-failure-hunter`        | Silent failure and error handling analysis                                                                                                                                                                                                                     |
 | `thermonuclear-reviewer`       | Strict structural-quality lane: code-judo restructurings, spaghetti-condition growth, weak type/module boundaries, misplaced ownership, evidence-gated file-size threshold crossings. **Opt-in only** — never auto-selected; enable via `reviewer_set.include` |
 
 A `plugin.json` whose only changed line is `"version"` (Changesets' "chore:
@@ -165,109 +164,111 @@ manifest change or plugin-authoring path still does.
 
 ### Workflow (1)
 
-| Agent                 | Description                                |
-| --------------------- | ------------------------------------------ |
+| Agent                 | Description                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
 | `pr-comment-resolver` | Implements one fix per cluster of review comments and proposes a disposition for each thread (no Bash) |
 
 ## Skills
 
-| Skill                | Description                                                          |
-| -------------------- | -------------------------------------------------------------------- |
-| `pr-review-workflow` | Internal reference for adaptive selection and output format          |
-| `stack-traversal`    | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack` |
+| Skill                         | Description                                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pr-review-workflow`          | Internal reference for adaptive selection and output format                                                                                       |
+| `stack-traversal`             | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack`                                      |
 | `yellow-thermonuclear-review` | Portable structural-quality rubric preloaded by `thermonuclear-reviewer`; adapted from Cursor's MIT-licensed `thermo-nuclear-code-quality-review` |
 
 ## Scripts
 
-Helpers under `skills/pr-review-workflow/scripts/` that implement the
-mechanical parts of the resolve contract in
-`references/resolve/dispositions.md`. `/review:resolve` invokes
-`get-pr-blockers` and `apply-thread-actions` (which runs `reply-pr-thread`,
-`resolve-pr-thread` and `file-followup-issue`) per that contract; the other helpers below serve the
-fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
-`file-line-counts` need `gh` and `jq`; those two read only local files.
+Helpers under `skills/pr-review-workflow/scripts/` that implement the mechanical
+parts of the resolve contract in `references/resolve/dispositions.md`.
+`/review:resolve` invokes `get-pr-blockers` and `apply-thread-actions` (which
+runs `reply-pr-thread`, `resolve-pr-thread` and `file-followup-issue`) per that
+contract; the other helpers below serve the fetch, verify, commit and re-pass
+steps. All but `check-resolve-text` and `file-line-counts` need `gh` and `jq`;
+those two read only local files.
 
-| Script | Purpose |
-| --- | --- |
-| `get-pr-comments` | Unresolved review threads (`--include-outdated` adds outdated ones) |
-| `get-pr-blockers` | `CHANGES_REQUESTED` reviewers and conversation-resolution enforcement |
-| `pr-changed-ranges` | Changed line ranges per file in the PR, for the in-diff check |
-| `file-line-counts` | Before/after line counts per changed file, for the thermonuclear-reviewer's size rule |
-| `apply-thread-actions` | Run the resolve write phase for one PR from a JSONL plan (issue, reply, resolve per thread), resumable after its time budget |
-| `reply-pr-thread` | Reply to a thread with an idempotency marker |
-| `resolve-pr-thread` | Resolve one thread |
-| `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |
-| `poll-new-threads` | Re-pass poll for threads not yet seen this run, with P1 / P2-or-lower counts from the bot's severity badge |
-| `pr-review-delta` | Zero-token change check: has a thread appeared since `/review:resolve` last recorded the PR (`check`), and the record itself (`record`) |
-| `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
-| `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
-| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker, except regular-file tool state: `.ruvector/coedit.json`, `.ruvector/coedit-sessions/`, `.ruvector/intelligence.json` (a change is named in a stderr `Note:` line) and `node_modules/.vite/vitest/results.json`; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--revert-denied` reverts only trusted-config dirty paths (a subset of the deny list), takes no file list, and needs `--ignored-since` (refusing on a changed gitignored trusted-config file) or `--no-ignored-guard`; `--dry-run` lists those paths without reverting, so an interactive resolve asks first; it leaves a tracked or untracked trusted-config symlink whose target was written (nested links below it included; without the marker, one that points outside the worktree) and an untracked FIFO, socket or device at a trusted-config path in place with `deniedClean` false; `--check-ignored` runs only the gitignored-file guard) |
-| `head-ignore-probe` | Judge whether a PR head ignores `yellow-plugins.local.md` from its root tree, `.gitignore` and `.gitattributes`, read through `gh api` at `headRefOid` (no fetch or checkout), against this clone's `info/exclude` and `core.excludesFile`; prints the judged `headRefOid` beside the answer; exit 3 is systemic (rate limit, network, auth, 403, tree/blob 404, this clone's own attributes on `.gitignore`), exit 4 PR-specific (`/review:sweep` Step 1b) |
-| `guard-local-config` | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR) |
-| `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
+| Script                     | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get-pr-comments`          | Unresolved review threads (`--include-outdated` adds outdated ones)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `get-pr-blockers`          | `CHANGES_REQUESTED` reviewers and conversation-resolution enforcement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `pr-changed-ranges`        | Changed line ranges per file in the PR, for the in-diff check; `--stack` covers the PRs below it too                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `check-addressed-evidence` | Judge each `addressed` reply's `path:line` evidence; a human thread must cite a line the PR or its stack changed, off its own anchor                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `read-resolve-config`      | Read and validate the `resolve_pr.*` keys of `yellow-plugins.local.md` into one JSON snapshot                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `file-line-counts`         | Before/after line counts per changed file, for the thermonuclear-reviewer's size rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `apply-thread-actions`     | Run the resolve write phase for one PR from a JSONL plan (issue, reply, resolve per thread), resumable after its time budget                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `reply-pr-thread`          | Reply to a thread with an idempotency marker                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `resolve-pr-thread`        | Resolve one thread                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `file-followup-issue`      | File or find the follow-up issue for an out-of-scope thread                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `poll-new-threads`         | Re-pass poll for threads not yet seen this run, with P1 / P2-or-lower counts from the bot's severity badge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `pr-review-delta`          | Zero-token change check: has a thread appeared since `/review:resolve` last recorded the PR (`check`), and the record itself (`record`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `check-resolve-text`       | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `commit-resolve-fixes`     | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `run-verify-command`       | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker, except regular-file tool state: `.ruvector/coedit.json`, `.ruvector/coedit-sessions/`, `.ruvector/intelligence.json` (a change is named in a stderr `Note:` line) and `node_modules/.vite/vitest/results.json`; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--revert-denied` reverts only trusted-config dirty paths (a subset of the deny list), takes no file list, and needs `--ignored-since` (refusing on a changed gitignored trusted-config file) or `--no-ignored-guard`; `--dry-run` lists those paths without reverting, so an interactive resolve asks first; it leaves a tracked or untracked trusted-config symlink whose target was written (nested links below it included; without the marker, one that points outside the worktree) and an untracked FIFO, socket or device at a trusted-config path in place with `deniedClean` false; `--check-ignored` runs only the gitignored-file guard) |
+| `head-ignore-probe`        | Judge whether a PR head ignores `yellow-plugins.local.md` from its root tree, `.gitignore` and `.gitattributes`, read through `gh api` at `headRefOid` (no fetch or checkout), against this clone's `info/exclude` and `core.excludesFile`; prints the judged `headRefOid` beside the answer; exit 3 is systemic (rate limit, network, auth, 403, tree/blob 404, this clone's own attributes on `.gitignore`), exit 4 PR-specific (`/review:sweep` Step 1b)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `guard-local-config`       | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `file-line-counts`         | Base/head line counts per changed file for `thermonuclear-reviewer`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 In revert modes `run-verify-command` never opens a FIFO, socket, or device
-standing in for a tracked file. It renames the entry aside in its own
-directory (`.yellow-review-hold-*/node`) so the recovery patch records the
-tracked deletion, then renames it back. When the index holds staged content
-for that path, the patch records the staged content instead. The hold path is recorded before
-that rename. If the ledger write fails, the file is put back when it can
-and nothing is reverted; if it cannot, stderr names the remaining path. If
-the rename back fails, the parent retries it. If the entry is still held,
-the reason names that path and does not say the tree was left untouched.
-The special file is unlinked only after both snapshots succeed. An `rm`
-that cannot unlink one special file is recorded and the revert continues,
-so one already removed is still restored. Checkout does not open a special
-file that is still present. `--revert-denied` leaves a special file in place
-and reports `deniedClean: false`. A directory that replaced a tracked file
-is checked against the mount table before its device walk, and that walk
-does not cross into another filesystem.
+standing in for a tracked file. It renames the entry aside in its own directory
+(`.yellow-review-hold-*/node`) so the recovery patch records the tracked
+deletion, then renames it back. When the index holds staged content for that
+path, the patch records the staged content instead. The hold path is recorded
+before that rename. If the ledger write fails, the file is put back when it can
+and nothing is reverted; if it cannot, stderr names the remaining path. If the
+rename back fails, the parent retries it. If the entry is still held, the reason
+names that path and does not say the tree was left untouched. The special file
+is unlinked only after both snapshots succeed. An `rm` that cannot unlink one
+special file is recorded and the revert continues, so one already removed is
+still restored. Checkout does not open a special file that is still present.
+`--revert-denied` leaves a special file in place and reports
+`deniedClean: false`. A directory that replaced a tracked file is checked
+against the mount table before its device walk, and that walk does not cross
+into another filesystem.
 
 The worktree walks (the PATH screen's hard-link check and the special-file
-search) skip a directory that another user owns and this user can neither
-read, write nor search, such as a root-owned docker volume. An unreadable
-directory the user owns still stops the run, and stderr names it.
+search) skip a directory that another user owns and this user can neither read,
+write nor search, such as a root-owned docker volume. An unreadable directory
+the user owns still stops the run, and stderr names it.
 
-`commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
-`jq` whose canonical file is inside the worktree, and they exec only the
-absolute path outside it. `commit-resolve-fixes` also refuses a `gt` or
-`node` whose canonical file is inside the worktree, including a symlink
-outside the worktree that points at one, and drops empty or relative `PATH`
-entries before that check. Every other tool they run by bare name, and
-every program git or its children look up through `PATH` (`grep`, `sed`,
-`ssh`, `git-credential-*`, `gpg`, pagers and so on), runs from a `PATH` that
-drops directories inside the worktree, any directory that holds a symlink
-(dangling or not) whose target is inside it, whatever the link is named, and any
-directory with an executable script whose `#!` interpreter is inside it. Both
-scripts also refuse an inherited `GIT_SSH_COMMAND`, `GIT_ASKPASS`, `GIT_PAGER`,
-`EDITOR` or injected git config (`core.sshCommand`, `credential.helper`, ...)
-whose command line names a path inside the worktree (`sh <worktree>/script`
-included), or uses shell syntax that cannot be judged (`$VAR`, backticks, `;`,
-`|`, ...), or a `HOME`/`XDG_CONFIG_HOME` that puts git's global config inside
-the worktree; values outside it keep working. Any non-empty `GIT_EXEC_PATH` or
-`GIT_CONFIG` is refused, wherever it points. A program-running key in the
-user's own global or system config is refused on the same unjudgeable shell
-syntax, except `alias.*`, pagers, editors and diff or merge tools, which these
-scripts never run. A script whose `#!` line passes a path inside the worktree as
-an argument is treated like one whose interpreter is inside it. Both scripts
-force `protocol.ext.allow=never`, so an `ext::` remote cannot run its command.
-In the verify command's environment the ssh command line runs on the screened
-`PATH`, and a bare `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS` or
-`GIT_PROXY_COMMAND`, and a bare credential helper, is pinned to an absolute
-program there. Other credential helpers run on the screened `PATH`, so a git the command
-starts by absolute path (`/usr/bin/git`) still skips worktree helpers.
+`commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or `jq`
+whose canonical file is inside the worktree, and they exec only the absolute
+path outside it. `commit-resolve-fixes` also refuses a `gt` or `node` whose
+canonical file is inside the worktree, including a symlink outside the worktree
+that points at one, and drops empty or relative `PATH` entries before that
+check. Every other tool they run by bare name, and every program git or its
+children look up through `PATH` (`grep`, `sed`, `ssh`, `git-credential-*`,
+`gpg`, pagers and so on), runs from a `PATH` that drops directories inside the
+worktree, any directory that holds a symlink (dangling or not) whose target is
+inside it, whatever the link is named, and any directory with an executable
+script whose `#!` interpreter is inside it. Both scripts also refuse an
+inherited `GIT_SSH_COMMAND`, `GIT_ASKPASS`, `GIT_PAGER`, `EDITOR` or injected
+git config (`core.sshCommand`, `credential.helper`, ...) whose command line
+names a path inside the worktree (`sh <worktree>/script` included), or uses
+shell syntax that cannot be judged (`$VAR`, backticks, `;`, `|`, ...), or a
+`HOME`/`XDG_CONFIG_HOME` that puts git's global config inside the worktree;
+values outside it keep working. Any non-empty `GIT_EXEC_PATH` or `GIT_CONFIG` is
+refused, wherever it points. A program-running key in the user's own global or
+system config is refused on the same unjudgeable shell syntax, except `alias.*`,
+pagers, editors and diff or merge tools, which these scripts never run. A script
+whose `#!` line passes a path inside the worktree as an argument is treated like
+one whose interpreter is inside it. Both scripts force
+`protocol.ext.allow=never`, so an `ext::` remote cannot run its command. In the
+verify command's environment the ssh command line runs on the screened `PATH`,
+and a bare `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS` or `GIT_PROXY_COMMAND`, and a
+bare credential helper, is pinned to an absolute program there. Other credential
+helpers run on the screened `PATH`, so a git the command starts by absolute path
+(`/usr/bin/git`) still skips worktree helpers.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
-`resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
-`lib/persona-shadow.sh` is the `/review:pr` shadow selection logger (see
-"Opt-in: persona selection shadow log" below).
+`resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these
+scripts. `lib/persona-shadow.sh` is the `/review:pr` shadow selection logger
+(see "Opt-in: persona selection shadow log" below).
 
 ## Opt-in: thermonuclear structural review
 
-`thermonuclear-reviewer` is the one persona `/review:pr` never selects on
-its own. It applies a deliberately aggressive structural rubric at
-opus/xhigh, which is not worth paying on every PR — so a repository enables
-it explicitly in `yellow-plugins.local.md`:
+`thermonuclear-reviewer` is the one persona `/review:pr` never selects on its
+own. It applies a deliberately aggressive structural rubric at opus/xhigh, which
+is not worth paying on every PR — so a repository enables it explicitly in
+`yellow-plugins.local.md`:
 
 ```yaml
 ---
@@ -278,45 +279,43 @@ reviewer_set:
 ```
 
 Then run `/review:pr` as usual. All default personas still run; this adds a
-high-pressure structural lane on top of them. Remove the entry to turn it
-off again.
+high-pressure structural lane on top of them. Remove the entry to turn it off
+again.
 
 ### Cursor and Codex
 
-Those hosts do not ship `/review:pr`, the persona, or the
-`reviewer_set.include` opt-in. Each generated target exposes **only** the
-`yellow-thermonuclear-review` skill, and it is explicit-invocation-only:
-ask for a thermonuclear review (or one of the skill description's other
-trigger phrases) after installing the plugin. It will not load on an
-ordinary review.
+Those hosts do not ship `/review:pr`, the persona, or the `reviewer_set.include`
+opt-in. Each generated target exposes **only** the `yellow-thermonuclear-review`
+skill, and it is explicit-invocation-only: ask for a thermonuclear review (or
+one of the skill description's other trigger phrases) after installing the
+plugin. It will not load on an ordinary review.
 
 - **Cursor** — install the generated `yellow-review` plugin (see
   [cursor-distribution.md](../../docs/cursor-distribution.md)) and invoke
   `yellow-thermonuclear-review` directly.
-- **Codex** — install from the generated `.agents/plugins/` marketplace
-  (see [codex-distribution.md](../../docs/codex-distribution.md)), confirm
-  it with `codex plugin list`, then invoke the same skill.
+- **Codex** — install from the generated `.agents/plugins/` marketplace (see
+  [codex-distribution.md](../../docs/codex-distribution.md)), confirm it with
+  `codex plugin list`, then invoke the same skill.
 
-The Codex manifest sets `commands: []` to prevent automatic conversion of
-Claude command wrappers into additional skills.
+The Codex manifest sets `commands: []` to prevent automatic conversion of Claude
+command wrappers into additional skills.
 
-Neither host enforces the Claude agent's read-only tool allowlist. The
-skill's report-only rails are prompt-level, not runtime-enforced. Live
-host smoke tests are tracked in
+Neither host enforces the Claude agent's read-only tool allowlist. The skill's
+report-only rails are prompt-level, not runtime-enforced. Live host smoke tests
+are tracked in
 [#774](https://github.com/KingInYellows/yellow-plugins/issues/774).
 
 Two caveats worth knowing before enabling it:
 
-- Its findings are advisory and owned by a human. No automatic-fix lane
-  will ever apply a restructuring it proposes.
-- It is unreachable under `review_pipeline: legacy`. The legacy escape
-  hatch carries its own fixed persona list and never reads `reviewer_set`,
-  so `include` has no effect there.
+- Its findings are advisory and owned by a human. No automatic-fix lane will
+  ever apply a restructuring it proposes.
+- It is unreachable under `review_pipeline: legacy`. The legacy escape hatch
+  carries its own fixed persona list and never reads `reviewer_set`, so
+  `include` has no effect there.
 - Its category is `maintainability`. If the repository already sets
   `focus_areas` without `maintainability` in it, the mapping filters this
-  persona back out after `reviewer_set.include` adds it — add
-  `maintainability` to `focus_areas` too, or the opt-in snippet above has
-  no effect.
+  persona back out after `reviewer_set.include` adds it — add `maintainability`
+  to `focus_areas` too, or the opt-in snippet above has no effect.
 
 ## Opt-in: persona selection shadow log
 
@@ -326,25 +325,24 @@ pick, which ones the orchestrator picked, and which ones TypeSafe's Jev would
 pick from one request on the redacted diff. It never changes which reviewers
 run; it collects data for a later eval of Jev-based selection. The Jev call
 needs `TYPESAFE_API_KEY` and is made only for public repositories or those in
-`reviewer_selection_private_repos`; without it the record still holds the
-exact and orchestrator sets. Records land in
+`reviewer_selection_private_repos`; without it the record still holds the exact
+and orchestrator sets. Records land in
 `<git-common-dir>/yellow-review/jev-persona/` and hold no diff text.
 
-To turn it on for every repository, put `reviewer_selection` in the
-user-level file `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md` instead; a repo file that sets it still wins.
-`reviewer_selection_private_repos` is read only from that user-level file,
-since a PR could otherwise add its own opt-in. `owner/*` allows all of one
-owner's private repositories:
+To turn it on for every repository, put `reviewer_selection` in the user-level
+file `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md` instead; a
+repo file that sets it still wins. `reviewer_selection_private_repos` is read
+only from that user-level file, since a PR could otherwise add its own opt-in.
+`owner/*` allows all of one owner's private repositories:
 
 ```yaml
 ---
 reviewer_selection: shadow
-reviewer_selection_private_repos: ["KingInYellows/*"]
+reviewer_selection_private_repos: ['KingInYellows/*']
 ---
 ```
 
-Details:
-`references/review-pr/persona-shadow.md`; trust boundary:
+Details: `references/review-pr/persona-shadow.md`; trust boundary:
 [`docs/security.md`](../../docs/security.md) "Persona Selection Shadow Log".
 
 ## Review-findings ledger
@@ -360,34 +358,32 @@ included. Step 7 auto-applies P0/P1 `safe_auto` fixes plus up to 5 P2
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`. It
   lives inside `.git`, so every worktree of the clone shares it and it never
   appears in a diff. It is local to this clone and this machine.
-- **When:** after Step 6's partition (before any edit), after each Step 7
-  fix (`applied`), after the Step 8 simplifier pass, and at Step 9 (the
-  fixing commit's SHA, then the published head). A fix becomes `fixed` only
-  when its commit is proved to be on the remote PR head and the defect no
-  longer reproduces there.
-- **Lifecycle states:** `open`, `report_only`, `applied`, `fixed`,
-  `dismissed`, `stale`, `reopened`. Pending = `open`, `reopened`, `applied`;
-  needs attention = `report_only`, `stale`. Re-observing a `fixed` or
-  `stale` finding, or a dismissed one whose anchor or dependencies changed,
-  reopens it.
-- **Dismissed findings** that still apply are injected into reviewer prompts
-  as a fenced, reference-only block, so a re-review does not raise them
-  again.
+- **When:** after Step 6's partition (before any edit), after each Step 7 fix
+  (`applied`), after the Step 8 simplifier pass, and at Step 9 (the fixing
+  commit's SHA, then the published head). A fix becomes `fixed` only when its
+  commit is proved to be on the remote PR head and the defect no longer
+  reproduces there.
+- **Lifecycle states:** `open`, `report_only`, `applied`, `fixed`, `dismissed`,
+  `stale`, `reopened`. Pending = `open`, `reopened`, `applied`; needs attention
+  = `report_only`, `stale`. Re-observing a `fixed` or `stale` finding, or a
+  dismissed one whose anchor or dependencies changed, reopens it.
+- **Dismissed findings** that still apply are injected into reviewer prompts as
+  a fenced, reference-only block, so a re-review does not raise them again.
 - Every stored title, fix, reason and anchor line is redacted first. Without
   yellow-core the ledger withholds all model-authored text.
 
 The Step 10 report ends Coverage with a `Ledger:` line (new, carried over,
 reopened, pending, need attention).
 
-`/review:triage [PR]` works the ledger down. It first reconciles every
-finding against the fetched PR head. An `applied` fix becomes `fixed` once
-it is proved published, or once its defect is gone from the PR head when a
-restack rewrote the fix commit; it becomes `reopened` if the fix commit was
-abandoned and the defect is still there. Findings whose anchor is gone
-become `stale`, and a `stale` finding whose anchor matches again becomes
-`reopened`. Anything unverifiable (a shallow clone, missing objects, a
-partial clone offline) is listed rather than changed. After that it walks
-the remaining findings one card at a time:
+`/review:triage [PR]` works the ledger down. It first reconciles every finding
+against the fetched PR head. An `applied` fix becomes `fixed` once it is proved
+published, or once its defect is gone from the PR head when a restack rewrote
+the fix commit; it becomes `reopened` if the fix commit was abandoned and the
+defect is still there. Findings whose anchor is gone become `stale`, and a
+`stale` finding whose anchor matches again becomes `reopened`. Anything
+unverifiable (a shallow clone, missing objects, a partial clone offline) is
+listed rather than changed. After that it walks the remaining findings one card
+at a time:
 
 - **Apply** — only when HEAD is the PR head and the tree is clean.
 - **Dismiss** — with a reason and optional dependency paths. The dismissal
@@ -395,62 +391,59 @@ the remaining findings one card at a time:
 - **Restore file** — for a file the PR deleted, byte-for-byte from the base.
 - **Skip.**
 
-`--non-interactive` reconciles and applies nothing, and keeps the ledger of
-a PR that has merged or closed. Attended triage of such a PR asks before
-deleting its ledger. `--prune <PR#>` deletes the ledger of a merged or
-closed PR.
+`--non-interactive` reconciles and applies nothing, and keeps the ledger of a PR
+that has merged or closed. Attended triage of such a PR asks before deleting its
+ledger. `--prune <PR#>` deletes the ledger of a merged or closed PR.
 
 Triage Step 3, sweep Step 3b and sweep-all Step 2b each record a closed or
-merged PR's live state via `review-ledger.sh refresh-state`, so the
-SessionStart notice below lists that PR as unverified instead of pending. A
-failed refresh (exit 6, 4 or 1) leaves the state unchanged and is reported
-as `state not recorded, exit <N>`.
+merged PR's live state via `review-ledger.sh refresh-state`, so the SessionStart
+notice below lists that PR as unverified instead of pending. A failed refresh
+(exit 6, 4 or 1) leaves the state unchanged and is reported as
+`state not recorded, exit <N>`.
 
-A SessionStart hook prints one line when any open PR in this clone has
-pending or attention findings, for example
+A SessionStart hook prints one line when any open PR in this clone has pending
+or attention findings, for example
 `[yellow-review] Review ledger: 3 pending, 1 need attention (PRs #12, #34). Run /review:triage 12.`
 It names PRs whose last-seen state is not OPEN, or is over a week old, as
-unverified instead of counting them. It reads only small sidecar files and
-never prints finding text.
+unverified instead of counting them. It reads only small sidecar files and never
+prints finding text.
 
-Trade-offs: the ledger is local to one clone on one machine. Deleting the
-clone deletes it, and nothing is posted to GitHub.
+Trade-offs: the ledger is local to one clone on one machine. Deleting the clone
+deletes it, and nothing is posted to GitHub.
 
-`/review:sweep` runs `/review:triage --non-interactive` after its resolve
-pass and prints `Ledger: <pending> pending, <attention> need attention`,
-then a `Merge:` row that reads `not ready` while any P0-P2 finding is still
-pending (the ledger refuses writes once a PR closes, so findings left at merge
-are stranded). `/review:sweep-all` adds a `Residual` column
-(`pending/attention`) to its summary table and a `Not merge-ready` line naming
-those PRs. After its confirmation it also prunes the ledgers of PRs that
-no longer appear in an all-authors open-PR query, and skips the prune when
-that query fails or may be truncated.
+`/review:sweep` runs `/review:triage --non-interactive` after its resolve pass
+and prints `Ledger: <pending> pending, <attention> need attention`, then a
+`Merge:` row that reads `not ready` while any P0-P2 finding is still pending
+(the ledger refuses writes once a PR closes, so findings left at merge are
+stranded). `/review:sweep-all` adds a `Residual` column (`pending/attention`) to
+its summary table and a `Not merge-ready` line naming those PRs. After its
+confirmation it also prunes the ledgers of PRs that no longer appear in an
+all-authors open-PR query, and skips the prune when that query fails or may be
+truncated.
 
 ## Confidence gating
 
 Four conditional personas (`agent-native-reviewer`,
 `agent-cli-readiness-reviewer`, `cli-readiness-reviewer`,
-`thermonuclear-reviewer`) report every
-in-scope finding with a `confidence` anchor (`0`, `25`, `50`, `75`, `100`)
-and severity — they no longer pre-filter below 75. They do cap at 40
-findings: overflow is dropped at the persona and is not counted in the
-orchestrator's suppressed total. Other
-persona reviewers still apply their own anchor floors (for example,
-`correctness-reviewer` suppresses anchor-25 items and
-`plugin-contract-reviewer` suppresses anchor-25 items before Step 6).
+`thermonuclear-reviewer`) report every in-scope finding with a `confidence`
+anchor (`0`, `25`, `50`, `75`, `100`) and severity — they no longer pre-filter
+below 75. They do cap at 40 findings: overflow is dropped at the persona and is
+not counted in the orchestrator's suppressed total. Other persona reviewers
+still apply their own anchor floors (for example, `correctness-reviewer`
+suppresses anchor-25 items and `plugin-contract-reviewer` suppresses anchor-25
+items before Step 6).
 
 `/review:pr` Step 6 and `/review:all` Step 8 item 9 (the Aggregate-findings
-confidence gate) apply the **single** confidence gate: suppress findings
-below anchor 75 except P0 at 50+. Sub-75 input
-from the four recall personas is expected; the report's "Findings suppressed
-at confidence < 75" line counts only what the orchestrator removes.
-Pre-existing findings pass through the same gate (gated-out items count as
-suppressed, not listed under Pre-existing).
+confidence gate) apply the **single** confidence gate: suppress findings below
+anchor 75 except P0 at 50+. Sub-75 input from the four recall personas is
+expected; the report's "Findings suppressed at confidence < 75" line counts only
+what the orchestrator removes. Pre-existing findings pass through the same gate
+(gated-out items count as suppressed, not listed under Pre-existing).
 
 ## Prompt cache TTL
 
-Five always-run `/review:pr` agents carry `experimental.cacheTtl: 1h` in
-agent frontmatter (nested under `experimental:`):
+Five always-run `/review:pr` agents carry `experimental.cacheTtl: 1h` in agent
+frontmatter (nested under `experimental:`):
 
 - `project-compliance-reviewer`
 - `correctness-reviewer`
@@ -458,18 +451,17 @@ agent frontmatter (nested under `experimental:`):
 - `project-standards-reviewer`
 - `code-simplifier`
 
-On Claude Code 2.1.259+, a second review of the same PR within an hour can
-read these stable persona prompts from cache instead of reprocessing them
-full length. Supported values are `5m` and `1h`; the field is read only from
-subagent files. Trade-off: on usage-billed routes a `1h` cache write bills at
-about 2x base input versus 1.25x for the default `5m`, so the setting pays off
-only when a second review runs within the hour (a re-review,
-`/review:all` across several PRs, or `/review:sweep-all`). A
-`subagentPromptCacheTtl` setting or
-environment variable overrides the frontmatter value for every subagent, which
-is the opt-out. While a subscription is drawing on usage credits, Claude Code
-may ignore the setting — check `cache_read_input_tokens` in the transcript
-(Ctrl-O) to confirm caching on your auth route.
+On Claude Code 2.1.259+, a second review of the same PR within an hour can read
+these stable persona prompts from cache instead of reprocessing them full
+length. Supported values are `5m` and `1h`; the field is read only from subagent
+files. Trade-off: on usage-billed routes a `1h` cache write bills at about 2x
+base input versus 1.25x for the default `5m`, so the setting pays off only when
+a second review runs within the hour (a re-review, `/review:all` across several
+PRs, or `/review:sweep-all`). A `subagentPromptCacheTtl` setting or environment
+variable overrides the frontmatter value for every subagent, which is the
+opt-out. While a subscription is drawing on usage credits, Claude Code may
+ignore the setting — check `cache_read_input_tokens` in the transcript (Ctrl-O)
+to confirm caching on your auth route.
 
 ## Limitations
 
@@ -477,24 +469,24 @@ may ignore the setting — check `cache_read_input_tokens` in the transcript
   splitting
 - Draft PRs excluded from `/review:all scope=all` by default
 - Cross-plugin agents require the yellow-core plugin to be installed
-- On WSL2, `commit-resolve-fixes` and `run-verify-command` can take a minute
-  or more to start. Their `PATH` screen reads every entry of every `PATH`
+- On WSL2, `commit-resolve-fixes` and `run-verify-command` can take a minute or
+  more to start. Their `PATH` screen reads every entry of every `PATH`
   directory, and WSL's default `appendWindowsPath = true` adds dozens of
-  `/mnt/c` directories (`System32` alone holds thousands of files) read over
-  the slow 9p mount. One measurement: 92 s with 37 `/mnt/c` entries, 0.6 s
-  without them. Fix it by adding this to `/etc/wsl.conf` and running
-  `wsl --shutdown` from Windows:
+  `/mnt/c` directories (`System32` alone holds thousands of files) read over the
+  slow 9p mount. One measurement: 92 s with 37 `/mnt/c` entries, 0.6 s without
+  them. Fix it by adding this to `/etc/wsl.conf` and running `wsl --shutdown`
+  from Windows:
 
   ```ini
   [interop]
   appendWindowsPath = false
   ```
 
-  Windows programs still run by full path, and you can add back the few you
-  need (for example `/mnt/c/Windows/System32`) in your shell profile, at the
-  cost of screening those directories. The screen result is not cached across
-  script starts: the resolvers run as you and could edit both a cache and a
-  script in a cached directory without changing its mtime.
+  Windows programs still run by full path, and you can add back the few you need
+  (for example `/mnt/c/Windows/System32`) in your shell profile, at the cost of
+  screening those directories. The screen result is not cached across script
+  starts: the resolvers run as you and could edit both a cache and a script in a
+  cached directory without changing its mtime.
 
 ## License
 

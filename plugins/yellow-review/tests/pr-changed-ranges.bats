@@ -111,3 +111,54 @@ setup() {
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
+
+@test "--stack on a PR based on the default branch prints its own rows and skips the compare call" {
+  run --separate-stderr "$SCRIPT" --stack 7
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"src/a.ts 2-2,31-31"* ]]
+  [ ! -e "${BATS_TEST_TMPDIR}/mock_gh_compare_calls" ]
+}
+
+@test "--stack on a stacked PR prints the stack diff from the default branch to the head" {
+  MOCK_GH_PULL_BASE=feature/lower run --separate-stderr "$SCRIPT" --stack 7
+  [ "$status" -eq 0 ]
+  [[ "$output" == *".changeset/stack-fix.md 1-5"* ]]
+  [[ "$output" == *"src/lower.ts 11-11"* ]]
+  [[ "$output" == *"src/a.ts 2-2,31-31"* ]]
+  grep -q 'compare/main...0123456789abcdef0123456789abcdef01234567' "${BATS_TEST_TMPDIR}/mock_gh_compare_calls"
+}
+
+@test "--stack fails closed on a compare listing of 300 files or one with no file list" {
+  MOCK_GH_PULL_BASE=feature/lower MOCK_GH_COMPARE_FIXTURE=compare-response-300.json run --separate-stderr "$SCRIPT" --stack 7
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"300 files or more"* ]]
+  MOCK_GH_PULL_BASE=feature/lower MOCK_GH_COMPARE_FIXTURE=compare-response-nofiles.json run --separate-stderr "$SCRIPT" --stack 7
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "--stack refuses an unsafe base name or head before any compare call" {
+  MOCK_GH_PULL_BASE='feat..x' run --separate-stderr "$SCRIPT" --stack 7
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"could not read the base"* ]]
+  MOCK_GH_PULL_BASE='feat x' run --separate-stderr "$SCRIPT" --stack 7
+  [ "$status" -eq 1 ]
+  MOCK_GH_PULL_BASE=feature/lower MOCK_GH_PULL_HEAD=HEAD run --separate-stderr "$SCRIPT" --stack 7
+  [ "$status" -eq 1 ]
+  [ ! -e "${BATS_TEST_TMPDIR}/mock_gh_compare_calls" ]
+}
+
+@test "--stack: a failed compare call exits 1 with no rows" {
+  MOCK_GH_PULL_BASE=feature/lower MOCK_GH_COMPARE_FAIL=1 run --separate-stderr "$SCRIPT" --stack 7
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"could not compare"* ]]
+}
+
+@test "usage: --stack needs a numeric PR" {
+  run "$SCRIPT" --stack
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --stack abc
+  [ "$status" -eq 2 ]
+}

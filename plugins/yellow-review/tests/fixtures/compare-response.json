@@ -1,0 +1,8 @@
+{
+  "status": "ahead",
+  "files": [
+    {"filename":".changeset/stack-fix.md","status":"added","patch":"@@ -0,0 +1,5 @@\n+---\n+\"yellow-review\": patch\n+---\n+\n+Fix."},
+    {"filename":"src/a.ts","status":"modified","patch":"@@ -1,3 +1,4 @@\n a\n+b\n c\n@@ -20,2 +30,5 @@\n x\n+y"},
+    {"filename":"src/lower.ts","status":"modified","patch":"@@ -10,2 +10,3 @@\n p\n+q\n r"}
+  ]
+}

@@ -1,5 +1,6 @@
 ---
 name: pr-review-workflow
+# prettier-ignore
 description: "Internal reference for PR review workflow patterns. Use when agents or commands need shared conventions for adaptive selection, output format, or error handling."
 user-invocable: false
 ---
@@ -35,10 +36,10 @@ yellow-review plugin's commands and agents.
 
 ### Pre-Pass (always)
 
-- `learnings-researcher` (yellow-core) — runs before reviewer dispatch;
-  surfaces matching `docs/solutions/` entries as advisory context. Returns
-  `NO_PRIOR_LEARNINGS` when no matches; orchestrator skips injection in
-  that case.
+- `learnings-researcher` (yellow-core) — runs before reviewer dispatch; surfaces
+  matching `docs/solutions/` entries as advisory context. Returns
+  `NO_PRIOR_LEARNINGS` when no matches; orchestrator skips injection in that
+  case.
 
 ### Conditional Selection
 
@@ -46,9 +47,8 @@ Selection is based on `git diff --stat` and `git diff` output analysis:
 
 **reliability-reviewer** — Selected when:
 
-- Diff contains: I/O calls (`fetch`, `requests.`, `axios`, `http.`), DB
-  queries, retry/backoff/timeout keywords, async/await, queues, jobs,
-  background workers
+- Diff contains: I/O calls (`fetch`, `requests.`, `axios`, `http.`), DB queries,
+  retry/backoff/timeout keywords, async/await, queues, jobs, background workers
 - OR PR touches network, external-service, or async-handler code
 
 **adversarial-reviewer** — Selected when:
@@ -81,11 +81,11 @@ Selection is based on `git diff --stat` and `git diff` output analysis:
 
 ### Cross-Plugin Agents (from yellow-core)
 
-These are spawned via Agent tool when conditions match. The Wave 2
-pipeline dispatches the calibrated reviewer variants
-(`security-reviewer`, `performance-reviewer`); the legacy fallback
-(`review_pipeline: legacy` in `yellow-plugins.local.md`) keeps the
-deeper-audit variants (`security-sentinel`, `performance-oracle`).
+These are spawned via Agent tool when conditions match. The Wave 2 pipeline
+dispatches the calibrated reviewer variants (`security-reviewer`,
+`performance-reviewer`); the legacy fallback (`review_pipeline: legacy` in
+`yellow-plugins.local.md`) keeps the deeper-audit variants (`security-sentinel`,
+`performance-oracle`).
 
 **security-reviewer** (Wave 2) / **security-sentinel** (legacy) — Selected when:
 
@@ -96,7 +96,8 @@ deeper-audit variants (`security-sentinel`, `performance-oracle`).
 
 - PR touches 10+ files across 3+ directories
 
-**performance-reviewer** (Wave 2) / **performance-oracle** (legacy) — Selected when:
+**performance-reviewer** (Wave 2) / **performance-oracle** (legacy) — Selected
+when:
 
 - Diff contains: `query`, `SELECT`, `INSERT`, `loop`, `while`, `for.*range`
 - OR gross line count > 500
@@ -105,8 +106,8 @@ deeper-audit variants (`security-sentinel`, `performance-oracle`).
 
 - PR introduces new patterns (new directories, new file type conventions)
 - OR changes to `agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`,
-  `plugin.json` (plugin authoring convention checks). A `plugin.json` whose
-  only changed line is `"version"` does not count.
+  `plugin.json` (plugin authoring convention checks). A `plugin.json` whose only
+  changed line is `"version"` does not count.
 
 **code-simplicity-reviewer** (yellow-core) — Available as additional pass when:
 
@@ -129,30 +130,27 @@ Binary files show `-` in numstat and are excluded.
 ### Opt-in Only (never auto-selected)
 
 - `thermonuclear-reviewer` — strict structural-quality lane. It appears in
-  neither the always-on nor the conditional set at any size tier, and no
-  diff content triggers it. A repository reaches it only by naming it in
+  neither the always-on nor the conditional set at any size tier, and no diff
+  content triggers it. A repository reaches it only by naming it in
   `reviewer_set.include` in `yellow-plugins.local.md`. Under
-  `review_pipeline: legacy` it is unreachable by design — the legacy
-  persona list is fixed and never reads `reviewer_set`. Its
-  `subagent_type` mapping lives in `review-pr.md` Step 4's "Opt-in only"
-  table, not here.
+  `review_pipeline: legacy` it is unreachable by design — the legacy persona
+  list is fixed and never reads `reviewer_set`. Its `subagent_type` mapping
+  lives in `review-pr.md` Step 4's "Opt-in only" table, not here.
 
 ### Size Tiers
 
 - **Small** (< 100 lines): always-on persona set + code-simplifier
 - **Medium** (100–500 lines): + conditional agents based on content
-- **Large** (> 500 lines): all applicable agents including cross-plugin
-  agents and `adversarial-reviewer`
+- **Large** (> 500 lines): all applicable agents including cross-plugin agents
+  and `adversarial-reviewer`
 
 ## Finding Output Format
 
-Wave 2 persona reviewers (`correctness-reviewer`,
-`maintainability-reviewer`, `reliability-reviewer`,
-`project-standards-reviewer`, `project-compliance-reviewer`,
-`adversarial-reviewer`, `thermonuclear-reviewer`) return structured JSON
-per the compact-return
-schema. The orchestrator aggregates and presents them as pipe-delimited
-tables.
+Wave 2 persona reviewers (`correctness-reviewer`, `maintainability-reviewer`,
+`reliability-reviewer`, `project-standards-reviewer`,
+`project-compliance-reviewer`, `adversarial-reviewer`, `thermonuclear-reviewer`)
+return structured JSON per the compact-return schema. The orchestrator
+aggregates and presents them as pipe-delimited tables.
 
 ```json
 {
@@ -180,31 +178,29 @@ tables.
 ```
 
 `rule` comes from the `<rule-vocabulary>` block the orchestrator injects
-(`lib/review-ledger-vocab.json`; `unclassified` when none fits) and `scope`
-is the enclosing dotted symbol path; in a prose file it is the nearest
-markdown heading when that heading is unique in the file, otherwise the full
+(`lib/review-ledger-vocab.json`; `unclassified` when none fits) and `scope` is
+the enclosing dotted symbol path; in a prose file it is the nearest markdown
+heading when that heading is unique in the file, otherwise the full
 `Parent > Child` heading path (`rl_verify_scope` rejects an ambiguous short
-form). In that path, escape a literal ` > ` inside one heading's own text as
-` \> ` and double any `\`: `## A > B` under `# Parent` is `Parent > A \> B`.
-Both feed the review-findings ledger's identity key; the orchestrator defaults a
-missing value to `unclassified` / `unscoped` and counts it instead of
-dropping the return.
+form). In that path, escape a literal `>` inside one heading's own text as `\>`
+and double any `\`: `## A > B` under `# Parent` is `Parent > A \> B`. Both feed
+the review-findings ledger's identity key; the orchestrator defaults a missing
+value to `unclassified` / `unscoped` and counts it instead of dropping the
+return.
 
-`residual_risks` and `testing_gaps` are aggregator-populated demotion
-buckets — reviewer agents ALWAYS emit them as empty arrays. The
-orchestrator (`review-pr.md` Step 6, its mode-aware demotion
-sub-step) moves a finding into one of them only when it qualifies
-for mode-aware demotion: severity P2/P3 AND
-`autofix_class: advisory` AND every contributing reviewer is
-testing- or maintainability-flavored. Qualifying findings land in
-`testing_gaps` when any contributing reviewer is testing-flavored,
-otherwise in `residual_risks` (testing wins on mixed sets). Reviewer
-agents must never populate these arrays themselves.
+`residual_risks` and `testing_gaps` are aggregator-populated demotion buckets —
+reviewer agents ALWAYS emit them as empty arrays. The orchestrator
+(`review-pr.md` Step 6, its mode-aware demotion sub-step) moves a finding into
+one of them only when it qualifies for mode-aware demotion: severity P2/P3 AND
+`autofix_class: advisory` AND every contributing reviewer is testing- or
+maintainability-flavored. Qualifying findings land in `testing_gaps` when any
+contributing reviewer is testing-flavored, otherwise in `residual_risks`
+(testing wins on mixed sets). Reviewer agents must never populate these arrays
+themselves.
 
 Existing yellow-review agents that pre-date the keystone (pr-test-analyzer,
-comment-analyzer, code-simplifier, type-design-analyzer,
-silent-failure-hunter) continue to use the prose finding format below until
-they are migrated:
+comment-analyzer, code-simplifier, type-design-analyzer, silent-failure-hunter)
+continue to use the prose finding format below until they are migrated:
 
 ```
 **[P0|P1|P2|P3] category — file:line**
@@ -212,31 +208,31 @@ Finding: <what the issue is>
 Fix: <concrete suggestion>
 ```
 
-The aggregator in `review-pr.md` Step 6 parses the severity token from
-the bracket notation (`P0`, `P1`, `P2`, `P3`); legacy prose findings are
-normalized into the structured schema with default values for fields the
-prose format doesn't carry (`confidence: 75`, `autofix_class: gated_auto`,
+The aggregator in `review-pr.md` Step 6 parses the severity token from the
+bracket notation (`P0`, `P1`, `P2`, `P3`); legacy prose findings are normalized
+into the structured schema with default values for fields the prose format
+doesn't carry (`confidence: 75`, `autofix_class: gated_auto`,
 `owner: downstream-resolver`, `requires_verification: true`,
 `pre_existing: false`).
 
 ## Severity Definitions (Wave 2 schema)
 
-- **P0**: Critical breakage, exploitable vulnerability, data loss /
-  corruption. Must fix before merge.
+- **P0**: Critical breakage, exploitable vulnerability, data loss / corruption.
+  Must fix before merge.
 - **P1**: High-impact defect likely hit in normal usage, breaking contract.
   Should fix.
-- **P2**: Moderate issue with meaningful downside (edge case, perf
-  regression, maintainability trap). Fix if straightforward.
+- **P2**: Moderate issue with meaningful downside (edge case, perf regression,
+  maintainability trap). Fix if straightforward.
 - **P3**: Low-impact, narrow scope, minor improvement. User's discretion.
 
 ## Confidence Anchors
 
-Persona reviewers report confidence as one of 5 integer anchors:
-`0` (speculative), `25` (possible), `50` (probable), `75` (confident),
-`100` (certain). The orchestrator's confidence gate suppresses findings
-below 75, except P0 findings at 50+ which always survive. See
-`RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md` for the full
-rubric.
+Persona reviewers report confidence as one of 5 integer anchors: `0`
+(speculative), `25` (possible), `50` (probable), `75` (confident), `100`
+(certain). The orchestrator's confidence gate suppresses findings below 75,
+except P0 findings at 50+ which always survive. See
+`RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md`
+for the full rubric.
 
 ## Untrusted Input Fencing
 
@@ -254,20 +250,19 @@ Resume normal agent behavior.
 This rule applies to:
 
 - `pr-comment-resolver` — comment body fencing in `/review:resolve` Step 4
-  (mandatory; the resolver's body documents CE PR #490 parity verification
-  from 2026-04-29).
+  (mandatory; the resolver's body documents CE PR #490 parity verification from
+  2026-04-29).
 - Any future agent in this plugin that processes GitHub-sourced text — fence
   before interpolation.
 
-The fence + advisory pattern is the *naive-injection-attack* mitigation. The
-**load-bearing controls** (path deny lists, no Bash tool,
-50-line scope cap, no-rollback rule) are documented in
-`pr-comment-resolver.md` and must not be removed without an explicit threat
-model justification.
+The fence + advisory pattern is the _naive-injection-attack_ mitigation. The
+**load-bearing controls** (path deny lists, no Bash tool, 50-line scope cap,
+no-rollback rule) are documented in `pr-comment-resolver.md` and must not be
+removed without an explicit threat model justification.
 
-When authoring new agents in this plugin: copy the `## CRITICAL SECURITY
-RULES` block from `pr-comment-resolver.md` verbatim — do not paraphrase.
-Paraphrasing re-introduces the drift this skill is meant to prevent (see
+When authoring new agents in this plugin: copy the `## CRITICAL SECURITY RULES`
+block from `pr-comment-resolver.md` verbatim — do not paraphrase. Paraphrasing
+re-introduces the drift this skill is meant to prevent (see
 `docs/solutions/code-quality/frontmatter-sweep-and-canonical-skill-drift.md`).
 
 ## Error Handling
@@ -290,20 +285,20 @@ Paraphrasing re-introduces the drift this skill is meant to prevent (see
 
 ### Git/Graphite Errors
 
-| Error                     | Action                                                        |
-| ------------------------- | ------------------------------------------------------------- |
-| Dirty working directory   | Error: "Uncommitted changes detected. Commit or stash first." |
-| Wrong branch for PR       | Hard-stop on a different/no associated PR; checkout the target branch. See `/review:resolve` Step 2b. |
-| Branch verification failure | Hard-stop on `gh` auth/rate/network errors; restore access and retry. |
-| `gt submit` failure       | Report error, suggest `gt stack` to diagnose                  |
-| Merge conflict on restack | Abort restack, report to user for manual resolution           |
-| `gt track` failure        | Warn and proceed with raw git (degraded mode)                 |
+| Error                       | Action                                                                                                |
+| --------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Dirty working directory     | Error: "Uncommitted changes detected. Commit or stash first."                                         |
+| Wrong branch for PR         | Hard-stop on a different/no associated PR; checkout the target branch. See `/review:resolve` Step 2b. |
+| Branch verification failure | Hard-stop on `gh` auth/rate/network errors; restore access and retry.                                 |
+| `gt submit` failure         | Report error, suggest `gt stack` to diagnose                                                          |
+| Merge conflict on restack   | Abort restack, report to user for manual resolution                                                   |
+| `gt track` failure          | Warn and proceed with raw git (degraded mode)                                                         |
 
 ### GitHub Errors (github-workflow provider)
 
-| Error                     | Action                                                        |
-| ------------------------- | ------------------------------------------------------------- |
-| Adapter `submit` non-`SUCCESS` status | Report the result's `recoveryAction`             |
+| Error                                              | Action                                                          |
+| -------------------------------------------------- | --------------------------------------------------------------- |
+| Adapter `submit` non-`SUCCESS` status              | Report the result's `recoveryAction`                            |
 | Adapter `rebase --mode upstack` returns `CONFLICT` | Run `rebase --mode abort`, report to user for manual resolution |
 
 ## Commit Conventions
@@ -324,24 +319,24 @@ fix: resolve PR #<num> review comments (<n> files)
 
 Same per-PR messages as above, applied to each PR in sequence.
 
-The commands that use these conventions resolve the active stacked-PR
-provider (`stack-provider-router` skill) before their first commit/push
-action; the message conventions above apply to both providers.
+The commands that use these conventions resolve the active stacked-PR provider
+(`stack-provider-router` skill) before their first commit/push action; the
+message conventions above apply to both providers.
 
 When resolvers edited files, `/review:resolve` adds a **new** commit so
-reviewers keep their "changes since my last review" view. With no resolver
-edits (a reply/resolve-only run), `commit-resolve-fixes` returns `NOOP` and
-no commit is added. `/review:resolve` never calls `gt modify` directly:
+reviewers keep their "changes since my last review" view. With no resolver edits
+(a reply/resolve-only run), `commit-resolve-fixes` returns `NOOP` and no commit
+is added. `/review:resolve` never calls `gt modify` directly:
 `commit-resolve-fixes` stages the exact files the resolvers changed
-(`git add -- <files>`), checks the staged set, then makes a new commit with
-the active provider, submits, and verifies the remote head. Staging
-explicitly matters: Graphite's modify silently skips unstaged edits in
-non-interactive runs.
+(`git add -- <files>`), checks the staged set, then makes a new commit with the
+active provider, submits, and verifies the remote head. Staging explicitly
+matters: Graphite's modify silently skips unstaged edits in non-interactive
+runs.
 
-`/review:pr` and `/review:all` still fold their fixes into the branch's
-last commit with `gt modify -m "<message>"` on the Graphite provider; a
-follow-up issue tracks moving them to stage plus a new commit as well. Push
-via `gt submit --no-interactive`.
+`/review:pr` and `/review:all` still fold their fixes into the branch's last
+commit with `gt modify -m "<message>"` on the Graphite provider; a follow-up
+issue tracks moving them to stage plus a new commit as well. Push via
+`gt submit --no-interactive`.
 
 ## Graphite Integration
 
@@ -387,13 +382,12 @@ Agent(subagent_type="yellow-core:review:security-reviewer",
      prompt="Review these files for security issues: <file-list>")
 ```
 
-Agent type names follow the pattern: `<plugin>:<dir>:<agent-name>` —
-three segments (plugin id, agent directory under
-`plugins/<plugin>/agents/`, agent name from frontmatter). The example
-above resolves to `plugins/yellow-core/agents/review/security-reviewer.md`.
-`security-reviewer` is the Wave 2 default; the deeper-audit
-`security-sentinel` is the legacy fallback (use the `review_pipeline:
-legacy` opt-in to dispatch it instead).
+Agent type names follow the pattern: `<plugin>:<dir>:<agent-name>` — three
+segments (plugin id, agent directory under `plugins/<plugin>/agents/`, agent
+name from frontmatter). The example above resolves to
+`plugins/yellow-core/agents/review/security-reviewer.md`. `security-reviewer` is
+the Wave 2 default; the deeper-audit `security-sentinel` is the legacy fallback
+(use the `review_pipeline: legacy` opt-in to dispatch it instead).
 
 To spawn the optional Codex supplementary reviewer (requires yellow-codex):
 
@@ -403,80 +397,89 @@ Agent(subagent_type="yellow-codex:review:codex-reviewer",
              Base branch: <base-ref>. PR title: <title>.")
 ```
 
-The codex-reviewer runs in parallel with other agents and returns the
-structured 6-key council contract (`verdict=`/`confidence=`/`summary=`/
+The codex-reviewer runs in parallel with other agents and returns the structured
+6-key council contract (`verdict=`/`confidence=`/`summary=`/
 `fenced_output_path=`/`findings_block_begin`...`findings_block_end`), with
 P1/P2/P3 findings tagged `[codex]` nested inside the findings block for
-convergence analysis. `review-pr.md` Step 6 sub-step 0 extracts the
-findings block before normalizing it into the compact-return schema. If
-yellow-codex is not installed, the agent spawn silently fails — no
-degradation to the review.
+convergence analysis. `review-pr.md` Step 6 sub-step 0 extracts the findings
+block before normalizing it into the compact-return schema. If yellow-codex is
+not installed, the agent spawn silently fails — no degradation to the review.
 
 ## GraphQL Scripts
 
 Located at `skills/pr-review-workflow/scripts/`:
 
-- **get-pr-comments** `[--include-outdated] <owner/repo> <pr-number>` —
-  Returns a JSON array of unresolved review threads (non-outdated only
-  unless `--include-outdated`), with `isOutdated`, `viewerCanResolve`,
-  `viewerCanReply` per thread and `id`, `createdAt`, `viewerDidAuthor`,
-  `authorType` per comment, and `commentsTruncated` per thread (true when it
-  has more comments than were fetched, and a resolver must never resolve such a
-  thread); exits 3 with the partial array on stdout when the thread list is
-  truncated (page cap, missing cursor or the 270 s fetch deadline)
-- **get-pr-blockers** `<owner/repo> <pr-number>` — Reports
-  `CHANGES_REQUESTED` reviews, `reviewDecision`, whether conversation
-  resolution is enforced (read from the base branch and the default branch),
-  and `lookupReason` when a lookup failed
-- **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with
-  an idempotency marker; skips when our latest recent comment carries a marker for
-  this thread and only bot comments follow it, and reports that disposition.
-  An upgrade still posts: `disagree`/`unclear` to `fixed`/`addressed`/`oos`, and
+- **get-pr-comments** `[--include-outdated] <owner/repo> <pr-number>` — Returns
+  a JSON array of unresolved review threads (non-outdated only unless
+  `--include-outdated`), with `isOutdated`, `viewerCanResolve`, `viewerCanReply`
+  per thread and `id`, `createdAt`, `viewerDidAuthor`, `authorType` per comment,
+  and `commentsTruncated` per thread (true when it has more comments than were
+  fetched, and a resolver must never resolve such a thread); exits 3 with the
+  partial array on stdout when the thread list is truncated (page cap, missing
+  cursor or the 270 s fetch deadline)
+- **get-pr-blockers** `<owner/repo> <pr-number>` — Reports `CHANGES_REQUESTED`
+  reviews, `reviewDecision`, whether conversation resolution is enforced (read
+  from the base branch and the default branch), and `lookupReason` when a lookup
+  failed
+- **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with an
+  idempotency marker; skips when our latest recent comment carries a marker for
+  this thread and only bot comments follow it, and reports that disposition. An
+  upgrade still posts: `disagree`/`unclear` to `fixed`/`addressed`/`oos`, and
   `oos` to `fixed`/`addressed`
 - **resolve-pr-thread** `<thread-node-id>` — Resolves a single thread
-  (idempotent). Exit codes: 1 other failure, 2 usage, 3 not found or
-  permission, 4 rate limited or `gh` timed out (`YELLOW_REVIEW_GH_TIMEOUT`,
-  default 30 s, clamped to 60 s, not retried). It sleeps 1 s after the mutation
-  (`YELLOW_REVIEW_PACE_SECONDS`) and, on a rate limit, waits `Retry-After`
-  (else 60 s) and retries once; a required wait over 90 s exits 4. After exit
-  4, stop mutating. The contract's "Script exit codes" and "Pacing and rate
-  limits" sections in `references/resolve/dispositions.md` are authoritative.
+  (idempotent). Exit codes: 1 other failure, 2 usage, 3 not found or permission,
+  4 rate limited or `gh` timed out (`YELLOW_REVIEW_GH_TIMEOUT`, default 30 s,
+  clamped to 60 s, not retried). It sleeps 1 s after the mutation
+  (`YELLOW_REVIEW_PACE_SECONDS`) and, on a rate limit, waits `Retry-After` (else
+  60 s) and retries once; a required wait over 90 s exits 4. After exit 4, stop
+  mutating. The contract's "Script exit codes" and "Pacing and rate limits"
+  sections in `references/resolve/dispositions.md` are authoritative.
 - **apply-thread-actions** — Runs the resolve write phase from a JSONL plan
   (contract "Batch apply")
-- **file-followup-issue** `<owner/repo> <pr> <PRRT_id> <title-file>
-  <body-file>` — Files or finds (by marker) the follow-up issue for an
-  out-of-scope thread; `--find <owner/repo> <PRRT_id>` only looks and never
-  files
+- **file-followup-issue** `<owner/repo> <pr> <PRRT_id> <title-file> <body-file>`
+  — Files or finds (by marker) the follow-up issue for an out-of-scope thread;
+  `--find <owner/repo> <PRRT_id>` only looks and never files
 - **check-resolve-text** `<file>...` — Exits 6 when text looks like a
   credential, has a markdown image, an `@` mention or a foreign URL, or could
   not be scanned (2 stays usage or an unreadable file). A refusal prints a
-  `resolve-text:` line on stderr (`refused rule=<rule> line=<n>`, or `scan
-  failed` when the scan did not run); look for it anywhere on stderr, not just
-  first. `reply-pr-thread` and `file-followup-issue` exit 6 and print the same
-  line
+  `resolve-text:` line on stderr (`refused rule=<rule> line=<n>`, or
+  `scan failed` when the scan did not run); look for it anywhere on stderr, not
+  just first. `reply-pr-thread` and `file-followup-issue` exit 6 and print the
+  same line
 - **pr-changed-ranges** `<pr-number>` — Prints one `<path> <ranges>` row per
   changed file from the files API (`10-24,58-60`, `none`, or `unknown` when
-  GitHub returns no patch); only paths matching `^[A-Za-z0-9._/-]+$` are
-  listed. Exit 1 on a fetch failure, 2 on usage. `/review:resolve` Step 4
-  builds the resolver's `PR-changed lines` and `PR files` from it.
-- **poll-new-threads** `--wait <s> [--fixed-anchors <file>] <owner/repo> <pr>
-  <seen-ids-file> <out-file>` — The Step 8 re-pass poll: fetches at least once
-  (`--wait 0` fetches once with no sleep), stops at the first fetch with a
-  thread ID not in the seen-IDs file, and ends with `repass fetched=<0|1>
-  found=<0|1> p1=<n> p2plus=<n> same_anchor=<n>` (header comment has the
-  rules). A failed fetch or parse is never read as "no new threads". Exit 4
-  on a rate limit (`poll rate-limited`), 2 on usage.
-- **pr-review-delta** `check <owner/repo> <pr>...` | `record <owner/repo> <pr>
-  <ids-file> <head-sha>` — `check` prints `PR <n> state=<new|unchanged|unknown|closed>
-  ...` per PR against the set Step 9 recorded; a failure is `unknown`, never
-  `unchanged`. Exit 4 on a rate limit, 2 on usage, 1 when `record` cannot write.
+  GitHub returns no patch); only paths matching `^[A-Za-z0-9._/-]+$` are listed.
+  Exit 1 on a fetch failure, 2 on usage. `/review:resolve` Step 4 builds the
+  resolver's `PR-changed lines` and `PR files` from it. `--stack` prints the
+  rows for the whole stack below and including the PR (default branch to head),
+  for Step 5's `addressed` check.
+- **check-addressed-evidence**
+  `--ranges-from <f> [--stack-ranges-from <f>] [--modified-from <f>] <proposals.jsonl>`
+  — Judges each `addressed` proposal's evidence and prints one JSON verdict per
+  thread (`ok`, `basis` or `reason`); exit 2 refuses a bad input file whole.
+- **read-resolve-config** — Prints the `/review:resolve` config snapshot as one
+  JSON object (validated `resolve_pr.*` keys with defaults, `tracked`,
+  `warnings`).
+- **poll-new-threads**
+  `--wait <s> [--fixed-anchors <file>] <owner/repo> <pr> <seen-ids-file> <out-file>`
+  — The Step 8 re-pass poll: fetches at least once (`--wait 0` fetches once with
+  no sleep), stops at the first fetch with a thread ID not in the seen-IDs file,
+  and ends with
+  `repass fetched=<0|1> found=<0|1> p1=<n> p2plus=<n> same_anchor=<n>` (header
+  comment has the rules). A failed fetch or parse is never read as "no new
+  threads". Exit 4 on a rate limit (`poll rate-limited`), 2 on usage.
+- **pr-review-delta** `check <owner/repo> <pr>...` |
+  `record <owner/repo> <pr> <ids-file> <head-sha>` — `check` prints
+  `PR <n> state=<new|unchanged|unknown|closed> ...` per PR against the set Step
+  9 recorded; a failure is `unknown`, never `unchanged`. Exit 4 on a rate limit,
+  2 on usage, 1 when `record` cannot write.
 
 The GraphQL scripts above require `gh` and `jq`; `check-resolve-text` needs only
 POSIX sh with awk. Exit codes and markers are defined in
 `references/resolve/dispositions.md`.
 
-The local (non-GraphQL) scripts `/review:resolve` Steps 5–7 and the callers
-that walk several PRs use (`commit-resolve-fixes`, `run-verify-command`,
+The local (non-GraphQL) scripts `/review:resolve` Steps 5–7 and the callers that
+walk several PRs use (`commit-resolve-fixes`, `run-verify-command`,
 `check-resolve-text`) are documented in `references/local-scripts.md`; Read it
 before calling them.
 
@@ -486,15 +489,15 @@ Same directory. Not GraphQL; it reads only the local repository:
 
 - **file-line-counts** `<diff-base-ref>` — Prints a
   `file-line-counts rows=N dropped=M skipped=K` header, N
-  `<path> base=<n> head=<n>` rows, and a matching `end` footer, measured at
-  the merge-base of the ref and `HEAD`. Fails closed (exit 1, no header)
-  on an unresolved merge-base, a truncated numstat stream, a failed object
-  probe, or more than 500 changed files. Consumed by `review-pr.md` Step 5
-  item 6 for the `thermonuclear-reviewer` size rule; `review-all.md`
-  delegates to that item rather than calling the script itself.
+  `<path> base=<n> head=<n>` rows, and a matching `end` footer, measured at the
+  merge-base of the ref and `HEAD`. Fails closed (exit 1, no header) on an
+  unresolved merge-base, a truncated numstat stream, a failed object probe, or
+  more than 500 changed files. Consumed by `review-pr.md` Step 5 item 6 for the
+  `thermonuclear-reviewer` size rule; `review-all.md` delegates to that item
+  rather than calling the script itself.
 
 ## Verification Loop
 
 `/review:resolve` Step 8 (the re-pass loop and resolve retries) is the
-procedure; `references/resolve/dispositions.md` defines what counts as
-blocking. Threads left open by design are not errors.
+procedure; `references/resolve/dispositions.md` defines what counts as blocking.
+Threads left open by design are not errors.
