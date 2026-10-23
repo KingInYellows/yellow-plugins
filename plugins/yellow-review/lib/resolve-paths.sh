@@ -2437,7 +2437,14 @@ rp_hooks_changed_since() {
             [ $((n % 2)) = 1 ] || continue
             case "$rec" in file:*) c="${rec#file:}" ;; *) continue ;; esac
             case "$c" in /*) ;; *) c="$top/$c" ;; esac
-            [ -e "$c" ] && [ "$c" -nt "$marker" ] || continue
+            [ -e "$c" ] || [ -L "$c" ] || continue
+            # A symlinked config counts by the link too: one retargeted at
+            # an older file leaves the target's time unchanged.
+            if ! [ "$c" -nt "$marker" ]; then
+                [ -L "$c" ] || continue
+                any=$(find -P "$c" -prune -newer "$marker" -print 2>/dev/null) || exit 2
+                [ -n "$any" ] || continue
+            fi
             case " ${cfgs[*]-} " in *" $c "*) continue ;; esac
             cfgs+=("$c")
         done <"$origins"
