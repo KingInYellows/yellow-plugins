@@ -2524,7 +2524,12 @@ EOF_ROOTS
             key=""
             if [ -f "$c" ]; then
                 d=$(dirname -- "$c") || exit 2
-                key=$(cd -P -- "$d" 2>/dev/null && pwd -P) || exit 2
+                # The x keeps a trailing newline in the real name, which
+                # would otherwise collide with a sibling's key: refuse it.
+                key=$(cd -P -- "$d" 2>/dev/null && pwd -P && printf x) || exit 2
+                key="${key%x}"
+                key="${key%$'\n'}"
+                case "$key" in *[[:cntrl:]]*) exit 2 ;; esac
                 key="${key%/}/${c##*/}"
                 rp_in_list "$key" ${walked[@]+"${walked[@]}"} && key=""
             fi

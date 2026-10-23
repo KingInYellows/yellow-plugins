@@ -2914,6 +2914,17 @@ mark_hooks() {
   [[ "$stderr" == *"dormant.cfg"* ]]
 }
 
+@test "--mark-hooks refuses an include whose real directory name ends in a newline" {
+  hooks_fixture
+  local d="$BATS_TEST_TMPDIR/nl"$'\n'
+  mkdir -p "$d"
+  printf '[user]\n\tname = x\n' >| "$d/x.cfg"
+  ln -s "$d" "$BATS_TEST_TMPDIR/lnk"
+  git config --add include.path "$BATS_TEST_TMPDIR/lnk/x.cfg"
+  run --separate-stderr "$SCRIPT" --pr 7 --mark-hooks --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+}
+
 @test "--mark-hooks accepts more than 64 sibling includes and still checks the last" {
   hooks_fixture
   local d="$BATS_TEST_TMPDIR/wide" k
