@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.11.5
+
+### Patch Changes
+
+- [`3a99548`](https://github.com/KingInYellows/yellow-plugins/commit/3a99548dd3386ce5958235ce5ecd934de230a425)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Single-source
+  the review compact-return schema and depth-gate `reviewer_set.include`.
+  - `pr-review-workflow/references/compact-return-schema.md` now holds the
+    canonical compact-return schema and persona notes between marker comments.
+    Every persona copy (yellow-review's eleven Wave 2 personas, the
+    thermonuclear skill, and yellow-core's `security-reviewer` and
+    `performance-reviewer`) is marked, and the new `validate:compact-return`
+    gate fails a copy whose keys, key order, value types or `rule`/`scope`
+    placeholders drift, whose enums widen past the canonical set, or whose notes
+    are not byte-identical (CLAUDE-30).
+  - `reviewer_set.include` no longer bypasses depth tiering in `/review:pr` and
+    `/review:all`. An included `thermonuclear-reviewer`, `adversarial-reviewer`,
+    `code-simplicity-reviewer` or `architecture-strategist` that no rule already
+    selected is skipped below the medium tier, with a stderr line and a Coverage
+    entry. The new `reviewer_set.force_depth` list keeps one running at every
+    size (CLAUDE-31).
+
+- [`7b9405b`](https://github.com/KingInYellows/yellow-plugins/commit/7b9405b07dacdb16aa99c21ab70528439f057bf4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Bring
+  yellow-ci's CI-log redactor and yellow-core's `cs_redact_secrets` to the same
+  set of credential shapes. yellow-ci now also masks `ASIA`/`ABIA`/`ACCA` AWS
+  keys, Anthropic, OpenAI, Slack, Stripe, Hugging Face, Tavily (`tvly-`),
+  Perplexity (`pplx-`) and Semgrep (`sgp_`) keys, credentials in URL userinfo,
+  and bare `Basic <base64>` payloads (decoded to tell a `user:pass` from prose),
+  in `lib/redact.sh` and in the four skill references that inline its pipeline.
+  yellow-core now also masks `gho_`, `ghr_`, `ghu_` and `pypi-` tokens. A new
+  parity test fails when either redactor gains a labelled pattern the other
+  lacks, or when an inline copy drifts from `redact.sh`.
+
 ## 2.11.4
 
 ### Patch Changes

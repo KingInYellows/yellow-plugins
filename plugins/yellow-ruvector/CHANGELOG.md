@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.5
+
+### Patch Changes
+
+- [`978cf1d`](https://github.com/KingInYellows/yellow-plugins/commit/978cf1dfcaa85894f7a76dc4c5370e63d5d529fb)
+  Thanks [@cursor[bot]](https://github.com/cursor%5Bbot%5D)! - Make the
+  busy-store co-edit bats case deterministic. It started two background edits a
+  fixed 20ms apart and required the later path to be the session's last file, so
+  on a busy runner the later edit could finish first. The test now starts the
+  second edit only after the first has saved its session state, which keeps the
+  check that a waiting edit releases its session lock.
+
 ## 2.0.4
 
 ### Patch Changes

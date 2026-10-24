@@ -1,5 +1,152 @@
 # Changelog
 
+## 3.11.0
+
+### Minor Changes
+
+- [`3a99548`](https://github.com/KingInYellows/yellow-plugins/commit/3a99548dd3386ce5958235ce5ecd934de230a425)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Single-source
+  the review compact-return schema and depth-gate `reviewer_set.include`.
+  - `pr-review-workflow/references/compact-return-schema.md` now holds the
+    canonical compact-return schema and persona notes between marker comments.
+    Every persona copy (yellow-review's eleven Wave 2 personas, the
+    thermonuclear skill, and yellow-core's `security-reviewer` and
+    `performance-reviewer`) is marked, and the new `validate:compact-return`
+    gate fails a copy whose keys, key order, value types or `rule`/`scope`
+    placeholders drift, whose enums widen past the canonical set, or whose notes
+    are not byte-identical (CLAUDE-30).
+  - `reviewer_set.include` no longer bypasses depth tiering in `/review:pr` and
+    `/review:all`. An included `thermonuclear-reviewer`, `adversarial-reviewer`,
+    `code-simplicity-reviewer` or `architecture-strategist` that no rule already
+    selected is skipped below the medium tier, with a stderr line and a Coverage
+    entry. The new `reviewer_set.force_depth` list keeps one running at every
+    size (CLAUDE-31).
+
+- [`0e6c469`](https://github.com/KingInYellows/yellow-plugins/commit/0e6c46981d0a1f40688423cf39cc807db341616c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:resolve` Step 7 now runs the whole write phase through a new
+  `apply-thread-actions` script: the orchestrator writes one JSONL plan (per
+  thread: disposition, follow-up issue text, reply and plain fallback, resolve)
+  and the script runs issue, reply and resolve per thread with the contract's
+  fallbacks (refusal, exit 7, issue cap, already-replied skip), stops every
+  write on exit 4, and appends one result row per thread. A 540 s time budget
+  keeps each call inside the Bash timeout; on exit 5 a re-run with the same
+  files resumes after the last finished stage. This replaces about three tool
+  calls per thread with one Write and one Bash call per PR. Contract: "Batch
+  apply" in `references/resolve/dispositions.md`.
+
+- [`6c53580`](https://github.com/KingInYellows/yellow-plugins/commit/6c535803ac347406ffc1098f033b7e5dd7a38825)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:resolve` hardens and widens its `addressed` evidence check. A new
+  `check-addressed-evidence` script applies the rules in one call: on a stacked
+  PR, evidence may cite a fix that a lower PR in the stack made (for example the
+  stack's changeset), using the new `pr-changed-ranges --stack` capture of the
+  default branch to the PR head. A human thread under
+  `resolve_human_threads: evidence` is resolved as `addressed` only when the
+  cited line was changed by the PR or its stack, lies outside the thread's own
+  anchor and sits in a file no cluster edited this run. The config snapshot now
+  comes from a new `read-resolve-config` script that prints every `resolve_pr.*`
+  key validated as JSON, instead of being parsed in prose; an unreadable
+  `verify_command` is unset, never half-read. An interactive run whose verify
+  command the user does not want to run can now commit without verifying instead
+  of reverting the fixes.
+
+- [`c8b5dfa`](https://github.com/KingInYellows/yellow-plugins/commit/c8b5dfacd75c700a590cc9652db7308378b31b7f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/review:pr`,
+  `/review:all` and `/review:triage` now commit review fixes through
+  `commit-resolve-fixes`, the script `/review:resolve` already uses: it stages
+  only the files the fixes touched, adds a new commit instead of amending the
+  branch's last one with `gt modify -m`, submits through the active provider and
+  verifies the remote head (CLAUDE-54). The ledger records the fix SHA from the
+  script's result. Before editing, Step 7 runs the new
+  `commit-resolve-fixes --check-paths` mode and routes findings on paths the
+  commit would refuse (deny-listed CI, agent-config and secret files; runner
+  files when unattended) to Residual Actionable Work instead of applying them.
+
+- [`c21d10d`](https://github.com/KingInYellows/yellow-plugins/commit/c21d10d23a524982f7a8ef73ea9790fa0aed64b3)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:resolve-stack` and `/review:sweep-all` now end with a
+  machine-readable outcome line, `ResolveStack: …` or `SweepAll: …`, carrying
+  `blocking=<n> ratelimited=<0|1> aborted=<0|1> not_attempted=<n> exit=<0|1>`. A
+  parent agent can tell a rate-limited run (re-run later) from blocking threads
+  (a human must answer) and a dirty-tree abort (fix the tree first) without
+  parsing the summary table. Exit codes are unchanged. Pinned in
+  `tests/skill-content.bats` (CLAUDE-66).
+
+### Patch Changes
+
+- [`a267ae1`](https://github.com/KingInYellows/yellow-plugins/commit/a267ae1190bfbf5f5f877d484af3326bc30ef50c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Close the
+  remaining git trust-boundary gaps from the #1076 review (CLAUDE-100). A
+  program-running key in a global or system git config that uses shell syntax
+  the check cannot judge (`core.sshCommand=sh $PWD/evil`) is now refused, while
+  `!` aliases, pagers, editors and diff or merge tools keep working. The
+  hardened git environment forces `protocol.ext.allow=never`, so an `ext::`
+  remote cannot run its command. In the verify command's environment the ssh
+  command line runs on the screened PATH and bare `GIT_SSH`, `GIT_ASKPASS`,
+  `SSH_ASKPASS` and `GIT_PROXY_COMMAND` values and bare credential helpers are
+  pinned to absolute programs, so a verifier that runs `/usr/bin/git` no longer
+  reaches a worktree `ssh`. `resolve-paths.bats` negated assertions now fail
+  when they should, and the README states that any `GIT_EXEC_PATH` is refused
+  (CLAUDE-111).
+
+- [`bd272e0`](https://github.com/KingInYellows/yellow-plugins/commit/bd272e0645788f5d35c58a1fec7f8a30b05b109c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Route
+  comment-analyzer and project-standards-reviewer to `haiku` / `medium` and
+  complexity-scanner to `haiku` / `low`, after the CLAUDE-163 replay eval showed
+  equal or better recall. Fix three doc errors the eval found.
+
+- [`c90072f`](https://github.com/KingInYellows/yellow-plugins/commit/c90072f14bb33db949d291c4a8a6ff117da00ebb)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The
+  `.git/hooks` guard no longer refuses a config with more than 64 includes:
+  `rp_config_paths` now reads each real config file's includes once instead of
+  capping the walk, which still ends on a self-include spelled differently each
+  pass (CLAUDE-184).
+
+- [`4130982`](https://github.com/KingInYellows/yellow-plugins/commit/4130982c1c5435d66a191c48fa1996592c256e50)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `run-verify-command`'s ignored-file guard now also refuses when a hook in
+  `.git/hooks` (or a hooks directory outside the tree) changed after the
+  `--ignored-since` marker, using the same wording so `/review:resolve` takes
+  its ignored-file stop (CLAUDE-60). It also refuses when a config file Git
+  reads, or a symlink on the way to a hook or config file, changed after the
+  marker, and a new `--mark-hooks` mode, run by `/review:resolve` when it mints
+  the marker, records the effective hooks directory and the config files so a
+  change to the directory, or a deleted config file, is refused too.
+  `guard-local-config check` ends every exit 4 with its own `snapshot kept at`
+  line: only a failed restore points at the snapshot as the copy to recover
+  from, while an invalid or tampered snapshot is kept for investigation only;
+  `/review:sweep` and `/review:resolve-stack` print that line instead of one
+  fixed recovery hint (CLAUDE-69). The dirty-tree cleanup notes now state why no
+  per-path baseline is recorded (CLAUDE-67).
+
+- [`13ff0b4`](https://github.com/KingInYellows/yellow-plugins/commit/13ff0b4c9b0ee1c83c2b8ff54eb75e5b994ead93)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The review
+  ledger's fix-up pass (`observe --step 8 --anchor-source worktree`) now maps
+  existing findings through the uncommitted edits into the worktree snapshot
+  before comparing them with new observations, so the line-map, alias and scope
+  passes all work in one frame. The scopeless re-observation merge from
+  CLAUDE-88 is switched back on for that pass (CLAUDE-179).
+
+- [`028b032`](https://github.com/KingInYellows/yellow-plugins/commit/028b03252d08d5e65acf2b94f8f9720de73630ef)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `run-verify-command` edge cases. A directory in the worktree that another user
+  owns and this user cannot read, write or search (a root-owned docker volume)
+  no longer drops every PATH directory and stops every mode; an unreadable
+  directory the user owns still fails closed, and stderr now names it instead of
+  a missing awk (CLAUDE-174). The recovery patch keeps the staged content of a
+  path replaced by a FIFO, socket or device instead of recording an empty
+  creation or a deletion (CLAUDE-128). A directory that replaced a tracked file
+  is checked against the mount table before its device walk, which no longer
+  crosses filesystems (CLAUDE-109).
+
+- [`92c0818`](https://github.com/KingInYellows/yellow-plugins/commit/92c081878b266568099afe7dc12d27cdfe0b6c47)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/review:sweep`
+  ends a changed-local-config stop with an anchored
+  `Sweep: aborted (local-config-changed)` line, and `/review:sweep-all` reads it
+  as an aborted batch (`aborted=1`) instead of a `no contract` review blocker
+  (CLAUDE-180).
+
 ## 3.10.3
 
 ### Patch Changes

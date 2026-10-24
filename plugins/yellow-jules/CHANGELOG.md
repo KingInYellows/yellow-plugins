@@ -1,5 +1,37 @@
 # yellow-jules
 
+## 0.4.0
+
+### Minor Changes
+
+- [`44ce2b2`](https://github.com/KingInYellows/yellow-plugins/commit/44ce2b2b7aa46c263216bf5980024f88bdaad470)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `supervise --clear-deviation --session <ref>` is the recovery path for a
+  blocking policy deviation: TTY-confirmed, controller-checked, and only after a
+  complete `status` walk newer than the deviation. It marks the session's open
+  deviations reconciled; a pull request reference outside the grant's repository
+  also revokes the owning grant, so work continues only under a fresh grant.
+  `status --reconcile` now asserts the grant's controller authority before any
+  journal write, so a copied data directory can no longer settle a create as
+  `failed`. `authorize --take-over` writes its journal marker (now carrying the
+  new epoch) before rebinding grants, and reconcile leaves reservations unaged
+  when a grant's epoch has no matching marker. The pending-plan rebase orders a
+  plan against a concurrent watermark by `createTime` only, keeping an
+  equal-time plan as `ambiguous` instead of dropping it.
+
+### Patch Changes
+
+- [`561f989`](https://github.com/KingInYellows/yellow-plugins/commit/561f989bc3fd944aa656cca8f06fdae7cf5b21e1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Serialize
+  controller authority writes across data directories that share a controller id
+  (CLAUDE-182). A new `<controllerDir>/<controllerId>.lock`, taken inside the
+  journal lock, now covers the first `authorize`, `authorize --take-over` and
+  `--revoke`, reservations and the dispatch stamp, slot releases, `abandon`,
+  `supervise --clear-pause` / `--clear-deviation`, and reconcile persistence.
+  Two concurrent take-overs can no longer roll the authority back to a stale
+  epoch, and a take-over of another data directory can no longer land between a
+  write's controller check and its journal write.
+
 ## 0.3.1
 
 ### Patch Changes
