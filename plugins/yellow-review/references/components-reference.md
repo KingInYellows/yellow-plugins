@@ -65,9 +65,10 @@ flags, exit codes, trust-boundary rules and library behavior.
   columns, and a `Not merge-ready` line from the ledger's `merge_blocking`).
   Each PR stages its learnings for the compound-staging drain; there is no
   end-of-loop compounding pass. A rate limit, an unreadable PR state, a dirty
-  tree or a missing `Resolve:` contract line ends the batch and exits 1; the
-  last line is a `SweepAll:` outcome line with the same fields as
-  `ResolveStack:` (a run without it failed); a PR-specific stop
+  tree, a changed local config (`Sweep: aborted (local-config-changed)`,
+  reported as `aborted=1`) or a missing `Resolve:` contract line ends the batch
+  and exits 1; the last line is a `SweepAll:` outcome line with the same fields
+  as `ResolveStack:` (a run without it failed); a PR-specific stop
   (`Sweep: skipped`) is skipped and the batch continues. It lists the ledgers of
   PRs missing from an all-authors open-PR query and deletes them via
   `/review:triage --prune` only after the confirmation (a prune-only prompt when
