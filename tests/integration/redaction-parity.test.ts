@@ -52,18 +52,21 @@ function functionBody(src: string, name: string): string {
   return src.slice(start, end);
 }
 
+// No regex literals in this file. Lizard 1.24.0 (Codacy nloc-medium) drops
+// the token after one, and a quote inside one is read as a string, so
+// awkPrograms was counted through the corpus (103 lines, limit 50).
 function labels(text: string): Set<string> {
-  return new Set(
-    [...text.matchAll(/REDACTED:([a-z0-9-]+)\]/g)].map((m) => m[1])
-  );
+  const pattern = new RegExp('REDACTED:([a-z0-9-]+)\\]', 'g');
+  return new Set([...text.matchAll(pattern)].map((m) => m[1]));
 }
 
 /** Runs of consecutive `-e` sed script lines, trimmed. */
 function sedBlocks(text: string): string[][] {
   const blocks: string[][] = [];
   let cur: string[] = [];
+  const sedArg = new RegExp('^\\s*-e ');
   for (const line of text.split('\n')) {
-    if (/^\s*-e /.test(line)) {
+    if (sedArg.test(line)) {
       cur.push(line.trim());
     } else if (cur.length) {
       blocks.push(cur);
@@ -74,14 +77,32 @@ function sedBlocks(text: string): string[][] {
   return blocks.filter((b) => b.some((l) => l.includes('REDACTED')));
 }
 
-/** The awk program text after each `awk '`, one entry per pipeline. */
+/** Single-quoted awk program after each `| awk`, one entry per pipeline. */
 function awkPrograms(text: string): string[] {
-  return [...text.matchAll(/\| awk '([^']*)'/g)].map((m) =>
-    m[1]
-      .split('\n')
-      .map((l) => l.trim())
-      .join('\n')
-  );
+  const marker = '| awk ';
+  const quote = "'";
+  const programs: string[] = [];
+  let from = 0;
+  while (from < text.length) {
+    const at = text.indexOf(marker, from);
+    if (at < 0) break;
+    const open = at + marker.length;
+    if (text[open] !== quote) {
+      from = open;
+      continue;
+    }
+    const close = text.indexOf(quote, open + 1);
+    if (close < 0) break;
+    programs.push(
+      text
+        .slice(open + 1, close)
+        .split('\n')
+        .map((line) => line.trim())
+        .join('\n')
+    );
+    from = close + 1;
+  }
+  return programs;
 }
 
 function redact(lib: string, fn: string, input: string): string {
@@ -216,7 +237,7 @@ describe('secret redaction parity (yellow-ci <-> yellow-core)', () => {
       for (const block of blocks) {
         expect(block.slice(0, canonical.length), file).toEqual(canonical);
         for (const extra of block.slice(canonical.length)) {
-          expect(extra, file).toMatch(/\[ESCAPED\]/);
+          expect(extra, file).toMatch(new RegExp('\\[ESCAPED\\]'));
         }
       }
     }
