@@ -239,16 +239,17 @@ Use the anchored confidence rubric (integer anchors 0/25/50/75/100):
 
 ## Output Format
 
-Return findings in the standard yellow-review compact-return JSON schema
-shown below. Report every in-scope finding you identify, each with a
-confidence score and severity, up to 40. Do not filter by confidence — the
-orchestrator applies the 75 gate after aggregation, and a finding it later
-drops costs less than a real issue silently omitted here. Bound output at
-40 findings. Rank gate-surviving findings first (anchors 75/100) by
-severity (P1 first) then confidence descending; then remaining findings by
-confidence then severity. Drop the lowest-ranked overflow. Never emit
-partial JSON — the orchestrator's compact-return validation drops an
-entire malformed return.
+Return findings in the standard yellow-review compact-return JSON schema shown
+below. Report every in-scope finding you identify, each with a confidence score
+and severity, up to 40. Do not filter by confidence — the orchestrator applies
+the 75 gate after aggregation, and a finding it later drops costs less than a
+real issue silently omitted here. Rank gate-surviving findings first (anchors
+75/100) by severity (P1 first) then confidence descending; then remaining
+findings by confidence then severity. Drop the lowest-ranked overflow. Never
+emit partial JSON — the orchestrator's compact-return validation drops an entire
+malformed return.
+
+<!-- compact-return-schema:begin -->
 
 ```json
 {
@@ -277,14 +278,23 @@ entire malformed return.
 }
 ```
 
-`rule` is a slug from the `<rule-vocabulary>` block the orchestrator injects
-for your `category` (`unclassified` when none fits); `scope` is the enclosing
-dotted symbol path at `line` (e.g. `handlers.createUser`); in a prose file,
-use the nearest markdown heading only when it is unique in the file,
-otherwise the full `Parent > Child` heading path. In that path, escape a
-literal ` > ` inside one heading's own text as ` \> ` and double any `\`:
-`## A > B` under `# Parent` is `Parent > A \> B`.
+<!-- compact-return-schema:end -->
 
-`residual_risks` and `testing_gaps` are aggregator-populated demotion
-buckets — always emit them as empty arrays (see pr-review-workflow
-"Finding Output Format").
+<!-- compact-return-notes:begin -->
+
+`line` must be an integer — the 1-based line number of the finding in `file`;
+the `42` above is an example value, not a literal.
+
+`rule` is a slug from the `<rule-vocabulary>` block the orchestrator injects for
+your `category` (`unclassified` when none fits); `scope` is the enclosing dotted
+symbol path at `line` (e.g. `handlers.createUser`); in a prose file, use the
+nearest markdown heading only when it is unique in the file, otherwise the full
+`Parent > Child` heading path. In that path, escape a literal `>` inside one
+heading's own text as `\>` and double any `\`: `## A > B` under `# Parent` is
+`Parent > A \> B`.
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion buckets —
+always emit them as empty arrays (see pr-review-workflow "Finding Output
+Format").
+
+<!-- compact-return-notes:end -->

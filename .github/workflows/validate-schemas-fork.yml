@@ -202,8 +202,8 @@ jobs:
               # fork contributor sees identical blocking signals for authoring
               # rules, setup:all coverage, ERROR-* codes, snippet drift,
               # flow: namespace sweep completeness, the provider-neutral
-              # command gate, council reviewer-roster drift, and narrative
-              # plugin-count drift.
+              # command gate, council reviewer-roster drift, compact-return
+              # schema drift, and narrative plugin-count drift.
               node scripts/validate-agent-authoring.js
               node scripts/validate-setup-all.js
               node scripts/lint-error-codes.js
@@ -211,6 +211,7 @@ jobs:
               node scripts/validate-flow-namespace.js
               node scripts/validate-provider-neutral-commands.js
               node scripts/validate-council-roster.js
+              node scripts/validate-compact-return-schema.js
               node scripts/validate-doc-counts.js
               ;;
             codex)

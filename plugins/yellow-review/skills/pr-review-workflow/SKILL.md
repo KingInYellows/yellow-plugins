@@ -135,7 +135,10 @@ Binary files show `-` in numstat and are excluded.
   `reviewer_set.include` in `yellow-plugins.local.md`. Under
   `review_pipeline: legacy` it is unreachable by design — the legacy persona
   list is fixed and never reads `reviewer_set`. Its `subagent_type` mapping
-  lives in `review-pr.md` Step 4's "Opt-in only" table, not here.
+  lives in `review-pr.md` Step 4's "Opt-in only" table, not here. Being named in
+  `include` does not bypass depth tiering: below the medium tier it is skipped
+  with a stderr line unless `reviewer_set.force_depth` also names it
+  (`review-pr.md` Step 4 "Depth gate for `reviewer_set.include`").
 
 ### Size Tiers
 
@@ -151,6 +154,18 @@ Wave 2 persona reviewers (`correctness-reviewer`, `maintainability-reviewer`,
 `project-compliance-reviewer`, `adversarial-reviewer`, `thermonuclear-reviewer`)
 return structured JSON per the compact-return schema. The orchestrator
 aggregates and presents them as pipe-delimited tables.
+
+The block below is the single source of that schema. A subagent cannot read this
+skill at dispatch, so each persona carries an inline copy, and
+`scripts/validate-compact-return-schema.js` (in `pnpm validate:schemas`) checks
+every copy under `plugins/*/agents/` and `plugins/*/skills/` against it. A copy
+keeps the same keys in the same order with the same value types and the same
+`rule` and `scope` placeholders. It may narrow `severity`, `autofix_class` and
+`owner` to a subset, put its own values in `reviewer`, `category`, `confidence`
+and the free-text placeholders, and add extension keys after `suggested_fix`.
+Change the contract here first, then each copy the validator names.
+
+<!-- compact-return-schema:begin -->
 
 ```json
 {
@@ -176,6 +191,31 @@ aggregates and presents them as pipe-delimited tables.
   "testing_gaps": []
 }
 ```
+
+<!-- compact-return-schema:end -->
+
+Persona copies also carry the notes below verbatim between the matching
+`compact-return-notes` markers; the validator requires them byte-identical to
+this block.
+
+<!-- compact-return-notes:begin -->
+
+`line` must be an integer — the 1-based line number of the finding in `file`;
+the `42` above is an example value, not a literal.
+
+`rule` is a slug from the `<rule-vocabulary>` block the orchestrator injects for
+your `category` (`unclassified` when none fits); `scope` is the enclosing dotted
+symbol path at `line` (e.g. `handlers.createUser`); in a prose file, use the
+nearest markdown heading only when it is unique in the file, otherwise the full
+`Parent > Child` heading path. In that path, escape a literal `>` inside one
+heading's own text as `\>` and double any `\`: `## A > B` under `# Parent` is
+`Parent > A \> B`.
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion buckets —
+always emit them as empty arrays (see pr-review-workflow "Finding Output
+Format").
+
+<!-- compact-return-notes:end -->
 
 `rule` comes from the `<rule-vocabulary>` block the orchestrator injects
 (`lib/review-ledger-vocab.json`; `unclassified` when none fits) and `scope` is

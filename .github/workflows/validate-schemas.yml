@@ -356,6 +356,13 @@ jobs:
                 echo "::group::Council reviewer-roster drift"
                 node scripts/validate-council-roster.js
                 echo "::endgroup::"
+                # Compact-return schema drift: every review persona's inline
+                # copy of the schema must agree with the canonical block in
+                # yellow-review's pr-review-workflow skill. Same rationale as
+                # the gates above.
+                echo "::group::Compact-return schema drift"
+                node scripts/validate-compact-return-schema.js
+                echo "::endgroup::"
                 # Narrative plugin-count drift. This validator has existed
                 # since the 2026-05-07 audit but ran only in
                 # `pnpm release:check`, so it gated nothing on a PR.

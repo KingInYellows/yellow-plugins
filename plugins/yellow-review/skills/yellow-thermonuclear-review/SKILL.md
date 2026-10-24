@@ -354,6 +354,8 @@ Report findings ordered by:
 
 Emit a single JSON object and no prose around it:
 
+<!-- compact-return-schema:begin -->
+
 ```json
 {
   "reviewer": "thermonuclear",
@@ -378,6 +380,8 @@ Emit a single JSON object and no prose around it:
   "testing_gaps": []
 }
 ```
+
+<!-- compact-return-schema:end -->
 
 `line` is the 1-based line number of the finding in `file`; the `42` above is
 an example, not a literal. `residual_risks` and `testing_gaps` are always

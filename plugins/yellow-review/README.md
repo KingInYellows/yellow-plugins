@@ -279,8 +279,23 @@ reviewer_set:
 ```
 
 Then run `/review:pr` as usual. All default personas still run; this adds a
-high-pressure structural lane on top of them. Remove the entry to turn it off
-again.
+high-pressure structural lane on top of them on any diff of 100 or more changed
+lines, or at any size under `review_depth: medium` or `large`. On a smaller diff
+it is skipped, with a stderr line and a Coverage entry, so a one-line fix does
+not pay for an opus/xhigh pass. To run it at every size, name it in
+`force_depth` too:
+
+```yaml
+---
+reviewer_set:
+  include:
+    - thermonuclear-reviewer
+  force_depth:
+    - thermonuclear-reviewer
+---
+```
+
+Remove the entries to turn it off again.
 
 ### Cursor and Codex
 

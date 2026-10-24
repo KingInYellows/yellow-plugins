@@ -113,6 +113,14 @@ were never designed to be extended.
 - [ ] If the persona ships both a Claude-only agent and a portable skill
       (or any two files expressing the same schema), add or extend a
       sync/byte-identity test in the same PR — do not defer it.
+- [ ] If the persona returns the compact-return schema, wrap its copy in
+      `compact-return-schema` markers (and, for an agent, paste the
+      canonical `compact-return-notes` block) from
+      `pr-review-workflow/SKILL.md`; `pnpm validate:compact-return` fails an
+      unmarked copy.
+- [ ] If the persona is opt-in and costly (high model or effort), add it to
+      `review-pr.md` Step 4's "Depth gate for `reviewer_set.include`" table
+      so naming it in `include` does not run it on a one-line diff.
 - [ ] Search any cap/limit prose for a target field name; if the schema has
       no such field, either add one or change the instruction to state
       what's dropped.
