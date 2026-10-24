@@ -2449,7 +2449,7 @@ rp_path_link_newer() {
 # --show-origin names, and every include.path and includeIf.*.path reached
 # from those, whether its condition holds now or not (a verify command that
 # switches branches makes Git read it). Returns 2 when it cannot tell (a
-# control character in a name, a git failure, or more than 64 includes).
+# control character in a name or a git failure).
 rp_config_paths() {
     local top="$1"
     (
@@ -2504,7 +2504,7 @@ rp_config_paths() {
         done <<EOF_ROOTS
 $roots
 EOF_ROOTS
-        local queue=() seen=() i=0 inc d nin=0
+        local queue=() seen=() walked=() i=0 inc d key
         while IFS= read -r -d '' rec; do
             n=$((n + 1))
             [ $((n % 2)) = 1 ] || continue
@@ -2517,8 +2517,24 @@ EOF_ROOTS
             i=$((i + 1))
             rp_in_list "$c" ${seen[@]+"${seen[@]}"} && continue
             seen+=("$c")
+            # Spelling a self-include differently each pass (sub/../x.cfg)
+            # would loop forever: read each file's includes once, keyed by
+            # its real directory and name. Git resolves a relative include
+            # against the directory as spelled, which is that real directory.
+            key=""
             if [ -f "$c" ]; then
                 d=$(dirname -- "$c") || exit 2
+                # The x keeps a trailing newline in the real name, which
+                # would otherwise collide with a sibling's key: refuse it.
+                key=$(cd -P -- "$d" 2>/dev/null && pwd -P && printf x) || exit 2
+                key="${key%x}"
+                key="${key%$'\n'}"
+                case "$key" in *[[:cntrl:]]*) exit 2 ;; esac
+                key="${key%/}/${c##*/}"
+                rp_in_list "$key" ${walked[@]+"${walked[@]}"} && key=""
+            fi
+            if [ -n "$key" ]; then
+                walked+=("$key")
                 yr_git config --file "$c" -z --type=path --get-regexp '^include(if\..*)?\.path$' >|"$origins" 2>/dev/null
                 rc=$?
                 [ "$rc" = 0 ] || [ "$rc" = 1 ] || exit 2
@@ -2532,11 +2548,6 @@ EOF_ROOTS
                         *) inc="$d/$inc" ;;
                     esac
                     queue+=("$inc")
-                    # Spelling a self-include differently each pass
-                    # (sub/../x.cfg) would loop forever: past Git's own
-                    # include depth (10) and breadth the walk cannot tell.
-                    nin=$((nin + 1))
-                    [ "$nin" -le 64 ] || exit 2
                 done <"$origins"
             fi
             case "$c" in *[[:cntrl:]]*) exit 2 ;; esac
