@@ -104,7 +104,14 @@ stale lock is never taken over (`JULES_STALE_LOCK`) — both need a human.
 empty). Outside the data directory, `<controllerDir>/<controllerId>.json`
 (`YELLOW_JULES_CONTROLLER_DIR` > `$XDG_STATE_HOME/yellow-jules-controller` >
 `~/.local/state/yellow-jules-controller`) records the epoch and the canonical
-data-directory path this host may write from.
+data-directory path this host may write from. `<controllerId>.lock` beside it
+serializes every data directory that shares the controller id: each write that
+checks or moves the authority (first `authorize`, `--take-over`, `--revoke`,
+reservations and the dispatch stamp, slot releases, `abandon`, `--clear-pause`,
+`--clear-deviation`, and reconcile persistence) takes it inside its own journal
+lock, always in that order, and holds it through its last write. A crashed
+holder leaves it behind like `state/.lock`: it fails loud with
+`JULES_STALE_LOCK` and needs a human to remove it.
 
 ## Security model
 

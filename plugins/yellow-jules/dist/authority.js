@@ -385,9 +385,11 @@ function listGrants(dataDir, now, journal) {
         unreconciledDeviation: grantHasUnreconciledDeviation(journal, grant.grantId),
     }));
 }
-async function revokeGrant(dataDir, grantId, now, beforeWrite) {
+async function revokeGrant(dataDir, grantId, now, beforeWrite, 
+/** Held from `beforeWrite` (a controller check) through the write; see `withControllerLock`. */
+lock) {
     (0, validate_js_1.validateGrantId)(grantId);
-    return (0, state_js_1.withJournalLock)(dataDir, async () => {
+    return (0, state_js_1.withControllerLock)(dataDir, lock, async () => {
         const file = loadGrants(dataDir);
         const grant = file.grants[grantId];
         if (grant === undefined) {
@@ -412,8 +414,10 @@ async function revokeGrant(dataDir, grantId, now, beforeWrite) {
  * that no longer exists (hand-removed file) is a no-op; a corrupt grants file
  * still fails loud.
  */
-async function releaseSlotInStore(dataDir, grantId, localRequestId, beforeWrite) {
-    return (0, state_js_1.withJournalLock)(dataDir, async () => {
+async function releaseSlotInStore(dataDir, grantId, localRequestId, beforeWrite, 
+/** Held from `beforeWrite` (a controller check) through the write; see `withControllerLock`. */
+lock) {
+    return (0, state_js_1.withControllerLock)(dataDir, lock, async () => {
         const file = loadGrants(dataDir);
         const grant = file.grants[grantId];
         if (grant === undefined ||

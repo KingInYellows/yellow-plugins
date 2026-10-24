@@ -101,7 +101,8 @@ async function authorizeCreate(deps, args) {
     // The grant's clock starts when the owner confirms, not when the prompt opened.
     const createdAt = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
     const expiresAt = new Date(deps.clock.now() + ttlMinutes * 60_000).toISOString();
-    return (0, state_js_1.withJournalLock)(deps.dataDir, async () => {
+    const lock = (0, controller_js_1.controllerLockPath)(ctx.controllerDir, ctx.controllerId);
+    return (0, state_js_1.withControllerLock)(deps.dataDir, lock, async () => {
         const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
         const existing = (0, controller_js_1.readControllerAuthority)(ctx.controllerDir, ctx.controllerId);
         let epoch;
@@ -193,7 +194,7 @@ async function authorizeRevoke(deps, grantId) {
             }
             throw err;
         }
-    });
+    }, (0, controller_js_1.controllerLockPath)(ctx.controllerDir, ctx.controllerId));
     return { operation: 'authorize', ...result };
 }
 /** R38 handoff: TTY-confirmed; writes epoch+1 for this host and path and rebinds every grant. */
@@ -210,7 +211,8 @@ async function authorizeTakeOver(deps) {
         'This host becomes the only writer. Every grant is rebound to the new epoch;',
         'any other copy of this data directory stops being able to write.',
     ].join('\n'));
-    return (0, state_js_1.withJournalLock)(deps.dataDir, async () => {
+    const lock = (0, controller_js_1.controllerLockPath)(ctx.controllerDir, ctx.controllerId);
+    return (0, state_js_1.withControllerLock)(deps.dataDir, lock, async () => {
         const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
         // Reservations from the earlier epoch carry the old host's clock; reconcile
         // ages them from this moment on this host's clock. The marker is written
@@ -219,9 +221,9 @@ async function authorizeTakeOver(deps) {
         // newer marker), never rebound grants without a marker.
         const journal = await (0, state_js_1.readJournal)(deps.dataDir);
         const seq = (0, state_js_1.nextSeq)(journal);
-        // Computed once: a take-over of another data directory on this host
-        // shares the authority file but not this lock, so a recomputed epoch
-        // could differ from the one the marker names.
+        // Another data directory on this host shares the authority file but not
+        // this journal lock; the controller lock held here keeps this epoch, which
+        // the marker names, current until the authority file is written.
         const epoch = (0, controller_js_1.takeOverEpoch)(ctx, grants);
         await (0, state_js_1.writeJournal)(deps.dataDir, {
             ...journal,

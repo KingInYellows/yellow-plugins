@@ -23,6 +23,7 @@ import {
 import { canonicalPath } from './config.js';
 import {
   assertControllerAuthority,
+  controllerLockPath,
   initControllerAuthority,
   readControllerAuthority,
   takeOverController,
@@ -43,7 +44,7 @@ import {
 import {
   nextSeq,
   readJournal,
-  withJournalLock,
+  withControllerLock,
   writeJournal,
 } from './state.js';
 import type { GrantOperation, GrantRecord } from './types.js';
@@ -258,7 +259,8 @@ export async function authorizeCreate(
     deps.clock.now() + ttlMinutes * 60_000
   ).toISOString();
 
-  return withJournalLock(deps.dataDir, async () => {
+  const lock = controllerLockPath(ctx.controllerDir, ctx.controllerId);
+  return withControllerLock(deps.dataDir, lock, async () => {
     const grants = loadGrants(deps.dataDir);
     const existing = readControllerAuthority(
       ctx.controllerDir,
@@ -380,7 +382,8 @@ export async function authorizeRevoke(
         }
         throw err;
       }
-    }
+    },
+    controllerLockPath(ctx.controllerDir, ctx.controllerId)
   );
   return { operation: 'authorize', ...result };
 }
@@ -404,7 +407,8 @@ export async function authorizeTakeOver(
       'any other copy of this data directory stops being able to write.',
     ].join('\n')
   );
-  return withJournalLock(deps.dataDir, async () => {
+  const lock = controllerLockPath(ctx.controllerDir, ctx.controllerId);
+  return withControllerLock(deps.dataDir, lock, async () => {
     const grants = loadGrants(deps.dataDir);
     // Reservations from the earlier epoch carry the old host's clock; reconcile
     // ages them from this moment on this host's clock. The marker is written
@@ -413,9 +417,9 @@ export async function authorizeTakeOver(
     // newer marker), never rebound grants without a marker.
     const journal = await readJournal(deps.dataDir);
     const seq = nextSeq(journal);
-    // Computed once: a take-over of another data directory on this host
-    // shares the authority file but not this lock, so a recomputed epoch
-    // could differ from the one the marker names.
+    // Another data directory on this host shares the authority file but not
+    // this journal lock; the controller lock held here keeps this epoch, which
+    // the marker names, current until the authority file is written.
     const epoch = takeOverEpoch(ctx, grants);
     await writeJournal(deps.dataDir, {
       ...journal,

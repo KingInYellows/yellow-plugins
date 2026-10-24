@@ -43,6 +43,19 @@ export function controllerFilePath(
   return path.join(controllerDir, `${controllerId}.json`);
 }
 
+/**
+ * The controller-wide lock beside the authority file. Every data directory
+ * that shares this controller id takes it inside its own journal lock (see
+ * `withControllerLock`) around any write that reads or moves the authority.
+ */
+export function controllerLockPath(
+  controllerDir: string,
+  controllerId: string
+): string {
+  validateControllerId(controllerId);
+  return path.join(controllerDir, `${controllerId}.lock`);
+}
+
 function mismatch(message: string): never {
   return throwAppError('JULES_CONTROLLER_MISMATCH', message);
 }
@@ -145,6 +158,8 @@ function writeAuthority(
 /**
  * First `authorize` on this host: no controller file and no grants exist yet.
  * Writes epoch 1 bound to the canonical data directory. Refuses to overwrite.
+ * Callers hold the controller lock, so the existence check and the write are
+ * one step.
  */
 export function initControllerAuthority(
   ctx: ControllerContext,
@@ -243,8 +258,9 @@ export interface TakeOverResult {
  * still reference (`takeOverEpoch`). The controller file is written first: a
  * crash before the grants are rewritten leaves grants pointing at an old epoch,
  * so writes fail closed until `--take-over` is run again. Runs only inside a
- * TTY-confirmed `authorize --take-over`, under the journal lock, after the
- * journal's take-over marker for the same epoch is written.
+ * TTY-confirmed `authorize --take-over`, under the journal lock and the
+ * controller lock, after the journal's take-over marker for the same epoch is
+ * written.
  */
 export function takeOverEpoch(
   ctx: ControllerContext,
@@ -265,10 +281,10 @@ export function takeOverController(
   /** The epoch the journal marker already names; computed here when absent. */
   epoch: number = takeOverEpoch(ctx, grants)
 ): TakeOverResult {
-  // Re-read just before the write: a take-over of another data directory on
-  // this host shares the authority file but not this journal lock. Writing a
-  // stale epoch would roll that authority back, so refuse; the grants stay on
-  // their old epoch (writes fail closed) until the take-over is run again.
+  // The caller holds the controller lock, so the authority cannot have moved
+  // since `epoch` was computed. Re-checked anyway: writing a stale epoch would
+  // roll another data directory's authority back, so refuse; the grants stay
+  // on their old epoch (writes fail closed) until the take-over is run again.
   if (takeOverEpoch(ctx, grants) !== epoch) {
     return mismatch(
       'the controller authority changed during the take-over; run authorize --take-over again'
