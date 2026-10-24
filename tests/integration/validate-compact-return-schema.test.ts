@@ -198,6 +198,43 @@ describe('validate-compact-return-schema', () => {
     );
   });
 
+  it('fails an unmarked copy in an uppercase JSON fence', () => {
+    write(
+      root,
+      PERSONA,
+      '```JSON\n' + schemaJson('example', finding()) + '\n```\n'
+    );
+    const r = run(root);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(
+      /line 1: compact-return schema copy is not wrapped/
+    );
+  });
+
+  it('fails a known producer that drops its schema markers', () => {
+    write(
+      root,
+      'plugins/yellow-review/agents/review/correctness-reviewer.md',
+      '```json\n{ "reviewer": "correctness", "findings": [] }\n```\n'
+    );
+    const r = run(root);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(
+      /correctness-reviewer\.md: known compact-return producer has no/
+    );
+  });
+
+  it('fails a schema block that repeats a key', () => {
+    const json = schemaJson('example', finding()).replace(
+      '"title"',
+      '"severity": "P1",\n      "title"'
+    );
+    write(root, PERSONA, `${schemaBlock(json)}\n\n${notesBlock()}\n`);
+    const r = run(root);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/repeats the key "severity" in one object/);
+  });
+
   it('fails a missing base key', () => {
     const f = finding();
     delete f.scope;

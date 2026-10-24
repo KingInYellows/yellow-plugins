@@ -27,6 +27,7 @@
  *      (`severity`, `autofix_class`, `owner`) may narrow to a subset; the
  *      `rule` and `scope` placeholders must match byte for byte; extension
  *      keys may follow `suggested_fix`; `confidence` must be a rubric anchor.
+ *   P  Producers. Each file in PRODUCERS that exists must carry a marked copy.
  *   N  Notes. Every file under agents/ that carries a schema copy also
  *      carries the notes block, byte-identical to the canonical one.
  *
@@ -60,7 +61,26 @@ const NOTES_END = '<!-- compact-return-notes:end -->';
 const ENUM_FIELDS = new Set(['severity', 'autofix_class', 'owner']);
 const EXACT_FIELDS = new Set(['rule', 'scope']);
 const CONFIDENCE_ANCHORS = new Set([0, 25, 50, 75, 100]);
-const JSON_FENCE = /^```jsonc?$/;
+
+// Known compact-return producers. Each must keep its marked copy while it
+// exists, so deleting the markers cannot drop a malformed copy out of rule S.
+const PRODUCERS = [
+  'plugins/yellow-core/agents/review/performance-reviewer.md',
+  'plugins/yellow-core/agents/review/security-reviewer.md',
+  'plugins/yellow-review/agents/review/adversarial-reviewer.md',
+  'plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md',
+  'plugins/yellow-review/agents/review/agent-native-reviewer.md',
+  'plugins/yellow-review/agents/review/cli-readiness-reviewer.md',
+  'plugins/yellow-review/agents/review/correctness-reviewer.md',
+  'plugins/yellow-review/agents/review/maintainability-reviewer.md',
+  'plugins/yellow-review/agents/review/plugin-contract-reviewer.md',
+  'plugins/yellow-review/agents/review/project-compliance-reviewer.md',
+  'plugins/yellow-review/agents/review/project-standards-reviewer.md',
+  'plugins/yellow-review/agents/review/reliability-reviewer.md',
+  'plugins/yellow-review/agents/review/thermonuclear-reviewer.md',
+  'plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md',
+];
+const JSON_FENCE = /^```jsonc?$/i;
 
 const errors = [];
 function fail(rel, message) {
@@ -110,12 +130,57 @@ function fenceJson(region, rel) {
 
 /** The parsed value, or undefined (never a JSON value) when it does not parse. */
 function parseSchema(text, rel) {
+  let value;
   try {
-    return JSON.parse(text);
+    value = JSON.parse(text);
   } catch (err) {
     fail(rel, `schema block is not valid JSON: ${err.message}`);
     return undefined;
   }
+  // JSON.parse keeps the last of two same-named keys, hiding the drift.
+  const dup = duplicateKey(text);
+  if (dup !== null) {
+    fail(rel, `schema block repeats the key "${dup}" in one object`);
+    return undefined;
+  }
+  return value;
+}
+
+/** Index of the closing quote of the string that opens at `i`. */
+function stringEnd(text, i) {
+  let j = i + 1;
+  while (j < text.length && text[j] !== '"') j += text[j] === '\\' ? 2 : 1;
+  return j;
+}
+
+function followedByColon(text, i) {
+  const rest = text.slice(i + 1).trimStart();
+  return rest.startsWith(':');
+}
+
+/** Records the key whose string opens at `i`; returns the string's end. */
+function noteKey(text, i, keys, dups) {
+  const end = stringEnd(text, i);
+  if (keys && followedByColon(text, end)) {
+    const key = text.slice(i + 1, end);
+    if (keys.has(key)) dups.push(key);
+    keys.add(key);
+  }
+  return end;
+}
+
+/** The first key repeated within one object of valid JSON `text`, or null. */
+function duplicateKey(text) {
+  const stack = [];
+  const dups = [];
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '{') stack.push(new Set());
+    else if (c === '[') stack.push(null);
+    else if (c === '}' || c === ']') stack.pop();
+    else if (c === '"') i = noteKey(text, i, stack[stack.length - 1], dups);
+  }
+  return dups.length > 0 ? dups[0] : null;
 }
 
 function typeOf(value) {
@@ -348,7 +413,12 @@ function checkFile(file, canonical) {
   checkUnmarked(lines, schemaRegion, rel);
   const needsNotes = Boolean(schemaRegion) && rel.includes('/agents/');
   checkNotes(notesRegion, canonical, rel, needsNotes);
-  if (!schemaRegion) return 0;
+  if (!schemaRegion) {
+    if (PRODUCERS.includes(rel)) {
+      fail(rel, `known compact-return producer has no ${SCHEMA_BEGIN} block`);
+    }
+    return 0;
+  }
   const text = fenceJson(schemaRegion, rel);
   const copy = text === null ? undefined : parseSchema(text, rel);
   if (copy !== undefined) checkSchema(canonical.canon, copy, rel);
