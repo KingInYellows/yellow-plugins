@@ -108,12 +108,13 @@ function fenceJson(region, rel) {
     .join('\n');
 }
 
+/** The parsed value, or undefined (never a JSON value) when it does not parse. */
 function parseSchema(text, rel) {
   try {
     return JSON.parse(text);
   } catch (err) {
     fail(rel, `schema block is not valid JSON: ${err.message}`);
-    return null;
+    return undefined;
   }
 }
 
@@ -296,8 +297,17 @@ function loadCanonical() {
     return null;
   }
   const text = fenceJson(schema, CANONICAL_REL);
-  const canon = text && parseSchema(text, CANONICAL_REL);
-  return canon ? { canon, notes: notes.body.join('\n') } : null;
+  if (text === null) return null;
+  const canon = parseSchema(text, CANONICAL_REL);
+  if (canon === undefined) return null;
+  if (typeOf(canon) !== 'object' || !isSingleFinding(canon.findings)) {
+    fail(
+      CANONICAL_REL,
+      'canonical schema must be an object with one example finding'
+    );
+    return null;
+  }
+  return { canon, notes: notes.body.join('\n') };
 }
 
 function checkUnmarked(lines, schemaRegion, rel) {
@@ -340,8 +350,8 @@ function checkFile(file, canonical) {
   checkNotes(notesRegion, canonical, rel, needsNotes);
   if (!schemaRegion) return 0;
   const text = fenceJson(schemaRegion, rel);
-  const copy = text && parseSchema(text, rel);
-  if (copy) checkSchema(canonical.canon, copy, rel);
+  const copy = text === null ? undefined : parseSchema(text, rel);
+  if (copy !== undefined) checkSchema(canonical.canon, copy, rel);
   return 1;
 }
 

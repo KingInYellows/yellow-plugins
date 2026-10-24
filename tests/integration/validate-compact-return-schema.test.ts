@@ -241,6 +241,16 @@ describe('validate-compact-return-schema', () => {
     expect(run(root).stderr).toMatch(/rubric anchor/);
   });
 
+  it.each(['null', 'false', '0', '""'])(
+    'fails a falsy JSON schema block (%s)',
+    (value) => {
+      write(root, PERSONA, `${schemaBlock(value)}\n\n${notesBlock()}\n`);
+      const r = run(root);
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(/schema block must be a JSON object/);
+    }
+  );
+
   it('fails populated aggregator buckets', () => {
     const json = schemaJson('example', finding()).replace(
       '"residual_risks": []',
