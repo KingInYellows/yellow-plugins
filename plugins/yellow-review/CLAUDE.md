@@ -31,8 +31,8 @@ resolution, and sequential stack review. Graphite-native workflow.
   confidence, then remaining findings, and drop the lowest-ranked overflow —
   never emit partial JSON.
 - **The compact-return schema has one source.**
-  `skills/pr-review-workflow/SKILL.md` "Finding Output Format" holds it between
-  `compact-return-schema` markers, plus the persona notes between
+  `skills/pr-review-workflow/references/compact-return-schema.md` holds it
+  between `compact-return-schema` markers, plus the persona notes between
   `compact-return-notes` markers. Each persona keeps an inline marked copy
   (subagents cannot read the skill), and `pnpm validate:compact-return` fails a
   copy whose keys, order, types or `rule`/`scope` placeholders drift, whose

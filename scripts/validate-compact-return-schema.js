@@ -4,13 +4,13 @@
  * Compact-Return Schema Drift Validator
  *
  * Every Wave 2 review persona emits findings in the compact-return schema the
- * `/review:pr` aggregator parses. A subagent cannot read
- * `pr-review-workflow/SKILL.md` at dispatch, so each persona carries an inline
+ * `/review:pr` aggregator parses. A subagent cannot read the pr-review-workflow
+ * skill at dispatch, so each persona carries an inline
  * copy, and a drifted copy used to fail only at runtime, as a return the
  * aggregator could not parse (CLAUDE-30).
  *
  * The canonical schema lives in plugins/yellow-review/skills/pr-review-workflow/
- * SKILL.md between two marker lines:
+ * references/compact-return-schema.md between two marker lines:
  *
  *   <!-- compact-return-schema:begin -->  ...one ```json fence...  <!-- compact-return-schema:end -->
  *   <!-- compact-return-notes:begin -->   ...persona-facing prose...  <!-- compact-return-notes:end -->
@@ -50,7 +50,7 @@ const ROOT = path.resolve(
   process.env.VALIDATE_COMPACT_RETURN_ROOT || process.cwd()
 );
 const CANONICAL_REL =
-  'plugins/yellow-review/skills/pr-review-workflow/SKILL.md';
+  'plugins/yellow-review/skills/pr-review-workflow/references/compact-return-schema.md';
 
 const SCHEMA_BEGIN = '<!-- compact-return-schema:begin -->';
 const SCHEMA_END = '<!-- compact-return-schema:end -->';

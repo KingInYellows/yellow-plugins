@@ -114,16 +114,16 @@ were never designed to be extended.
       (or any two files expressing the same schema), add or extend a
       sync/byte-identity test in the same PR — do not defer it.
 - [ ] If the persona returns the compact-return schema, wrap its copy in
-      `compact-return-schema` markers (and, for an agent, paste the
-      canonical `compact-return-notes` block) from
-      `pr-review-workflow/SKILL.md`; `pnpm validate:compact-return` fails an
-      unmarked copy.
+      `compact-return-schema` markers (and, for an agent, paste the canonical
+      `compact-return-notes` block) from
+      `pr-review-workflow/references/compact-return-schema.md`;
+      `pnpm validate:compact-return` fails an unmarked copy.
 - [ ] If the persona is opt-in and costly (high model or effort), add it to
-      `review-pr.md` Step 4's "Depth gate for `reviewer_set.include`" table
-      so naming it in `include` does not run it on a one-line diff.
-- [ ] Search any cap/limit prose for a target field name; if the schema has
-      no such field, either add one or change the instruction to state
-      what's dropped.
+      `review-pr.md` Step 4's "Depth gate for `reviewer_set.include`" table so
+      naming it in `include` does not run it on a one-line diff.
+- [ ] Search any cap/limit prose for a target field name; if the schema has no
+      such field, either add one or change the instruction to state what's
+      dropped.
 - [ ] Audit severity/precedence rules, manifest/config generation, and any
       path-relative logic for a hidden "closed set of personas" assumption
       before assuming the new persona is fully wired.

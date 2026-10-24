@@ -19,7 +19,8 @@ const VALIDATOR = join(
   'scripts',
   'validate-compact-return-schema.js'
 );
-const CANONICAL = 'plugins/yellow-review/skills/pr-review-workflow/SKILL.md';
+const CANONICAL =
+  'plugins/yellow-review/skills/pr-review-workflow/references/compact-return-schema.md';
 const PERSONA = 'plugins/yellow-review/agents/review/example-reviewer.md';
 
 interface Run {
