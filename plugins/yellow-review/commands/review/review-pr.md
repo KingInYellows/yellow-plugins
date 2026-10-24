@@ -24,8 +24,8 @@ allowed-tools:
 
 Run a tiered multi-agent persona review on a single PR, apply P0/P1 fixes,
 and push via the active stacked-PR provider. The pipeline includes a learnings
-pre-pass against `docs/solutions/`, structured compact-return findings per reviewer,
-cross-reviewer agreement promotion, and a confidence gate before any
+pre-pass against `docs/solutions/`, structured compact-return findings per
+reviewer, cross-reviewer agreement promotion, and a confidence gate before any
 finding is surfaced.
 
 ## Workflow

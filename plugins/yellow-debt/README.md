@@ -242,8 +242,8 @@ paths.
 - **Optional**: yellow-linear plugin (for `/debt:sync`)
 - **Optional**: the `ast-grep` CLI. When it is on PATH, the complexity and
   duplication scanners use it for structural matches; otherwise they use Grep.
-- **Optional**: github-workflow plugin (optional): under `READY_GITHUB`, stack
-  operations run its `lib/github-stack-runtime.js` through this plugin's
+- **github-workflow provider**: under `READY_GITHUB`, stack operations run its
+  `lib/github-stack-runtime.js` through this plugin's
   `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the
   active installed version (the newest cached one when that is unknown). Without
   it they report `RUNTIME_NOT_FOUND` and tell you to install it or run

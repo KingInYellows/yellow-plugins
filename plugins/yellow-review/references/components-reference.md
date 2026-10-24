@@ -8,9 +8,9 @@ flags, exit codes, trust-boundary rules and library behavior.
 
 ### Commands (8)
 
-- `/review:setup` — Validate GitHub, jq, Graphite, yellow-core and the
-  review-ledger prerequisites (flock, realpath, git 2.31+, optional
-  universal-ctags) before reviewing PRs
+- `/review:setup` — Validate GitHub, jq, yellow-core and the review-ledger
+  prerequisites (flock, realpath, git 2.31+, optional universal-ctags) before
+  reviewing PRs; the Graphite CLI is reported but needed only with gt-workflow
 - `/review:pr` — Adaptive multi-agent review of a single PR with automatic fix
   application (P0/P1 `safe_auto`, plus up to 5 `review-fixer`-owned P2
   `safe_auto` at anchor 100); persists every reported-but-unapplied finding to

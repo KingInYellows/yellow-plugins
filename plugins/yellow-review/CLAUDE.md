@@ -62,8 +62,8 @@ it before editing a script, library or command.
 
 ### Commands (8)
 
-- `/review:setup` — validate GitHub, jq, Graphite, yellow-core and ledger
-  prerequisites
+- `/review:setup` — validate GitHub, jq, yellow-core and ledger prerequisites;
+  the Graphite CLI is reported but needed only with gt-workflow
 - `/review:pr` — adaptive multi-agent review of one PR with auto-applied safe
   fixes; persists unapplied findings to the ledger; `--non-interactive`
   suppresses push and learnings prompts
