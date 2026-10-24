@@ -760,7 +760,12 @@ SH
   edit q1 "$PROJECT_ROOT/src/a.ts"
   mkdir "$RUVECTOR_DIR/.coedit.lock"
   ( edit q1 "$PROJECT_ROOT/src/b.ts" ) &
-  sleep 0.02
+  # Start the second edit only once the first has saved its session state
+  # and is waiting on the store lock, so the launch order is the edit order.
+  for _ in $(seq 1 100); do
+    [ "$(jq -r .last "$RUVECTOR_DIR/coedit-sessions/q1" 2>/dev/null)" = "src/b.ts" ] && break
+    sleep 0.02
+  done
   ( edit q1 "$PROJECT_ROOT/src/c.ts" ) &
   wait
   rmdir "$RUVECTOR_DIR/.coedit.lock"
