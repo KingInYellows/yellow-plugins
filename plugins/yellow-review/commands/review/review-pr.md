@@ -360,7 +360,11 @@ overrides documented in that schema:
   is not listed (filtering them would defeat the always-on contract); to
   drop an always-on persona, use `reviewer_set.exclude`.
 - `reviewer_set.include` / `reviewer_set.exclude` → additive / subtractive
-  overrides applied last (`(defaults ∪ include) \ exclude`).
+  overrides applied last: `(defaults ∪ depth_gate(include)) \ exclude`. An
+  included persona still respects the depth tier; see "Depth gate for
+  `reviewer_set.include`" below.
+- `reviewer_set.force_depth: [<agent-name>, ...]` → names from `include` that
+  skip the depth gate and run at every tier. It never adds a persona by itself.
 
 **Security warning.** When `reviewer_set.exclude` contains a security-class
 agent (`security-reviewer`, `adversarial-reviewer`,
@@ -431,6 +435,33 @@ the only registry entry that maps the bare `thermonuclear-reviewer` name
 from `reviewer_set.include` to a spawnable `subagent_type`; without it the
 opt-in path has no mapping to dispatch. The graceful-degradation guard
 below covers this table too.
+
+#### Depth gate for `reviewer_set.include`
+
+An included persona that the always-on and conditional rules did not already
+select runs only when the effective depth tier reaches its minimum tier. The
+effective tier is `review_depth` when set, otherwise the Step 3 gross line
+count: small below 100, medium from 100 to 500, large above 500.
+
+| Agent                      | Minimum tier |
+| -------------------------- | ------------ |
+| `thermonuclear-reviewer`   | medium       |
+| `adversarial-reviewer`     | medium       |
+| `code-simplicity-reviewer` | medium       |
+| `architecture-strategist`  | medium       |
+
+Every other agent has no minimum and always passes. A name also listed in
+`reviewer_set.force_depth` passes at every tier. For each persona the gate
+drops, log to stderr:
+
+```
+[review:pr] reviewer_set.include: <agent> skipped at <tier> depth (minimum <min>); add it to reviewer_set.force_depth to run it anyway
+```
+
+and list it as skipped by the depth gate in the Coverage section. A
+`force_depth` name missing from `include` adds nothing: warn
+`[review:pr] Warning: reviewer_set.force_depth names <agent>, which is not in reviewer_set.include; ignoring`
+and continue.
 
 #### Shadow selection log (`reviewer_selection`)
 

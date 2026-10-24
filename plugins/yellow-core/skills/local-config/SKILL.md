@@ -20,8 +20,8 @@ notes.
   rewrite — projects experiencing high false-positive review noise can
   set `review_pipeline: legacy` and the pre-Wave-2 adaptive selection is
   used instead.
-- Supports optional `reviewer_set.{include,exclude}` for narrowing or
-  expanding the persona dispatch table without forking commands.
+- Supports optional `reviewer_set.{include,exclude,force_depth}` for narrowing
+  or expanding the persona dispatch table without forking commands.
 
 ## When to Use
 
@@ -60,6 +60,7 @@ focus_areas: [security, correctness, ...]  # default: all areas
 reviewer_set:
   include: [<agent-name>, ...]            # additional agents to spawn beyond defaults
   exclude: [<agent-name>, ...]            # agents to skip
+  force_depth: [<agent-name>, ...]        # included agents that skip the depth gate
 reviewer_selection: off | shadow | jev     # default: off (review:pr only; jev = shadow for now)
 reviewer_selection_private_repos: [<owner/repo | owner/*>, ...]  # user-level file only; default: empty
 
@@ -102,8 +103,9 @@ means the file remains valid forward-and-backward.
 | `review_pipeline` | `persona` \| `legacy` | `persona` | `legacy` falls back to pre-Wave-2 adaptive selection (no learnings pre-pass, no confidence rubric, no new personas). Use as escape hatch only. |
 | `review_depth` | `small` \| `medium` \| `large` | auto | Forces a depth tier regardless of computed diff size. `large` always invokes `adversarial-reviewer`; `small` skips it even on large diffs. |
 | `focus_areas` | array of strings | empty (= all) | Narrows reviewer set to those whose `category` matches one of the listed areas. Recognized areas: `security`, `correctness`, `reliability`, `performance`, `maintainability`, `project-compliance`, `project-standards`, `architecture`, `testing`, `documentation`, `types`, `adversarial`. Always-on personas (`project-compliance-reviewer`, `correctness-reviewer`, `maintainability-reviewer`, `project-standards-reviewer`) survive the filter regardless of `focus_areas` — filtering them out would defeat the always-on contract. |
-| `reviewer_set.include` | array of agent names | empty | Additive — agents are spawned even if their conditional triggers don't fire. This is also the only way to reach `thermonuclear-reviewer` (yellow-review): an opt-in structural-quality persona that appears in neither dispatch table, so it runs only when named here. Two silent drops apply to `include`, both visible in the precedence pseudo-code under "Reading the config from a command". First, `review_pipeline: legacy` branches before overrides are read at all, so `include` has no effect there. Second, `focus_areas` filters the merged set afterwards, and `thermonuclear-reviewer` is not always-on (its category is `maintainability`), so an included `thermonuclear-reviewer` survives only when `focus_areas` is unset or lists `maintainability`. Neither drop emits a diagnostic. |
+| `reviewer_set.include` | array of agent names | empty | Additive — agents are spawned even if their conditional triggers don't fire. This is also the only way to reach `thermonuclear-reviewer` (yellow-review): an opt-in structural-quality persona that appears in neither dispatch table, so it runs only when named here. Two silent drops apply to `include`, both visible in the precedence pseudo-code under "Reading the config from a command". First, `review_pipeline: legacy` branches before overrides are read at all, so `include` has no effect there. Second, `focus_areas` filters the merged set afterwards, and `thermonuclear-reviewer` is not always-on (its category is `maintainability`), so an included `thermonuclear-reviewer` survives only when `focus_areas` is unset or lists `maintainability`. Neither drop emits a diagnostic. A third drop does: included agents still respect the depth tier. `thermonuclear-reviewer`, `adversarial-reviewer`, `code-simplicity-reviewer` and `architecture-strategist`, when no dispatch rule already selected them, run only at `medium` depth or above (`review_depth`, else the diff's gross line count: below 100 is `small`). Each one dropped is logged to stderr and listed in the report's Coverage section; `reviewer_set.force_depth` lifts the gate. |
 | `reviewer_set.exclude` | array of agent names | empty | Subtractive — agents are skipped even if always-on or their triggers fire. Applied after `include`. |
+| `reviewer_set.force_depth` | array of agent names | empty | Agents from `include` that bypass the depth gate, so they run even on a `small` diff — paying full model and effort on a one-line change becomes a stated choice. It adds nothing by itself: a name not in `include` warns and is ignored. `exclude` still wins. |
 | `reviewer_selection` | `off` \| `shadow` \| `jev` | `off` | `/review:pr` only. `shadow` logs, per review, the conditional personas the table's exact rules pick, the set the orchestrator picked, and the set TypeSafe's Jev would pick from one request on the redacted diff, to `<git-common-dir>/yellow-review/jev-persona/` (yellow-review `references/review-pr/persona-shadow.md`). It never changes which reviewers run. `jev` behaves as `shadow` until per-persona switching ships. The Jev call needs `TYPESAFE_API_KEY` and sends diff text to a third party only for public repositories or those in `reviewer_selection_private_repos` (`docs/security.md` "Persona selection shadow log"). The only key with a user-level fallback: when the repo file leaves it unset, `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md` is read, so one line there enables it for every repository. |
 | `reviewer_selection_private_repos` | array of `owner/repo` or `owner/*` | empty | Private repositories that may send their redacted diff to Jev under `reviewer_selection: shadow`; `owner/*` covers every repository of that owner (case-insensitive). Read only from the user-level `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`; a value in a repository's file is ignored, because `/review:pr` reads config from the checked-out PR head, where a contributor could add an opt-in. A repository whose visibility cannot be read counts as private. |
 | `stack` | array of `ts` \| `py` \| `rust` \| `go` | auto-detect | Forces language-specific reviewer behavior. When set, `polyglot-reviewer` (when triggered) scopes to listed languages and skips non-matching files. Auto-detect uses repo root signals: `package.json` → `ts`, `pyproject.toml`/`requirements.txt` → `py`, `Cargo.toml` → `rust`, `go.mod` → `go`. Multi-stack repos may set this explicitly to scope review to a subset. Acted on by W3-pending consumers (see status table). |
@@ -180,9 +182,18 @@ if review_pipeline == "legacy":
 focus_areas = config.focus_areas ?? []  # empty = no filter
 include = config.reviewer_set.include ?? []
 exclude = config.reviewer_set.exclude ?? []
+force_depth = config.reviewer_set.force_depth ?? []
+
+# Included agents respect the depth tier. MIN_TIER is review-pr.md Step 4's
+# "Depth gate for reviewer_set.include" table (thermonuclear-reviewer,
+# adversarial-reviewer, code-simplicity-reviewer, architecture-strategist:
+# medium); every other agent has no minimum.
+tier = review_depth  # small < 100 gross lines <= medium <= 500 < large
+gated = {a in include \ defaults : a not in force_depth and tier < MIN_TIER[a]}
+warn_each(gated)  # stderr + Coverage; never silent
 
 # After computing the default reviewer set per Step 4 of review-pr.md:
-reviewer_set = (defaults ∪ include) \ exclude
+reviewer_set = (defaults ∪ (include \ gated)) \ exclude
 
 # Precedence step 3: focus_areas filters the merged set, so an included agent
 # is still dropped when its category is not listed.
@@ -206,6 +217,8 @@ use_persona_dispatch(reviewer_set)
   Step 4 handles missing agents at dispatch time anyway.
 - Mutually exclusive entries (same name in both `include` and `exclude`)
   → `exclude` wins; emit a warning naming the conflicting agent.
+- A `reviewer_set.force_depth` name that is not in `include` → ignore it and
+  emit a warning naming it; `force_depth` never adds an agent.
 - `review_pipeline` values other than `persona` / `legacy` → fall back to
   `persona` and emit a warning.
 - `stack` entries other than `ts` / `py` / `rust` / `go` → drop the

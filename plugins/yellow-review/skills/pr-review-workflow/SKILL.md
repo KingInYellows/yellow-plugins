@@ -135,7 +135,10 @@ Binary files show `-` in numstat and are excluded.
   `reviewer_set.include` in `yellow-plugins.local.md`. Under
   `review_pipeline: legacy` it is unreachable by design — the legacy persona
   list is fixed and never reads `reviewer_set`. Its `subagent_type` mapping
-  lives in `review-pr.md` Step 4's "Opt-in only" table, not here.
+  lives in `review-pr.md` Step 4's "Opt-in only" table, not here. Being named in
+  `include` does not bypass depth tiering: below the medium tier it is skipped
+  with a stderr line unless `reviewer_set.force_depth` also names it
+  (`review-pr.md` Step 4 "Depth gate for `reviewer_set.include`").
 
 ### Size Tiers
 
@@ -152,30 +155,10 @@ Wave 2 persona reviewers (`correctness-reviewer`, `maintainability-reviewer`,
 return structured JSON per the compact-return schema. The orchestrator
 aggregates and presents them as pipe-delimited tables.
 
-```json
-{
-  "reviewer": "<name>",
-  "findings": [
-    {
-      "title": "<short actionable summary>",
-      "severity": "P0|P1|P2|P3",
-      "category": "<reviewer category>",
-      "rule": "<slug from the injected rule-vocabulary>",
-      "scope": "<enclosing dotted symbol path or nearest markdown heading>",
-      "file": "<repo-relative path>",
-      "line": 42,
-      "confidence": 75,
-      "autofix_class": "safe_auto|gated_auto|manual|advisory",
-      "owner": "review-fixer|downstream-resolver|human|release",
-      "requires_verification": true,
-      "pre_existing": false,
-      "suggested_fix": "<one-sentence concrete fix or null>"
-    }
-  ],
-  "residual_risks": [],
-  "testing_gaps": []
-}
-```
+The canonical schema lives in `references/compact-return-schema.md`, with the
+rules each persona's inline copy must follow and the notes every persona carries
+verbatim. Change the contract there first; `pnpm validate:compact-return` then
+names each copy that disagrees.
 
 `rule` comes from the `<rule-vocabulary>` block the orchestrator injects
 (`lib/review-ledger-vocab.json`; `unclassified` when none fits) and `scope` is

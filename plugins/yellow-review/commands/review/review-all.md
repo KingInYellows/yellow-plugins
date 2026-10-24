@@ -239,12 +239,17 @@ aggregation rules change there, propagate the same change here.
 
 6. **Tiered persona dispatch** (mirrors review-pr.md Step 4): always-on
    personas + conditional personas (version-only `plugin.json` edits do not
-   trigger them) + the "Opt-in only" registry (the
-   `thermonuclear-reviewer` row, reachable solely via `reviewer_set.include`)
-   + graceful-degradation guard. Read
-   `yellow-plugins.local.md` for `review_pipeline`, `review_depth`,
-   `focus_areas`, `reviewer_set.{include,exclude}` overrides. Never abort
-   on a missing persona — log to stderr and continue.
+   trigger them) + the "Opt-in only" registry (the `thermonuclear-reviewer` row,
+   reachable solely via `reviewer_set.include`) + graceful-degradation guard.
+   Read `yellow-plugins.local.md` for `review_pipeline`, `review_depth`,
+   `focus_areas`, `reviewer_set.{include,exclude,force_depth}` overrides. Apply
+   review-pr.md Step 4's "Depth gate for `reviewer_set.include`" per PR, from
+   that PR's own tier (`review_depth`, else gross lines: small below 100, medium
+   100–500, large above 500): an included `thermonuclear-reviewer`,
+   `adversarial-reviewer`, `code-simplicity-reviewer` or
+   `architecture-strategist` that no rule selected is dropped below medium
+   unless `reviewer_set.force_depth` names it, with the same stderr line. Never
+   abort on a missing persona — log to stderr and continue.
 
    Opt-in only (never auto-selected). Dispatched only when named in
    `reviewer_set.include`:

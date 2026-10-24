@@ -27,7 +27,7 @@ pnpm lint                     # eslint .js/.ts
 pnpm test:unit                # vitest run --dir packages
 pnpm test:integration         # vitest run --dir tests/integration (validator tests live here)
 
-pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + provider-groups + codex + cursor + jules + flow-namespace + provider-neutral-commands + council-roster + doc-counts + shell-compat
+pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + provider-groups + codex + cursor + jules + flow-namespace + provider-neutral-commands + council-roster + compact-return + doc-counts + shell-compat
 pnpm validate:agents          # agent-authoring rules only (fast; run after any plugin markdown edit)
 pnpm validate:shell-compat    # bash/zsh lint of fenced shell blocks + tier 4 libs (run after any shell edit)
 pnpm check:shell-parse        # blocks bash parses but zsh does not (skips locally without zsh; CI fails)

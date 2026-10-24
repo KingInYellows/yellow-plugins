@@ -30,6 +30,13 @@ resolution, and sequential stack review. Graphite-native workflow.
   gate-surviving items first (anchors 75/100, plus P0 at 50+) by severity then
   confidence, then remaining findings, and drop the lowest-ranked overflow —
   never emit partial JSON.
+- **The compact-return schema has one source.**
+  `skills/pr-review-workflow/references/compact-return-schema.md` holds it
+  between `compact-return-schema` markers, plus the persona notes between
+  `compact-return-notes` markers. Each persona keeps an inline marked copy
+  (subagents cannot read the skill), and `pnpm validate:compact-return` fails a
+  copy whose keys, order, types or `rule`/`scope` placeholders drift, whose
+  enums widen, or whose notes differ. Edit the canonical block first.
 - All shell scripts follow POSIX security patterns (quoted variables, input
   validation, `set -eu`)
 - Working directory must be clean before running any review command
@@ -96,7 +103,8 @@ applies fixes.
   `agent-native-reviewer`
 - Opt-in only, never auto-selected: `thermonuclear-reviewer` (name it in
   `reviewer_set.include`; opus/xhigh; unreachable under
-  `review_pipeline: legacy`)
+  `review_pipeline: legacy`; skipped below the medium depth tier unless
+  `reviewer_set.force_depth` names it)
 - Specialists: `pr-test-analyzer`, `comment-analyzer`, `code-simplifier` (final
   pass), `type-design-analyzer`, `silent-failure-hunter`
 - Workflow: `pr-comment-resolver` — one fix per comment cluster plus a proposed

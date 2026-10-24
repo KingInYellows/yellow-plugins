@@ -51,6 +51,7 @@ REVIEW_ALL="$COMMANDS_DIR/review-all.md"
 
 REVIEW_PR="$COMMANDS_DIR/review-pr.md"
 WORKFLOW_SKILL="$SKILLS_DIR/pr-review-workflow/SKILL.md"
+WORKFLOW_SCHEMA="$SKILLS_DIR/pr-review-workflow/references/compact-return-schema.md"
 YR_AGENTS="$BATS_TEST_DIRNAME/../agents/review"
 YC_AGENTS="$BATS_TEST_DIRNAME/../../yellow-core/agents/review"
 VOCAB="$BATS_TEST_DIRNAME/../lib/review-ledger-vocab.json"
@@ -87,16 +88,16 @@ schema_fields() {
 
 @test "ledger: every producer explains escaping ' > ' inside a heading path segment" {
   while IFS= read -r f; do
-    grep -qF 'is `Parent > A \> B`.' "$f" || { echo "no heading escape: $f"; false; }
+    flat "$f" | grep -qF 'is `Parent > A \> B`.' || { echo "no heading escape: $f"; false; }
   done < <(
     producers
-    printf '%s\n' "$WORKFLOW_SKILL" "$SKILLS_DIR/yellow-thermonuclear-review/SKILL.md"
+    printf '%s\n' "$WORKFLOW_SKILL" "$WORKFLOW_SCHEMA" "$SKILLS_DIR/yellow-thermonuclear-review/SKILL.md"
   )
 }
 
-@test "ledger: review-pr.md and SKILL.md schema examples carry the same fields" {
+@test "ledger: review-pr.md and the canonical compact-return schema carry the same fields" {
   a=$(schema_fields "$REVIEW_PR")
-  b=$(schema_fields "$WORKFLOW_SKILL")
+  b=$(schema_fields "$WORKFLOW_SCHEMA")
   [ -n "$a" ]
   [ "$a" = "$b" ]
   printf '%s\n' "$a" | grep -qx rule

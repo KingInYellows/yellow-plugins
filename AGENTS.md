@@ -162,6 +162,12 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   identity gate there is fatal and aborts the whole file when any copy
   differs from SKILL.md after dedent; `validate:agents` and `lint:plugins`
   do not run it.
+- Edits to a review persona's compact-return schema or its notes (the blocks
+  between `compact-return-schema` / `compact-return-notes` markers), or a new
+  persona that returns that schema: `pnpm validate:compact-return`. The
+  canonical copy is yellow-review's
+  `skills/pr-review-workflow/references/compact-return-schema.md`; change it
+  first.
 - `plugins/yellow-core/commands/setup/all.md` or marketplace inventory changes:
   `pnpm validate:setup-all`.
 - TypeScript package changes: `pnpm test:unit`, `pnpm lint`, and

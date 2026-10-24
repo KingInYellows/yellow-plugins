@@ -513,6 +513,26 @@ describe('opt-in wiring', () => {
     expect(localConfig).toContain('thermonuclear-reviewer');
   });
 
+  it('is depth-gated when included, with force_depth as the explicit bypass', () => {
+    const reviewPr = readFileSync(REVIEW_PR_PATH, 'utf8');
+    expect(reviewPr).toContain('#### Depth gate for `reviewer_set.include`');
+    expect(reviewPr).toMatch(/^\| `thermonuclear-reviewer`\s+\| medium\s+\|$/m);
+    expect(flatten(reviewPr)).toContain(
+      '`(defaults ∪ depth_gate(include)) \\ exclude`'
+    );
+    expect(flatten(readFileSync(REVIEW_ALL_PATH, 'utf8'))).toContain(
+      'unless `reviewer_set.force_depth` names it'
+    );
+    const localConfig = readFileSync(
+      resolve(REPO_ROOT, 'plugins/yellow-core/skills/local-config/SKILL.md'),
+      'utf8'
+    );
+    expect(localConfig).toContain('| `reviewer_set.force_depth` |');
+    expect(localConfig).toContain(
+      'reviewer_set = (defaults ∪ (include \\ gated)) \\ exclude'
+    );
+  });
+
   it('records that legacy mode cannot reach it', () => {
     const legacy = readFileSync(
       resolve(

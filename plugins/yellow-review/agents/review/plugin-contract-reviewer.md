@@ -185,6 +185,8 @@ Return findings as JSON matching the compact-return schema **with two
 yellow-plugins extensions: `breaking_change_class` and `migration_path`**.
 No prose outside the JSON block.
 
+<!-- compact-return-schema:begin -->
+
 ```jsonc
 {
   "reviewer": "plugin-contract",
@@ -215,20 +217,26 @@ No prose outside the JSON block.
 }
 ```
 
-`line` must be an integer — the 1-based line number of the finding in
-`file`; the `42` above is an example value, not a literal.
+<!-- compact-return-schema:end -->
 
-`rule` is a slug from the `<rule-vocabulary>` block the orchestrator injects
-for your `category` (`unclassified` when none fits); `scope` is the enclosing
-dotted symbol path at `line` (e.g. `handlers.createUser`); in a prose file,
-use the nearest markdown heading only when it is unique in the file,
-otherwise the full `Parent > Child` heading path. In that path, escape a
-literal ` > ` inside one heading's own text as ` \> ` and double any `\`:
-`## A > B` under `# Parent` is `Parent > A \> B`.
+<!-- compact-return-notes:begin -->
 
-`residual_risks` and `testing_gaps` are aggregator-populated demotion
-buckets — always emit them as empty arrays (see pr-review-workflow
-"Finding Output Format").
+`line` must be an integer — the 1-based line number of the finding in `file`;
+the `42` above is an example value, not a literal.
+
+`rule` is a slug from the `<rule-vocabulary>` block the orchestrator injects for
+your `category` (`unclassified` when none fits); `scope` is the enclosing dotted
+symbol path at `line` (e.g. `handlers.createUser`); in a prose file, use the
+nearest markdown heading only when it is unique in the file, otherwise the full
+`Parent > Child` heading path. In that path, escape a literal `>` inside one
+heading's own text as `\>` and double any `\`: `## A > B` under `# Parent` is
+`Parent > A \> B`.
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion buckets —
+always emit them as empty arrays (see pr-review-workflow "Finding Output
+Format").
+
+<!-- compact-return-notes:end -->
 
 `category` is always `"plugin-contract"` for this reviewer. The
 orchestrator uses it for grouping in the final report.
