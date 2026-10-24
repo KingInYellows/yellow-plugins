@@ -133,10 +133,45 @@ function enumSet(value) {
   );
 }
 
+// Per-field value rules beyond the type check. Each returns an error message
+// or null.
+const FIELD_RULES = {
+  enum(key, want, got) {
+    const allowed = enumSet(want);
+    const extra = [...enumSet(got)].filter((v) => !allowed.has(v));
+    if (extra.length === 0) return null;
+    return `finding.${key} lists values outside the canonical set (${want}): ${extra.join(', ')}`;
+  },
+  exact(key, want, got) {
+    if (got === want) return null;
+    return `finding.${key} placeholder must read ${JSON.stringify(want)}`;
+  },
+  anchor(key, want, got) {
+    if (CONFIDENCE_ANCHORS.has(got)) return null;
+    return `finding.confidence example must be a rubric anchor (0, 25, 50, 75, 100), found ${got}`;
+  },
+};
+
+function fieldRule(key) {
+  if (ENUM_FIELDS.has(key)) return FIELD_RULES.enum;
+  if (EXACT_FIELDS.has(key)) return FIELD_RULES.exact;
+  if (key === 'confidence') return FIELD_RULES.anchor;
+  return null;
+}
+
+function checkField(key, want, got, rel) {
+  if (typeOf(want) !== typeOf(got)) {
+    fail(rel, `finding.${key} must be ${typeOf(want)}, found ${typeOf(got)}`);
+    return;
+  }
+  const rule = fieldRule(key);
+  const message = rule && rule(key, want, got);
+  if (message) fail(rel, message);
+}
+
 function checkFinding(canon, copy, rel) {
   const canonKeys = Object.keys(canon);
-  const copyKeys = Object.keys(copy);
-  const base = copyKeys.slice(0, canonKeys.length);
+  const base = Object.keys(copy).slice(0, canonKeys.length);
   if (base.join(',') !== canonKeys.join(',')) {
     fail(
       rel,
@@ -144,64 +179,47 @@ function checkFinding(canon, copy, rel) {
     );
     return;
   }
-  for (const key of canonKeys) {
-    const want = typeOf(canon[key]);
-    const got = typeOf(copy[key]);
-    if (want !== got) {
-      fail(rel, `finding.${key} must be ${want}, found ${got}`);
-      continue;
-    }
-    if (ENUM_FIELDS.has(key)) {
-      const allowed = enumSet(canon[key]);
-      const extra = [...enumSet(copy[key])].filter((v) => !allowed.has(v));
-      if (extra.length > 0) {
-        fail(
-          rel,
-          `finding.${key} lists values outside the canonical set (${canon[key]}): ${extra.join(', ')}`
-        );
-      }
-    }
-    if (EXACT_FIELDS.has(key) && copy[key] !== canon[key]) {
-      fail(
-        rel,
-        `finding.${key} placeholder must read ${JSON.stringify(canon[key])}`
-      );
-    }
-    if (key === 'confidence' && !CONFIDENCE_ANCHORS.has(copy[key])) {
-      fail(
-        rel,
-        `finding.confidence example must be a rubric anchor (0, 25, 50, 75, 100), found ${copy[key]}`
-      );
-    }
+  for (const key of canonKeys) checkField(key, canon[key], copy[key], rel);
+}
+
+function isEmptyArray(value) {
+  return Array.isArray(value) && value.length === 0;
+}
+
+function isSingleFinding(findings) {
+  return (
+    Array.isArray(findings) &&
+    findings.length === 1 &&
+    typeOf(findings[0]) === 'object'
+  );
+}
+
+/** True when the top-level shape is right; reports what is wrong otherwise. */
+function checkTopLevel(canon, copy, rel) {
+  if (typeOf(copy) !== 'object') {
+    fail(rel, 'schema block must be a JSON object');
+    return false;
   }
+  const want = Object.keys(canon).join(', ');
+  const got = Object.keys(copy).join(', ');
+  if (want !== got) {
+    fail(rel, `top-level keys must be exactly: ${want} (found ${got})`);
+    return false;
+  }
+  return true;
 }
 
 function checkSchema(canon, copy, rel) {
-  if (typeOf(copy) !== 'object') {
-    fail(rel, 'schema block must be a JSON object');
-    return;
-  }
-  const want = Object.keys(canon).join(',');
-  const got = Object.keys(copy).join(',');
-  if (want !== got) {
-    fail(
-      rel,
-      `top-level keys must be exactly: ${Object.keys(canon).join(', ')} (found ${Object.keys(copy).join(', ')})`
-    );
-    return;
-  }
-  if (typeOf(copy.reviewer) !== 'string')
+  if (!checkTopLevel(canon, copy, rel)) return;
+  if (typeOf(copy.reviewer) !== 'string') {
     fail(rel, 'reviewer must be a string');
+  }
   for (const bucket of ['residual_risks', 'testing_gaps']) {
-    if (!Array.isArray(copy[bucket]) || copy[bucket].length !== 0) {
+    if (!isEmptyArray(copy[bucket])) {
       fail(rel, `${bucket} must be an empty array (the aggregator owns it)`);
     }
   }
-  if (
-    !Array.isArray(copy.findings) ||
-    copy.findings.length !== 1 ||
-    typeOf(copy.findings[0]) !== 'object'
-  ) {
+  if (!isSingleFinding(copy.findings)) {
     fail(rel, 'findings must hold exactly one example finding object');
     return;
   }
@@ -257,77 +275,84 @@ function schemaLikeFences(lines) {
   return fences;
 }
 
-function main() {
-  const canonPath = path.join(ROOT, CANONICAL_REL);
-  let canonLines;
+/** The canonical schema object and notes text, or null after reporting. */
+function loadCanonical() {
+  let lines;
   try {
-    canonLines = fs.readFileSync(canonPath, 'utf8').split('\n');
+    lines = fs.readFileSync(path.join(ROOT, CANONICAL_REL), 'utf8').split('\n');
   } catch (err) {
     console.error(
       `Cannot read the canonical schema file ${CANONICAL_REL}: ${err.message}`
     );
     process.exit(1);
   }
-  const canonSchemaRegion = extractRegion(
-    canonLines,
-    SCHEMA_BEGIN,
-    SCHEMA_END,
-    CANONICAL_REL
-  );
-  const canonNotesRegion = extractRegion(
-    canonLines,
-    NOTES_BEGIN,
-    NOTES_END,
-    CANONICAL_REL
-  );
-  if (!canonSchemaRegion || !canonNotesRegion) {
+  const schema = extractRegion(lines, SCHEMA_BEGIN, SCHEMA_END, CANONICAL_REL);
+  const notes = extractRegion(lines, NOTES_BEGIN, NOTES_END, CANONICAL_REL);
+  if (!schema || !notes) {
     fail(
       CANONICAL_REL,
       'the canonical file must carry both the schema and the notes marker pairs'
     );
+    return null;
   }
-  const canonText =
-    canonSchemaRegion && fenceJson(canonSchemaRegion, CANONICAL_REL);
-  const canon = canonText && parseSchema(canonText, CANONICAL_REL);
-  if (!canon || errors.length > 0) {
-    report(0);
-    return;
-  }
-  const canonNotes = canonNotesRegion.body.join('\n');
+  const text = fenceJson(schema, CANONICAL_REL);
+  const canon = text && parseSchema(text, CANONICAL_REL);
+  return canon ? { canon, notes: notes.body.join('\n') } : null;
+}
 
-  let copies = 0;
-  for (const file of candidateFiles()) {
-    const rel = path.relative(ROOT, file).split(path.sep).join('/');
-    if (rel === CANONICAL_REL) continue;
-    const lines = fs.readFileSync(file, 'utf8').split('\n');
-    const schemaRegion = extractRegion(lines, SCHEMA_BEGIN, SCHEMA_END, rel);
-    for (const at of schemaLikeFences(lines)) {
-      if (!schemaRegion || at < schemaRegion.start || at > schemaRegion.end) {
-        fail(
-          rel,
-          `line ${at + 1}: compact-return schema copy is not wrapped in ${SCHEMA_BEGIN} / ${SCHEMA_END}`
-        );
-      }
-    }
-    const notesRegion = extractRegion(lines, NOTES_BEGIN, NOTES_END, rel);
-    if (notesRegion && notesRegion.body.join('\n') !== canonNotes) {
+function checkUnmarked(lines, schemaRegion, rel) {
+  for (const at of schemaLikeFences(lines)) {
+    const inside =
+      schemaRegion && at > schemaRegion.start && at < schemaRegion.end;
+    if (!inside) {
       fail(
         rel,
-        `notes block differs from the canonical one in ${CANONICAL_REL}`
+        `line ${at + 1}: compact-return schema copy is not wrapped in ${SCHEMA_BEGIN} / ${SCHEMA_END}`
       );
     }
-    if (!schemaRegion) continue;
-    copies++;
-    const text = fenceJson(schemaRegion, rel);
-    const copy = text && parseSchema(text, rel);
-    if (copy) checkSchema(canon, copy, rel);
-    if (rel.includes('/agents/') && !notesRegion) {
+  }
+}
+
+function checkNotes(notesRegion, canonical, rel, needsNotes) {
+  if (!notesRegion) {
+    if (needsNotes) {
       fail(
         rel,
         `persona carries a schema copy but no ${NOTES_BEGIN} / ${NOTES_END} block`
       );
     }
+    return;
   }
+  if (notesRegion.body.join('\n') !== canonical.notes) {
+    fail(rel, `notes block differs from the canonical one in ${CANONICAL_REL}`);
+  }
+}
+
+/** Checks one Markdown file; returns 1 when it carries a schema copy. */
+function checkFile(file, canonical) {
+  const rel = path.relative(ROOT, file).split(path.sep).join('/');
+  if (rel === CANONICAL_REL) return 0;
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  const schemaRegion = extractRegion(lines, SCHEMA_BEGIN, SCHEMA_END, rel);
+  const notesRegion = extractRegion(lines, NOTES_BEGIN, NOTES_END, rel);
+  checkUnmarked(lines, schemaRegion, rel);
+  const needsNotes = Boolean(schemaRegion) && rel.includes('/agents/');
+  checkNotes(notesRegion, canonical, rel, needsNotes);
+  if (!schemaRegion) return 0;
+  const text = fenceJson(schemaRegion, rel);
+  const copy = text && parseSchema(text, rel);
+  if (copy) checkSchema(canonical.canon, copy, rel);
+  return 1;
+}
+
+function main() {
+  const canonical = loadCanonical();
+  if (!canonical || errors.length > 0) {
+    report(0);
+    return;
+  }
+  let copies = 0;
+  for (const file of candidateFiles()) copies += checkFile(file, canonical);
   report(copies);
 }
 
