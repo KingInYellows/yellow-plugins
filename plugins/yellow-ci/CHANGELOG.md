@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.5.9
+
+### Patch Changes
+
+- [`7b9405b`](https://github.com/KingInYellows/yellow-plugins/commit/7b9405b07dacdb16aa99c21ab70528439f057bf4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Bring
+  yellow-ci's CI-log redactor and yellow-core's `cs_redact_secrets` to the same
+  set of credential shapes. yellow-ci now also masks `ASIA`/`ABIA`/`ACCA` AWS
+  keys, Anthropic, OpenAI, Slack, Stripe, Hugging Face, Tavily (`tvly-`),
+  Perplexity (`pplx-`) and Semgrep (`sgp_`) keys, credentials in URL userinfo,
+  and bare `Basic <base64>` payloads (decoded to tell a `user:pass` from prose),
+  in `lib/redact.sh` and in the four skill references that inline its pipeline.
+  yellow-core now also masks `gho_`, `ghr_`, `ghu_` and `pypi-` tokens. A new
+  parity test fails when either redactor gains a labelled pattern the other
+  lacks, or when an inline copy drifts from `redact.sh`.
+
 ## 1.5.8
 
 ### Patch Changes

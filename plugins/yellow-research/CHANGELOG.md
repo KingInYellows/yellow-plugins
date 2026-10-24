@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.2.1
+
+### Patch Changes
+
+- [`247f773`](https://github.com/KingInYellows/yellow-plugins/commit/247f773eafb3fadcbbd5f9ad7bb9404d5fdcb574)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Replace the
+  global ast-grep recipe lock with a per-search token handoff, so the complexity
+  and duplication scanners in a parallel `/debt:audit` (and `code-researcher`)
+  no longer collide or fall back to Grep (CLAUDE-91). Document the scanners'
+  ast-grep value files in the yellow-debt README (CLAUDE-96).
+
 ## 5.2.0
 
 ### Minor Changes
