@@ -714,6 +714,31 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [[ "$all" == *'not `no contract`'* ]]
 }
 
+@test "sweep: a changed local config ends with an anchored abort line" {
+  text=$(flat "$SWEEP")
+  grep -qxF 'Sweep: aborted (local-config-changed)' "$SWEEP"
+  re='^Sweep: aborted \((local-config-changed)\)$'
+  [[ "$text" == *"$re"* ]]
+  # Both guard checks end with it: before resolve (Step 2b) and after (Step 3a).
+  step2b=$(awk '/^### Step 2b:/ { p = 1 } /^### Step 3:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step2b" == *'Each `changed during the review` stop (exit `3`, `4` or any other) ends with `Sweep: aborted (local-config-changed)`'* ]]
+  step3a=$(awk '/^### Step 3a:/ { p = 1 } /^### Step 3b:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step3a" == *'end with `Sweep: aborted (local-config-changed)` as the last line'* ]]
+  [[ "$step3a" != *'(`no contract` stops the batch)'* ]]
+}
+
+@test "sweep-all: a local-config abort stops the batch with aborted=1, not a review blocker" {
+  all=$(flat "$SWEEP_ALL")
+  re='^Sweep: aborted \((local-config-changed)\)$'
+  [[ "$all" == *"$re"* ]]
+  [[ "$all" == *'`Skip Reason` `local config changed (aborted)`, `Blocking` `—`'* ]]
+  [[ "$all" == *'not a review blocker or `no contract`'* ]]
+  [[ "$all" == *'4b. **Local-config stop** — only after item 4'* ]]
+  [[ "$all" == *'`skipped — not attempted (local config changed)`'* ]]
+  [[ "$all" == *'`aborted=1` means item 4 stopped on a dirty tree or item 4b on a changed local config'* ]]
+  [[ "$all" == *'Unless item 1b, 4, 4b, 5, 5b or 5c stopped the loop'* ]]
+}
+
 @test "sweep: a failed PR fetch prints no skip line; only a confirmed non-OPEN state does" {
   text=$(flat "$SWEEP")
   [[ "$text" == *'If `exit=0` and the state is not `OPEN`'* ]]
@@ -1096,7 +1121,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 
 @test "sweep-all: an early stop exits 1 after the summary, even with zero attempts" {
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
-  [ "$(tr '\n' ' ' <<<"$step4" | tr -s ' ' | grep -o 'Record `pending-exit-1`' | wc -l)" -eq 4 ]
+  [ "$(tr '\n' ' ' <<<"$step4" | tr -s ' ' | grep -o 'Record `pending-exit-1`' | wc -l)" -eq 5 ]
   # Item 1b records it too, in lowercase, for the rate-limit and unreadable-state stops.
   [ "$(tr '\n' ' ' <<<"$step4" | tr -s ' ' | grep -oi 'record `pending-exit-1`' | wc -l)" -ge 6 ]
   grep -qF '**Final exit (every path, including zero attempts):** read `pending-exit-1`.' "$SWEEP_ALL"
@@ -1428,7 +1453,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$flat" == *'`blocking` count `<b>`, `verify` and `ratelimited`'* ]]
   [[ "$flat" == *'5c. **Verify-skipped stop** — only after item 4'* ]]
   [[ "$flat" == *'`skipped — not attempted (verify skipped)`'* ]]
-  [[ "$flat" == *'Unless item 1b, 4, 5, 5b or 5c stopped the loop'* ]]
+  [[ "$flat" == *'Unless item 1b, 4, 4b, 5, 5b or 5c stopped the loop'* ]]
 }
 
 @test "sweep-all: no project command after a verify-skipped stop" {
@@ -1471,7 +1496,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [ "$status" -eq 1 ]
   run grep -n '^### Step 6' "$SWEEP_ALL"
   [ "$status" -eq 1 ]
-  grep -qF 'compound-staging drain; sweep-all runs no compounding pass of its own' "$SWEEP_ALL"
+  [[ "$(flat "$SWEEP_ALL")" == *'compound-staging drain; sweep-all runs no compounding pass of its own'* ]]
 }
 
 # Runs sweep Step 1b's existing-path check (the fenced block that starts at
@@ -1717,7 +1742,7 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   [[ "$stack" == *'`aborted=1` means item 1b or 3b stopped the walk'* ]]
   [[ "$stack" == *'`blocking` counts walked PRs a human must answer: `b > 0`, `no contract`, `verify skipped` or an inconclusive self-verify.'* ]]
   [[ "$sweep" == *'`ratelimited=1` means item 1b or 5 stopped on a rate limit'* ]]
-  [[ "$sweep" == *'`aborted=1` means item 4 stopped on a dirty tree.'* ]]
+  [[ "$sweep" == *'`aborted=1` means item 4 stopped on a dirty tree or item 4b on a changed local config'* ]]
   [[ "$sweep" == *'`blocking` counts attempted PRs whose `Blocking` cell is above 0 or `?`.'* ]]
   # The early clean exits print the line too, so a missing line means failure.
   [[ "$stack" == *'No open PRs found in current stack.`, then the Step 4 outcome line with zeros'* ]]
