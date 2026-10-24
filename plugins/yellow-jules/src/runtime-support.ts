@@ -13,7 +13,7 @@ import {
   resolveControllerDir,
   resolvePluginRoot,
 } from './config.js';
-import type { ControllerContext } from './controller.js';
+import { type ControllerContext, controllerLockPath } from './controller.js';
 import { type Deadline, isExpired, withReadRetry } from './deadline.js';
 import {
   AdapterError,
@@ -350,6 +350,26 @@ export function resolveControllerContext(
     ),
     now: nowFn(deps),
   };
+}
+
+/**
+ * The controller lock path for `withControllerLock` / `updateUnderController`, or
+ * `undefined` when the controller cannot be resolved. Skipping the lock then is
+ * safe: every authority check resolves the same context and fails closed.
+ */
+export function controllerLockFor(
+  deps: Pick<
+    WriteDeps,
+    'dataDir' | 'env' | 'controllerDir' | 'controllerId' | 'clock'
+  >
+): string | undefined {
+  let ctx: ControllerContext;
+  try {
+    ctx = resolveControllerContext(deps);
+  } catch {
+    return undefined;
+  }
+  return controllerLockPath(ctx.controllerDir, ctx.controllerId);
 }
 
 export function refuseInsideSupervisedSession(

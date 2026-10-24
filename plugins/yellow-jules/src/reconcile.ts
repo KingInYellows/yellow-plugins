@@ -26,6 +26,7 @@ import { type Deadline, isExpired } from './deadline.js';
 import { AppErrorException, errorLabel } from './errors.js';
 import { redactDeep } from './redact.js';
 import {
+  controllerLockFor,
   type RuntimeDeps,
   nowFn,
   read,
@@ -43,8 +44,8 @@ import {
   messageDigest,
   ownsSession,
   UNRESOLVED_STATUSES,
-  updateJournal,
   applyRetention,
+  updateUnderController,
 } from './state.js';
 import type {
   AdapterSession,
@@ -623,7 +624,10 @@ async function persist(
   // The requests this pass actually moved to `failed`: only those give up a slot.
   const released = new Set<string>();
   const refused = new Map<string, Resolution>();
-  await updateJournal(deps.dataDir, (operations) => {
+  // The controller lock spans every record's authority check and the journal
+  // write, so a take-over of another data directory cannot land in between.
+  const lock = controllerLockFor(deps);
+  await updateUnderController(deps.dataDir, lock, (operations) => {
     // Read under the journal lock, which every grants.json writer also holds.
     let grants: GrantsFile | Error;
     try {

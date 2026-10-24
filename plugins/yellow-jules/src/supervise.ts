@@ -48,6 +48,7 @@ import {
 import {
   type Attention,
   attentionOf,
+  controllerLockFor,
   nowFn,
   prepare,
   resolveSessionResource,
@@ -67,9 +68,9 @@ import {
   readJournal,
   seqBefore,
   takeSeq,
-  updateJournal,
   updateSupervision,
   type SupervisionPatch,
+  updateUnderController,
 } from './state.js';
 import type {
   AdapterActivity,
@@ -1128,9 +1129,10 @@ export async function clearPause(
   );
   // The owner typed the code for THIS pause. A pass that recorded a different
   // pause or newer outside activity during the wait must not be cleared by it.
-  await updateJournal(deps.dataDir, (operations) => {
-    // Rechecked under the journal lock: the controller may have changed while
-    // the confirmation was open.
+  const lock = controllerLockFor(deps);
+  await updateUnderController(deps.dataDir, lock, (operations) => {
+    // Rechecked under the journal and controller locks: the controller may
+    // have changed while the confirmation was open.
     assertPauseControllerAuthority(deps, owner.grantId);
     const current = operations[owner.localRequestId];
     const state = current?.supervision;
@@ -1312,9 +1314,10 @@ export async function clearDeviation(
   );
   const nowIso = nowFn(deps)().toISOString();
   const key = openDeviationKey(owner);
-  await updateJournal(deps.dataDir, (operations) => {
-    // Rechecked under the journal lock: the controller may have changed while
-    // the confirmation was open.
+  const lock = controllerLockFor(deps);
+  await updateUnderController(deps.dataDir, lock, (operations) => {
+    // Rechecked under the journal and controller locks: the controller may
+    // have changed while the confirmation was open.
     assertDeviationControllerAuthority(deps, owner.grantId);
     const current = operations[owner.localRequestId];
     if (

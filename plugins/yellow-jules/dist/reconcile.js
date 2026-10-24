@@ -420,7 +420,10 @@ async function persist(deps, resolutions) {
     // The requests this pass actually moved to `failed`: only those give up a slot.
     const released = new Set();
     const refused = new Map();
-    await (0, state_js_1.updateJournal)(deps.dataDir, (operations) => {
+    // The controller lock spans every record's authority check and the journal
+    // write, so a take-over of another data directory cannot land in between.
+    const lock = (0, runtime_support_js_1.controllerLockFor)(deps);
+    await (0, state_js_1.updateUnderController)(deps.dataDir, lock, (operations) => {
         // Read under the journal lock, which every grants.json writer also holds.
         let grants;
         try {

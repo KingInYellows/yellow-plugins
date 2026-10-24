@@ -56,10 +56,12 @@ exports.emptyJournal = emptyJournal;
 exports.readJournal = readJournal;
 exports.writeJournal = writeJournal;
 exports.withJournalLock = withJournalLock;
+exports.withControllerLock = withControllerLock;
 exports.nextSeq = nextSeq;
 exports.seqBefore = seqBefore;
 exports.takeSeq = takeSeq;
 exports.updateJournal = updateJournal;
+exports.updateUnderController = updateUnderController;
 exports.ownsSession = ownsSession;
 exports.findBySessionResource = findBySessionResource;
 exports.findByLocalId = findByLocalId;
@@ -585,7 +587,7 @@ function staleLock(lockPath, why) {
  * already occupies the path. The lock records owner token, pid, hostname,
  * and start time so a crashed holder can be recognized and reported.
  */
-async function acquireLock(lockPath, config) {
+async function acquireLock(lockPath, config, label = 'state/.lock') {
     const owner = crypto.randomUUID();
     const deadline = Date.now() + config.timeoutMs;
     for (;;) {
@@ -642,7 +644,7 @@ async function acquireLock(lockPath, config) {
         if (Date.now() > deadline) {
             return (0, errors_js_1.throwAppError)('JULES_STALE_LOCK', `${lockPath} is held by another yellow-jules process`, {
                 retryable: true,
-                recoveryAction: 'Another yellow-jules process holds state/.lock; retry after it finishes. If no such process is running, inspect and remove the lock by hand.',
+                recoveryAction: `Another yellow-jules process holds ${label}; retry after it finishes. If no such process is running, inspect and remove the lock by hand.`,
             });
         }
         await new Promise((resolve) => setTimeout(resolve, config.pollMs));
@@ -672,6 +674,29 @@ async function withJournalLock(dataDir, fn, config = exports.DEFAULT_LOCK_CONFIG
     }
 }
 /**
+ * `withJournalLock` plus the controller-wide lock at `controllerLockPath`
+ * (`controllerLockPath` in controller.ts), taken inside the journal lock and
+ * always in that order. Data directories that share a controller id share one
+ * authority file but not a journal lock, so a write that checks or moves the
+ * controller authority holds this from the check through its last write: a
+ * take-over or first `authorize` of another data directory cannot move the
+ * authority in between. `undefined` takes the journal lock alone.
+ */
+async function withControllerLock(dataDir, controllerLockPath, fn, config = exports.DEFAULT_LOCK_CONFIG) {
+    return withJournalLock(dataDir, async () => {
+        if (controllerLockPath === undefined)
+            return fn();
+        (0, config_js_1.ensureOwnerOnlyDir)(path.dirname(controllerLockPath));
+        const owner = await acquireLock(controllerLockPath, config, controllerLockPath);
+        try {
+            return await fn();
+        }
+        finally {
+            await releaseLock(controllerLockPath, owner);
+        }
+    }, config);
+}
+/**
  * Advances and returns the journal's ordering counter. Callers hold the journal
  * lock and persist the journal afterwards; every value handed out is strictly
  * greater than every earlier one, so two events can never tie.
@@ -694,7 +719,11 @@ async function takeSeq(dataDir, config = exports.DEFAULT_LOCK_CONFIG) {
 }
 /** Read, mutate, and write the journal as one critical section; returns the mutator's value. */
 async function updateJournal(dataDir, mutate, config = exports.DEFAULT_LOCK_CONFIG) {
-    return withJournalLock(dataDir, async () => {
+    return updateUnderController(dataDir, undefined, mutate, config);
+}
+/** `updateJournal` under `withControllerLock`: the mutator may check the controller authority. */
+async function updateUnderController(dataDir, controllerLockPath, mutate, config = exports.DEFAULT_LOCK_CONFIG) {
+    return withControllerLock(dataDir, controllerLockPath, async () => {
         const journal = await readJournal(dataDir);
         // Change detection by reference, not by serializing the whole journal
         // twice: every record type is readonly and every mutator replaces a record

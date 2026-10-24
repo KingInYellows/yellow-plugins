@@ -33,7 +33,7 @@ import {
   isPositiveInt,
   isStringArray,
 } from './shape.js';
-import { hasUnreconciledDeviation, withJournalLock } from './state.js';
+import { hasUnreconciledDeviation, withControllerLock } from './state.js';
 import type {
   GrantOperation,
   GrantRecord,
@@ -536,10 +536,12 @@ export async function revokeGrant(
   dataDir: string,
   grantId: string,
   now: Date,
-  beforeWrite?: (grant: GrantRecord) => void
+  beforeWrite?: (grant: GrantRecord) => void,
+  /** Held from `beforeWrite` (a controller check) through the write; see `withControllerLock`. */
+  lock?: string
 ): Promise<{ grantId: string; revokedAt: string }> {
   validateGrantId(grantId);
-  return withJournalLock(dataDir, async () => {
+  return withControllerLock(dataDir, lock, async () => {
     const file = loadGrants(dataDir);
     const grant = file.grants[grantId];
     if (grant === undefined) {
@@ -572,9 +574,11 @@ export async function releaseSlotInStore(
   dataDir: string,
   grantId: string,
   localRequestId: string,
-  beforeWrite?: (grant: GrantRecord) => void
+  beforeWrite?: (grant: GrantRecord) => void,
+  /** Held from `beforeWrite` (a controller check) through the write; see `withControllerLock`. */
+  lock?: string
 ): Promise<boolean> {
-  return withJournalLock(dataDir, async () => {
+  return withControllerLock(dataDir, lock, async () => {
     const file = loadGrants(dataDir);
     const grant = file.grants[grantId];
     if (

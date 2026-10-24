@@ -1168,7 +1168,8 @@ async function abandon(deps, args) {
         'repository/branch guard and the grant slot so a new delegate can run.',
     ].join('\n'));
     const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
-    return (0, state_js_1.withJournalLock)(deps.dataDir, async () => {
+    const lock = (0, controller_js_1.controllerLockPath)(ctx.controllerDir, ctx.controllerId);
+    return (0, state_js_1.withControllerLock)(deps.dataDir, lock, async () => {
         const journal = await (0, state_js_1.readJournal)(deps.dataDir);
         // Re-check under the lock: the record may have been reconciled while the owner typed.
         const record = abandonable(journal.operations[requestId], requestId);

@@ -96,7 +96,8 @@ function denialError(denial, grant, journal, ids) {
 }
 async function reserveUnderGrant(deps, gate) {
     const now = (0, runtime_support_js_1.nowFn)(deps);
-    return (0, state_js_1.withJournalLock)(deps.dataDir, async () => {
+    const lock = (0, runtime_support_js_1.controllerLockFor)(deps);
+    return (0, state_js_1.withControllerLock)(deps.dataDir, lock, async () => {
         const journal = await (0, state_js_1.readJournal)(deps.dataDir);
         // A recorded request id is answered before the grant is judged, so an agent
         // that lost the reply to a launch that landed is not told to write a new grant.
@@ -254,7 +255,8 @@ async function assertGrantLiveBeforeWrite(deps, record, reconcileHint, vendorFlo
 async function finalDispatchCheck(deps, record, vendorFloor) {
     const now = (0, runtime_support_js_1.nowFn)(deps);
     const paused = (why) => new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', `${why} after the write was reserved; nothing was sent`));
-    return (0, state_js_1.updateJournal)(deps.dataDir, (operations, journal) => {
+    const lock = (0, runtime_support_js_1.controllerLockFor)(deps);
+    return (0, state_js_1.updateUnderController)(deps.dataDir, lock, (operations, journal) => {
         // `authorize --revoke` writes grants.json under this same journal lock, so
         // reading the grant here serializes a revoke with the dispatch stamp.
         const { grant } = loadAuthorizedGrant(deps, record.grantId ?? '');
@@ -424,7 +426,7 @@ async function settleFailure(deps, record, error, options) {
             // Only the grant's controller rewrites grants.json; a take-over during
             // the POST leaves the slot held (checked under the journal lock).
             const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
-            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId, (grant) => (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId));
+            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId, (grant) => (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId), (0, controller_js_1.controllerLockPath)(ctx.controllerDir, ctx.controllerId));
         }
         catch (releaseError) {
             // The record is `failed`, so nothing will retry this: the slot stays held.

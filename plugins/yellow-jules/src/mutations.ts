@@ -25,7 +25,7 @@ import {
   updateGrant,
   writeGrants,
 } from './authority.js';
-import { assertControllerAuthority } from './controller.js';
+import { assertControllerAuthority, controllerLockPath } from './controller.js';
 import {
   DEFAULT_MUTATION_DEADLINE_MS,
   deadlineIn,
@@ -69,7 +69,7 @@ import {
   recordDeviation,
   takeSeq,
   UNRESOLVED_STATUSES,
-  withJournalLock,
+  withControllerLock,
   writeJournal,
 } from './state.js';
 import type { GrantsFile, OperationRecord, SdkAdapter } from './types.js';
@@ -1927,7 +1927,8 @@ export async function abandon(
   );
 
   const ctx = resolveControllerContext(deps);
-  return withJournalLock(deps.dataDir, async () => {
+  const lock = controllerLockPath(ctx.controllerDir, ctx.controllerId);
+  return withControllerLock(deps.dataDir, lock, async () => {
     const journal = await readJournal(deps.dataDir);
     // Re-check under the lock: the record may have been reconciled while the owner typed.
     const record = abandonable(journal.operations[requestId], requestId);

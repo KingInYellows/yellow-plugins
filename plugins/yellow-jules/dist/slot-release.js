@@ -33,7 +33,7 @@ async function releaseTerminalSlot(deps, record, vendorState) {
     }
     try {
         const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
-        await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId, (grant) => (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId));
+        await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId, (grant) => (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId), (0, controller_js_1.controllerLockPath)(ctx.controllerDir, ctx.controllerId));
         return undefined;
     }
     catch (err) {

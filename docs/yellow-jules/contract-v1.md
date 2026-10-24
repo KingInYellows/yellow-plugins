@@ -1085,8 +1085,15 @@ different epoch, or a different canonical data-dir path fails loud with
 `JULES_CONTROLLER_MISMATCH`, so a copied or restored data directory cannot write
 in parallel. The first `authorize` on a host with no controller file and no
 grants writes epoch 1; `authorize --take-over` writes epoch+1 for this host and
-path and rewrites every grant's `epochRef` under the lock. The handoff procedure
-lives in `plugins/yellow-jules/CLAUDE.md`.
+path and rewrites every grant's `epochRef` under the lock. Data directories that
+share a controller id share the authority file, so every write that checks or
+moves it also holds `<controllerDir>/<controllerId>.lock`, taken inside the
+journal lock and held from the check through the last write; a take-over or
+first `authorize` of one data directory therefore cannot interleave with
+another's take-over (no epoch rollback) or with a write it already checked. The
+controller lock follows the journal lock's stale rules (`JULES_STALE_LOCK`,
+never taken over). The handoff procedure lives in
+`plugins/yellow-jules/CLAUDE.md`.
 
 The SDK's own storage is the per-process memory factory; the runtime never
 creates `.jules/` anywhere and treats a populated `sdk-scratch/` as

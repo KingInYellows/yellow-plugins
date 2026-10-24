@@ -28,7 +28,7 @@ import {
   writeGrants,
 } from './authority.js';
 import { resolvePluginRoot } from './config.js';
-import { assertControllerAuthority } from './controller.js';
+import { assertControllerAuthority, controllerLockPath } from './controller.js';
 import {
   AdapterError,
   AppErrorException,
@@ -40,6 +40,7 @@ import {
 } from './errors.js';
 import { assertNoSecretShapedValues } from './redact.js';
 import {
+  controllerLockFor,
   isTerminalCondition,
   nowFn,
   type WriteDeps,
@@ -53,8 +54,8 @@ import {
   nextSeq,
   readJournal,
   type ReservationInput,
-  updateJournal,
-  withJournalLock,
+  updateUnderController,
+  withControllerLock,
   writeJournal,
 } from './state.js';
 import type {
@@ -203,7 +204,8 @@ export async function reserveUnderGrant(
   gate: GateRequest
 ): Promise<OperationRecord> {
   const now = nowFn(deps);
-  return withJournalLock(deps.dataDir, async () => {
+  const lock = controllerLockFor(deps);
+  return withControllerLock(deps.dataDir, lock, async () => {
     const journal = await readJournal(deps.dataDir);
     // A recorded request id is answered before the grant is judged, so an agent
     // that lost the reply to a launch that landed is not told to write a new grant.
@@ -459,7 +461,8 @@ async function finalDispatchCheck(
         `${why} after the write was reserved; nothing was sent`
       )
     );
-  return updateJournal(deps.dataDir, (operations, journal) => {
+  const lock = controllerLockFor(deps);
+  return updateUnderController(deps.dataDir, lock, (operations, journal) => {
     // `authorize --revoke` writes grants.json under this same journal lock, so
     // reading the grant here serializes a revoke with the dispatch stamp.
     const { grant } = loadAuthorizedGrant(deps, record.grantId ?? '');
@@ -757,7 +760,8 @@ export async function settleFailure(
             deps.dataDir,
             grant.epochRef,
             ctx.controllerId
-          )
+          ),
+        controllerLockPath(ctx.controllerDir, ctx.controllerId)
       );
     } catch (releaseError) {
       // The record is `failed`, so nothing will retry this: the slot stays held.

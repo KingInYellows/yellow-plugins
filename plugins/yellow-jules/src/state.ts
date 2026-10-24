@@ -667,7 +667,8 @@ function staleLock(lockPath: string, why: string): never {
  */
 async function acquireLock(
   lockPath: string,
-  config: LockConfig
+  config: LockConfig,
+  label = 'state/.lock'
 ): Promise<string> {
   const owner = crypto.randomUUID();
   const deadline = Date.now() + config.timeoutMs;
@@ -730,8 +731,7 @@ async function acquireLock(
         `${lockPath} is held by another yellow-jules process`,
         {
           retryable: true,
-          recoveryAction:
-            'Another yellow-jules process holds state/.lock; retry after it finishes. If no such process is running, inspect and remove the lock by hand.',
+          recoveryAction: `Another yellow-jules process holds ${label}; retry after it finishes. If no such process is running, inspect and remove the lock by hand.`,
         }
       );
     }
@@ -762,6 +762,41 @@ export async function withJournalLock<T>(
   } finally {
     await releaseLock(lockPath, owner);
   }
+}
+
+/**
+ * `withJournalLock` plus the controller-wide lock at `controllerLockPath`
+ * (`controllerLockPath` in controller.ts), taken inside the journal lock and
+ * always in that order. Data directories that share a controller id share one
+ * authority file but not a journal lock, so a write that checks or moves the
+ * controller authority holds this from the check through its last write: a
+ * take-over or first `authorize` of another data directory cannot move the
+ * authority in between. `undefined` takes the journal lock alone.
+ */
+export async function withControllerLock<T>(
+  dataDir: string,
+  controllerLockPath: string | undefined,
+  fn: () => Promise<T>,
+  config: LockConfig = DEFAULT_LOCK_CONFIG
+): Promise<T> {
+  return withJournalLock(
+    dataDir,
+    async () => {
+      if (controllerLockPath === undefined) return fn();
+      ensureOwnerOnlyDir(path.dirname(controllerLockPath));
+      const owner = await acquireLock(
+        controllerLockPath,
+        config,
+        controllerLockPath
+      );
+      try {
+        return await fn();
+      } finally {
+        await releaseLock(controllerLockPath, owner);
+      }
+    },
+    config
+  );
 }
 
 type MutableOperations = Record<string, OperationRecord>;
@@ -806,8 +841,19 @@ export async function updateJournal<T>(
   mutate: (operations: MutableOperations, journal: Journal) => T,
   config: LockConfig = DEFAULT_LOCK_CONFIG
 ): Promise<T> {
-  return withJournalLock(
+  return updateUnderController(dataDir, undefined, mutate, config);
+}
+
+/** `updateJournal` under `withControllerLock`: the mutator may check the controller authority. */
+export async function updateUnderController<T>(
+  dataDir: string,
+  controllerLockPath: string | undefined,
+  mutate: (operations: MutableOperations, journal: Journal) => T,
+  config: LockConfig = DEFAULT_LOCK_CONFIG
+): Promise<T> {
+  return withControllerLock(
     dataDir,
+    controllerLockPath,
     async () => {
       const journal = await readJournal(dataDir);
       // Change detection by reference, not by serializing the whole journal

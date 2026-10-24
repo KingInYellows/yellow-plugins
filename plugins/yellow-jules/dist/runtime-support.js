@@ -54,10 +54,12 @@ exports.boundRecord = boundRecord;
 exports.checkPolicyDeviation = checkPolicyDeviation;
 exports.defaultControllerId = defaultControllerId;
 exports.resolveControllerContext = resolveControllerContext;
+exports.controllerLockFor = controllerLockFor;
 exports.refuseInsideSupervisedSession = refuseInsideSupervisedSession;
 exports.confirmOwner = confirmOwner;
 const os = __importStar(require("node:os"));
 const config_js_1 = require("./config.js");
+const controller_js_1 = require("./controller.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
 const state_js_1 = require("./state.js");
@@ -267,6 +269,21 @@ function resolveControllerContext(deps) {
         controllerId: (0, validate_js_1.validateControllerId)(deps.controllerId ?? defaultControllerId()),
         now: nowFn(deps),
     };
+}
+/**
+ * The controller lock path for `withControllerLock` / `updateUnderController`, or
+ * `undefined` when the controller cannot be resolved. Skipping the lock then is
+ * safe: every authority check resolves the same context and fails closed.
+ */
+function controllerLockFor(deps) {
+    let ctx;
+    try {
+        ctx = resolveControllerContext(deps);
+    }
+    catch {
+        return undefined;
+    }
+    return (0, controller_js_1.controllerLockPath)(ctx.controllerDir, ctx.controllerId);
 }
 function refuseInsideSupervisedSession(env, command = 'authorize') {
     const active = env[exports.ACTIVE_GRANT_ENV];

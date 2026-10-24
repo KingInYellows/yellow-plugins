@@ -4,7 +4,7 @@
  * module boundary.
  */
 import { releaseSlotInStore } from './authority.js';
-import { assertControllerAuthority } from './controller.js';
+import { assertControllerAuthority, controllerLockPath } from './controller.js';
 import { AppErrorException, errorLabel } from './errors.js';
 import { resolveControllerContext, type WriteDeps } from './runtime-support.js';
 
@@ -54,7 +54,8 @@ export async function releaseTerminalSlot(
           deps.dataDir,
           grant.epochRef,
           ctx.controllerId
-        )
+        ),
+      controllerLockPath(ctx.controllerDir, ctx.controllerId)
     );
     return undefined;
   } catch (err) {

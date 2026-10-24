@@ -769,9 +769,10 @@ async function clearPause(deps, args) {
     ].join('\n'));
     // The owner typed the code for THIS pause. A pass that recorded a different
     // pause or newer outside activity during the wait must not be cleared by it.
-    await (0, state_js_1.updateJournal)(deps.dataDir, (operations) => {
-        // Rechecked under the journal lock: the controller may have changed while
-        // the confirmation was open.
+    const lock = (0, runtime_support_js_1.controllerLockFor)(deps);
+    await (0, state_js_1.updateUnderController)(deps.dataDir, lock, (operations) => {
+        // Rechecked under the journal and controller locks: the controller may
+        // have changed while the confirmation was open.
         assertPauseControllerAuthority(deps, owner.grantId);
         const current = operations[owner.localRequestId];
         const state = current?.supervision;
@@ -877,9 +878,10 @@ async function clearDeviation(deps, args) {
     ].join('\n'));
     const nowIso = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
     const key = openDeviationKey(owner);
-    await (0, state_js_1.updateJournal)(deps.dataDir, (operations) => {
-        // Rechecked under the journal lock: the controller may have changed while
-        // the confirmation was open.
+    const lock = (0, runtime_support_js_1.controllerLockFor)(deps);
+    await (0, state_js_1.updateUnderController)(deps.dataDir, lock, (operations) => {
+        // Rechecked under the journal and controller locks: the controller may
+        // have changed while the confirmation was open.
         assertDeviationControllerAuthority(deps, owner.grantId);
         const current = operations[owner.localRequestId];
         if (current === undefined ||
