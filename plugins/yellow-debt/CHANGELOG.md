@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.9.4
+
+### Patch Changes
+
+- [`247f773`](https://github.com/KingInYellows/yellow-plugins/commit/247f773eafb3fadcbbd5f9ad7bb9404d5fdcb574)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Replace the
+  global ast-grep recipe lock with a per-search token handoff, so the complexity
+  and duplication scanners in a parallel `/debt:audit` (and `code-researcher`)
+  no longer collide or fall back to Grep (CLAUDE-91). Document the scanners'
+  ast-grep value files in the yellow-debt README (CLAUDE-96).
+
+- [`bd272e0`](https://github.com/KingInYellows/yellow-plugins/commit/bd272e0645788f5d35c58a1fec7f8a30b05b109c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Route
+  comment-analyzer and project-standards-reviewer to `haiku` / `medium` and
+  complexity-scanner to `haiku` / `low`, after the CLAUDE-163 replay eval showed
+  equal or better recall. Fix three doc errors the eval found.
+
 ## 1.9.3
 
 ### Patch Changes

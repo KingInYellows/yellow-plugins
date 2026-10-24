@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.11.4",
+      "version": "2.11.5",
       "author": {
         "name": "KingInYellows"
       },
@@ -74,7 +74,7 @@
     {
       "name": "yellow-jules",
       "description": "Google Jules integration (experimental) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -84,7 +84,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.10.3",
+      "version": "3.11.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -114,7 +114,7 @@
     {
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
-      "version": "1.9.3",
+      "version": "1.9.4",
       "author": {
         "name": "KingInYellows"
       },
@@ -124,7 +124,7 @@
     {
       "name": "yellow-ci",
       "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
-      "version": "1.5.8",
+      "version": "1.5.9",
       "author": {
         "name": "KingInYellows"
       },
@@ -144,7 +144,7 @@
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, and Parallel Task MCP servers, plus optional ast-grep CLI code search. Code research inline; deep research saved to docs/research/.",
-      "version": "5.2.0",
+      "version": "5.2.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -194,7 +194,7 @@
     {
       "name": "yellow-council",
       "description": "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
-      "version": "0.6.1",
+      "version": "0.6.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -214,7 +214,7 @@
     {
       "name": "yellow-claudemod",
       "description": "Claude Code mod that records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "author": {
         "name": "KingInYellows"
       },

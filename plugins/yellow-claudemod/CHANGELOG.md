@@ -1,5 +1,14 @@
 # yellow-claudemod
 
+## 0.1.2
+
+### Patch Changes
+
+- [`4d9a767`](https://github.com/KingInYellows/yellow-plugins/commit/4d9a767b6d0f079ae4311e2b45d93e201f2e69b6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Run ledger key
+  pruning beside the write chain, one prune at a time, so a store call that
+  never answers while pruning no longer holds up later spawns' rows.
+
 ## 0.1.1
 
 ### Patch Changes
