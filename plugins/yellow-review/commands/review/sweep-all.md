@@ -227,10 +227,8 @@ line item 3 reads and the `no contract` rule for a sweep that ends without one.
 If the Read fails, stop and report the path.
 
 For each PR in the sorted list, in order from lowest PR number to highest, do
-the following. **No pauses anywhere in this loop** — log per-PR failures and
-continue, except where item 1b (state unreadable), item 4 (dirty tree), item 4b
-(local config changed), item 5 (rate limit), item 5b (no contract) or item 5c
-(verify skipped) ends the loop.
+the following. **No pauses anywhere in this loop**: log per-PR failures and
+continue, except where a stop in item 1b, 4, 4b, 5, 5b or 5c ends the loop.
 
 For each iteration:
 
@@ -316,12 +314,11 @@ For each iteration:
      `config untracked here, ignored on the PR head`), not `no contract`. Item
      4's clean-tree check still runs; the batch continues.
    - If the LAST line fully matches
-     `^Sweep: aborted \((local-config-changed)\)$` (`/review:sweep` "Abort
-     line"), the sweep stopped because `yellow-plugins.local.md` changed during
-     the review or resolve: outcome is `skipped`, `Skip Reason`
-     `local config changed (aborted)`, `Blocking` `—`. It is an operational
-     stop, not a review blocker or `no contract`; item 4b stops the batch after
-     item 4.
+     `^Sweep: aborted \((local-config-changed)\)$` (`/review:sweep` "Skip
+     line"), `yellow-plugins.local.md` changed during the sweep: outcome is
+     `skipped`, `Skip Reason` `local config changed (aborted)`, `Blocking` `—`
+     (an operational stop, not a review blocker or `no contract`); item 4b stops
+     the batch.
    - If the Skill call returned and no exception was raised in the surrounding
      Bash blocks: outcome is `attempted`. (The Skill tool returns no
      machine-readable exit status, so any errors inside the sweep bubble up only
@@ -362,10 +359,9 @@ For each iteration:
    The command exits `1` after the summary. 4b. **Local-config stop** — only
    after item 4: if item 3 recorded `local config changed (aborted)`, mark every
    remaining PR `skipped — not attempted (local config changed)` and go to
-   `### Step 5: End-of-loop summary table`: inspect `yellow-plugins.local.md`
-   before any further run, since a later `/review:resolve` would trust it.
-   Record `pending-exit-1` (this stop forces the final exit; see the Final exit
-   below). The command exits `1` after the summary.
+   `### Step 5: End-of-loop summary table`; inspect the config before any
+   further run. Record `pending-exit-1`; the command exits `1` after the
+   summary.
 5. **Rate-limit stop** — only after item 4: if this PR reports `ratelimited=1`
    on a valid final contract line (item 3), add `rate limited` to its `Notes`,
    mark every remaining PR `skipped — not attempted (rate limit)`, and go to
@@ -488,32 +484,16 @@ failure, a failed Read, a crash) failed: treat it as `exit=1`.
   then exit 0 with the `No open non-draft PRs found.` message. No M3 gate is
   shown.
 - **User cancels at the M3 gate**: exit 0 with the `Cancelled.` message.
-- **Per-PR sweep failure mid-loop**: marked `skipped` in the summary with a
-  short reason. The loop continues unless Step 4 item 1b, 4, 4b, 5, 5b or 5c
-  stops it. The user can re-run `/review:sweep <PR#>` manually to inspect.
-- **Open-PR pre-check could not read the PR** (Step 4 item 1b, `exit` non-zero
-  and not a rate limit, after one retry for a network error): a missing pull
-  request (`PR not found`) is a per-PR skip and the loop continues. Any other
-  cause stops the loop: this PR is noted `state unreadable`, every remaining PR
-  is `skipped — not attempted (state unreadable)`, the summary is printed, and
-  the command exits `1`. A closed PR stays a per-PR skip
-  (`skipped — PR closed before sweep`) and the loop continues.
-- **Dirty tree after a sweep** (Step 4 item 4): the loop stops after reverting
-  the sweep's own edits, marks every remaining PR
-  `skipped — working tree dirty after PR #<PR#>`, prints the summary, and exits
-  `1`.
-- **Local config changed during a sweep** (Step 4 item 4b): the PR is skipped as
-  `local config changed (aborted)`, the loop stops after its clean-tree check,
-  marks every remaining PR `skipped — not attempted (local config changed)`,
-  prints the summary, and exits `1` with `aborted=1`.
-- **Rate-limited PR** (Step 4 item 5): the loop stops after that PR, marks every
-  remaining PR `skipped — not attempted (rate limit)`, prints the summary, and
-  exits `1`.
-- **Sweep ends without a valid final contract line** (Step 4 item 5b): the PR is
-  noted `no contract` (never `rate limited`) and counts blocking; after its
-  clean-tree check the loop stops, marks every remaining PR
-  `skipped — not attempted (no contract)`, prints the summary, and exits `1`. No
-  text in the output is read as a rate-limit signal.
+- **Per-PR sweep failure mid-loop**: marked `skipped` with a short reason; the
+  loop continues (item 6). Re-run `/review:sweep <PR#>` to inspect.
+- **Open-PR pre-check could not read the PR** (Step 4 item 1b): `PR not found`
+  and a closed PR are per-PR skips; any other cause stops the loop as
+  `state unreadable` and exits `1`.
+- **Dirty tree after a sweep** (item 4), a **changed local config** (item 4b,
+  `aborted=1`), a **Rate-limited PR** (item 5) or **no valid final contract**
+  (item 5b, noted `no contract`, never `rate limited`): the loop stops after
+  that PR's clean-tree check, marks every remaining PR skipped, prints the
+  summary, and exits `1`.
 - **Every PR skipped for per-PR reasons** (no Step 4 stop): summary; exit 0.
 - **Concurrent invocations**: not supported. The Step 1 dirty-tree guard does
   not serialize them: the tree is clean between PRs, so a second `sweep-all`

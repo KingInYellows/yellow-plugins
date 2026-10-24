@@ -326,10 +326,8 @@ esac
   `snapshot kept at` line (exit `4`: it says to recover from the snapshot only
   after `restore failed:`) or, on any other exit,
   `snapshot kept at <guard-dir> (not validated: inspect it before any restore)`,
-  and stop. Every stop here skips `/review:resolve` and prints no `Resolve:`
-  line. Each `changed during the review` stop (exit `3`, `4` or any other) ends
-  with `Sweep: aborted (local-config-changed)`, so `/review:sweep-all` reports
-  an aborted batch rather than a review blocker.
+  and stop. Every stop here skips `/review:resolve`; each
+  `changed during the review` stop ends with the abort line (see "Skip line").
 
 ### Step 3: Run /review:resolve --non-interactive
 
@@ -377,9 +375,8 @@ intact copy of the config.
 Exit `0`: continue. Exit `3`, `4` or any other exit: print
 `[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve`
 with the script's lines (exit `4` ends with its `snapshot kept at` line; any
-other exit adds Step 2b's `not validated` line) and stop. Skip Step 3b and Step
-4, and end with `Sweep: aborted (local-config-changed)` as the last line, after
-the nested `Resolve:` line.
+other exit adds Step 2b's `not validated` line) and stop. Skip Steps 3b and 4,
+and end with the abort line (see "Skip line").
 
 ### Step 3b: Reconcile the review-findings ledger
 
@@ -484,22 +481,11 @@ on the last line only and records `skipped — <reason>`; a missing line stays
 returned a state other than `OPEN`, and each other reason only on the confirmed
 result its step names. Argument errors, a failed fetch or rate limit, a dirty
 tree and a `head-ignore-probe` exit `3` print no skip line: they are not
-specific to this PR, so the batch stops.
-
-## Abort line
-
-A changed `yellow-plugins.local.md` (Step 2b or Step 3a) is an operational stop,
-not a review outcome, and the batch must not sweep past it. That stop ends with
-this line, as the very last line:
-
-```text
-Sweep: aborted (local-config-changed)
-```
-
-`/review:sweep-all` reads it by the anchored form
-`^Sweep: aborted \((local-config-changed)\)$` on the last line only, stops the
-batch and reports `aborted=1`. Print it only on the `guard-local-config check`
-exits those steps name; every other config stop keeps its own last line.
+specific to this PR, so the batch stops. A changed config (the Step 2b and 3a
+`guard-local-config check` stops) is an operational stop that ends instead with
+the abort line `Sweep: aborted (local-config-changed)`; `/review:sweep-all`
+reads `^Sweep: aborted \((local-config-changed)\)$` on the last line only, stops
+the batch and reports `aborted=1`.
 
 ## Error Handling
 
@@ -511,6 +497,3 @@ Each stop's message and last line are defined in its step. Beyond those:
   through the enabled stack provider, and rerun.
 - **No valid final contract**: print the Step 4 fallback; never re-emit a
   contract-looking line from earlier in its output.
-- **Ledger step fails** (Step 3b): `Ledger:  unavailable`; it never blocks a
-  sweep, though a rate limit still prints the contract fallback.
-- **Zero unresolved threads** is a clean outcome.

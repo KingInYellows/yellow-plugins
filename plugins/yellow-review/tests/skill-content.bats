@@ -716,25 +716,26 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
 
 @test "sweep: a changed local config ends with an anchored abort line" {
   text=$(flat "$SWEEP")
-  grep -qxF 'Sweep: aborted (local-config-changed)' "$SWEEP"
   re='^Sweep: aborted \((local-config-changed)\)$'
-  [[ "$text" == *"$re"* ]]
+  [[ "$text" == *"the abort line \`Sweep: aborted (local-config-changed)\`; \`/review:sweep-all\` reads \`$re\` on the last line only"* ]]
   # Both guard checks end with it: before resolve (Step 2b) and after (Step 3a).
   step2b=$(awk '/^### Step 2b:/ { p = 1 } /^### Step 3:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
-  [[ "$step2b" == *'Each `changed during the review` stop (exit `3`, `4` or any other) ends with `Sweep: aborted (local-config-changed)`'* ]]
+  [[ "$step2b" == *'each `changed during the review` stop ends with the abort line'* ]]
   step3a=$(awk '/^### Step 3a:/ { p = 1 } /^### Step 3b:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
-  [[ "$step3a" == *'end with `Sweep: aborted (local-config-changed)` as the last line'* ]]
+  [[ "$step3a" == *'end with the abort line'* ]]
   [[ "$step3a" != *'(`no contract` stops the batch)'* ]]
 }
 
 @test "sweep-all: a local-config abort stops the batch with aborted=1, not a review blocker" {
   all=$(flat "$SWEEP_ALL")
   re='^Sweep: aborted \((local-config-changed)\)$'
-  [[ "$all" == *"$re"* ]]
+  # Matched on the LAST line only, like the skip and contract lines.
+  [[ "$all" == *"If the LAST line fully matches \`$re\`"* ]]
   [[ "$all" == *'`Skip Reason` `local config changed (aborted)`, `Blocking` `—`'* ]]
   [[ "$all" == *'not a review blocker or `no contract`'* ]]
   [[ "$all" == *'4b. **Local-config stop** — only after item 4'* ]]
   [[ "$all" == *'`skipped — not attempted (local config changed)`'* ]]
+  grep -qF 'a changed local config (`aborted=1`)' "$BATS_TEST_DIRNAME/../README.md"
   [[ "$all" == *'`aborted=1` means item 4 stopped on a dirty tree or item 4b on a changed local config'* ]]
   [[ "$all" == *'Unless item 1b, 4, 4b, 5, 5b or 5c stopped the loop'* ]]
 }
