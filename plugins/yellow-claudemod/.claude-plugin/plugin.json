@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-claudemod",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Claude Code mod that records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit",
   "author": {
     "name": "KingInYellows",

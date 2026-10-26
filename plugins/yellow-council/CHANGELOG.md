@@ -1,5 +1,19 @@
 # yellow-council
 
+## 0.6.2
+
+### Patch Changes
+
+- [`cd818d4`](https://github.com/KingInYellows/yellow-plugins/commit/cd818d4742fa7c6b0b21057dadff9d34bd0c2f37)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rework the
+  credential-redaction program: `cred_hit` and `strip_deco` now run in linear
+  time (a line of many short `sk-` placeholders and nested list, diff or
+  numbered prefixes were quadratic), and the PEM body tests unwrap JSON string
+  arrays, markdown table columns and `\n`-escaped strings so a
+  serializer-wrapped key no longer leaks its tail. Step 5e lists every staged
+  citation under Unverified Claims (`verifier-error`) when `verification.tsv`
+  vanished after Step 5b.
+
 ## 0.6.1
 
 ### Patch Changes

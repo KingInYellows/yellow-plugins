@@ -13,6 +13,55 @@ and this project adheres to
 
 ---
 
+## [2.1.26] - 2026-10-26
+
+### Added
+
+- **yellow-review 3.11.0, yellow-core 2.11.5** — The review compact-return
+  schema lives in one canonical file, and the new `validate:compact-return`
+  gate fails any persona copy that drifts from it. `reviewer_set.include` no
+  longer bypasses depth tiering in `/review:pr` and `/review:all`; the new
+  `reviewer_set.force_depth` list keeps a reviewer running at every size.
+- **yellow-review 3.11.0** — `/review:resolve` runs its whole write phase
+  (follow-up issue, reply, resolve) through one `apply-thread-actions` call per
+  PR, checks `addressed` evidence with a new `check-addressed-evidence` script
+  that accepts fixes made lower in a stack, and reads its config through
+  `read-resolve-config`. `/review:pr`, `/review:all` and `/review:triage` commit
+  fixes through `commit-resolve-fixes` as a new commit instead of amending.
+  `/review:resolve-stack` and `/review:sweep-all` end with a machine-readable
+  `ResolveStack:` / `SweepAll:` outcome line.
+- **yellow-jules 0.4.0** — `supervise --clear-deviation --session <ref>` is the
+  recovery path for a blocking policy deviation, and controller authority
+  writes are serialized across data directories that share a controller id.
+
+### Changed
+
+- **yellow-review 3.11.0, yellow-debt 1.9.4** — comment-analyzer and
+  project-standards-reviewer route to `haiku` / `medium`, and complexity-scanner
+  to `haiku` / `low`, after a replay eval showed equal or better recall.
+- **yellow-debt 1.9.4, yellow-research 5.2.1** — A per-search token handoff
+  replaces the global ast-grep recipe lock, so parallel scanners no longer
+  collide or fall back to Grep.
+
+### Fixed
+
+- **yellow-review 3.11.0** — Closes the remaining git trust-boundary gaps
+  (unjudgeable program-running config keys are refused, `ext::` remotes are
+  blocked, ssh and askpass programs are pinned in the verify environment).
+  `run-verify-command` also refuses when hooks or git config changed after the
+  ignored-file marker, handles unreadable foreign-owned worktree directories,
+  and the `.git/hooks` guard no longer refuses configs with more than 64
+  includes. `/review:sweep` reports a changed-local-config stop as aborted.
+- **yellow-ci 1.5.9, yellow-core 2.11.5** — The CI-log redactor and
+  `cs_redact_secrets` mask the same set of credential shapes, enforced by a
+  new parity test.
+- **yellow-council 0.6.2** — Credential redaction runs in linear time and no
+  longer leaks the tail of a serializer-wrapped PEM key.
+- **yellow-claudemod 0.1.2** — Ledger key pruning no longer holds up later
+  spawns' rows when a store call hangs.
+- **yellow-ruvector 2.0.5** — The busy-store co-edit bats case is
+  deterministic.
+
 ## [2.1.25] - 2026-10-22
 
 ### Changed
