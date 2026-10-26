@@ -208,7 +208,7 @@ def run(args):
             return "%s: %s" % (rid, " ".join(cmd))
         env = dict(os.environ, EVAL_FINGERPRINT=fingerprint(work, case, args.model, args.effort))
         # Argument list, no shell; cmd is built from fixed paths and case ids.
-        rc = subprocess.run(cmd, env=env).returncode  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+        rc = subprocess.run(cmd, env=env, check=False).returncode  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
         return "%s: rc=%d" % (rid, rc)
     with ThreadPoolExecutor(max_workers=args.j) as pool:
         for line in pool.map(one, jobs):
@@ -229,17 +229,21 @@ REQUIRED = ("title", "severity", "category", "rule", "scope", "file", "line", "c
             "autofix_class", "owner", "requires_verification", "pre_existing", "suggested_fix")
 
 
+def integer(v):
+    # bool is an int subclass in Python; JSON `true` is not a line number.
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
 FINDING_RULES = [
     ("severity above P1 or missing", lambda x: x.get("severity") in ("P1", "P2", "P3")),
     ("category not maintainability", lambda x: x.get("category") == "maintainability"),
     ("autofix_class/owner not advisory/human",
      lambda x: x.get("autofix_class") == "advisory" and x.get("owner") == "human"),
     ("requires_verification not true", lambda x: x.get("requires_verification") is True),
-    # bool is an int subclass in Python; JSON `true` is not a line number.
-    ("line not a positive integer", lambda x: type(x.get("line")) is int and x["line"] > 0),
-    ("confidence not an anchor", lambda x: x.get("confidence") in (0, 25, 50, 75, 100)
-     and type(x.get("confidence")) is int),
-    ("pre_existing not a boolean", lambda x: type(x.get("pre_existing")) is bool),
+    ("line not a positive integer", lambda x: integer(x.get("line")) and x["line"] > 0),
+    ("confidence not an anchor",
+     lambda x: integer(x.get("confidence")) and x["confidence"] in (0, 25, 50, 75, 100)),
+    ("pre_existing not a boolean", lambda x: isinstance(x.get("pre_existing"), bool)),
 ]
 # Top-level keys /review:pr Step 6 requires before it reads any finding.
 TOP_LEVEL = ("reviewer", "findings", "residual_risks", "testing_gaps")
@@ -346,7 +350,7 @@ def smoke_claude(args):
     out = subprocess.run(  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
         ["claude", "-p", "--setting-sources", "", "--strict-mcp-config", *plugins, "--model", args.model,
          "--tools", tools, "--allowedTools", tools, "--output-format", "json", "--no-session-persistence",
-         prompt], cwd=cwd, capture_output=True, text=True, timeout=900)
+         prompt], cwd=cwd, capture_output=True, text=True, timeout=900, check=False)
     write(os.path.join(work, "smoke-claude.json"), out.stdout)
     reply = parse(json.loads(out.stdout or "{}").get("result")) or {}
     checks = smoke_checks(reply) + [("claude exited 0", out.returncode == 0)]
