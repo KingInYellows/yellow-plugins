@@ -1,7 +1,7 @@
 ---
 name: review:merge-ready
 # prettier-ignore
-description: 'Read-only merge gate for one PR: unresolved review threads (outdated included), CHANGES_REQUESTED reviewers, conversation-resolution enforcement, CI and pending P0-P2 ledger findings. Use before adding graphite-queue or merging; it never writes to GitHub or the ledger.'
+description: 'Read-only merge gate for one PR: unresolved review threads (outdated included), CHANGES_REQUESTED reviewers, conversation-resolution enforcement, CI and pending P0-P2 ledger findings. Use before adding graphite-queue or merging; it never writes to GitHub and adds no ledger records.'
 argument-hint: '[PR# | URL | branch]'
 allowed-tools:
   - Bash
@@ -19,11 +19,20 @@ nothing went unread.
 Split `$ARGUMENTS` on whitespace. Any token beginning with `--` is an error:
 report `[review:merge-ready] Error: unknown flag <token>.` and stop. More than
 one remaining token is an error too
-(`[review:merge-ready] Error: too many arguments.`). Resolve the target exactly
-as `review-pr.md` Step 1 does: a number, a PR URL (the number after `/pull/`), a
-branch name (`gh pr view "<token>" --json number -q .number`), or the current
-branch when none is given (`gh pr view --json number -q .number`). Then read the
-repository:
+(`[review:merge-ready] Error: too many arguments.`). Resolve the target:
+
+- **Number**: digits only, used as the PR number.
+- **URL** `https://github.com/<owner>/<repo>/pull/<n>`: take `<owner>/<repo>`
+  and `<n>` from the URL itself, so a PR in another repository is checked there.
+  Each of `<owner>` and `<repo>` must match `^[A-Za-z0-9._-]+$` and `<n>` must
+  be digits; any other URL is an error.
+- **Branch name**: it must match `^[A-Za-z0-9._/-]+$` and must not begin with
+  `-`; otherwise report `[review:merge-ready] Error: invalid branch name.` and
+  stop, so no quote, `$` or backtick reaches the shell. Then
+  `gh pr view '<token>' --json number -q .number`.
+- **None**: the current branch, `gh pr view --json number -q .number`.
+
+Unless the URL gave it, read the repository:
 
 ```bash
 gh repo view --json nameWithOwner -q .nameWithOwner
@@ -60,7 +69,7 @@ Print one row per check, then the contract line. Mark each row `ok`, `blocks` or
   Reviews:     <reviewDecision>; changes requested by <logins or "nobody">
   Resolution:  conversation resolution <enforced | not enforced | unknown>
   CI:          <ci.state>; failing: <names>; pending: <names>
-  Ledger:      <mergeBlocking> pending P0-P2 findings | none | unavailable
+  Ledger:      <mergeBlocking> pending P0-P2 findings | none | other repo | unavailable
   Queue:       graphite-queue <present | absent>
 
 MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens or none> queued=<true|false|unknown>
@@ -72,7 +81,9 @@ MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens
   GitHub will not stop the merge on open threads, so this gate is the only check
   for them.
 - `Ledger: none` is normal in a clone that never ran `/review:pr` and does not
-  block. Name `/review:triage <PR#>` when the ledger blocks.
+  block; neither does `other repo`, a checkout of a different repository whose
+  ledger is not read. `unavailable` is an unknown. Name `/review:triage <PR#>`
+  when the ledger blocks.
 - For `blocked`, end with the next step for each blocker: `/review:resolve` for
   threads, the reviewer for changes requested, the failing check names for CI, a
   rebase for conflicts.

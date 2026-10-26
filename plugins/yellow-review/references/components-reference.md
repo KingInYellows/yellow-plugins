@@ -87,7 +87,8 @@ flags, exit codes, trust-boundary rules and library behavior.
   conflicts and pending P0-P2 ledger findings block; conversation-resolution
   enforcement and the `graphite-queue` label are reported. Ends with a
   `MergeReady:` contract line; an unread source is `unknown`, never `ready`.
-  Writes nothing to GitHub or the ledger
+  Writes nothing to GitHub and adds no ledger records; the ledger is read only
+  from a checkout of the same repository whose PR has ledger files
 
 ### Agents (17)
 

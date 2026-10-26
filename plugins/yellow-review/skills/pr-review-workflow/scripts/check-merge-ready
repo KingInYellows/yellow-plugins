@@ -1,6 +1,8 @@
 #!/bin/sh
-# Read-only merge-readiness gate for one PR. Makes no GitHub writes and never
-# writes a ledger record (the ledger summary only reads).
+# Read-only merge-readiness gate for one PR. Makes no GitHub writes and adds
+# no ledger records. It reads the ledger only when the current checkout's
+# origin is <owner/repo> and the PR already has ledger files; that read takes
+# the ledger lock like any other ledger read.
 # Usage: check-merge-ready <owner/repo> <pr-number>
 # Output: one JSON object on stdout:
 #   {"pr":N,"head":"<sha>"|null,"state":"OPEN|CLOSED|MERGED"|null,
@@ -13,11 +15,12 @@
 #    "conversationResolution":"enforced|not_enforced|unknown",
 #    "ci":{"state":"SUCCESS|PENDING|EXPECTED|FAILURE|ERROR|NONE"|null,
 #          "failing":[names],"pending":[names],"truncated":bool},
-#    "ledger":{"status":"read|none|unavailable","mergeBlocking":N|null}}
+#    "ledger":{"status":"read|none|other_repo|unavailable","mergeBlocking":N|null}}
 # blockers holds fixed tokens: not_open, draft, conflicts, unresolved_threads,
 # changes_requested, review_required, ci_failing, ci_pending, ledger_findings.
 # unknowns names what could not be read: pr_state, threads, reviews, ci,
 # mergeable (GitHub reports UNKNOWN while it is still computing the merge),
+# ledger (the PR has ledger files but the summary failed),
 # merge_state (mergeStateStatus is BLOCKED: GitHub refuses the merge for a
 # reason this gate may not see, such as a required check that never reported
 # on the head, so the PR is not reported ready).
@@ -28,11 +31,14 @@
 # counts skipped and neutral runs as passing) or the head has no checks at all
 # (NONE). The failing/pending name lists cover the first 100 contexts;
 # truncated is true past that, and the verdict still comes from the rollup.
-# A missing ledger (status none) does not block: the queue rule needs CI,
-# threads and reviews, and cloud sessions never hold a local ledger.
+# A missing ledger (status none: no checkout, or no files for the PR) does not
+# block: the queue rule needs CI, threads and reviews, and cloud sessions never
+# hold a local ledger. A checkout of another repository (other_repo) is not
+# read, since ledger files are keyed by PR number only.
 # Exit: 0 ready, 1 blocked (any blocker, even with unknowns), 3 unknown (no
 # blocker but something unread), 2 usage. Every lookup failure exits 1 or 3
-# with a note on stderr, never with an empty stdout.
+# with a note on stderr, never with an empty stdout; with jq missing or no
+# temp directory the report keeps its shape with every field null.
 # Time bound: get-pr-comments (270 s deadline), get-pr-blockers (up to 360 s)
 # and the state query run in parallel, so the worst case is about 370 s,
 # inside the 420000 ms Bash tool timeout merge-ready.md gives the call.
@@ -62,9 +68,14 @@ case "$PR_NUMBER" in
 esac
 [ "${#PR_NUMBER}" -le 9 ] || { printf 'Error: PR number too long: %s\n' "$PR_NUMBER" >&2; exit 2; }
 
+# all_unknown: the full report shape with nothing read; built without jq.
+all_unknown() {
+    printf '{"pr":%s,"head":null,"state":null,"verdict":"unknown","blockers":[],"unknowns":["pr_state","threads","reviews","ci"],"isDraft":null,"mergeable":null,"mergeStateStatus":null,"queued":null,"threads":null,"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown","ci":{"state":null,"failing":[],"pending":[],"truncated":false},"ledger":{"status":"unavailable","mergeBlocking":null}}\n' "$PR_NUMBER"
+}
+
 if ! command -v jq >/dev/null 2>&1; then
     note 'jq not found; readiness unknown'
-    printf '{"pr":%s,"verdict":"unknown","blockers":[],"unknowns":["pr_state","threads","reviews","ci"]}\n' "$PR_NUMBER"
+    all_unknown
     exit 3
 fi
 
@@ -72,7 +83,7 @@ HERE=$(dirname -- "$0")
 RESOLVE_GH_LIB="$HERE/../../../lib/resolve-gh.sh"
 LEDGER_LIB="$HERE/../../../lib/review-ledger.sh"
 
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/check-merge-ready.XXXXXX") || { note 'mktemp failed'; exit 3; }
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/check-merge-ready.XXXXXX") || { note 'mktemp failed; readiness unknown'; all_unknown; exit 3; }
 trap 'rm -rf "$WORK"' EXIT
 
 # --- Threads and reviews run in the background (each can take minutes) ---
@@ -160,16 +171,32 @@ elif jq -e '.lookupFailed' "$WORK/blockers" >/dev/null 2>&1; then
     note "review lookup failed ($(jq -r '.lookupReason // "other"' "$WORK/blockers")); reviews unknown"
 fi
 
-# --- Ledger (local, optional): summary prints {} when the PR has none ---
-LEDGER_STATUS=unavailable
+# --- Ledger (local, optional) ---
+# Ledger files are keyed by PR number alone, so read them only from a checkout
+# of the same repository, and call the library only when the PR has files:
+# the summary would otherwise create the ledger directory.
+LEDGER_STATUS=none
 LEDGER_BLOCKING=null
-if [ -x "$LEDGER_LIB" ]; then
-    if "$LEDGER_LIB" summary "$PR_NUMBER" >"$WORK/ledger" 2>"$WORK/ledger.err" \
-        && jq -e 'type == "object"' "$WORK/ledger" >/dev/null 2>&1; then
-        LEDGER_BLOCKING=$(jq --arg pr "$PR_NUMBER" '.[$pr].merge_blocking // null | if type == "number" then . else null end' "$WORK/ledger")
-        if [ "$LEDGER_BLOCKING" = null ]; then LEDGER_STATUS=none; else LEDGER_STATUS=read; fi
-    else
-        note "ledger summary unavailable: $(head -c 200 "$WORK/ledger.err" | tr '\n' ' ')"
+COMMON_DIR=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || COMMON_DIR=""
+if [ -n "$COMMON_DIR" ]; then
+    ORIGIN=$(git config --get remote.origin.url 2>/dev/null) || ORIGIN=""
+    ORIGIN=${ORIGIN%/}
+    ORIGIN=${ORIGIN%.git}
+    ORIGIN_REPO=$(printf '%s' "$ORIGIN" | awk -F'[/:]' 'NF >= 2 { print $(NF-1) "/" $NF }' | tr '[:upper:]' '[:lower:]')
+    WANT_REPO=$(printf '%s/%s' "$OWNER" "$NAME" | tr '[:upper:]' '[:lower:]')
+    LEDGER_DIR="$COMMON_DIR/yellow-review/findings"
+    if [ "$ORIGIN_REPO" != "$WANT_REPO" ]; then
+        LEDGER_STATUS=other_repo
+    elif [ -f "$LEDGER_DIR/$PR_NUMBER.jsonl" ] || [ -f "$LEDGER_DIR/$PR_NUMBER.pending" ]; then
+        LEDGER_STATUS=unavailable
+        if [ -x "$LEDGER_LIB" ] \
+            && "$LEDGER_LIB" summary "$PR_NUMBER" >"$WORK/ledger" 2>"$WORK/ledger.err" \
+            && LEDGER_BLOCKING=$(jq -e --arg pr "$PR_NUMBER" '.[$pr].merge_blocking | numbers' "$WORK/ledger" 2>/dev/null); then
+            LEDGER_STATUS=read
+        else
+            LEDGER_BLOCKING=null
+            note "ledger summary unavailable; ledger unknown: $(head -c 200 "$WORK/ledger.err" 2>/dev/null | tr '\n' ' ')"
+        fi
     fi
 fi
 
@@ -232,7 +259,8 @@ jq -n \
       (if $bl.lookupFailed then "reviews" else empty end),
       (if $stateok and (.ci.state | IN("SUCCESS","NONE","PENDING","EXPECTED","FAILURE","ERROR")) then empty else "ci" end),
       (if $stateok and .mergeable == "UNKNOWN" then "mergeable" else empty end),
-      (if $stateok and .mergeStateStatus == "BLOCKED" then "merge_state" else empty end)
+      (if $stateok and .mergeStateStatus == "BLOCKED" then "merge_state" else empty end),
+      (if .ledger.status == "unavailable" then "ledger" else empty end)
     ]
   | .verdict = (if (.blockers | length) > 0 then "blocked"
                 elif (.unknowns | length) > 0 then "unknown"

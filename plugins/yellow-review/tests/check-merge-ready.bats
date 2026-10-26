@@ -31,12 +31,25 @@ STUB
   cat >"$ROOT/lib/review-ledger.sh" <<'STUB'
 #!/bin/sh
 [ "${MR_LEDGER_FAIL:-0}" = 1 ] && { printf 'not a git repo\n' >&2; exit 1; }
+: >"${BATS_TEST_TMPDIR}/ledger_called"
 printf '%s\n' "${MR_LEDGER:-{\}}"
 STUB
   chmod +x "$ROOT"/skills/pr-review-workflow/scripts/* "$ROOT/lib/review-ledger.sh"
   unset MR_THREADS MR_THREADS_RC MR_BLOCKERS MR_LEDGER MR_LEDGER_FAIL
   export MOCK_GH_MR_BODY
   MOCK_GH_MR_BODY=$(state_body)
+  # A checkout of test/repo, so the ledger is read for it.
+  CHECKOUT="${BATS_TEST_TMPDIR}/checkout"
+  git init -q "$CHECKOUT"
+  git -C "$CHECKOUT" remote add origin git@github.com:Test/repo.git
+  LEDGER_DIR="$CHECKOUT/.git/yellow-review/findings"
+  cd "$CHECKOUT"
+}
+
+# with_ledger_files: give PR 7 a ledger record so the summary is consulted.
+with_ledger_files() {
+  mkdir -p "$LEDGER_DIR"
+  : >"$LEDGER_DIR/7.jsonl"
 }
 
 # state_body [key=json ...]: a green, open, mergeable PR with overrides
@@ -205,6 +218,7 @@ state_body() {
 }
 
 @test "pending P0-P2 ledger findings block" {
+  with_ledger_files
   export MR_LEDGER='{"7":{"pending":3,"attention":0,"merge_blocking":2}}'
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 1 ]
@@ -212,14 +226,45 @@ state_body() {
   [ "$(jq -c .blockers <<<"$output")" = '["ledger_findings"]' ]
 }
 
-@test "no ledger or an unreadable ledger does not block" {
+@test "a PR with no ledger files is none, and the library is not called" {
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 0 ]
   [ "$(jq -r .ledger.status <<<"$output")" = none ]
+  [ ! -e "${BATS_TEST_TMPDIR}/ledger_called" ]
+  [ ! -d "$LEDGER_DIR" ]
+}
+
+@test "an unreadable ledger is unknown, not ready" {
+  with_ledger_files
   export MR_LEDGER_FAIL=1
   run --separate-stderr "$SCRIPT" test/repo 7
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 3 ]
   [ "$(jq -r .ledger.status <<<"$output")" = unavailable ]
+  [ "$(jq -c .unknowns <<<"$output")" = '["ledger"]' ]
+}
+
+@test "a checkout of another repository does not read its ledger" {
+  with_ledger_files
+  export MR_LEDGER='{"7":{"pending":3,"attention":0,"merge_blocking":2}}'
+  run --separate-stderr "$SCRIPT" other/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .ledger.status <<<"$output")" = other_repo ]
+  [ ! -e "${BATS_TEST_TMPDIR}/ledger_called" ]
+}
+
+@test "outside a git checkout the ledger is none" {
+  mkdir -p "${BATS_TEST_TMPDIR}/plain"
+  cd "${BATS_TEST_TMPDIR}/plain"
+  GIT_CEILING_DIRECTORIES="${BATS_TEST_TMPDIR}" run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .ledger.status <<<"$output")" = none ]
+}
+
+@test "a missing temp directory still prints the full report shape" {
+  TMPDIR="${BATS_TEST_TMPDIR}/nonexistent" run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -r .verdict <<<"$output")" = unknown ]
+  [ "$(jq -r 'has("ci") and has("ledger") and has("mergeable")' <<<"$output")" = true ]
 }
 
 @test "makes no write calls to GitHub" {

@@ -91,7 +91,7 @@ it before editing a script, library or command.
   path
 - `/review:merge-ready` — read-only merge gate (threads, reviews, CI,
   mergeability, ledger P0-P2); ends with the `MergeReady:` contract line and
-  never writes to GitHub or the ledger
+  never writes to GitHub or adds ledger records
 
 ### Agents (17)
 
