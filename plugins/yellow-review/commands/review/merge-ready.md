@@ -77,6 +77,8 @@ MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens
   threads, the reviewer for changes requested, the failing check names for CI, a
   rebase for conflicts.
 - For `unknown`, say what could not be read and suggest re-running; an unknown
-  is never reported as ready.
+  is never reported as ready. `merge_state` means GitHub reports the merge as
+  `BLOCKED` for a reason none of the rows show, often a required check that
+  never ran on the head: point at the branch protection's required checks.
 - For `ready` with `queued=false`, say the PR meets the queue rule. Do not add
   the label: this command is read-only.
