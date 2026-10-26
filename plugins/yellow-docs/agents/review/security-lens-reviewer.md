@@ -2,6 +2,7 @@
 name: security-lens-reviewer
 description: "Evaluates planning documents for security gaps at the plan level — auth/authz assumptions, data exposure risks, API surface vulnerabilities, third-party trust boundaries, secrets management, and a plan-level threat model. Distinct from code-level security review. Use when reviewing technical plans, ADRs, or feature specs that introduce new endpoints, data stores, integrations, or user input via /docs:review."
 model: sonnet
+effort: medium
 background: true
 tools:
   - Read

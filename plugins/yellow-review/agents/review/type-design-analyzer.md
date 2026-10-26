@@ -2,6 +2,7 @@
 name: type-design-analyzer
 description: "Conditional code-review persona, selected when the diff introduces or modifies type definitions (interfaces, classes, structs, enums, models) in TypeScript, Python, Rust, or Go. Ensures strong invariants and proper encapsulation."
 model: sonnet
+effort: medium
 background: true
 memory: project
 tools:

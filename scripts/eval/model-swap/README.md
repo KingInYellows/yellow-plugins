@@ -31,10 +31,21 @@ an output with another fingerprint as missing.
   planted into it, and the agent reviews the diff against the parent. A plant
   counts as found when a single finding names the plant's file and matches every
   regex in its `match` list. Recall only counts plants in the agent's `lane`.
-- **Scan.** A scanner runs over unchanged files. The golden set is every
-  function lizard reports over the spec's `ccn_over` or `length_over` limit. A
-  finding counts when its file matches and its start line is within 3 of the
-  function's.
+- **Scan.** A scanner runs over a file set. With `golden.ccn_over` /
+  `length_over`, the files are unchanged and the golden set is every function
+  lizard reports over the limit; a finding counts when its file matches and its
+  start line is within 3 of the function's. With `golden.planted`, the scan's
+  `plants` for the agent's `lane` are the golden set; a finding counts when its
+  line range overlaps a planted region (or an `also` region, such as the
+  original a planted duplicate copies), widened by 3 lines.
+- **Prompt.** A sub-task prompt that is not an agent file (a compounder
+  extractor, the `/optimize` judge) runs from a stand-in under `fixtures/` with
+  a case's context: inline `text`, or a repo file at a commit (`source`, with
+  its title and any `docs/solutions` line removed). Each case passes when the
+  reply hits every `match` regex and no `not` regex, or, for `lowest`, scores
+  every one of the case's `candidates` and gives that one the lowest
+  `weighted_score`. Cases run in a worktree at `prompt_commit`, so a finder can
+  search the repo there without seeing the fixtures.
 - **Everything else.** `grade` writes the findings that match no plant to
   `unmatched-findings.txt`. Judge those by hand for false positives.
 
@@ -60,10 +71,17 @@ Add a spec under `fixtures/`, or extend one:
   compact-return agents);
 - a `replays` entry: a merge commit and its plants. Each plant is an exact `old`
   → `new` replacement that must match once, or `fold_description`;
-- a `scans` entry: a commit and a file list.
+- a `scans` entry: a commit, a file list and optional `plants` (each with a
+  `lane`);
+- a `prompts` entry for `prompt` agents, which name a stand-in `file`, a
+  `prompt` template with `{context}`, and an `expect` map from case id to
+  checks.
+
+An agent's optional `replays` or `scans` list limits it to those targets.
 
 ## Results
 
-| Date       | Spec                                    | Write-up                                                                                                                                                                               |
-| ---------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-10-22 | `fixtures/2026-10-22-haiku-phase2.json` | CLAUDE-163 comment: comment-analyzer and project-standards-reviewer pass at `haiku` / `medium`; complexity-scanner passes at `haiku` / `low`; `haiku` / `low` fails for both reviewers |
+| Date       | Spec                                    | Write-up                                                                                                                                                                                                                                                           |
+| ---------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-10-22 | `fixtures/2026-10-22-haiku-phase2.json` | CLAUDE-163 comment: comment-analyzer and project-standards-reviewer pass at `haiku` / `medium`; complexity-scanner passes at `haiku` / `low`; `haiku` / `low` fails for both reviewers                                                                             |
+| 2026-10-26 | `fixtures/2026-10-26-haiku-phase3.json` | CLAUDE-187 comment: agent-native-reviewer passes at `sonnet` / `medium`; agent-cli-readiness-reviewer stays on Opus; duplication and ai-pattern scanners pass at `haiku` / `low`; compounder analyzer and finder pass at `haiku` / `low`; judge pinned to `sonnet` |

@@ -2,7 +2,7 @@
 name: duplication-scanner
 # prettier-ignore
 description: "Code duplication and near-duplicate detection. Use when auditing code for repeated patterns, copy-paste code, or duplicate logic."
-model: sonnet
+model: haiku
 effort: low
 background: true
 skills:

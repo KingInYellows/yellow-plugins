@@ -2,6 +2,7 @@
 name: security-lens
 description: "Plan-level security architect. Use when reviewing planning documents, brainstorms, or architecture proposals — evaluates whether the plan accounts for security at the planning level (auth/authz assumptions, data exposure, attack surface) before implementation begins."
 model: sonnet
+effort: medium
 memory: project
 tools:
   - Read

@@ -1,8 +1,8 @@
 ---
 name: agent-native-reviewer
 description: "Reviews code to ensure agent-native parity — any action a user can take, an agent can also take. Reviews UI/agent action parity, context parity, shared workspace patterns, primitive-vs-workflow tool design, and dynamic context injection in system prompts. Use when reviewing PRs that introduce or modify UI features, agent tool definitions, system prompts, or LLM-integration scaffolding."
-model: opus
-effort: high
+model: sonnet
+effort: medium
 background: true
 tools:
   - Read

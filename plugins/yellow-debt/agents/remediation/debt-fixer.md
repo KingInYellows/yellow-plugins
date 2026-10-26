@@ -2,6 +2,7 @@
 name: debt-fixer
 description: "Implement fixes for specific technical debt findings with human approval. Use when remediating accepted debt items."
 model: sonnet
+effort: medium
 isolation: worktree
 skills:
   - debt-conventions
