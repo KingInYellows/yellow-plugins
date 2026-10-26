@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadGrants } from '../src/authority.js';
 import { authorizeRevoke, authorizeTakeOver } from '../src/authorize.js';
-import { canonicalPath } from '../src/config.js';
+import { canonicalPath, resolveLockPath } from '../src/config.js';
 import {
   controllerLockPath,
   readControllerAuthority,
@@ -93,7 +93,17 @@ describe('the controller-wide lock', () => {
     let takeOver: Promise<unknown> | undefined;
     await withControllerLock(a.dataDir, lock, async () => {
       takeOver = authorizeTakeOver(b.deps);
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // The take-over holds b's journal lock before it tries the controller
+      // lock, so wait for that; a fixed sleep would pass vacuously if the
+      // take-over had not started yet.
+      const journalLock = resolveLockPath(b.dataDir);
+      const deadline = Date.now() + 5_000;
+      while (!fs.existsSync(journalLock)) {
+        if (Date.now() > deadline) throw new Error('take-over never started');
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      // Give it a few lock polls (50 ms each) to get past a held lock if it could.
+      await new Promise((resolve) => setTimeout(resolve, 200));
       // Still inside a's critical section: the authority has not moved.
       expect(authority()).toMatchObject({
         epoch: 1,

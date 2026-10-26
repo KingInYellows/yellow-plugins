@@ -532,16 +532,25 @@ export function listGrants(
   }));
 }
 
+/**
+ * A check that runs under the lock, before a grant write, together with the
+ * controller lock it needs. One object so a caller cannot pass a controller
+ * check without the lock that keeps it true through the write (see
+ * `withControllerLock`).
+ */
+export interface CheckedGrantWrite {
+  readonly beforeWrite: (grant: GrantRecord) => void;
+  readonly lock: string;
+}
+
 export async function revokeGrant(
   dataDir: string,
   grantId: string,
   now: Date,
-  beforeWrite?: (grant: GrantRecord) => void,
-  /** Held from `beforeWrite` (a controller check) through the write; see `withControllerLock`. */
-  lock?: string
+  checked?: CheckedGrantWrite
 ): Promise<{ grantId: string; revokedAt: string }> {
   validateGrantId(grantId);
-  return withControllerLock(dataDir, lock, async () => {
+  return withControllerLock(dataDir, checked?.lock, async () => {
     const file = loadGrants(dataDir);
     const grant = file.grants[grantId];
     if (grant === undefined) {
@@ -553,7 +562,7 @@ export async function revokeGrant(
       return { grantId, revokedAt: grant.revokedAt };
     }
     // Runs under the lock, before any write: a refusal leaves grants.json as it was.
-    beforeWrite?.(grant);
+    checked?.beforeWrite(grant);
     const revokedAt = now.toISOString();
     writeGrants(
       dataDir,
@@ -574,11 +583,9 @@ export async function releaseSlotInStore(
   dataDir: string,
   grantId: string,
   localRequestId: string,
-  beforeWrite?: (grant: GrantRecord) => void,
-  /** Held from `beforeWrite` (a controller check) through the write; see `withControllerLock`. */
-  lock?: string
+  checked?: CheckedGrantWrite
 ): Promise<boolean> {
-  return withControllerLock(dataDir, lock, async () => {
+  return withControllerLock(dataDir, checked?.lock, async () => {
     const file = loadGrants(dataDir);
     const grant = file.grants[grantId];
     if (
@@ -588,7 +595,7 @@ export async function releaseSlotInStore(
       return false;
     }
     // Under the lock, before the write: a refusal leaves grants.json as it was.
-    beforeWrite?.(grant);
+    checked?.beforeWrite(grant);
     writeGrants(
       dataDir,
       updateGrant(file, grantId, (g) => releaseGrant(g, localRequestId))

@@ -385,11 +385,9 @@ function listGrants(dataDir, now, journal) {
         unreconciledDeviation: grantHasUnreconciledDeviation(journal, grant.grantId),
     }));
 }
-async function revokeGrant(dataDir, grantId, now, beforeWrite, 
-/** Held from `beforeWrite` (a controller check) through the write; see `withControllerLock`. */
-lock) {
+async function revokeGrant(dataDir, grantId, now, checked) {
     (0, validate_js_1.validateGrantId)(grantId);
-    return (0, state_js_1.withControllerLock)(dataDir, lock, async () => {
+    return (0, state_js_1.withControllerLock)(dataDir, checked?.lock, async () => {
         const file = loadGrants(dataDir);
         const grant = file.grants[grantId];
         if (grant === undefined) {
@@ -401,7 +399,7 @@ lock) {
             return { grantId, revokedAt: grant.revokedAt };
         }
         // Runs under the lock, before any write: a refusal leaves grants.json as it was.
-        beforeWrite?.(grant);
+        checked?.beforeWrite(grant);
         const revokedAt = now.toISOString();
         writeGrants(dataDir, updateGrant(file, grantId, (g) => ({ ...g, revokedAt })));
         return { grantId, revokedAt };
@@ -414,10 +412,8 @@ lock) {
  * that no longer exists (hand-removed file) is a no-op; a corrupt grants file
  * still fails loud.
  */
-async function releaseSlotInStore(dataDir, grantId, localRequestId, beforeWrite, 
-/** Held from `beforeWrite` (a controller check) through the write; see `withControllerLock`. */
-lock) {
-    return (0, state_js_1.withControllerLock)(dataDir, lock, async () => {
+async function releaseSlotInStore(dataDir, grantId, localRequestId, checked) {
+    return (0, state_js_1.withControllerLock)(dataDir, checked?.lock, async () => {
         const file = loadGrants(dataDir);
         const grant = file.grants[grantId];
         if (grant === undefined ||
@@ -425,7 +421,7 @@ lock) {
             return false;
         }
         // Under the lock, before the write: a refusal leaves grants.json as it was.
-        beforeWrite?.(grant);
+        checked?.beforeWrite(grant);
         writeGrants(dataDir, updateGrant(file, grantId, (g) => releaseGrant(g, localRequestId)));
         return true;
     });
