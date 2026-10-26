@@ -21,6 +21,7 @@
 #                                        bot-account viewer: botself/botmarker,
 #                                        own human account: ownafter)
 #   latestOpinionatedReviews             MOCK_GH_BLOCKERS_{FAIL,FIXTURE}
+#   MergeReadyState                      MOCK_GH_MR_BODY, MOCK_GH_MR_FAIL
 #   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES;
 #                                        MOCK_GH_PROTECTION_MAIN and
 #                                        MOCK_GH_RULES_MAIN override them for
@@ -112,6 +113,17 @@ emit_pages() {
 # Arms keyed on query or endpoint text come first so the number=/PRRT_ arms
 # below never capture them.
 case "$ALL_ARGS" in
+  *"MergeReadyState"*)
+    # check-merge-ready state query. MOCK_GH_MR_BODY is the whole response;
+    # MOCK_GH_MR_FAIL=1|ratelimit simulates a failure.
+    case "${MOCK_GH_MR_FAIL:-0}" in
+      ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 403)\n' >&2; exit 1 ;;
+      1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+    esac
+    _mr_default='{"data":{"repository":{"pullRequest":null}}}'
+    printf '%s\n' "${MOCK_GH_MR_BODY:-$_mr_default}"
+    exit 0
+    ;;
   *"FollowupViewer"*)
     # file-followup-issue viewer lookup. MOCK_GH_VIEWER overrides the login;
     # MOCK_GH_VIEWER_FAIL=1|ratelimit simulates a failure.

@@ -67,7 +67,7 @@ library behavior, hook budgets, testing map, usage guide) lives in
 [`references/components-reference.md`](references/components-reference.md). Read
 it before editing a script, library or command.
 
-### Commands (8)
+### Commands (9)
 
 - `/review:setup` — validate GitHub, jq, yellow-core and ledger prerequisites;
   the Graphite CLI is reported but needed only with gt-workflow
@@ -89,6 +89,9 @@ it before editing a script, library or command.
 - `/review:triage` — own the review-findings ledger lifecycle for one PR
   (reconcile, apply, dismiss, restore); `rl prune` is the only ledger deletion
   path
+- `/review:merge-ready` — read-only merge gate (threads, reviews, CI,
+  mergeability, ledger P0-P2); ends with the `MergeReady:` contract line and
+  never writes to GitHub or adds ledger records
 
 ### Agents (17)
 
@@ -118,7 +121,7 @@ all scripts), `stack-traversal` (shared by `/review:all` and
 `thermonuclear-reviewer`; the only Codex/Cursor-distributed skill). None is
 user-invocable.
 
-### Scripts (17)
+### Scripts (18)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
@@ -127,6 +130,9 @@ the resolve scripts: `references/resolve/dispositions.md`.
 - `get-pr-comments`, `get-pr-blockers`, `pr-changed-ranges`, `poll-new-threads`
   — read PR threads, blockers, changed ranges, and new threads for the Step 8
   re-pass
+- `check-merge-ready` — read-only `/review:merge-ready` gate combining the
+  readers above with a PR-state and CI read and the ledger summary; exits 0
+  ready, 1 blocked, 3 unknown
 - `apply-thread-actions` — the Step 7 write phase in one call: runs the three
   scripts below per thread from a JSONL plan; exit 4 stops, exit 5 resumes
 - `reply-pr-thread`, `resolve-pr-thread`, `file-followup-issue` — write to
