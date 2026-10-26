@@ -384,6 +384,33 @@ def scan_hits(golden, scan_file):
     return found, unmatched
 
 
+def finding_span(finding):
+    """(path, first, last) for one scan finding. A missing line span is -1."""
+    loc = finding.get("file") or {}
+    if not isinstance(loc, dict):
+        return str(loc), -1, -1
+    path = loc.get("path", "")
+    match = re.match(r"(\d+)(?:\s*-\s*(\d+))?", str(loc.get("lines", "")))
+    if not match:
+        return path, -1, -1
+    first = int(match.group(1))
+    return path, first, int(match.group(2) or first)
+
+
+def span_hits_region(path, first, last, region):
+    """True when the finding span overlaps region (path, start, end), +/- 3 lines."""
+    return (path.endswith(region[0])
+            and first <= region[2] + 3
+            and last >= region[1] - 3)
+
+
+def span_hits_plant(path, first, last, plant):
+    for region in plant["regions"]:
+        if span_hits_region(path, first, last, region):
+            return True
+    return False
+
+
 def planted_hits(golden, scan_file):
     """Golden plants a scan found: a finding whose file matches and whose line range
     overlaps one of the plant's regions, widened by 3 lines. Overlap, not start
@@ -391,16 +418,15 @@ def planted_hits(golden, scan_file):
     found, unmatched = set(), []
     with open(scan_file, encoding="utf-8") as handle:
         scan = json.load(handle)
-    for f in scan.get("findings", []):
-        loc = f.get("file") or {}
-        path = loc.get("path", "") if isinstance(loc, dict) else str(loc)
-        m = re.match(r"(\d+)(?:\s*-\s*(\d+))?", str(loc.get("lines", "") if isinstance(loc, dict) else ""))
-        first, last = (int(m.group(1)), int(m.group(2) or m.group(1))) if m else (-1, -1)
-        matched = {g["id"] for g in golden
-                   if any(path.endswith(r[0]) and first <= r[2] + 3 and last >= r[1] - 3 for r in g["regions"])}
+    for finding in scan.get("findings", []):
+        path, first, last = finding_span(finding)
+        matched = set()
+        for plant in golden:
+            if span_hits_plant(path, first, last, plant):
+                matched.add(plant["id"])
         found |= matched
         if not matched:
-            unmatched.append(json.dumps(f))
+            unmatched.append(json.dumps(finding))
     return found, unmatched
 
 
@@ -414,19 +440,51 @@ def weighted_scores(text):
     return scores
 
 
-def case_passes(expect, text):
-    if any(not re.search(rx, text, re.I | re.M) for rx in expect.get("match", [])):
+def reply_misses(patterns, text):
+    for rx in patterns:
+        if not re.search(rx, text, re.I | re.M):
+            return True
+    return False
+
+
+def reply_hits(patterns, text):
+    for rx in patterns:
+        if re.search(rx, text, re.I | re.M):
+            return True
+    return False
+
+
+def scores_cover(scores, candidates, low):
+    """False when `low` is not a candidate or any candidate has no score.
+
+    An incomplete reply could otherwise rank `lowest` last by omission.
+    """
+    if low not in candidates:
         return False
-    if any(re.search(rx, text, re.I | re.M) for rx in expect.get("not", [])):
-        return False
-    if "lowest" in expect:
-        # Every candidate must be scored, or an incomplete reply could rank `lowest` last.
-        scores = weighted_scores(text)
-        low = expect["lowest"]
-        if low not in expect["candidates"] or any(c not in scores for c in expect["candidates"]):
+    for candidate in candidates:
+        if candidate not in scores:
             return False
-        return all(scores[low] < scores[c] for c in expect["candidates"] if c != low)
     return True
+
+
+def lowest_ranks_last(scores, candidates, low):
+    for candidate in candidates:
+        if candidate != low and scores[low] >= scores[candidate]:
+            return False
+    return True
+
+
+def case_passes(expect, text):
+    if reply_misses(expect.get("match", []), text):
+        return False
+    if reply_hits(expect.get("not", []), text):
+        return False
+    if "lowest" not in expect:
+        return True
+    scores = weighted_scores(text)
+    low = expect["lowest"]
+    candidates = expect["candidates"]
+    return scores_cover(scores, candidates, low) and lowest_ranks_last(scores, candidates, low)
 
 
 def reject(out, rid, why):
