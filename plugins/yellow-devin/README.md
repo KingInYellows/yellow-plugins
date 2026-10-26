@@ -32,7 +32,12 @@ plan-implement-review chains.
 - `DEVIN_ORG_ID` environment variable (organization ID)
 - `curl` and `jq` installed
 - Graphite CLI (`gt`) for branch management
-- github-workflow plugin (optional): under `READY_GITHUB`, stack operations run its `lib/github-stack-runtime.js` through this plugin's `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the active installed version (the newest cached one when that is unknown). Without it they report `RUNTIME_NOT_FOUND` and tell you to install it or run `/stack:select`.
+- github-workflow plugin (optional): under `READY_GITHUB`, stack operations run
+  its `lib/github-stack-runtime.js` through this plugin's
+  `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the
+  active installed version (the newest cached one when that is unknown). Without
+  it they report `RUNTIME_NOT_FOUND` and tell you to install it or run
+  `/stack:select`.
 
 ## Setup
 
@@ -71,16 +76,17 @@ If you previously used `DEVIN_API_TOKEN` with an `apk_` key:
 
 ## Commands
 
-| Command           | Description                                                                          |
-| ----------------- | ------------------------------------------------------------------------------------ |
-| `/devin:setup`    | Validate credentials and permissions (first install, token rotation, 401/403 errors) |
-| `/devin:delegate` | Create a session with task prompt, tags, ACU limit                                   |
-| `/devin:status`   | Check session status or list recent sessions                                         |
-| `/devin:message`  | Send follow-up message (auto-resumes suspended sessions)                             |
-| `/devin:cancel`   | Terminate a session (requires confirmation)                                          |
-| `/devin:wiki`     | Query DeepWiki/Devin Wiki about a repository                                         |
-| `/devin:archive`  | Archive a session (hides from default listing)                                       |
-| `/devin:tag`      | Add, remove, or list session tags                                                    |
+| Command             | Description                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `/devin:setup`      | Validate credentials and permissions (first install, token rotation, 401/403 errors) |
+| `/devin:delegate`   | Create a session with task prompt, tags, ACU limit                                   |
+| `/devin:status`     | Check session status or list recent sessions                                         |
+| `/devin:message`    | Send follow-up message (auto-resumes suspended sessions)                             |
+| `/devin:cancel`     | Terminate a session (requires confirmation)                                          |
+| `/devin:wiki`       | Query DeepWiki/Devin Wiki about a repository                                         |
+| `/devin:archive`    | Archive a session (hides from default listing)                                       |
+| `/devin:tag`        | Add, remove, or list session tags                                                    |
+| `/devin:review-prs` | Find Devin PRs for the current repo, review them, and remediate                      |
 
 ## Agents
 

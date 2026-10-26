@@ -512,8 +512,8 @@ pnpm test:contracts
 
 ## Additional Resources
 
-- [Main Contract Documentation](../docs/contracts/cli-contracts.md)
-- [Error Codes Reference](../docs/contracts/error-codes.md)
+- [Main Contract Documentation](../../docs/contracts/cli-contracts.md)
+- [Error Codes Reference](../../docs/contracts/error-codes.md)
 - [JSON Schema Specification](https://json-schema.org/draft-07/schema)
 - [AJV Documentation](https://ajv.js.org/)
 

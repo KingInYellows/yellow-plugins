@@ -15,7 +15,7 @@ observability. The work is organized into three approaches (A: quick wins, B:
 shared infrastructure, C: routing + observability) that can ship sequentially.
 
 Source brainstorm:
-[2026-04-17-claude-code-plugin-improvements-brainstorm.md](../docs/brainstorms/2026-04-17-claude-code-plugin-improvements-brainstorm.md)
+[2026-04-17-claude-code-plugin-improvements-brainstorm.md](../../docs/brainstorms/2026-04-17-claude-code-plugin-improvements-brainstorm.md)
 
 ---
 

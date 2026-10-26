@@ -6,8 +6,9 @@ Phase 4 wave, and approved local Phase 5 deliverables are complete. Base:
 `cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0`; detached and uncommitted.
 
 Final evidence:
-[integrated report](../docs/research/codex-phases-2-5-2026-10-06/report.md) and
-[acceptance audit](../docs/research/codex-phases-2-5-2026-10-06/acceptance-audit.json).
+[integrated report](../../docs/research/codex-phases-2-5-2026-10-06/report.md)
+and
+[acceptance audit](../../docs/research/codex-phases-2-5-2026-10-06/acceptance-audit.json).
 
 ## Decision
 
@@ -18,7 +19,7 @@ installed-runtime evidence, instead of enabling all 20 at once.
 The final Codex marketplace installs nine plugins exposing exactly 29 skills.
 The original Phase 1 inventory was four plugins / 23 skills. The evaluation and
 raw receipts are in
-[Codex compatibility evaluation](../docs/research/codex-evaluation-2026-10-04/evaluation.md).
+[Codex compatibility evaluation](../../docs/research/codex-evaluation-2026-10-04/evaluation.md).
 
 ## Boundaries
 
@@ -62,7 +63,7 @@ raw receipts are in
       plugin docs only after the runtime test establishes current behavior.
 
 Implementation evidence:
-[October 5 Phase 1 report](../docs/research/codex-phase-1-2026-10-05/report.md).
+[October 5 Phase 1 report](../../docs/research/codex-phase-1-2026-10-05/report.md).
 The pinned CLI is 0.157.0; Windows desktop 26.930.4958.0 was freshly inventoried
 separately (the earlier checkpoint was 26.930.3930.0). Desktop runtime behavior
 remains untested. The discovery gate found 26 loaded skills despite 23 selected

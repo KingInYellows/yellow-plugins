@@ -24,7 +24,7 @@ and internal development artifacts are archived out of the main branch.
 marketplace.
 
 **Brainstorm:**
-[2026-02-18-public-release-audit-brainstorm.md](../brainstorms/2026-02-18-public-release-audit-brainstorm.md)
+[2026-02-18-public-release-audit-brainstorm.md](../../docs/brainstorms/2026-02-18-public-release-audit-brainstorm.md)
 
 ## Problem Statement
 

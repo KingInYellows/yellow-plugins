@@ -306,8 +306,8 @@ their tools constrained pre-existing.
 - Source plan: `plans/model-selection-frontmatter-rollout.md` *(archived
   during plan-lifecycle cleanup; canonical tier rule and per-agent
   assignments migrated to the catalog below)*
-- Source brainstorm: [`docs/brainstorms/2026-05-08-research-integration-model-selection-context-optimization-brainstorm.md`](../docs/brainstorms/2026-05-08-research-integration-model-selection-context-optimization-brainstorm.md)
-- Subagent frontmatter catalog: [`docs/solutions/code-quality/subagent-frontmatter-field-catalog.md`](../docs/solutions/code-quality/subagent-frontmatter-field-catalog.md) (canonical source for `effort:` enum, including `xhigh` semantics)
-- Validator implementation: [`scripts/validate-agent-authoring.js`](../scripts/validate-agent-authoring.js) (V1-V4 rules from PR #477)
+- Source brainstorm: [`docs/brainstorms/2026-05-08-research-integration-model-selection-context-optimization-brainstorm.md`](../../docs/brainstorms/2026-05-08-research-integration-model-selection-context-optimization-brainstorm.md)
+- Subagent frontmatter catalog: [`docs/solutions/code-quality/subagent-frontmatter-field-catalog.md`](../../docs/solutions/code-quality/subagent-frontmatter-field-catalog.md) (canonical source for `effort:` enum, including `xhigh` semantics)
+- Validator implementation: [`scripts/validate-agent-authoring.js`](../../scripts/validate-agent-authoring.js) (V1-V4 rules from PR #477)
 - M-A-01 through M-A-04 PRs (merged or in flight): #467, #469, #470, #471, #477
 - PR #471 review surfaced these gaps — see review-all run summary

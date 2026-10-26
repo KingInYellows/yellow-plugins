@@ -664,12 +664,12 @@ Follow yellow-devin's pattern exactly:
 
 ## References
 
-- [Brainstorm](../docs/brainstorms/2026-03-03-yellow-semgrep-plugin-implementation-brainstorm.md)
-- [Research](../docs/research/semgrep-to-fix-fixer-claude-code-plugin-mcp.md)
-- [Solution Doc](../docs/solutions/integration-issues/semgrep-mcp-appsec-plugin-architecture.md)
-- [Plugin Template](../docs/plugin-template.md)
-- [MCP Tool Naming Patterns](../docs/solutions/integration-issues/mcp-bundled-server-tool-naming-and-plugin-authoring-patterns.md)
-- [Shell Security Patterns](../docs/solutions/code-quality/yellow-ci-shell-security-patterns.md)
-- [AGENTS.md](../AGENTS.md) — Content fencing, credential handling, tool naming
+- [Brainstorm](../../docs/brainstorms/2026-03-03-yellow-semgrep-plugin-implementation-brainstorm.md)
+- [Research](../../docs/research/semgrep-to-fix-fixer-claude-code-plugin-mcp.md)
+- [Solution Doc](../../docs/solutions/integration-issues/semgrep-mcp-appsec-plugin-architecture.md)
+- [Plugin Template](../../docs/plugin-template.md)
+- [MCP Tool Naming Patterns](../../docs/solutions/integration-issues/mcp-bundled-server-tool-naming-and-plugin-authoring-patterns.md)
+- [Shell Security Patterns](../../docs/solutions/code-quality/yellow-ci-shell-security-patterns.md)
+- [AGENTS.md](../../AGENTS.md) — Content fencing, credential handling, tool naming
 - [Semgrep API Docs](https://semgrep.dev/api/v1/docs/)
 - Reference plugin: `plugins/yellow-devin/` (convention-mirroring source)

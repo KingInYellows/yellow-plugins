@@ -6,7 +6,7 @@
 > ("do not run ultrareview," "do not merge," baseline SHAs, "when this
 > task was authored") describe that session, not an ongoing policy. The
 > durable design source this brief implements is
-> [`plans/stacked-pr-provider-abstraction.md`](../stacked-pr-provider-abstraction.md).
+> [`plans/stacked-pr-provider-abstraction.md`](stacked-pr-provider-abstraction.md).
 > Content below is otherwise unedited from the original.
 
 # Objective

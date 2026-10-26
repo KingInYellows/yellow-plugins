@@ -45,7 +45,7 @@ polluting real state.
 ## Usage
 
 ```bash
-pnpm smoke:install                       # T0 validate + T1 install, all 19 plugins
+pnpm smoke:install                       # T0 validate + T1 install, every marketplace plugin
 pnpm smoke:install -- --help             # options
 pnpm smoke:install -- --dry-run          # print the plan; no claude, no temp dirs
 pnpm smoke:install -- --plugin yellow-core   # one plugin only
@@ -239,10 +239,9 @@ in the same order as setup: `~/.graphite_user_config`,
 `$XDG_CONFIG_HOME/graphite/user_config` (defaulting to `~/.config`), then
 `~/.config/graphite/user_config`. The selected file is mounted at its matching
 sandbox location without reading or copying its contents; symlinks are refused.
-It retains classified account/access status,
-excludes credentials/account identity/raw diagnostics, and verifies unchanged
-owner metadata. No mutation MCP tool runs. Account proof does not replace MCP
-registration or startup evidence.
+It retains classified account/access status, excludes credentials/account
+identity/raw diagnostics, and verifies unchanged owner metadata. No mutation MCP
+tool runs. Account proof does not replace MCP registration or startup evidence.
 
 See [Phase 1 report](research/codex-phase-1-2026-10-05/report.md) for real-model
 success, the missing-code-host fixture failure, separate account proof and

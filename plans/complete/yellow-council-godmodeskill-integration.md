@@ -712,24 +712,24 @@ The brainstorm listed 7 open questions. Research outcomes:
 ## References
 
 ### Plan and Brainstorm
-- [GodModeSkill Integration Brainstorm (2026-05-03)](../docs/brainstorms/2026-05-03-godmodeskill-integration-brainstorm.md)
+- [GodModeSkill Integration Brainstorm (2026-05-03)](../../docs/brainstorms/2026-05-03-godmodeskill-integration-brainstorm.md)
 - [GodModeSkill Integration Investigation](../research/GodModeSkill%20Integration%20Investigation.md)
 
 ### Repository Patterns to Mirror
-- [yellow-codex plugin manifest](../plugins/yellow-codex/.claude-plugin/plugin.json)
-- [yellow-codex package.json](../plugins/yellow-codex/package.json)
-- [yellow-codex CHANGELOG.md](../plugins/yellow-codex/CHANGELOG.md)
-- [yellow-codex CLAUDE.md](../plugins/yellow-codex/CLAUDE.md)
-- [codex-reviewer agent (binary check, timeout, redaction precedent)](../plugins/yellow-codex/agents/review/codex-reviewer.md)
-- [codex-patterns SKILL (8-pattern awk redaction, exit code catalog)](../plugins/yellow-codex/skills/codex-patterns/SKILL.md)
-- [Plugin schema](../schemas/plugin.schema.json)
-- [Marketplace JSON](../.claude-plugin/marketplace.json)
-- [W1.5 agent allowlist](../scripts/validate-agent-authoring.js)
-- [pr-review-workflow SKILL (cross-plugin Task spawn pattern)](../plugins/yellow-review/skills/pr-review-workflow/SKILL.md)
-- [yellow-core work.md (graceful-skip prose)](../plugins/yellow-core/commands/workflows/work.md)
-- [brainstorm-orchestrator (slug + collision + AskUserQuestion gate precedent)](../plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md)
-- [yellow-research deep.md (slug pattern)](../plugins/yellow-research/commands/research/deep.md)
-- [audit-synthesizer (sha256 fallback for empty slug)](../plugins/yellow-debt/agents/synthesis/audit-synthesizer.md)
+- [yellow-codex plugin manifest](../../plugins/yellow-codex/.claude-plugin/plugin.json)
+- [yellow-codex package.json](../../plugins/yellow-codex/package.json)
+- [yellow-codex CHANGELOG.md](../../plugins/yellow-codex/CHANGELOG.md)
+- [yellow-codex CLAUDE.md](../../plugins/yellow-codex/CLAUDE.md)
+- [codex-reviewer agent (binary check, timeout, redaction precedent)](../../plugins/yellow-codex/agents/review/codex-reviewer.md)
+- [codex-patterns SKILL (8-pattern awk redaction, exit code catalog)](../../plugins/yellow-codex/skills/codex-patterns/SKILL.md)
+- [Plugin schema](../../schemas/plugin.schema.json)
+- [Marketplace JSON](../../.claude-plugin/marketplace.json)
+- [W1.5 agent allowlist](../../scripts/validate-agent-authoring.js)
+- [pr-review-workflow SKILL (cross-plugin Task spawn pattern)](../../plugins/yellow-review/skills/pr-review-workflow/SKILL.md)
+- [yellow-core work.md (graceful-skip prose)](../../plugins/yellow-core/commands/flow/work.md)
+- [brainstorm-orchestrator (slug + collision + AskUserQuestion gate precedent)](../../plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md)
+- [yellow-research deep.md (slug pattern)](../../plugins/yellow-research/commands/research/deep.md)
+- [audit-synthesizer (sha256 fallback for empty slug)](../../plugins/yellow-debt/agents/synthesis/audit-synthesizer.md)
 
 ### External Documentation
 - [GodModeSkill repo (commit b693d1d)](https://github.com/99xAgency/GodModeSkill/tree/b693d1da498cbcfc2e5cba1f85b3d341205bfeb0)
