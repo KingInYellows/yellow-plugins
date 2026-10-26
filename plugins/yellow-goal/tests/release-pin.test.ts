@@ -66,29 +66,29 @@ describe('released engine pin provenance', () => {
     );
   });
 
-  it('names the released goal-gen 0.3.0 asset and nothing newer', () => {
-    expect(PINNED_ENGINE_VERSION).toBe('0.3.0');
-    expect(PINNED_ENGINE_TAG).toBe('v0.3.0');
+  it('names the released goal-gen 0.4.0 asset and nothing newer', () => {
+    expect(PINNED_ENGINE_VERSION).toBe('0.4.0');
+    expect(PINNED_ENGINE_TAG).toBe('v0.4.0');
     expect(PINNED_ENGINE_COMMIT).toBe(
-      '2f336d548523f795fef95f43fb03d751c2d65b80'
+      '63647f18cec3e1b1a7e8480914ec2efbff60b3c9'
     );
-    expect(PINNED_ENGINE_ASSET_NAME).toBe('goal-gen-0.3.0.tgz');
+    expect(PINNED_ENGINE_ASSET_NAME).toBe('goal-gen-0.4.0.tgz');
     expect(PINNED_ENGINE_ASSET_URL).toBe(
-      'https://github.com/KingInYellows/yellow-goal/releases/download/v0.3.0/goal-gen-0.3.0.tgz'
+      'https://github.com/KingInYellows/yellow-goal/releases/download/v0.4.0/goal-gen-0.4.0.tgz'
     );
     expect(PINNED_ENGINE_ASSET_SHA256).toBe(
-      '16e9d4b84f8b771ca1c368c886da70ef0d29c5e2af5ba68a51094c20f0a5db23'
+      'e95639e3fcd9943d2ad996508f75d9012da71346699dbf0970fcac956db4ba78'
     );
-    expect(shellConstant('PINNED_ENGINE_VERSION')).toBe('0.3.0');
-    expect(shellConstant('PINNED_ENGINE_TAG')).toBe('v0.3.0');
+    expect(shellConstant('PINNED_ENGINE_VERSION')).toBe('0.4.0');
+    expect(shellConstant('PINNED_ENGINE_TAG')).toBe('v0.4.0');
     expect(shellConstant('PINNED_ENGINE_COMMIT')).toBe(
-      '2f336d548523f795fef95f43fb03d751c2d65b80'
+      '63647f18cec3e1b1a7e8480914ec2efbff60b3c9'
     );
     expect(shellConstant('PINNED_ENGINE_ASSET_URL')).toBe(
-      'https://github.com/KingInYellows/yellow-goal/releases/download/v0.3.0/goal-gen-0.3.0.tgz'
+      'https://github.com/KingInYellows/yellow-goal/releases/download/v0.4.0/goal-gen-0.4.0.tgz'
     );
     expect(shellConstant('PINNED_ENGINE_ASSET_SHA256')).toBe(
-      '16e9d4b84f8b771ca1c368c886da70ef0d29c5e2af5ba68a51094c20f0a5db23'
+      'e95639e3fcd9943d2ad996508f75d9012da71346699dbf0970fcac956db4ba78'
     );
   });
 

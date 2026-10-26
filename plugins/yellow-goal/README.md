@@ -13,12 +13,12 @@ process**.
 ```
 
 Put a pinned `goal-gen` binary on PATH (GitHub Release tarball
-`goal-gen-0.3.0.tgz` from annotated tag `v0.3.0`; URL and SHA-256 in
+`goal-gen-0.4.0.tgz` from annotated tag `v0.4.0`; URL and SHA-256 in
 `src/pin.ts`), then run `/goal:setup`.
 
 ## Commands
 
-- `/goal:setup` — probe `goal-gen version --json` against pin `0.3.0`
+- `/goal:setup` — probe `goal-gen version --json` against pin `0.4.0`
 - `/goal:request` — `request create` / `request validate`
 - `/goal:run-stub` — one deterministic, zero-spend Provider Protocol v2 stub
   scenario (`success`, `failed`, `budget-exhausted`, `await-cancel`) through the

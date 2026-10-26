@@ -153,7 +153,7 @@ async function handleVersion() {
   installIgnoreSigterm();
   maybeSelfSignal();
   await maybeCancellableDelay('FAKE_PROVIDER_VERSION_DELAY_MS');
-  const version = process.env.FAKE_PROVIDER_VERSION || '0.3.0';
+  const version = process.env.FAKE_PROVIDER_VERSION || '0.4.0';
   const mode = process.env.FAKE_PROVIDER_VERSION_MODE || 'ok';
   if (mode === 'empty') process.exit(1);
   if (mode === 'usage-error') {
@@ -277,7 +277,7 @@ async function handleCapabilities() {
   installIgnoreSigterm();
   maybeSelfSignal();
   await maybeCancellableDelay('FAKE_PROVIDER_CAPABILITIES_DELAY_MS');
-  const version = process.env.FAKE_PROVIDER_VERSION || '0.3.0';
+  const version = process.env.FAKE_PROVIDER_VERSION || '0.4.0';
   const mode = process.env.FAKE_PROVIDER_CAPABILITIES_MODE || 'ok';
   if (mode === 'empty') process.exit(1);
   if (mode === 'usage-error') {
@@ -385,7 +385,7 @@ function writeBundleRecord(name, value) {
 
 async function handleManifest() {
   captureInvocation();
-  const version = process.env.FAKE_PROVIDER_VERSION || '0.3.0';
+  const version = process.env.FAKE_PROVIDER_VERSION || '0.4.0';
   const body = {
     manifest: {
       schemaVersion: 'yellow-goal/run-manifest/v1',

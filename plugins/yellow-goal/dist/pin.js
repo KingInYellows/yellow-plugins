@@ -11,12 +11,12 @@ exports.PINNED_ENGINE_ASSET_SHA256 = exports.PINNED_ENGINE_ASSET_URL = exports.P
  *
  * `scripts/verify-goal-release.sh` and `tests/release-pin.test.ts` keep the
  * shell-side download/hash gate in agreement with these constants. This pin
- * is the already-published v0.3.0 asset (annotated tag peeled at
- * 2f336d548523f795fef95f43fb03d751c2d65b80). It is not a newer main commit.
+ * is the already-published v0.4.0 asset (annotated tag peeled at
+ * 63647f18cec3e1b1a7e8480914ec2efbff60b3c9). It is not a newer main commit.
  */
-exports.PINNED_ENGINE_VERSION = '0.3.0';
-exports.PINNED_ENGINE_TAG = 'v0.3.0';
-exports.PINNED_ENGINE_COMMIT = '2f336d548523f795fef95f43fb03d751c2d65b80';
-exports.PINNED_ENGINE_ASSET_NAME = 'goal-gen-0.3.0.tgz';
-exports.PINNED_ENGINE_ASSET_URL = 'https://github.com/KingInYellows/yellow-goal/releases/download/v0.3.0/goal-gen-0.3.0.tgz';
-exports.PINNED_ENGINE_ASSET_SHA256 = '16e9d4b84f8b771ca1c368c886da70ef0d29c5e2af5ba68a51094c20f0a5db23';
+exports.PINNED_ENGINE_VERSION = '0.4.0';
+exports.PINNED_ENGINE_TAG = 'v0.4.0';
+exports.PINNED_ENGINE_COMMIT = '63647f18cec3e1b1a7e8480914ec2efbff60b3c9';
+exports.PINNED_ENGINE_ASSET_NAME = 'goal-gen-0.4.0.tgz';
+exports.PINNED_ENGINE_ASSET_URL = 'https://github.com/KingInYellows/yellow-goal/releases/download/v0.4.0/goal-gen-0.4.0.tgz';
+exports.PINNED_ENGINE_ASSET_SHA256 = 'e95639e3fcd9943d2ad996508f75d9012da71346699dbf0970fcac956db4ba78';

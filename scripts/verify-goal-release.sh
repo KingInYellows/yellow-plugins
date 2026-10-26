@@ -7,11 +7,11 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 : "${TMPDIR:?Set TMPDIR to the isolated runtime directory}"
 
-PINNED_ENGINE_VERSION="0.3.0"
-PINNED_ENGINE_TAG="v0.3.0"
-PINNED_ENGINE_COMMIT="2f336d548523f795fef95f43fb03d751c2d65b80"
-PINNED_ENGINE_ASSET_URL="https://github.com/KingInYellows/yellow-goal/releases/download/v0.3.0/goal-gen-0.3.0.tgz"
-PINNED_ENGINE_ASSET_SHA256="16e9d4b84f8b771ca1c368c886da70ef0d29c5e2af5ba68a51094c20f0a5db23"
+PINNED_ENGINE_VERSION="0.4.0"
+PINNED_ENGINE_TAG="v0.4.0"
+PINNED_ENGINE_COMMIT="63647f18cec3e1b1a7e8480914ec2efbff60b3c9"
+PINNED_ENGINE_ASSET_URL="https://github.com/KingInYellows/yellow-goal/releases/download/v0.4.0/goal-gen-0.4.0.tgz"
+PINNED_ENGINE_ASSET_SHA256="e95639e3fcd9943d2ad996508f75d9012da71346699dbf0970fcac956db4ba78"
 
 case "$PINNED_ENGINE_ASSET_URL" in
   *"/releases/download/${PINNED_ENGINE_TAG}/goal-gen-${PINNED_ENGINE_VERSION}.tgz") ;;
