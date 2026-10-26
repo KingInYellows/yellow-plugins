@@ -9,7 +9,7 @@ second source of truth.
 
 ## Process contract
 
-- Pin: `0.3.0` in `src/pin.ts` (annotated tag `v0.3.0`, public Release asset URL
+- Pin: `0.4.0` in `src/pin.ts` (annotated tag `v0.4.0`, public Release asset URL
   and SHA-256 live there too). `/goal:setup` fail-closes on missing binary
   (`GOAL_ENGINE_MISSING`) or `engineVersion` mismatch
   (`GOAL_ENGINE_VERSION_MISMATCH`). `tests/release-pin.test.ts` keeps
@@ -64,7 +64,7 @@ test-only preload (`tests/fixtures/fake-engine.mjs`), so no shell fixture or
 ambient engine is needed. Do not point tests at a product clone.
 
 The blocking `Released Goal Engine Compatibility` CI job downloads the public
-GitHub Release `v0.3.0` tarball, verifies its SHA-256 before installing it into
+GitHub Release `v0.4.0` tarball, verifies its SHA-256 before installing it into
 a temporary consumer with lifecycle scripts ignored, and verifies version, the
 `capabilities --json --protocol v2` handshake, create/validate, usage errors, schema
 rejection, and incompatible identity, then `tests/release-protocol-smoke.mjs`

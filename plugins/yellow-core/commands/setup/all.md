@@ -202,7 +202,7 @@ fi
 command -v agy >/dev/null 2>&1 && printf 'agy:                OK (%s)\n' "$(agy --version 2>&1 | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)" || printf 'agy:                NOT FOUND\n'
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
 command -v claude >/dev/null 2>&1 && printf 'claude:             OK (%s)\n' "$(claude --version 2>/dev/null | head -n1)" || printf 'claude:             NOT FOUND\n'
-# yellow-goal pins goal-gen engineVersion 0.3.0 (/goal:setup is authoritative).
+# yellow-goal pins goal-gen engineVersion 0.4.0 (/goal:setup is authoritative).
 # Same binary and output contract as src/spawn.ts and src/runtime.ts: honor
 # GOAL_GEN_BIN, require exit 0, empty stderr and exactly one JSON stdout line.
 _gg_bin=${GOAL_GEN_BIN:-goal-gen}
@@ -955,14 +955,14 @@ checks it.
 **yellow-goal:**
 
 Classify from Step 1's `goal-gen` row (`$GOAL_GEN_BIN` or `goal-gen`,
-`version --json`); the pin is `0.3.0` (`plugins/yellow-goal/src/pin.ts`) and `/goal:setup` is
+`version --json`); the pin is `0.4.0` (`plugins/yellow-goal/src/pin.ts`) and `/goal:setup` is
 authoritative.
 
-- READY: `goal-gen` OK with version `0.3.0` AND `yellow-core` installed AND
+- READY: `goal-gen` OK with version `0.4.0` AND `yellow-core` installed AND
   `node2222_lt25_check` ok (engines pin `>=22.22.0 <25.0.0`)
 - PARTIAL: never — missing binary or version mismatch is fail-closed
 - NEEDS SETUP: `goal-gen` NOT FOUND (`GOAL_ENGINE_MISSING`), a version other
-  than `0.3.0` (`GOAL_ENGINE_VERSION_MISMATCH`), `UNPARSEABLE`
+  than `0.4.0` (`GOAL_ENGINE_VERSION_MISMATCH`), `UNPARSEABLE`
   (`GOAL_ENGINE_UNPARSEABLE`), `yellow-core` NOT INSTALLED (required
   dependency), or `node2222_lt25_check` not ok
 
