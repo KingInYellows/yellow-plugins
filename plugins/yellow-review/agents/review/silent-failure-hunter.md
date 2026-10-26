@@ -2,6 +2,7 @@
 name: silent-failure-hunter
 description: "Conditional code-review persona, selected when the diff contains try-catch blocks, error handling, fallback logic, or any code that could suppress errors. Ensures failures are visible and actionable."
 model: sonnet
+effort: medium
 background: true
 memory: project
 tools:

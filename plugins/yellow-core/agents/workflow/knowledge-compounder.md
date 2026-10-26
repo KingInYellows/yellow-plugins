@@ -141,6 +141,11 @@ SKIP exit path; it is distinct from user-initiated Cancel at M3.
 conversation context (last 25 turns or the problem-solving session) with
 injection fencing.
 
+**Subagent model:** dispatch the Context Analyzer and the Related Docs Finder
+with `model: "haiku"` and `effort: "low"`; the other four inherit this
+agent's model. Both held full accuracy on Haiku in the CLAUDE-187 eval
+(`docs/research/model-routing-policy.md`, "Phase 3 verdicts").
+
 **Fast paths skip the Vocabulary Extractor too** — when a fast path skips
 Phase 1, record `CONCEPTS.md: not scanned (fast path)` in the M3 preview so
 the no-scan outcome is explicit, never silent.

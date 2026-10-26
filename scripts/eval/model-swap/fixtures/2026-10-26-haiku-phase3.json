@@ -1,0 +1,677 @@
+{
+ "$comment": "CLAUDE-187 Phase 3 eval, run 2026-10-26. Replays plant agent-native and CLI-readiness defects for the Opus -> Sonnet reviewer check. Scans plant one duplicated block and one AI-pattern block per file set for the Sonnet -> Haiku scanner check; a finding counts when its start line falls within 3 lines of a planted region (or of the original a duplicate copies). Prompt cases feed knowledge-compounder extractor stand-ins real solution docs from `prompt_commit` (so the finder can locate them and the fixtures are not in the tree), plus two novel problems, and give the /optimize judge three candidates where B has a planted substantive flaw.",
+ "prompt_commit": "31d1fb8",
+ "configs": {
+  "opus_to_sonnet": [
+   {
+    "model": "opus",
+    "effort": "high",
+    "reps": 2
+   },
+   {
+    "model": "sonnet",
+    "effort": "high",
+    "reps": 2
+   },
+   {
+    "model": "sonnet",
+    "effort": "medium",
+    "reps": 2
+   }
+  ],
+  "scanner": [
+   {
+    "model": "sonnet",
+    "effort": "low",
+    "reps": 2
+   },
+   {
+    "model": "haiku",
+    "effort": "low",
+    "reps": 2
+   }
+  ],
+  "extractor": [
+   {
+    "model": "sonnet",
+    "effort": "medium",
+    "reps": 2
+   },
+   {
+    "model": "haiku",
+    "effort": "low",
+    "reps": 2
+   },
+   {
+    "model": "haiku",
+    "effort": "medium",
+    "reps": 1
+   }
+  ],
+  "judge": [
+   {
+    "model": "opus",
+    "effort": "medium",
+    "reps": 1
+   },
+   {
+    "model": "sonnet",
+    "effort": "medium",
+    "reps": 2
+   },
+   {
+    "model": "haiku",
+    "effort": "medium",
+    "reps": 2
+   }
+  ]
+ },
+ "agents": {
+  "ane": {
+   "file": "plugins/yellow-review/agents/review/agent-native-reviewer.md",
+   "kind": "replay",
+   "configs": "opus_to_sonnet",
+   "lane": "agent-native",
+   "output": "json",
+   "replays": [
+    "pr1253",
+    "pr1319",
+    "pr1323"
+   ]
+  },
+  "acr": {
+   "file": "plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md",
+   "kind": "replay",
+   "configs": "opus_to_sonnet",
+   "lane": "cli",
+   "output": "json"
+  },
+  "dup": {
+   "file": "plugins/yellow-debt/agents/scanners/duplication-scanner.md",
+   "kind": "scan",
+   "configs": "scanner",
+   "lane": "duplication",
+   "preload_skills": [
+    "plugins/yellow-debt/skills/debt-conventions/SKILL.md"
+   ],
+   "golden": {
+    "planted": true
+   }
+  },
+  "aip": {
+   "file": "plugins/yellow-debt/agents/scanners/ai-pattern-scanner.md",
+   "kind": "scan",
+   "configs": "scanner",
+   "lane": "ai-pattern",
+   "preload_skills": [
+    "plugins/yellow-debt/skills/debt-conventions/SKILL.md"
+   ],
+   "golden": {
+    "planted": true
+   }
+  },
+  "kca": {
+   "file": "scripts/eval/model-swap/fixtures/2026-10-26-phase3/context-analyzer.md",
+   "kind": "prompt",
+   "configs": "extractor",
+   "prompt": "Process the conversation context below per your instructions and reply in the required format.\n\n{context}\n",
+   "expect": {
+    "doc01": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc02": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc03": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc04": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc05": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc06": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc07": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc08": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc09": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc10": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc11": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    },
+    "doc12": {
+     "match": [
+      "^PROBLEM_TYPE:\\s*\\S",
+      "^SYMPTOMS:\\s*\\S",
+      "^ROUTING_HINT:\\s*`?(DOC_ONLY|BOTH)`?\\s*$"
+     ]
+    }
+   }
+  },
+  "kcc": {
+   "file": "scripts/eval/model-swap/fixtures/2026-10-26-phase3/category-classifier.md",
+   "kind": "prompt",
+   "configs": "extractor",
+   "prompt": "Process the conversation context below per your instructions and reply in the required format.\n\n{context}\n",
+   "expect": {
+    "doc01": {
+     "match": [
+      "^CATEGORY:\\s*`?build-errors`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc02": {
+     "match": [
+      "^CATEGORY:\\s*`?build-errors`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc03": {
+     "match": [
+      "^CATEGORY:\\s*`?code-quality`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc04": {
+     "match": [
+      "^CATEGORY:\\s*`?code-quality`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc05": {
+     "match": [
+      "^CATEGORY:\\s*`?integration-issues`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc06": {
+     "match": [
+      "^CATEGORY:\\s*`?integration-issues`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc07": {
+     "match": [
+      "^CATEGORY:\\s*`?logic-errors`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc08": {
+     "match": [
+      "^CATEGORY:\\s*`?logic-errors`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc09": {
+     "match": [
+      "^CATEGORY:\\s*`?security-issues`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc10": {
+     "match": [
+      "^CATEGORY:\\s*`?security-issues`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc11": {
+     "match": [
+      "^CATEGORY:\\s*`?workflow`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    },
+    "doc12": {
+     "match": [
+      "^CATEGORY:\\s*`?workflow`?\\s*$",
+      "^SLUG:\\s*`?[a-z0-9]+(-[a-z0-9]+)*`?\\s*$"
+     ]
+    }
+   }
+  },
+  "kdf": {
+   "file": "scripts/eval/model-swap/fixtures/2026-10-26-phase3/related-docs-finder.md",
+   "kind": "prompt",
+   "configs": "extractor",
+   "prompt": "Process the conversation context below per your instructions and reply in the required format.\n\n{context}\n",
+   "expect": {
+    "doc01": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/build-errors/ajv-cli-v8-strict-mode-unknown-format\\.md"
+     ]
+    },
+    "doc02": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/build-errors/validate-agent-authoring-changelog-skip\\.md"
+     ]
+    },
+    "doc03": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/code-quality/jq-select-filter-over-first-empty-for-jsonl\\.md"
+     ]
+    },
+    "doc04": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/code-quality/mcp-tool-rename-prefix-collision\\.md"
+     ]
+    },
+    "doc05": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/integration-issues/ruvector-cursor-pretooluse-empty-stdout\\.md"
+     ]
+    },
+    "doc06": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/integration-issues/merge-queue-closed-pr-null-mergedat-detection\\.md"
+     ]
+    },
+    "doc07": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/logic-errors/bash-pipe-head-exit-code-masking\\.md"
+     ]
+    },
+    "doc08": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/logic-errors/git-diff-name-status-nul-safe-parsing\\.md"
+     ]
+    },
+    "doc09": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/security-issues/substring-regex-command-denylist-evasion\\.md"
+     ]
+    },
+    "doc10": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/security-issues/docs-snippet-path-traversal-and-lex-sort\\.md"
+     ]
+    },
+    "doc11": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/workflow/graphite-api-outage-fallback\\.md"
+     ]
+    },
+    "doc12": {
+     "match": [
+      "AMEND_EXISTING:\\s*`?docs/solutions/workflow/gt-sync-exit-128-stale-index-lock\\.md"
+     ]
+    },
+    "novel1": {
+     "match": [
+      "^\\W*NO_MATCH\\W*$"
+     ],
+     "not": [
+      "AMEND_EXISTING"
+     ]
+    },
+    "novel2": {
+     "match": [
+      "^\\W*NO_MATCH\\W*$"
+     ],
+     "not": [
+      "AMEND_EXISTING"
+     ]
+    }
+   }
+  },
+  "jdg": {
+   "file": "scripts/eval/model-swap/fixtures/2026-10-26-phase3/optimize-judge.md",
+   "kind": "prompt",
+   "configs": "judge",
+   "fence": false,
+   "prompt": "{context}",
+   "expect": {
+    "judge-sh-fwd": {
+     "lowest": "B"
+    },
+    "judge-sh-rev": {
+     "lowest": "B"
+    },
+    "judge-commit-fwd": {
+     "lowest": "B"
+    },
+    "judge-commit-rev": {
+     "lowest": "B"
+    },
+    "judge-errmsg-fwd": {
+     "lowest": "B"
+    },
+    "judge-errmsg-rev": {
+     "lowest": "B"
+    }
+   }
+  }
+ },
+ "replays": [
+  {
+   "id": "pr1319",
+   "commit": "3c0cd62",
+   "plants": [
+    {
+     "lane": "cli",
+     "file": "plugins/yellow-core/commands/setup/all.md",
+     "old": "    printf 'gt_mcp_check:       too_old (%s < 1.6.7)\\n' \"$_gt_ver\"\n",
+     "new": "    printf 'gt_mcp_check:       too_old (%s < 1.6.7)\\n' \"$_gt_ver\"\n    read -r -p 'gt is too old for the Graphite MCP server. Upgrade it now? [y/N] ' _gt_upgrade\n    [ \"$_gt_upgrade\" = y ] && npm install -g @withgraphite/graphite-cli@stable\n",
+     "match": [
+      "setup/all\\.md",
+      "read|interactiv|prompt|stdin|tty|hang|block|confirm|--yes|non-interactive"
+     ]
+    },
+    {
+     "lane": "agent-native",
+     "file": "plugins/yellow-core/commands/setup/all.md",
+     "old": "  `gh extension remove stack`, then `gh extension install github/gh-stack`\"\n",
+     "new": "  `gh extension remove stack`, then `gh extension install github/gh-stack`\".\n  Then stop and ask the user to open https://github.com/settings/extensions in\n  a browser and tell you which owner the extension has; do not check the owner\n  from the shell.\n",
+     "match": [
+      "setup/all\\.md",
+      "browser|manual|gh extension list|shell|parity|ask(s|ing)? the user|human"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pr1323",
+   "commit": "1fbd615",
+   "plants": [
+    {
+     "lane": "cli",
+     "file": "plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes",
+     "old": "die() { printf '[commit-resolve-fixes] Error: %s\\n' \"$2\" >&2; exit \"$1\"; }",
+     "new": "die() { printf '[commit-resolve-fixes] Error: %s\\n' \"$2\"; exit 0; }",
+     "match": [
+      "commit-resolve-fixes",
+      "exit 0|exit code|exit status|stdout|stderr|success"
+     ]
+    },
+    {
+     "lane": "agent-native",
+     "file": "plugins/yellow-review/commands/review/setup.md",
+     "old": "printf '=== Prerequisites ===\\n'\n",
+     "new": "# Do not run this block yourself: print it, ask the user to run it in their\n# own terminal, and wait for them to paste the output back.\nprintf '=== Prerequisites ===\\n'\n",
+     "match": [
+      "review/setup\\.md",
+      "paste|terminal|yourself|run it|parity|manual|user to run|human|ask(s|ing)? the user"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pr1320",
+   "commit": "f89a1e9",
+   "plants": [
+    {
+     "lane": "cli",
+     "file": "plugins/yellow-core/lib/statusline-settings.py",
+     "old": "    result = new_result(args.settings)\n    runners = {",
+     "new": "    result = new_result(args.settings)\n    if args.command in (\"install\", \"remove\") and not args.dry_run:\n        if input(\"Write %s? [y/N] \" % args.settings).strip().lower() != \"y\":\n            return 0\n    runners = {",
+     "match": [
+      "statusline-settings\\.py",
+      "input|interactiv|prompt|stdin|tty|hang|block|confirm|--yes|non-interactive"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "pr1253",
+   "commit": "a767c16a",
+   "plants": [
+    {
+     "lane": "agent-native",
+     "file": "plugins/yellow-codex/agents/review/codex-reviewer.md",
+     "old": "tools:\n  - Bash\n  - Read\n",
+     "new": "tools:\n  - Read\n",
+     "match": [
+      "codex-reviewer",
+      "Bash"
+     ]
+    },
+    {
+     "lane": "cli",
+     "file": "plugins/yellow-codex/agents/review/codex-reviewer.md",
+     "old": "  -c 'approval_policy=\"never\"' \\\n  -c 'sandbox_mode=\"read-only\"' \\\n",
+     "new": "  -c 'approval_policy=\"on-request\"' \\\n  -c 'sandbox_mode=\"read-only\"' \\\n",
+     "match": [
+      "codex-reviewer",
+      "approval|on-request|interactiv|hang|block|prompt"
+     ]
+    }
+   ]
+  }
+ ],
+ "scans": [
+  {
+   "id": "A",
+   "commit": "36365b8",
+   "files": [
+    "plugins/yellow-core/lib/stack-tooling-probe.js",
+    "plugins/yellow-core/lib/remote-agent-provider-state.js",
+    "plugins/yellow-core/lib/stack-operation-registry.js",
+    "plugins/yellow-core/lib/run-github-stack-runtime.js"
+   ],
+   "plants": [
+    {
+     "lane": "duplication",
+     "file": "plugins/yellow-core/lib/stack-operation-registry.js",
+     "old": "\nmodule.exports = {\n",
+     "new": "\nfunction getRegisteredOperation(opName, provider) {\n  const found = OPERATIONS[opName];\n  if (!found) {\n    throw new Error(`stack-operation-registry: unknown operation \"${opName}\"`);\n  }\n  if (!PROVIDER_IDS.includes(provider)) {\n    throw new Error(`stack-operation-registry: unknown provider \"${provider}\"`);\n  }\n  const impl = found[provider];\n  if (impl === null || impl === undefined) {\n    return null;\n  }\n  return impl;\n}\n\nfunction getRegisteredPrimitive(primName, provider) {\n  const found = PRIMITIVES[primName];\n  if (!found) {\n    throw new Error(`stack-operation-registry: unknown primitive \"${primName}\"`);\n  }\n  if (!PROVIDER_IDS.includes(provider)) {\n    throw new Error(`stack-operation-registry: unknown provider \"${provider}\"`);\n  }\n  const impl = found[provider];\n  if (impl === null || impl === undefined) {\n    return null;\n  }\n  return impl;\n}\n\nmodule.exports = {\n"
+    },
+    {
+     "lane": "ai-pattern",
+     "file": "plugins/yellow-core/lib/stack-operation-registry.js",
+     "old": "/** True when an entry represents a real, supported implementation. */\n",
+     "new": "/**\n * This function filters the data.\n * @param {any} data - The data.\n * @returns {any} The result.\n */\nfunction processData(data) {\n  // Initialize the result variable\n  let result = [];\n  // Loop through each item in the data\n  for (const item of data) {\n    // Check if the item is valid\n    if (item) {\n      // Add the item to the result\n      result.push(item);\n    }\n  }\n  // Return the result\n  return result;\n}\n\n/** True when an entry represents a real, supported implementation. */\n"
+    }
+   ]
+  },
+  {
+   "id": "B",
+   "commit": "36365b8",
+   "files": [
+    "plugins/yellow-core/lib/context-observer.py",
+    "plugins/yellow-core/lib/statusline-settings.py"
+   ],
+   "plants": [
+    {
+     "lane": "duplication",
+     "file": "plugins/yellow-core/lib/statusline-settings.py",
+     "old": "\n\ndef nonneg_days(value):\n",
+     "new": "\n\ndef carry_advisory(prior, pct, threshold):\n    \"\"\"Carry the advisory block forward from the prior record.\"\"\"\n    old = prior.get(\"advisory\") if isinstance(prior, dict) else None\n    if not isinstance(old, dict):\n        old = {}\n    old_state = old.get(\"last_state\")\n    if old_state not in (\"above\", \"below\"):\n        old_state = \"unknown\"\n    old_count = old.get(\"crossings\")\n    if isinstance(old_count, bool) or not isinstance(old_count, int) or old_count < 0:\n        old_count = 0\n\n    if pct is not None and 0 <= pct <= 100:\n        now = \"below\" if pct < threshold else \"above\"\n    else:\n        now = \"unknown\"\n\n    count = old_count\n    if now == \"below\" and old_state != \"below\":\n        count += 1\n    keep = now if now != \"unknown\" else old_state\n    return {\"watermark_remaining\": threshold, \"crossings\": count, \"last_state\": keep}\n\n\ndef nonneg_days(value):\n",
+     "also": [
+      {
+       "file": "plugins/yellow-core/lib/context-observer.py",
+       "text": "def advisory_state(previous, remaining, watermark):\n    \"\"\"Carry the advisory block forward per R21.\n\n    state is \"below\" / \"above\" from a 0-100 remaining percentage, else\n    \"unknown\". A crossing is counted when the state becomes \"below\" from\n    anything that was not already \"below\" (the spec's \"ten identical samples\n    below the watermark yield one marker\"). A null sample keeps the previous\n    last_state, so below -> unknown -> below never manufactures a second\n    crossing.\n    \"\"\"\n    prev_advisory = previous.get(\"advisory\") if isinstance(previous, dict) else None\n    if not isinstance(prev_advisory, dict):\n        prev_advisory = {}\n    prev_state = prev_advisory.get(\"last_state\")\n    if prev_state not in (\"above\", \"below\"):\n        prev_state = \"unknown\"\n    prev_crossings = prev_advisory.get(\"crossings\")\n    if isinstance(prev_crossings, bool) or not isinstance(prev_crossings, int) or prev_crossings < 0:\n        prev_crossings = 0\n\n    if remaining is not None and 0 <= remaining <= 100:\n        state = \"below\" if remaining < watermark else \"above\"\n    else:\n        state = \"unknown\"\n\n    crossings = prev_crossings\n    if state == \"below\" and prev_state != \"below\":\n        crossings += 1\n    last_state = state if state != \"unknown\" else prev_state\n    return {\"watermark_remaining\": watermark, \"crossings\": crossings, \"last_state\": last_state}"
+      }
+     ]
+    },
+    {
+     "lane": "ai-pattern",
+     "file": "plugins/yellow-core/lib/context-observer.py",
+     "old": "\n\ndef part_path(directory, session_id):\n",
+     "new": "\n\ndef handle_data(data):\n    \"\"\"Handle the data.\n\n    Args:\n        data: The data to handle.\n\n    Returns:\n        The result.\n    \"\"\"\n    # Initialize the result list\n    result = []\n    # Iterate over each item in the data\n    for item in data:\n        # Check whether the item is truthy\n        if item:\n            # Append the item to the result list\n            result.append(item)\n    # Return the result list\n    return result\n\n\ndef part_path(directory, session_id):\n"
+    }
+   ]
+  }
+ ],
+ "prompts": [
+  {
+   "id": "doc01",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/build-errors/ajv-cli-v8-strict-mode-unknown-format.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc02",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/build-errors/validate-agent-authoring-changelog-skip.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc03",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/code-quality/jq-select-filter-over-first-empty-for-jsonl.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc04",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/code-quality/mcp-tool-rename-prefix-collision.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc05",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/integration-issues/ruvector-cursor-pretooluse-empty-stdout.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc06",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/integration-issues/merge-queue-closed-pr-null-mergedat-detection.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc07",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/logic-errors/bash-pipe-head-exit-code-masking.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc08",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/logic-errors/git-diff-name-status-nul-safe-parsing.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc09",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/security-issues/substring-regex-command-denylist-evasion.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc10",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/security-issues/docs-snippet-path-traversal-and-lex-sort.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc11",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/workflow/graphite-api-outage-fallback.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "doc12",
+   "source": {
+    "commit": "31d1fb8",
+    "path": "docs/solutions/workflow/gt-sync-exit-128-stale-index-lock.md",
+    "strip_frontmatter": true
+   }
+  },
+  {
+   "id": "novel1",
+   "text": "User: Our Django app's product thumbnails look blurry since we upgraded Pillow.\nAssistant: Image.thumbnail() now defaults to a cheaper reducing_gap; the resize ran with Resampling.NEAREST because our helper passed resample=0, which the new enum maps to NEAREST.\nUser: Fix?\nAssistant: Pass resample=Image.Resampling.LANCZOS explicitly in media/thumbs.py and regenerate the cached thumbnails with manage.py rebuild_thumbs. Verified: SSIM against the originals went from 0.71 to 0.97.\n"
+  },
+  {
+   "id": "novel2",
+   "text": "User: terraform apply hangs with 'Error acquiring the state lock' after a CI job was cancelled.\nAssistant: The cancelled job left its lock row in the DynamoDB lock table. `terraform force-unlock <LOCK_ID>` with the ID from the error clears it; check no other apply is running first.\nUser: Can we stop it recurring?\nAssistant: Give the CI job a `trap` that runs `terraform force-unlock -force` only when this job created the lock, and set `-lock-timeout=5m` so a concurrent run waits instead of failing.\n"
+  },
+  {
+   "id": "judge-sh-fwd",
+   "text": "Score these candidates per the judge instructions.\n\n<optimization_target>\nA POSIX shell function `cfg_get KEY FILE` that prints the value of KEY from a KEY=VALUE config file. Contract: exit 0 and print the value when the key exists; exit 1 and print nothing when the key or the file is missing. Values may contain spaces and '=' characters.\n</optimization_target>\n\n<criteria>\ncorrectness (weight 0.5): meets every clause of the contract, including the exit codes.\nclarity (weight 0.3): a reader can verify it quickly.\nbrevity (weight 0.2): no needless code.\n</criteria>\n\n<candidates>\nCandidate A:\ncfg_get() {\n  [ -r \"$2\" ] || return 1\n  _v=$(grep -m1 \"^$1=\" \"$2\") || return 1\n  printf '%s\\n' \"${_v#*=}\"\n}\n\nCandidate B:\n# Reads a configuration value from a KEY=VALUE file and prints it.\ncfg_get() {\n  key=\"$1\"\n  file=\"$2\"\n  value=$(grep \"^$key=\" \"$file\" 2>/dev/null | head -n1 | cut -d= -f2)\n  echo \"$value\"\n  return 0\n}\n\nCandidate C:\ncfg_get() {\n  key=$1 file=$2\n  if [ ! -r \"$file\" ]; then\n    return 1\n  fi\n  line=$(grep -m1 \"^${key}=\" \"$file\")\n  status=$?\n  if [ \"$status\" -ne 0 ]; then\n    return 1\n  fi\n  value=${line#*=}\n  printf '%s\\n' \"$value\"\n  return 0\n}\n</candidates>\n"
+  },
+  {
+   "id": "judge-sh-rev",
+   "text": "Score these candidates per the judge instructions.\n\n<optimization_target>\nA POSIX shell function `cfg_get KEY FILE` that prints the value of KEY from a KEY=VALUE config file. Contract: exit 0 and print the value when the key exists; exit 1 and print nothing when the key or the file is missing. Values may contain spaces and '=' characters.\n</optimization_target>\n\n<criteria>\ncorrectness (weight 0.5): meets every clause of the contract, including the exit codes.\nclarity (weight 0.3): a reader can verify it quickly.\nbrevity (weight 0.2): no needless code.\n</criteria>\n\n<candidates>\nCandidate C:\ncfg_get() {\n  key=$1 file=$2\n  if [ ! -r \"$file\" ]; then\n    return 1\n  fi\n  line=$(grep -m1 \"^${key}=\" \"$file\")\n  status=$?\n  if [ \"$status\" -ne 0 ]; then\n    return 1\n  fi\n  value=${line#*=}\n  printf '%s\\n' \"$value\"\n  return 0\n}\n\nCandidate B:\n# Reads a configuration value from a KEY=VALUE file and prints it.\ncfg_get() {\n  key=\"$1\"\n  file=\"$2\"\n  value=$(grep \"^$key=\" \"$file\" 2>/dev/null | head -n1 | cut -d= -f2)\n  echo \"$value\"\n  return 0\n}\n\nCandidate A:\ncfg_get() {\n  [ -r \"$2\" ] || return 1\n  _v=$(grep -m1 \"^$1=\" \"$2\") || return 1\n  printf '%s\\n' \"${_v#*=}\"\n}\n</candidates>\n"
+  },
+  {
+   "id": "judge-commit-fwd",
+   "text": "Score these candidates per the judge instructions.\n\n<optimization_target>\nA commit message for this change. Diff summary: in `lib/retry.sh`, the retry loop's sleep changed from a fixed 2 seconds to exponential backoff (2, 4, 8, 16 s), and the maximum attempts stayed at 4. No tests changed. Repository convention: Conventional Commits, subject at most 72 characters.\n</optimization_target>\n\n<criteria>\naccuracy (weight 0.5): says only what the diff did, and nothing it did not.\nformat (weight 0.3): Conventional Commits subject, at most 72 characters.\nconcision (weight 0.2): no filler.\n</criteria>\n\n<candidates>\nCandidate A:\nfix(retry): back off exponentially between attempts\n\nSleep 2, 4, 8 then 16 s instead of a fixed 2 s. Max attempts unchanged (4).\n\nCandidate B:\nfix(retry): add exponential backoff and raise max attempts to 8\n\nReplaces the fixed 2 s sleep with exponential backoff and doubles the\nattempt limit so flaky networks get more chances. Adds bats coverage for\nthe new schedule.\n\nCandidate C:\nfix(retry): use exponential backoff in the retry loop\n\nThe retry loop in lib/retry.sh used to sleep a fixed 2 seconds between\nattempts. It now sleeps 2, 4, 8 and 16 seconds. The maximum number of\nattempts is still 4.\n</candidates>\n"
+  },
+  {
+   "id": "judge-commit-rev",
+   "text": "Score these candidates per the judge instructions.\n\n<optimization_target>\nA commit message for this change. Diff summary: in `lib/retry.sh`, the retry loop's sleep changed from a fixed 2 seconds to exponential backoff (2, 4, 8, 16 s), and the maximum attempts stayed at 4. No tests changed. Repository convention: Conventional Commits, subject at most 72 characters.\n</optimization_target>\n\n<criteria>\naccuracy (weight 0.5): says only what the diff did, and nothing it did not.\nformat (weight 0.3): Conventional Commits subject, at most 72 characters.\nconcision (weight 0.2): no filler.\n</criteria>\n\n<candidates>\nCandidate C:\nfix(retry): use exponential backoff in the retry loop\n\nThe retry loop in lib/retry.sh used to sleep a fixed 2 seconds between\nattempts. It now sleeps 2, 4, 8 and 16 seconds. The maximum number of\nattempts is still 4.\n\nCandidate B:\nfix(retry): add exponential backoff and raise max attempts to 8\n\nReplaces the fixed 2 s sleep with exponential backoff and doubles the\nattempt limit so flaky networks get more chances. Adds bats coverage for\nthe new schedule.\n\nCandidate A:\nfix(retry): back off exponentially between attempts\n\nSleep 2, 4, 8 then 16 s instead of a fixed 2 s. Max attempts unchanged (4).\n</candidates>\n"
+  },
+  {
+   "id": "judge-errmsg-fwd",
+   "text": "Score these candidates per the judge instructions.\n\n<optimization_target>\nThe error message `deploy` prints when it refuses to overwrite an existing release directory. The real flag that allows the overwrite is `--replace`. The message must name the directory and tell the user exactly how to proceed.\n</optimization_target>\n\n<criteria>\nactionability (weight 0.5): the user can fix the problem from the message alone, and the fix works.\naccuracy (weight 0.3): every fact in it is true for this CLI.\ntone (weight 0.2): plain and calm.\n</criteria>\n\n<candidates>\nCandidate A:\ndeploy: releases/v2.3.1 already exists. Re-run with --replace to overwrite it, or pick a new version.\n\nCandidate B:\nWe're sorry, but it looks like the release directory releases/v2.3.1 already exists on this machine. To keep your data safe, deploy will not overwrite it automatically. If you are sure you want to continue, simply re-run the same command with the --force flag, and deploy will take care of the rest for you.\n\nCandidate C:\ndeploy: refusing to overwrite releases/v2.3.1 (it exists). Use --replace to overwrite.\n</candidates>\n"
+  },
+  {
+   "id": "judge-errmsg-rev",
+   "text": "Score these candidates per the judge instructions.\n\n<optimization_target>\nThe error message `deploy` prints when it refuses to overwrite an existing release directory. The real flag that allows the overwrite is `--replace`. The message must name the directory and tell the user exactly how to proceed.\n</optimization_target>\n\n<criteria>\nactionability (weight 0.5): the user can fix the problem from the message alone, and the fix works.\naccuracy (weight 0.3): every fact in it is true for this CLI.\ntone (weight 0.2): plain and calm.\n</criteria>\n\n<candidates>\nCandidate C:\ndeploy: refusing to overwrite releases/v2.3.1 (it exists). Use --replace to overwrite.\n\nCandidate B:\nWe're sorry, but it looks like the release directory releases/v2.3.1 already exists on this machine. To keep your data safe, deploy will not overwrite it automatically. If you are sure you want to continue, simply re-run the same command with the --force flag, and deploy will take care of the rest for you.\n\nCandidate A:\ndeploy: releases/v2.3.1 already exists. Re-run with --replace to overwrite it, or pick a new version.\n</candidates>\n"
+  }
+ ]
+}

@@ -1,6 +1,7 @@
 # Model Routing Policy
 
-**Status:** Phase 1 in effect (2026-10-14). Supersedes
+**Status:** in effect (Phase 1 2026-10-14; Phase 2 and 3 verdicts below).
+Supersedes
 [model-selection-token-context-optimization.md](model-selection-token-context-optimization.md),
 which is kept for history.
 
@@ -10,10 +11,9 @@ which is kept for history.
 - Plan: `plans/haiku-5-5-model-routing-phase-1.md`, where the per-decision
   evidence lives.
 
-Every agent routed in Phase 1 pins a model and an effort level, except three
-that inherit the lead session's model on purpose. Other agents still pin a
-model without an effort level; see "Per-agent verdicts (Phase 1)" for the
-count and the Phase 2 sweep. This page says which tier each agent is on, why,
+Every agent pins a model and an effort level, except three that inherit the
+lead session's model on purpose and `knowledge-compounder`, which pins
+`sonnet` without effort (see "Per-agent verdicts (Phase 1)"). This page says which tier each agent is on, why,
 how to check what actually ran, and how to roll a choice back.
 
 ## Tiers
@@ -93,9 +93,23 @@ Non-agent pins:
 - **CI:** both claude-code-action workflows pass `claude_args: '--model
   sonnet'`. The action's `model:` input is deprecated.
 
-The 34 sonnet agents that still pin a model without `effort:` (V5's current
-output) are a Phase 2 sweep. `knowledge-compounder` is allowlisted:
-orchestration only, with the heavy work in its sub-agents.
+Phase 3 verdicts (CLAUDE-187; eval on 2026-10-26 with
+`scripts/eval/model-swap/fixtures/2026-10-26-haiku-phase3.json`):
+
+| Agent or sub-task | Model / effort | Reason |
+| --- | --- | --- |
+| `yellow-review` agent-native-reviewer | sonnet / medium (was opus / high) | 12/12 planted parity defects over two rounds, as Opus. Its other findings were P3s of the same kind, at about a fifth of the cost |
+| `yellow-review` agent-cli-readiness-reviewer | opus / high (unchanged) | Sonnet also found 8/8 plants, but in both runs on #1319 Opus raised two P2 agent-friction issues that no Sonnet run raised above P3 |
+| `yellow-debt` duplication-scanner | haiku / low (was sonnet / low) | 8/8 planted duplicates over two rounds against Sonnet's 5/8, at about a tenth of the cost |
+| `yellow-debt` ai-pattern-scanner | haiku / low (was sonnet / low) | 8/8 planted AI-pattern blocks over two rounds against Sonnet's 5/8 |
+| `knowledge-compounder` Context Analyzer and Related Docs Finder | haiku / low, set at dispatch | Over two rounds, Analyzer 72/72 well-formed replies and Finder 84/84 (the existing doc for all 12 real problems, `NO_MATCH` for both novel ones), as Sonnet |
+| `knowledge-compounder` Category Classifier | inherits (unchanged) | Sonnet and Haiku at `medium` agreed with the filed category two times in three, Haiku at `low` slightly less (56%), and the misses were borderline docs, so the eval cannot separate the models |
+| `/optimize` judge | sonnet / medium, set at dispatch (was the session's model) | Opus, Sonnet and Haiku each ranked the planted flaw last in every run, in both orderings. Sonnet keeps a margin over Haiku for subtler flaws |
+
+All 34 sonnet agents that had no `effort:` now pin `medium`, which is what
+they ran at under a 5.5 session's default effort, so V5 is clean.
+`knowledge-compounder` stays exempt: orchestration only, with the heavy work
+in its sub-agents.
 
 ## Requirements
 
@@ -224,20 +238,19 @@ PRs and against a lizard golden set for scanners. Candidates:
 
 - **Sonnet → Haiku:**
   - scan-verifier, after `/semgrep:fix` handles a refused verifier.
-  - git-history-analyzer (comment-analyzer and project-standards-reviewer
-    passed; see "Phase 2 verdicts").
-  - The duplication and ai-pattern scanners (complexity-scanner passed).
+  - git-history-analyzer.
   - staging-promoter.
   - test-runner.
   - codex-reviewer and codex-analyst, after 5 of 5 contract checks and the
     Step 6 vitest.
-- **Opus → Sonnet:** agent-cli-readiness-reviewer, agent-native-reviewer,
-  audit-synthesizer, research-conductor.
+- **Opus → Sonnet:** audit-synthesizer and research-conductor. Grading a
+  synthesizer needs a rubric beyond planted defects.
 - **Other:**
   - gemini-reviewer and opencode-reviewer effort to `medium`.
-  - The compounder extractors and the optimize judge.
+  - The compounder's Category Classifier, after its category definitions
+    are sharpened; its Solution Extractor and Prevention Strategist are
+    synthesis.
   - Conditional Opus reviewers in `/flow:work`.
-  - The V5 effort sweep.
 
 **Phase 3** tightens the plugin-markdown reviewer triggers in `/review:pr`.
 The router stays deferred. If revisited, use an add-only Haiku pass on top of

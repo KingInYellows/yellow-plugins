@@ -2,6 +2,7 @@
 name: doc-generator
 description: "AI-assisted documentation generator with human review gates. Use when generating READMEs, API references, architecture docs, or module documentation."
 model: sonnet
+effort: medium
 background: true
 memory: project
 skills:

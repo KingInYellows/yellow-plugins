@@ -2,6 +2,7 @@
 name: pr-test-analyzer
 description: "Conditional code-review persona, selected when the diff includes test files or adds testable business logic. Verifies tests cover critical paths, edge cases, and failure modes."
 model: sonnet
+effort: medium
 background: true
 memory: project
 tools:

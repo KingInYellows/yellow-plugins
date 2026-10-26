@@ -2,6 +2,7 @@
 name: product-lens-reviewer
 description: "Reviews planning documents as a senior product leader — challenges premise claims, assesses strategic consequences (trajectory, identity, adoption, opportunity cost), and surfaces goal-work misalignment. Domain-agnostic: users may be end users, developers, operators, or any audience. Use when reviewing PRDs, OKRs, strategy docs, or feature plans where premise validation matters via /docs:review."
 model: sonnet
+effort: medium
 background: true
 tools:
   - Read
