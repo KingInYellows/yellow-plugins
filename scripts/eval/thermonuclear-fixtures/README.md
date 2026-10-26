@@ -1,0 +1,57 @@
+# Thermonuclear-reviewer fixture eval
+
+Runs `thermonuclear-reviewer` against the ten fixtures in
+`plugins/yellow-review/tests/fixtures/thermonuclear/` and grades each run
+pass/fail against that README's "Expected" column. It is a manual evidence pass,
+not a gate: never wire it into CI or bats (the fixture README says why).
+
+`run` and `smoke-claude` spend real model usage. `prepare`, `run --dry-run` and
+`grade` spend nothing.
+
+```bash
+W=$(mktemp -d)
+python3 scripts/eval/thermonuclear-fixtures/eval.py prepare "$W"
+python3 scripts/eval/thermonuclear-fixtures/eval.py run "$W" -k 3   # opus, xhigh, as the agent declares
+python3 scripts/eval/thermonuclear-fixtures/eval.py grade "$W"
+python3 scripts/eval/thermonuclear-fixtures/eval.py smoke-claude "$W"
+```
+
+`prepare` builds the dispatch prompt the way `/review:pr` Step 5 does: delimiter
+substitution then XML escaping, the pr-context fence, a `<file-line-counts>`
+fence (header plus rows) when the fixture has a `.linecounts` file, the
+`.context` file inside the pr-context fence, and the `<rule-vocabulary>` block.
+The system prompt is the agent file with its preloaded skill appended. Each run
+is one `claude -p` through `../model-swap/run-one.sh` in an empty directory, so
+the reviewer sees only the prompt. The exception is `canonical-helper-reuse`,
+whose directory holds `src/lib/strings.ts` with `slugify` at line 14: in a real
+review the helper is in the checkout, and the reviewer should Read it before
+recommending reuse. With only the `.context` text it reports the finding at
+confidence 50, below `/review:pr`'s gate of 75.
+
+`grade` is binary per run. A run fails when its output is not parseable JSON,
+when the case predicate in `eval.py` `CASES` fails, or when a finding breaks the
+persona's output contract (severity above P1, a category other than
+`maintainability`, `autofix_class` other than `advisory`, `owner` other than
+`human`, `requires_verification` not `true`, or a non-integer `line`). Read the
+findings column as well: the predicates are regexes, and a title can match
+without the finding being right.
+
+## Cross-host smoke
+
+- **Claude Code:** `eval.py smoke-claude` loads yellow-core, yellow-linear and
+  yellow-review with `--plugin-dir` and dispatches the persona through the Agent
+  tool, as `/review:pr` does. yellow-review does not load without both
+  dependencies, and `--agent` is no substitute: the main-thread agent does not
+  get its `skills:` preload.
+- **Codex:** `pnpm smoke:codex -- --plugin yellow-review --keep-temp` installs
+  into a temporary `CODEX_HOME` and checks app-server discovery. Then run
+  `node scripts/eval/thermonuclear-fixtures/check-installed-skill.js` on the
+  installed `SKILL.md` path from its report. Invoking the skill needs Codex
+  credentials.
+- **Cursor:** needs the Cursor editor. Place the plugin at
+  `~/.cursor/plugins/local/yellow-review/` in an isolated profile, reload,
+  confirm `yellow-thermonuclear-review` is listed, run
+  `check-installed-skill.js` on the copy Cursor loaded, and invoke the skill by
+  name on one fixture diff.
+
+Results so far: [`results-2026-10-26.md`](results-2026-10-26.md).
