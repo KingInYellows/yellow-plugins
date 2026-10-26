@@ -486,34 +486,80 @@ interactive run asks before filing an issue. The controls
 Resolvers can write any file in the worktree, so `commit-resolve-fixes` and
 `run-verify-command` (`skills/pr-review-workflow/scripts/`, shared rules in
 `lib/resolve-paths.sh`) treat the worktree as untrusted when they run git and
-the verify command.
+the verify command. The script headers hold the full contract; this section is
+the boundary.
 
-- **PATH screen.** Every bare tool name resolves on a PATH that drops
-  directories inside the worktree, directories holding a symlink, hard link or
-  `#!` script that reaches into it, and directories that cannot be listed. The
-  hard-link walk skips a directory another user owns and this user can neither
-  read, write nor search (nothing in it is reachable), and fails closed on any
-  other unreadable directory, naming it on stderr.
+- **PATH screen (executable resolution).** Every bare tool name resolves on a
+  PATH that drops directories inside the worktree, directories holding a
+  symlink, hard link or `#!` script that reaches into it, and directories that
+  cannot be listed. An executable whose `#!` line the screen cannot read drops
+  its directory unless root owns the file (any user can `chmod 4111` a script,
+  so a set-ID bit proves nothing; only root can create a root-owned file). The
+  hard-link walk skips a sealed directory, one another user owns and this user
+  can neither read, write nor search, since nothing in it is reachable. It fails
+  closed on any other unreadable directory and names it on stderr. The sealed
+  rule needs GNU find; without it every unreadable directory fails the walk.
 - **Git config.** `harden_git_config` forces `core.fsmonitor` and
   `core.untrackedCache` off, `safe.bareRepository=explicit` and
-  `protocol.ext.allow=never`. It refuses a program-running key (transport
-  command, credential helper, filter, pager, ...) in the repository's own
-  config. In global or system config it refuses one that names a program
-  inside the worktree. It also refuses such a key that uses shell syntax the
-  check cannot judge. `alias.*`, pagers, editors and diff or merge tools are
-  exempt from that rule, since these scripts never run them. Any
+  `protocol.ext.allow=never` through `GIT_CONFIG_COUNT`, and checks that git
+  reads them back. It refuses a program-running key (transport command,
+  credential helper, filter, pager, ...) in the repository's own config. In
+  global or system config it refuses one that names a program inside the
+  worktree. It also refuses such a key that uses shell syntax the check cannot
+  judge, so a global `credential.helper = !f() { ...; }; f` is refused with a
+  message naming the key. `alias.*`, pagers, editors and diff or merge tools are
+  exempt from that rule, since these scripts never run them. Any non-empty
   `GIT_EXEC_PATH` or `GIT_CONFIG` is refused.
+- **Commit and push.** `commit-resolve-fixes` commits and submits with git hooks
+  disabled (`core.hooksPath=/dev/null`, checked), because a tracked hook is code
+  the PR controls and would run with submission authority.
+  `YELLOW_REVIEW_COMMIT_HOOKS=1` opts back in; the commit is then refused when
+  an in-tree hooks directory holds untracked or ignored files or is reached
+  through an in-tree symlink, and hooks still stay off when one lives in
+  `.git/hooks` or outside the tree, where nothing tracks it. Commit signing is
+  forced off when the repository's own config sets signing or any `gpg.*` key,
+  since signing runs the configured `gpg.program`. Every push URL must match the
+  PR's host and head repository; other schemes, such as `file` and `ext`, fail
+  closed.
 - **Verify command.** The command runs on the caller's PATH (it may need
   `node_modules/.bin`), behind a private shim directory whose `git` runs the
   validated git on the screened PATH. For a git started by absolute path, the
-  ssh command line runs as `PATH=<screened> ...`. Bare `GIT_SSH`,
-  `GIT_ASKPASS`, `SSH_ASKPASS` and `GIT_PROXY_COMMAND` values, and bare
-  credential helpers, are pinned to absolute programs from the screened PATH.
-  Shell and absolute credential helpers run as `PATH=<screened> ...`.
+  ssh command line runs as `PATH=<screened> ...`. Bare `GIT_SSH`, `GIT_ASKPASS`,
+  `SSH_ASKPASS` and `GIT_PROXY_COMMAND` values, and bare credential helpers, are
+  pinned to absolute programs from the screened PATH. Shell and absolute
+  credential helpers run as `PATH=<screened> ...`.
+- **Required `--ignored-since` marker.** The tree listing cannot see gitignored
+  files, `.git/hooks` or git config, so `/review:resolve` creates a marker file
+  before any resolver starts and runs `run-verify-command --mark-hooks` on it,
+  which records the effective hooks directory and every git config file that
+  exists. Every verify run requires `--ignored-since <marker>` (usage error,
+  exit 2, without it), and a run with no verify command uses `--check-ignored`
+  instead. The run refuses (exit 2, up to 20 paths named, never contents) when
+  any of these changed after the marker was made:
+  - a gitignored file or symlink newer than the marker, or a newer target of a
+    gitignored symlink;
+  - a hook in `.git/hooks` or in a hooks directory outside the tree newer than
+    the marker, or the hooks directory itself when it differs from the recorded
+    one;
+  - any config file Git could read written after the marker, including every
+    `include.path` and `includeIf` target whether its condition holds now or not
+    (a verify command that switches branches makes Git read it). A recorded
+    config file that is now missing counts too, as does a symlink on the way to
+    any of these, judged by its own mtime.
+
+  A marker that is missing, unreadable, a symlink or not a regular file refuses,
+  as does any listing failure. A few regular-file tool caches (the `.ruvector/`
+  memory files, named in a stderr note, and the Vitest results cache) are
+  exempt. `--revert-denied` needs the marker or an explicit
+  `--no-ignored-guard`, which a caller passes only when it could not create a
+  marker (`/review:resolve` then reports
+  `gitignored files unchecked (marker unavailable)` as blocking merge).
+
 - **Residual.** Other programs an absolute git finds by name on the caller's
   PATH, such as `git-remote-<scheme>` or a `git-<alias>`, are not pinned. A
-  worktree file planted there must still predate the `--ignored-since`
-  marker, which refuses newer gitignored files.
+  worktree file planted there must still predate the marker, which refuses newer
+  gitignored files. The marker compares mtimes, so a resolver that resets a
+  file's mtime to before the marker is not caught by it.
 
 ### Unattended Review Learning Staging (yellow-review / yellow-core)
 
