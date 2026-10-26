@@ -30,14 +30,17 @@ confidence 50, below `/review:pr`'s gate of 75.
 
 `grade` is binary per run and exits non-zero unless every run in the matrix
 `run` last wrote passes. A run fails when it left no output, when its output is
-not parseable JSON, when a finding breaks the persona's output contract (a
+not parseable JSON or lacks a top-level `reviewer`, `findings`, `residual_risks`
+or `testing_gaps` key, when a finding breaks the persona's output contract (a
 missing compact-return field, severity above P1, a category other than
 `maintainability`, `autofix_class` other than `advisory`, `owner` other than
-`human`, `requires_verification` not `true`, or a non-integer `line`), or when
-the case predicate in `eval.py` `CASES` fails. Each run's fingerprint hashes its
-prompts and seeded files, so after a persona or fixture change `run` reruns it
-instead of reusing the old output. Read the findings column as well: the
-predicates are regexes, and a title can match without the finding being right.
+`human`, `requires_verification` not `true`, a `line` that is not a positive
+integer, `confidence` off the 0/25/50/75/100 anchors, or a non-boolean
+`pre_existing`), or when the case predicate in `eval.py` `CASES` fails. Each
+run's fingerprint hashes its prompts and seeded files, so after a persona or
+fixture change `run` reruns it instead of reusing the old output. Read the
+findings column as well: the predicates are regexes, and a title can match
+without the finding being right.
 
 ## Cross-host smoke
 

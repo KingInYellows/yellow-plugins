@@ -44,7 +44,7 @@ def text(finding):
     return " ".join(str(finding.get(k) or "") for k in ("title", "file", "scope", "suggested_fix", "rule"))
 
 
-SIZE = re.compile(r"\b1,?000\b|threshold|line count|lines? long|file size|giant|oversized|decompos", re.I)
+SIZE = re.compile(r"\b1,?000\b|threshold|line count|lines? long|file size|giant|oversized", re.I)
 # Per fixture: (expectation shown in the report, predicate over the findings list).
 CASES = {
     "crosses-1000-lines": (
@@ -207,7 +207,8 @@ def run(args):
         if args.dry_run:
             return "%s: %s" % (rid, " ".join(cmd))
         env = dict(os.environ, EVAL_FINGERPRINT=fingerprint(work, case, args.model, args.effort))
-        rc = subprocess.run(cmd, env=env).returncode
+        # Argument list, no shell; cmd is built from fixed paths and case ids.
+        rc = subprocess.run(cmd, env=env).returncode  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
         return "%s: rc=%d" % (rid, rc)
     with ThreadPoolExecutor(max_workers=args.j) as pool:
         for line in pool.map(one, jobs):
@@ -235,8 +236,13 @@ FINDING_RULES = [
      lambda x: x.get("autofix_class") == "advisory" and x.get("owner") == "human"),
     ("requires_verification not true", lambda x: x.get("requires_verification") is True),
     # bool is an int subclass in Python; JSON `true` is not a line number.
-    ("line not an integer", lambda x: type(x.get("line")) is int),
+    ("line not a positive integer", lambda x: type(x.get("line")) is int and x["line"] > 0),
+    ("confidence not an anchor", lambda x: x.get("confidence") in (0, 25, 50, 75, 100)
+     and type(x.get("confidence")) is int),
+    ("pre_existing not a boolean", lambda x: type(x.get("pre_existing")) is bool),
 ]
+# Top-level keys /review:pr Step 6 requires before it reads any finding.
+TOP_LEVEL = ("reviewer", "findings", "residual_risks", "testing_gaps")
 
 
 def finding_issues(x):
@@ -257,13 +263,22 @@ def summary(x):
     return "%s %s:%s %s" % (x.get("severity"), x.get("file"), x.get("line"), x.get("title"))
 
 
+def shape_problem(review):
+    """Why a parsed reply is not a reviewer return, or None."""
+    if not isinstance(review, dict) or not isinstance(review.get("findings"), list):
+        return "no parseable JSON"
+    missing = [k for k in TOP_LEVEL if k not in review]
+    return "missing top-level " + ", ".join(missing) if missing else None
+
+
 def grade_one(out_file, predicate):
     """(result, findings summary, contract issues) for one run's output file."""
     if not os.path.exists(out_file):
         return "FAIL", "no output (failed, timed out or not run)", ""
     review = parse(json.loads(read(out_file)).get("result"))
-    if review is None or not isinstance(review.get("findings"), list):
-        return "FAIL", "no parseable JSON", ""
+    problem = shape_problem(review)
+    if problem:
+        return "FAIL", problem, ""
     findings = review["findings"]
     issues = contract(findings)
     got = "; ".join(map(summary, findings)) or "[]"
@@ -328,7 +343,7 @@ def smoke_claude(args):
               "\"yellow-review:review:thermonuclear-reviewer\" and this prompt verbatim: <<<%s>>> "
               "Then print its reply verbatim and nothing else." % SMOKE_QUESTION)
     tools = "Agent,Read,Grep,Glob"
-    out = subprocess.run(
+    out = subprocess.run(  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
         ["claude", "-p", "--setting-sources", "", "--strict-mcp-config", *plugins, "--model", args.model,
          "--tools", tools, "--allowedTools", tools, "--output-format", "json", "--no-session-persistence",
          prompt], cwd=cwd, capture_output=True, text=True, timeout=900)
