@@ -114,6 +114,25 @@ Clean Docker images/containers, old logs, and caches on runners.
 
 Always shows a dry-run preview and requires confirmation before executing.
 
+### `/ci:report-linear [run-id] [--repo owner/name]`
+
+Diagnose a CI failure and file a Linear bug issue for it. Requires
+yellow-linear.
+
+```
+/ci:report-linear             # Latest failed run
+/ci:report-linear 1234567890  # Specific run
+```
+
+### `/ci:setup-self-hosted`
+
+Inventory available self-hosted runners and move workflow jobs onto the best
+runner by labels, OS, and live load.
+
+```
+/ci:setup-self-hosted
+```
+
 ## Configuration
 
 For runner health and cleanup commands, create `.claude/yellow-ci.local.md` in

@@ -159,7 +159,7 @@ which, per git docs, "concatenates as separate paragraphs" (subject
 
 ## References
 
-- Plan: [`plans/plan-lifecycle-management.md`](../../plans/plan-lifecycle-management.md)
+- Plan: [`plans/plan-lifecycle-management.md`](../../../plans/complete/plan-lifecycle-management.md)
   (refreshed + deepen-plan-annotated 2026-05-28)
 - Bottom-of-stack PR: #556 — `scripts/validate-plans.js` validator,
   catalog entry, integration tests, CI wiring

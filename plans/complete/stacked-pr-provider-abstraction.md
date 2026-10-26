@@ -13,9 +13,9 @@ This plan covers the **foundation only**. No stack creation, submission,
 amendment, synchronisation, cleanup, or merging is implemented, and no
 `gh stack` subcommand is invoked anywhere in the repository.
 
-Research backing: [`docs/research/2026-08-16-github-native-stacks-vs-graphite.md`](../docs/research/2026-08-16-github-native-stacks-vs-graphite.md).
+Research backing: [`docs/research/2026-08-16-github-native-stacks-vs-graphite.md`](../../docs/research/2026-08-16-github-native-stacks-vs-graphite.md).
 The April 2026 Graphite report
-([`docs/research/graphite-merge-queue-stacked-prs-coding-agents.md`](../docs/research/graphite-merge-queue-stacked-prs-coding-agents.md))
+([`docs/research/graphite-merge-queue-stacked-prs-coding-agents.md`](../../docs/research/graphite-merge-queue-stacked-prs-coding-agents.md))
 is preserved unedited as the historical record.
 
 ## Problem Statement

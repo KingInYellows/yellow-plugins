@@ -770,7 +770,7 @@ codex exec \
 
 ## References
 
-- [Brainstorm document](../docs/brainstorms/2026-04-01-codex-plugin-integration-brainstorm.md)
+- [Brainstorm document](../../docs/brainstorms/2026-04-01-codex-plugin-integration-brainstorm.md)
 - [Codex CLI Reference](https://developers.openai.com/codex/cli/reference)
 - [Codex Non-Interactive Mode](https://developers.openai.com/codex/noninteractive)
 - [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) — Reference implementation

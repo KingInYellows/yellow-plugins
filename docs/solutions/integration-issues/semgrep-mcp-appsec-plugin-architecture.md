@@ -236,7 +236,7 @@ See `docs/solutions/integration-issues/ruvector-cli-and-mcp-tool-name-mismatches
 - [RuVector CLI and MCP Tool Name Mismatches](../integration-issues/ruvector-cli-and-mcp-tool-name-mismatches.md) — Cautionary tale: verify MCP tool names empirically
 - [RuVector MCP Tool Parameter Schema Mismatch](../integration-issues/ruvector-mcp-tool-parameter-schema-mismatch.md) — Warns against documenting API surface without empirical verification
 - [Shell Security Patterns](../code-quality/yellow-ci-shell-security-patterns.md) — Input validation, secret redaction, prompt injection fencing for shell invocations
-- [MCP Secrets Best Practices Plan](../../plans/2026-02-18-docs-mcp-secrets-best-practices-plan.md) — Env var auth patterns for `SEMGREP_APP_TOKEN`
+- [MCP Secrets Best Practices Plan](../../../plans/complete/2026-02-18-docs-mcp-secrets-best-practices-plan.md) — Env var auth patterns for `SEMGREP_APP_TOKEN`
 - [Security Architecture](../../security.md) — MCP Servers Inventory, authentication taxonomy, trust boundaries
 - [Plugin Template](../../plugin-template.md) — Full plugin directory structure and publishing checklist
 - [Full Research Document](../../research/semgrep-to-fix-fixer-claude-code-plugin-mcp.md) — Complete Semgrep MCP tool catalog, REST API reference, CLI flags, and data models

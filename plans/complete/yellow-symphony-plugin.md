@@ -449,14 +449,14 @@ yellow-ci's runner-health command. Config stored in
 
 ## References
 
-- [Brainstorm](../docs/brainstorms/2026-04-01-symphony-plugin-brainstorm.md)
+- [Brainstorm](../../docs/brainstorms/2026-04-01-symphony-plugin-brainstorm.md)
 - [Symphony SPEC.md](https://github.com/openai/symphony/blob/main/SPEC.md)
 - [Symphony elixir/WORKFLOW.md](https://github.com/openai/symphony/blob/main/elixir/WORKFLOW.md)
-- [yellow-ci runner-health (SSH pattern)](../plugins/yellow-ci/commands/ci/runner-health.md)
-- [yellow-ci setup (wizard pattern)](../plugins/yellow-ci/commands/ci/setup.md)
-- [yellow-ci .local.md config](../plugins/yellow-ci/CLAUDE.md)
-- [yellow-semgrep output fencing](../plugins/yellow-semgrep/commands/semgrep/status.md)
-- [gt-workflow setup (prereq pattern)](../plugins/gt-workflow/commands/gt-setup.md)
+- [yellow-ci runner-health (SSH pattern)](../../plugins/yellow-ci/commands/ci/runner-health.md)
+- [yellow-ci setup (wizard pattern)](../../plugins/yellow-ci/commands/ci/setup.md)
+- [yellow-ci .local.md config](../../plugins/yellow-ci/CLAUDE.md)
+- [yellow-semgrep output fencing](../../plugins/yellow-semgrep/commands/semgrep/status.md)
+- [gt-workflow setup (prereq pattern)](../../plugins/gt-workflow/commands/gt-setup.md)
 
 <!-- deepen-plan: external -->
 

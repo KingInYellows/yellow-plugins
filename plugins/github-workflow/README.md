@@ -9,7 +9,7 @@ group.
 > official `gh stack` extension. Every mutating call is argument-array-only
 > (no shell interpolation), validated, and — for destructive operations —
 > gated behind an explicit confirmation. See
-> [`plans/stacked-pr-provider-abstraction.md`](../../plans/stacked-pr-provider-abstraction.md)
+> [`plans/stacked-pr-provider-abstraction.md`](../../plans/complete/stacked-pr-provider-abstraction.md)
 > for the design history.
 
 ## Why it exists

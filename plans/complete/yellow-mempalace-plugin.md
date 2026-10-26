@@ -378,11 +378,11 @@ ships.
 
 ## References
 
-- [Research doc](../docs/research/mempalace-memory-tool-vs-ruvector.md)
+- [Research doc](../../docs/research/mempalace-memory-tool-vs-ruvector.md)
 - [MemPalace repo](https://github.com/milla-jovovich/mempalace)
-- [RuVector plugin](../plugins/yellow-ruvector/) — reference for conventions
-- [Semgrep plugin](../plugins/yellow-semgrep/) — reference for Python CLI setup
-- [Plugin structure docs](../docs/CLAUDE.md) — marketplace conventions
+- [RuVector plugin](../../plugins/yellow-ruvector/) — reference for conventions
+- [Semgrep plugin](../../plugins/yellow-semgrep/) — reference for Python CLI setup
+- [Plugin structure docs](../../docs/CLAUDE.md) — marketplace conventions
 
 <!-- deepen-plan: external -->
 > **Research:** Additional references from deep research:

@@ -130,6 +130,15 @@ Visualize your stack and navigate between branches.
 /gt-nav --pr
 ```
 
+### `/gt-merge`
+
+Merge the pull requests from trunk up to the current branch via `gt merge`. Use
+it when the stack is fully reviewed and ready to land.
+
+```
+/gt-merge
+```
+
 ## Hooks
 
 The plugin installs a **PreToolUse** hook that tokenises each Bash call and

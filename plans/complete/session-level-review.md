@@ -365,13 +365,13 @@ The user may run both. Session-level review should not re-run per-PR agents.
 
 ## References
 
-- [Brainstorm document](../docs/brainstorms/2026-03-20-session-level-review-brainstorm.md)
-- [Current workflows:review](../plugins/yellow-core/commands/workflows/review.md) — 34-line redirect
-- [workflows:work](../plugins/yellow-core/commands/workflows/work.md) — Plan execution engine (678 lines)
-- [review:pr](../plugins/yellow-review/commands/review/review-pr.md) — Per-PR review with fix application (Step 6 pattern)
-- [review:all](../plugins/yellow-review/commands/review/review-all.md) — Batch PR review (sequential, no cross-PR analysis)
-- [pr-review-workflow skill](../plugins/yellow-review/skills/pr-review-workflow/SKILL.md) — Finding format, severity definitions
-- [Stack Decomposition contract](../plugins/gt-workflow/output-styles/stack-decomposition.md) — Stack metadata format
+- [Brainstorm document](../../docs/brainstorms/2026-03-20-session-level-review-brainstorm.md)
+- [Current workflows:review](../../plugins/yellow-core/commands/flow/review.md) — 34-line redirect
+- [workflows:work](../../plugins/yellow-core/commands/flow/work.md) — Plan execution engine (678 lines)
+- [review:pr](../../plugins/yellow-review/commands/review/review-pr.md) — Per-PR review with fix application (Step 6 pattern)
+- [review:all](../../plugins/yellow-review/commands/review/review-all.md) — Batch PR review (sequential, no cross-PR analysis)
+- [pr-review-workflow skill](../../plugins/yellow-review/skills/pr-review-workflow/SKILL.md) — Finding format, severity definitions
+- [Stack Decomposition contract](../../plugins/gt-workflow/output-styles/stack-decomposition.md) — Stack metadata format
 
 <!-- deepen-plan: external -->
 > **Research:** External references from enrichment research:
