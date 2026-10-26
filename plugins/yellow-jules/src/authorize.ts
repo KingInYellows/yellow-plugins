@@ -357,11 +357,8 @@ export async function authorizeRevoke(
   // Revocation needs no terminal (it only narrows authority), but a host that
   // is not the grant's controller must not rewrite shared state. A legitimate
   // owner who lost the controller file recovers with `authorize --take-over`.
-  const result = await revokeGrant(
-    deps.dataDir,
-    grantId,
-    nowFn(deps)(),
-    (grant) => {
+  const result = await revokeGrant(deps.dataDir, grantId, nowFn(deps)(), {
+    beforeWrite: (grant) => {
       try {
         assertControllerAuthority(
           ctx.controllerDir,
@@ -383,8 +380,8 @@ export async function authorizeRevoke(
         throw err;
       }
     },
-    controllerLockPath(ctx.controllerDir, ctx.controllerId)
-  );
+    lock: controllerLockPath(ctx.controllerDir, ctx.controllerId),
+  });
   return { operation: 'authorize', ...result };
 }
 

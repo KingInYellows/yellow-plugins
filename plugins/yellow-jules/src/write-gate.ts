@@ -754,14 +754,16 @@ export async function settleFailure(
         deps.dataDir,
         record.grantId,
         record.localRequestId,
-        (grant) =>
-          assertControllerAuthority(
-            ctx.controllerDir,
-            deps.dataDir,
-            grant.epochRef,
-            ctx.controllerId
-          ),
-        controllerLockPath(ctx.controllerDir, ctx.controllerId)
+        {
+          beforeWrite: (grant) =>
+            assertControllerAuthority(
+              ctx.controllerDir,
+              deps.dataDir,
+              grant.epochRef,
+              ctx.controllerId
+            ),
+          lock: controllerLockPath(ctx.controllerDir, ctx.controllerId),
+        }
       );
     } catch (releaseError) {
       // The record is `failed`, so nothing will retry this: the slot stays held.

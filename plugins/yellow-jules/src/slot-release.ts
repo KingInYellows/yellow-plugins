@@ -48,14 +48,16 @@ export async function releaseTerminalSlot(
       deps.dataDir,
       record.grantId,
       record.localRequestId,
-      (grant) =>
-        assertControllerAuthority(
-          ctx.controllerDir,
-          deps.dataDir,
-          grant.epochRef,
-          ctx.controllerId
-        ),
-      controllerLockPath(ctx.controllerDir, ctx.controllerId)
+      {
+        beforeWrite: (grant) =>
+          assertControllerAuthority(
+            ctx.controllerDir,
+            deps.dataDir,
+            grant.epochRef,
+            ctx.controllerId
+          ),
+        lock: controllerLockPath(ctx.controllerDir, ctx.controllerId),
+      }
     );
     return undefined;
   } catch (err) {

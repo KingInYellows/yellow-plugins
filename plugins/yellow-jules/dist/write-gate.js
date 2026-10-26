@@ -426,7 +426,10 @@ async function settleFailure(deps, record, error, options) {
             // Only the grant's controller rewrites grants.json; a take-over during
             // the POST leaves the slot held (checked under the journal lock).
             const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
-            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId, (grant) => (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId), (0, controller_js_1.controllerLockPath)(ctx.controllerDir, ctx.controllerId));
+            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId, {
+                beforeWrite: (grant) => (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId),
+                lock: (0, controller_js_1.controllerLockPath)(ctx.controllerDir, ctx.controllerId),
+            });
         }
         catch (releaseError) {
             // The record is `failed`, so nothing will retry this: the slot stays held.
