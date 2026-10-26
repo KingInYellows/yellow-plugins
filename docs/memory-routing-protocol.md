@@ -40,7 +40,9 @@ workflow.
 
 ## Domain model
 
-Single store: memories land in ruvector. No dual-write.
+Generic memory triggers land in ruvector only. Separately, the trigger-free
+MEMORY.md pipeline writes `docs/solutions/` and `MEMORY.md`, and
+`/flow:compound` can also record the same learning with `hooks_remember`.
 
 ## Follow-up (done)
 

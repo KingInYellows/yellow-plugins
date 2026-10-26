@@ -135,7 +135,7 @@ Visualize your stack and navigate between branches.
 Merge the pull requests from trunk up to the current branch via `gt merge`. Use
 it when the stack is fully reviewed and ready to land.
 
-```
+```text
 /gt-merge
 ```
 

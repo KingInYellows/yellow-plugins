@@ -119,7 +119,7 @@ Always shows a dry-run preview and requires confirmation before executing.
 Diagnose a CI failure and file a Linear bug issue for it. Requires
 yellow-linear.
 
-```
+```text
 /ci:report-linear             # Latest failed run
 /ci:report-linear 1234567890  # Specific run
 ```
@@ -129,7 +129,7 @@ yellow-linear.
 Inventory available self-hosted runners and move workflow jobs onto the best
 runner by labels, OS, and live load.
 
-```
+```text
 /ci:setup-self-hosted
 ```
 
