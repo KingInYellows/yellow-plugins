@@ -21,9 +21,10 @@
 # unknowns names what could not be read: pr_state, threads, reviews, ci,
 # mergeable (GitHub reports UNKNOWN while it is still computing the merge),
 # ledger (the PR has ledger files but the summary failed),
-# merge_state (mergeStateStatus is BLOCKED: GitHub refuses the merge for a
-# reason this gate may not see, such as a required check that never reported
-# on the head, so the PR is not reported ready).
+# merge_state (mergeStateStatus is BLOCKED or BEHIND: GitHub refuses the merge
+# for a reason this gate may not see, such as a required check that never
+# reported on the head or a base branch that must be merged in first, so the
+# PR is not reported ready).
 # A blocker is definite; an unknown is never read as "no blocker".
 # Unresolved threads count outdated ones too, whether or not the base branch
 # enforces conversation resolution (conversationResolution is reported only).
@@ -259,7 +260,7 @@ jq -n \
       (if $bl.lookupFailed then "reviews" else empty end),
       (if $stateok and (.ci.state | IN("SUCCESS","NONE","PENDING","EXPECTED","FAILURE","ERROR")) then empty else "ci" end),
       (if $stateok and .mergeable == "UNKNOWN" then "mergeable" else empty end),
-      (if $stateok and .mergeStateStatus == "BLOCKED" then "merge_state" else empty end),
+      (if $stateok and (.mergeStateStatus | IN("BLOCKED","BEHIND")) then "merge_state" else empty end),
       (if .ledger.status == "unavailable" then "ledger" else empty end)
     ]
   | .verdict = (if (.blockers | length) > 0 then "blocked"

@@ -188,6 +188,13 @@ state_body() {
   [ "$(jq -c .unknowns <<<"$output")" = '["merge_state"]' ]
 }
 
+@test "a branch that must be updated first (BEHIND) is unknown, not ready" {
+  MOCK_GH_MR_BODY=$(state_body 'mergeStateStatus="BEHIND"')
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .unknowns <<<"$output")" = '["merge_state"]' ]
+}
+
 @test "the graphite-queue label is reported as queued" {
   MOCK_GH_MR_BODY=$(state_body 'labels={"nodes":[{"name":"bug"},{"name":"graphite-queue"}]}')
   run --separate-stderr "$SCRIPT" test/repo 7
