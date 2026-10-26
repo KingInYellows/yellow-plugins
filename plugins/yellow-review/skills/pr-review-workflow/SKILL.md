@@ -404,6 +404,13 @@ Located at `skills/pr-review-workflow/scripts/`:
   reviews, `reviewDecision`, whether conversation resolution is enforced (read
   from the base branch and the default branch), and `lookupReason` when a lookup
   failed
+- **check-merge-ready** `<owner/repo> <pr-number>` — Read-only merge gate behind
+  `/review:merge-ready`. Prints one JSON object with `verdict`
+  (`ready`/`blocked`/`unknown`), `blockers` (`not_open`, `draft`, `conflicts`,
+  `unresolved_threads`, `changes_requested`, `review_required`, `ci_failing`,
+  `ci_pending`, `ledger_findings`), `unknowns` (`pr_state`, `threads`,
+  `reviews`, `ci`, `mergeable`) and the detail behind each. Exits 0 ready, 1
+  blocked, 3 unknown, 2 usage; give it a Bash `timeout` of 420000 ms
 - **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with an
   idempotency marker; skips when our latest recent comment carries a marker for
   this thread and only bot comments follow it, and reports that disposition. An

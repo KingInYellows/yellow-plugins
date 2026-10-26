@@ -6,7 +6,7 @@ flags, exit codes, trust-boundary rules and library behavior.
 
 ## Components
 
-### Commands (8)
+### Commands (9)
 
 - `/review:setup` — Validate GitHub, jq, yellow-core and the review-ledger
   prerequisites (flock, realpath, git 2.31+, optional universal-ctags) before
@@ -81,6 +81,13 @@ flags, exit codes, trust-boundary rules and library behavior.
   attended triage of a closed PR asks before pruning. `rl prune` — via
   `--prune <PR#>` (used by `/review:sweep-all`) or that confirmed prompt — is
   the only ledger deletion path
+- `/review:merge-ready` — Read-only merge gate for one PR via
+  `check-merge-ready`: unresolved threads (outdated included),
+  `CHANGES_REQUESTED` reviewers, a missing required review, CI rollup, draft,
+  conflicts and pending P0-P2 ledger findings block; conversation-resolution
+  enforcement and the `graphite-queue` label are reported. Ends with a
+  `MergeReady:` contract line; an unread source is `unknown`, never `ready`.
+  Writes nothing to GitHub or the ledger
 
 ### Agents (17)
 
@@ -167,6 +174,12 @@ flags, exit codes, trust-boundary rules and library behavior.
 - `get-pr-blockers <owner/repo> <pr>` — Report CHANGES_REQUESTED reviews,
   `reviewDecision`, whether conversation resolution is enforced (read from the
   base branch and the default branch), and `lookupReason` when a lookup failed
+- `check-merge-ready <owner/repo> <pr>` — The `/review:merge-ready` gate: runs
+  `get-pr-comments --include-outdated` and `get-pr-blockers` in parallel with
+  one GraphQL read of the PR state and head-commit status-check rollup, then
+  `review-ledger.sh summary`; prints one JSON report (verdict, `blockers`,
+  `unknowns`, per-source detail) and exits 0 ready, 1 blocked, 3 unknown, 2
+  usage. Worst case about 370 s (the callers' Bash timeout is 420000 ms)
 - `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a thread with
   an idempotency marker (skips when our latest recent comment has a marker for
   the thread, any disposition, and only bot comments follow it). Which prior
@@ -651,6 +664,9 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   did not apply: after a sweep, or when the session-start notice reports pending
   findings. Distinct from `/review:resolve`, which only handles GitHub review
   threads and never reads the ledger.
+- **`/review:merge-ready`** — The last check before adding `graphite-queue` or
+  merging. Read-only and fast to re-run; it says what to run next for each
+  blocker.
 - **`/flow:review`** (yellow-core) — Session-level review against a plan file.
   Evaluates plan adherence, cross-PR coherence, and scope drift. Complementary
   to `/review:pr` (per-PR code quality) — use both for full coverage.
@@ -684,6 +700,9 @@ in the transcript (Ctrl-O) on a second `/review:pr` run within the hour.
   `check-addressed-evidence.bats`, `read-resolve-config.bats`,
   `pr-review-delta.bats` — GraphQL fixtures in `tests/fixtures/`, fake `gh` in
   `tests/mocks/gh`
+- `check-merge-ready.bats` — stub `get-pr-comments`, `get-pr-blockers` and
+  ledger beside a copy of the script, with the state query served by
+  `tests/mocks/gh` (`MOCK_GH_MR_BODY`)
 - `commit-resolve-fixes.bats`, `run-verify-command.bats` — a throwaway
   repository with a bare origin and stub `gt`/`node`/`gh`, built by
   `tests/helpers/resolve-repo.bash`

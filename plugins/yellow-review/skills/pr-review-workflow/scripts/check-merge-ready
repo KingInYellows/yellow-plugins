@@ -1,0 +1,243 @@
+#!/bin/sh
+# Read-only merge-readiness gate for one PR. Makes no GitHub writes and never
+# writes a ledger record (the ledger summary only reads).
+# Usage: check-merge-ready <owner/repo> <pr-number>
+# Output: one JSON object on stdout:
+#   {"pr":N,"head":"<sha>"|null,"state":"OPEN|CLOSED|MERGED"|null,
+#    "verdict":"ready|blocked|unknown",
+#    "blockers":[...],"unknowns":[...],
+#    "isDraft":bool|null,"mergeable":"MERGEABLE|CONFLICTING|UNKNOWN"|null,
+#    "mergeStateStatus":"..."|null,"queued":bool|null,
+#    "threads":{"unresolved":N,"outdated":N}|null,
+#    "changesRequested":["login",...]|null,"reviewDecision":"..."|null,
+#    "conversationResolution":"enforced|not_enforced|unknown",
+#    "ci":{"state":"SUCCESS|PENDING|EXPECTED|FAILURE|ERROR|NONE"|null,
+#          "failing":[names],"pending":[names],"truncated":bool},
+#    "ledger":{"status":"read|none|unavailable","mergeBlocking":N|null}}
+# blockers holds fixed tokens: not_open, draft, conflicts, unresolved_threads,
+# changes_requested, review_required, ci_failing, ci_pending, ledger_findings.
+# unknowns names what could not be read: pr_state, threads, reviews, ci,
+# mergeable (GitHub reports UNKNOWN while it is still computing the merge).
+# A blocker is definite; an unknown is never read as "no blocker".
+# Unresolved threads count outdated ones too, whether or not the base branch
+# enforces conversation resolution (conversationResolution is reported only).
+# CI is green when the head commit's status-check rollup is SUCCESS (GitHub
+# counts skipped and neutral runs as passing) or the head has no checks at all
+# (NONE). The failing/pending name lists cover the first 100 contexts;
+# truncated is true past that, and the verdict still comes from the rollup.
+# A missing ledger (status none) does not block: the queue rule needs CI,
+# threads and reviews, and cloud sessions never hold a local ledger.
+# Exit: 0 ready, 1 blocked (any blocker, even with unknowns), 3 unknown (no
+# blocker but something unread), 2 usage. Every lookup failure exits 1 or 3
+# with a note on stderr, never with an empty stdout.
+# Time bound: get-pr-comments (270 s deadline), get-pr-blockers (up to 360 s)
+# and the state query run in parallel, so the worst case is about 370 s,
+# inside the 420000 ms Bash tool timeout merge-ready.md gives the call.
+
+set -eu
+
+note() { printf '[check-merge-ready] %s\n' "$1" >&2; }
+
+if [ $# -ne 2 ]; then
+    printf 'Usage: check-merge-ready <owner/repo> <pr-number>\n' >&2
+    exit 2
+fi
+
+REPO="$1"
+PR_NUMBER="$2"
+
+case "$REPO" in
+    */*/*|/*|*/) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+    */*) OWNER="${REPO%%/*}"; NAME="${REPO#*/}" ;;
+    *) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+esac
+case "$OWNER$NAME" in
+    *[!A-Za-z0-9._-]*) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+esac
+case "$PR_NUMBER" in
+    ''|0*|*[!0-9]*) printf 'Error: PR number must be a positive integer, got: %s\n' "$PR_NUMBER" >&2; exit 2 ;;
+esac
+[ "${#PR_NUMBER}" -le 9 ] || { printf 'Error: PR number too long: %s\n' "$PR_NUMBER" >&2; exit 2; }
+
+if ! command -v jq >/dev/null 2>&1; then
+    note 'jq not found; readiness unknown'
+    printf '{"pr":%s,"verdict":"unknown","blockers":[],"unknowns":["pr_state","threads","reviews","ci"]}\n' "$PR_NUMBER"
+    exit 3
+fi
+
+HERE=$(dirname -- "$0")
+RESOLVE_GH_LIB="$HERE/../../../lib/resolve-gh.sh"
+LEDGER_LIB="$HERE/../../../lib/review-ledger.sh"
+
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/check-merge-ready.XXXXXX") || { note 'mktemp failed'; exit 3; }
+trap 'rm -rf "$WORK"' EXIT
+
+# --- Threads and reviews run in the background (each can take minutes) ---
+THREADS_RC=0
+"$HERE/get-pr-comments" --include-outdated "$OWNER/$NAME" "$PR_NUMBER" \
+    >"$WORK/threads" 2>"$WORK/threads.err" &
+THREADS_PID=$!
+BLOCKERS_RC=0
+"$HERE/get-pr-blockers" "$OWNER/$NAME" "$PR_NUMBER" \
+    >"$WORK/blockers" 2>"$WORK/blockers.err" &
+BLOCKERS_PID=$!
+
+# --- PR state, labels and the head commit's checks (GraphQL) ---
+# shellcheck disable=SC2016
+QUERY='
+query MergeReadyState($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      state
+      isDraft
+      mergeable
+      mergeStateStatus
+      headRefOid
+      labels(first: 100) { nodes { name } }
+      commits(last: 1) {
+        nodes {
+          commit {
+            oid
+            statusCheckRollup {
+              state
+              contexts(first: 100) {
+                pageInfo { hasNextPage }
+                nodes {
+                  __typename
+                  ... on CheckRun { name status conclusion }
+                  ... on StatusContext { context state }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}'
+
+STATE_OK=false
+if ! command -v gh >/dev/null 2>&1; then
+    note 'gh not found; PR state and CI unknown'
+elif [ ! -r "$RESOLVE_GH_LIB" ]; then
+    note "cannot read $RESOLVE_GH_LIB; PR state and CI unknown"
+else
+    # shellcheck source=../../../lib/resolve-gh.sh
+    . "$RESOLVE_GH_LIB"
+    STATE_RC=0
+    rg_gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
+        -f query="$QUERY" >"$WORK/state" 2>"$WORK/state.err" || STATE_RC=$?
+    if [ "$STATE_RC" -eq 0 ] && jq -e '((.errors // []) | length) == 0 and (.data.repository.pullRequest | type) == "object"' \
+        "$WORK/state" >/dev/null 2>&1; then
+        STATE_OK=true
+    else
+        [ "$STATE_RC" -ne 124 ] || note "gh timed out after ${RG_GH_TIMEOUT}s on the state lookup"
+        note "state lookup failed; PR state and CI unknown: $(head -c 300 "$WORK/state.err" | tr '\n' ' ')"
+    fi
+fi
+[ "$STATE_OK" = true ] || printf '{}' >"$WORK/state"
+
+wait "$THREADS_PID" || THREADS_RC=$?
+wait "$BLOCKERS_PID" || BLOCKERS_RC=$?
+
+# --- Threads: any non-zero exit (3 = truncated list) leaves them unknown ---
+THREADS_OK=false
+if [ "$THREADS_RC" -eq 0 ] && jq -e 'type == "array"' "$WORK/threads" >/dev/null 2>&1; then
+    THREADS_OK=true
+else
+    note "thread lookup failed (exit $THREADS_RC); threads unknown: $(head -c 300 "$WORK/threads.err" | tr '\n' ' ')"
+    printf '[]' >"$WORK/threads"
+fi
+
+# --- Reviews: lookupFailed true is unknown, never "no blockers" ---
+if [ "$BLOCKERS_RC" -ne 0 ] || ! jq -e 'type == "object" and (.lookupFailed | type) == "boolean"' "$WORK/blockers" >/dev/null 2>&1; then
+    note "review lookup failed (exit $BLOCKERS_RC): $(head -c 300 "$WORK/blockers.err" | tr '\n' ' ')"
+    printf '{"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown","lookupFailed":true}' >"$WORK/blockers"
+elif jq -e '.lookupFailed' "$WORK/blockers" >/dev/null 2>&1; then
+    note "review lookup failed ($(jq -r '.lookupReason // "other"' "$WORK/blockers")); reviews unknown"
+fi
+
+# --- Ledger (local, optional): summary prints {} when the PR has none ---
+LEDGER_STATUS=unavailable
+LEDGER_BLOCKING=null
+if [ -x "$LEDGER_LIB" ]; then
+    if "$LEDGER_LIB" summary "$PR_NUMBER" >"$WORK/ledger" 2>"$WORK/ledger.err" \
+        && jq -e 'type == "object"' "$WORK/ledger" >/dev/null 2>&1; then
+        LEDGER_BLOCKING=$(jq --arg pr "$PR_NUMBER" '.[$pr].merge_blocking // null | if type == "number" then . else null end' "$WORK/ledger")
+        if [ "$LEDGER_BLOCKING" = null ]; then LEDGER_STATUS=none; else LEDGER_STATUS=read; fi
+    else
+        note "ledger summary unavailable: $(head -c 200 "$WORK/ledger.err" | tr '\n' ' ')"
+    fi
+fi
+
+jq -n \
+    --argjson pr "$PR_NUMBER" \
+    --argjson stateok "$STATE_OK" \
+    --argjson threadsok "$THREADS_OK" \
+    --slurpfile s "$WORK/state" \
+    --slurpfile t "$WORK/threads" \
+    --slurpfile b "$WORK/blockers" \
+    --arg lstatus "$LEDGER_STATUS" \
+    --argjson lblocking "$LEDGER_BLOCKING" '
+  ($s[0].data.repository.pullRequest // {}) as $p
+  | ($p.commits.nodes[0].commit // {}) as $c
+  | ($c.statusCheckRollup) as $roll
+  | ($roll.contexts.nodes // []) as $ctx
+  | (if $stateok then (if $roll == null then "NONE" else $roll.state end) else null end) as $ci
+  | $b[0] as $bl
+  | {
+      pr: $pr,
+      head: (if $stateok then ($p.headRefOid // null) else null end),
+      state: (if $stateok then $p.state else null end),
+      isDraft: (if $stateok then $p.isDraft else null end),
+      mergeable: (if $stateok then $p.mergeable else null end),
+      mergeStateStatus: (if $stateok then $p.mergeStateStatus else null end),
+      queued: (if $stateok then ([$p.labels.nodes[]?.name] | index("graphite-queue") != null) else null end),
+      threads: (if $threadsok then {unresolved: ($t[0] | length), outdated: ([$t[0][] | select(.isOutdated == true)] | length)} else null end),
+      changesRequested: (if $bl.lookupFailed then null else [$bl.changesRequested[]?.login] end),
+      reviewDecision: (if $bl.lookupFailed then null else $bl.reviewDecision end),
+      conversationResolution: ($bl.conversationResolution // "unknown"),
+      ci: {
+        state: $ci,
+        failing: [$ctx[] | select(
+            (.__typename == "CheckRun" and .status == "COMPLETED"
+              and ((.conclusion // "") | IN("FAILURE","TIMED_OUT","CANCELLED","ACTION_REQUIRED","STARTUP_FAILURE","STALE")))
+            or (.__typename == "StatusContext" and ((.state // "") | IN("FAILURE","ERROR"))))
+          | (.name // .context)],
+        pending: [$ctx[] | select(
+            (.__typename == "CheckRun" and .status != "COMPLETED")
+            or (.__typename == "StatusContext" and ((.state // "") | IN("PENDING","EXPECTED"))))
+          | (.name // .context)],
+        truncated: ($roll.contexts.pageInfo.hasNextPage // false)
+      },
+      ledger: {status: $lstatus, mergeBlocking: $lblocking}
+    }
+  | .blockers = [
+      (if .state != null and .state != "OPEN" then "not_open" else empty end),
+      (if .isDraft == true then "draft" else empty end),
+      (if .mergeable == "CONFLICTING" then "conflicts" else empty end),
+      (if (.threads.unresolved // 0) > 0 then "unresolved_threads" else empty end),
+      (if ((.changesRequested // []) | length) > 0 then "changes_requested" else empty end),
+      (if .reviewDecision == "REVIEW_REQUIRED" then "review_required" else empty end),
+      (if .ci.state == "FAILURE" or .ci.state == "ERROR" then "ci_failing" else empty end),
+      (if .ci.state == "PENDING" or .ci.state == "EXPECTED" then "ci_pending" else empty end),
+      (if (.ledger.mergeBlocking // 0) > 0 then "ledger_findings" else empty end)
+    ]
+  | .unknowns = [
+      (if $stateok then empty else "pr_state" end),
+      (if .threads == null then "threads" else empty end),
+      (if $bl.lookupFailed then "reviews" else empty end),
+      (if $stateok and (.ci.state | IN("SUCCESS","NONE","PENDING","EXPECTED","FAILURE","ERROR")) then empty else "ci" end),
+      (if $stateok and .mergeable == "UNKNOWN" then "mergeable" else empty end)
+    ]
+  | .verdict = (if (.blockers | length) > 0 then "blocked"
+                elif (.unknowns | length) > 0 then "unknown"
+                else "ready" end)
+' >"$WORK/out" || { note 'could not assemble the report'; printf '{"pr":%s,"verdict":"unknown","blockers":[],"unknowns":["pr_state","threads","reviews","ci"]}\n' "$PR_NUMBER"; exit 3; }
+
+cat "$WORK/out"
+case "$(jq -r '.verdict' "$WORK/out")" in
+    ready) exit 0 ;;
+    blocked) exit 1 ;;
+    *) exit 3 ;;
+esac
