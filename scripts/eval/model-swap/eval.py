@@ -246,7 +246,8 @@ def prepare(spec_path, work):
         with open(os.path.join(work, "golden-%s.json" % s["id"]), "w", encoding="utf-8") as handle:
             json.dump(golden, handle, indent=1)
     if spec["prompts"]:
-        worktree(os.path.join(work, "wt", "prompt"), spec["prompt_commit"])
+        # Recreated each time: a finder's answers depend on the docs at prompt_commit.
+        fresh_worktree(os.path.join(work, "wt", "prompt"), spec["prompt_commit"])
     cases = {c["id"]: c for c in spec["prompts"]}
     for aid, agent in spec["agents"].items():
         sys_prompt = system_prompt_with_skills(aid, agent, work)
@@ -263,8 +264,8 @@ def prepare(spec_path, work):
                         rows.append(["%s-%s-%s-%s-r%d" % (aid, cid, c["model"], c["effort"], rep),
                                      sys_prompt, os.path.join(work, "wt", "prompt"), c["model"], c["effort"],
                                      prompt, aid, cid,
-                                     fingerprint(agent["expect"][cid], cases[cid], c["model"], c["effort"],
-                                                 sys_prompt, prompt)])
+                                     fingerprint(agent["expect"][cid], cases[cid], spec["prompt_commit"],
+                                                 c["model"], c["effort"], sys_prompt, prompt)])
                     continue
                 if agent["kind"] == "replay":
                     for r in spec["replays"]:
@@ -419,11 +420,12 @@ def case_passes(expect, text):
     if any(re.search(rx, text, re.I | re.M) for rx in expect.get("not", [])):
         return False
     if "lowest" in expect:
+        # Every candidate must be scored, or an incomplete reply could rank `lowest` last.
         scores = weighted_scores(text)
         low = expect["lowest"]
-        if low not in scores or len(scores) < 2:
+        if low not in expect["candidates"] or any(c not in scores for c in expect["candidates"]):
             return False
-        return all(scores[low] < v for k, v in scores.items() if k != low)
+        return all(scores[low] < scores[c] for c in expect["candidates"] if c != low)
     return True
 
 

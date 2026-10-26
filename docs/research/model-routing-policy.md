@@ -102,8 +102,8 @@ Phase 3 verdicts (CLAUDE-187; eval on 2026-10-26 with
 | `yellow-review` agent-cli-readiness-reviewer | opus / high (unchanged) | Sonnet also found 8/8 plants, but in both runs on #1319 Opus raised two P2 agent-friction issues that no Sonnet run raised above P3 |
 | `yellow-debt` duplication-scanner | haiku / low (was sonnet / low) | 8/8 planted duplicates over two rounds against Sonnet's 5/8, at about a tenth of the cost |
 | `yellow-debt` ai-pattern-scanner | haiku / low (was sonnet / low) | 8/8 planted AI-pattern blocks over two rounds against Sonnet's 5/8 |
-| `knowledge-compounder` Context Analyzer and Related Docs Finder | haiku / low, set at dispatch | Over two rounds, Analyzer 72/72 well-formed replies and Finder 84/84 (the existing doc for all 12 real problems, `NO_MATCH` for both novel ones), as Sonnet |
-| `knowledge-compounder` Category Classifier | inherits (unchanged) | Sonnet and Haiku at `medium` agreed with the filed category two times in three, Haiku at `low` slightly less (56%), and the misses were borderline docs, so the eval cannot separate the models |
+| `knowledge-compounder` Context Analyzer and Related Docs Finder | haiku / low, set at dispatch | Over three rounds, Analyzer 108/108 well-formed replies and Finder 126/126 (the existing doc for all 12 real problems, `NO_MATCH` for both novel ones), as Sonnet |
+| `knowledge-compounder` Category Classifier | inherits (unchanged) | Sonnet and Haiku at `medium` agreed with the filed category two times in three, Haiku at `low` slightly less (61%), and the misses were borderline docs, so the eval cannot separate the models |
 | `/optimize` judge | sonnet / medium, set at dispatch (was the session's model) | Opus, Sonnet and Haiku each ranked the planted flaw last in every run, in both orderings. Sonnet keeps a margin over Haiku for subtler flaws |
 
 All 34 sonnet agents that had no `effort:` now pin `medium`, which is what

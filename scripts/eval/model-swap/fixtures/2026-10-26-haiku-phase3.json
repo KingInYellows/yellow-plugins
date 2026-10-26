@@ -374,22 +374,52 @@
    "prompt": "{context}",
    "expect": {
     "judge-sh-fwd": {
-     "lowest": "B"
+     "lowest": "B",
+     "candidates": [
+      "A",
+      "B",
+      "C"
+     ]
     },
     "judge-sh-rev": {
-     "lowest": "B"
+     "lowest": "B",
+     "candidates": [
+      "A",
+      "B",
+      "C"
+     ]
     },
     "judge-commit-fwd": {
-     "lowest": "B"
+     "lowest": "B",
+     "candidates": [
+      "A",
+      "B",
+      "C"
+     ]
     },
     "judge-commit-rev": {
-     "lowest": "B"
+     "lowest": "B",
+     "candidates": [
+      "A",
+      "B",
+      "C"
+     ]
     },
     "judge-errmsg-fwd": {
-     "lowest": "B"
+     "lowest": "B",
+     "candidates": [
+      "A",
+      "B",
+      "C"
+     ]
     },
     "judge-errmsg-rev": {
-     "lowest": "B"
+     "lowest": "B",
+     "candidates": [
+      "A",
+      "B",
+      "C"
+     ]
     }
    }
   }

@@ -42,10 +42,10 @@ an output with another fingerprint as missing.
   extractor, the `/optimize` judge) runs from a stand-in under `fixtures/` with
   a case's context: inline `text`, or a repo file at a commit (`source`, with
   its title and any `docs/solutions` line removed). Each case passes when the
-  reply hits every `match` regex and no `not` regex, or, for `lowest`, gives
-  that candidate the lowest `weighted_score`. Cases run in a worktree at
-  `prompt_commit`, so a finder can search the repo there without seeing the
-  fixtures.
+  reply hits every `match` regex and no `not` regex, or, for `lowest`, scores
+  every one of the case's `candidates` and gives that one the lowest
+  `weighted_score`. Cases run in a worktree at `prompt_commit`, so a finder can
+  search the repo there without seeing the fixtures.
 - **Everything else.** `grade` writes the findings that match no plant to
   `unmatched-findings.txt`. Judge those by hand for false positives.
 
