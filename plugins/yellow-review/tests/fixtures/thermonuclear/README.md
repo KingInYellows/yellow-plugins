@@ -52,9 +52,12 @@ times, and require a majority — never a numeric threshold.
    actually exists; without it the expected reuse finding is unachievable.
 3. Compare against "Expected" and record pass/fail in the PR body.
 
-`scripts/eval/thermonuclear-fixtures/eval.py` automates steps 1–3 and the Claude
-Code smoke test; its README covers the Codex and Cursor legs. The first full
-pass is recorded in `scripts/eval/thermonuclear-fixtures/results-2026-10-26.md`.
+`scripts/eval/thermonuclear-fixtures/eval.py` builds the step 2 dispatch, runs
+it, and prints the step 3 grade table, plus the Claude Code smoke test. It runs
+the persona directly, so step 1's opt-in is not needed for it, and you still
+record the outcome in the PR body yourself. Its README covers the Codex and
+Cursor legs. The first full pass is recorded in
+`scripts/eval/thermonuclear-fixtures/results-2026-10-26.md`.
 
 ## Cases
 

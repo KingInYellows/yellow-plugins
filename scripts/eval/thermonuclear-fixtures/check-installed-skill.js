@@ -44,15 +44,19 @@ const keys = installed.frontmatter
   .split('\n')
   .filter((line) => /^[A-Za-z_-]+:/.test(line))
   .map((line) => line.split(':')[0]);
+const source = split(fs.readFileSync(SOURCE, 'utf8'));
+const nameLine = (frontmatter) =>
+  frontmatter.split('\n').find((line) => line.startsWith('name:'));
 const results = [
   [
     'frontmatter is name + description only',
     JSON.stringify(keys) === JSON.stringify(['name', 'description']),
   ],
   [
-    'body identical to source skill',
-    installed.body === split(fs.readFileSync(SOURCE, 'utf8')).body,
+    'name matches source skill',
+    nameLine(installed.frontmatter) === nameLine(source.frontmatter),
   ],
+  ['body identical to source skill', installed.body === source.body],
   ...MARKERS.map(([label, needle]) => [label, flat.includes(needle)]),
 ];
 for (const [label, ok] of results) {
