@@ -13,7 +13,10 @@ setup() {
   export SLEEP_LOG="${BATS_TEST_TMPDIR}/sleep.log"
   : >"$SLEEP_LOG"
   printf '#!/bin/sh\nprintf "%%s\\n" "$1" >>"$SLEEP_LOG"\n' >"${BATS_TEST_TMPDIR}/stubs/sleep"
-  chmod +x "${BATS_TEST_TMPDIR}/stubs/sleep"
+  # A frozen clock: real seconds ticking during a run would shrink the
+  # asserted sleeps on a slow runner. clock_setup replaces it with a fake one.
+  printf '#!/bin/sh\necho 1000\n' >"${BATS_TEST_TMPDIR}/stubs/date"
+  chmod +x "${BATS_TEST_TMPDIR}/stubs/sleep" "${BATS_TEST_TMPDIR}/stubs/date"
   export PATH="${BATS_TEST_TMPDIR}/stubs:${PATH}"
   ROUND1="${BATS_TEST_TMPDIR}/round1"
   OUT="${BATS_TEST_TMPDIR}/out.json"
