@@ -13,6 +13,52 @@ and this project adheres to
 
 ---
 
+## [2.1.27] - 2026-10-27
+
+### Added
+
+- **yellow-review 3.12.0** — `/review:merge-ready` is a read-only merge gate for
+  one PR. Its `check-merge-ready` script reports unresolved review threads
+  (outdated included), `CHANGES_REQUESTED` reviewers, a missing required review,
+  the head commit's CI rollup, draft and conflict state, conversation-resolution
+  enforcement, the `graphite-queue` label and pending P0-P2 ledger findings, and
+  exits 0 ready, 1 blocked or 3 unknown. It never writes to GitHub or the
+  ledger.
+
+### Changed
+
+- **yellow-goal 0.4.0, yellow-core 2.11.6** — The goal-gen engine is pinned to
+  0.4.0 (annotated tag `v0.4.0` at `63647f1`). 0.4.0 splits the engine's models
+  by role: extraction on Sonnet, action attempts on Haiku, and retries after a
+  failed attempt on Sonnet. The approval-gated real run is unchanged.
+  `/setup:all` now reports READY only for engine version 0.4.0.
+- **yellow-review 3.12.0, yellow-core 2.11.6, yellow-debt 1.9.5, yellow-docs
+  1.4.1** — Sonnet agents that had no `effort` now pin `effort: medium`, so they
+  no longer run at whatever effort the launching session uses. After the
+  CLAUDE-187 eval, agent-native-reviewer routes to `sonnet` / `medium`, the
+  duplication and ai-pattern scanners to `haiku` / `low`, knowledge-compounder's
+  Context Analyzer and Related Docs Finder to `haiku` / `low`, and the
+  `/optimize` judge to `sonnet` / `medium`.
+- **github-workflow 0.3.7, gt-workflow 2.0.9, yellow-ci 1.5.10, yellow-core
+  2.11.6, yellow-devin 3.0.9** — Documentation cleanup. `learnings-researcher`
+  now names `/review:all` instead of the retired `/review:review-all`. The
+  gt-workflow, yellow-ci, and yellow-devin READMEs document `/gt-merge`,
+  `/ci:report-linear`, `/ci:setup-self-hosted`, and `/devin:review-prs`. The
+  github-workflow README links the stacked-PR plan at its `plans/complete/`
+  path.
+
+### Fixed
+
+- **yellow-jules 0.4.1** — A grant write that passes a controller check now also
+  takes the controller lock: `revokeGrant` and `releaseSlotInStore` take one
+  `{ beforeWrite, lock }` object, so a caller cannot pass the check without the
+  lock. The take-over lock-wait test waits for the take-over to reach its lock
+  attempt instead of a fixed 300 ms.
+- **yellow-review 3.12.0** — The `poll-new-threads` bats suite stubs a frozen
+  `date` in `setup()`, so tests that assert exact sleep lengths no longer
+  shorten when a second ticks over on a slow runner. The wall-clock tests keep
+  their own fake clock.
+
 ## [2.1.26] - 2026-10-26
 
 ### Added

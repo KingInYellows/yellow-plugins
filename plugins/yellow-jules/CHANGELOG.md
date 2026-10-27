@@ -1,5 +1,17 @@
 # yellow-jules
 
+## 0.4.1
+
+### Patch Changes
+
+- [`b1eafbe`](https://github.com/KingInYellows/yellow-plugins/commit/b1eafbe37c9c7cd8e24c1ee3925ed6bf32206817)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Require the
+  controller lock whenever a grant write passes a controller check:
+  `revokeGrant` and `releaseSlotInStore` now take one `{ beforeWrite, lock }`
+  object, so a caller cannot pass the check without the lock. The take-over
+  lock-wait test now waits for the take-over to reach its lock attempt instead
+  of a fixed 300 ms.
+
 ## 0.4.0
 
 ### Minor Changes

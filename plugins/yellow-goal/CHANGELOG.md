@@ -1,5 +1,17 @@
 # yellow-goal
 
+## 0.4.0
+
+### Minor Changes
+
+- [`a3100cc`](https://github.com/KingInYellows/yellow-plugins/commit/a3100cc3191e8ed21edfd5b203c71d492bbbdfb6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Pin the
+  goal-gen engine to 0.4.0 (annotated tag `v0.4.0` at `63647f1`,
+  `goal-gen-0.4.0.tgz` SHA-256 `e95639e3…ba78`). 0.4.0 splits the engine's
+  models by role: extraction on Sonnet, action attempts on Haiku, and retries
+  after a failed attempt on Sonnet. The approval-gated real run is unchanged.
+  `/setup:all` now reports READY only for engine version 0.4.0.
+
 ## 0.3.2
 
 ### Patch Changes
