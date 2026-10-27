@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.9.5
+
+### Patch Changes
+
+- [`acbf645`](https://github.com/KingInYellows/yellow-plugins/commit/acbf6452ccaab28fd3c1a6afa1a783684a5d66fd)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Pin
+  `effort: medium` on the 34 sonnet agents that had no effort, so they no longer
+  run at whatever effort the launching session uses. After the CLAUDE-187 eval,
+  route agent-native-reviewer to `sonnet` / `medium`, the duplication and
+  ai-pattern scanners to `haiku` / `low`, knowledge-compounder's Context
+  Analyzer and Related Docs Finder to `haiku` / `low`, and the `/optimize` judge
+  to `sonnet` / `medium`.
+
 ## 1.9.4
 
 ### Patch Changes

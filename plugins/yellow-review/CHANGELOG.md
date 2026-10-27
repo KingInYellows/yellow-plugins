@@ -1,5 +1,37 @@
 # Changelog
 
+## 3.12.0
+
+### Minor Changes
+
+- [`c878bce`](https://github.com/KingInYellows/yellow-plugins/commit/c878bce3e3b5e698a3a9c3b6b523db00fd654095)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `/review:merge-ready`, a read-only merge gate for one PR. Its
+  `check-merge-ready` script reports unresolved review threads (outdated
+  included), `CHANGES_REQUESTED` reviewers, a missing required review, the head
+  commit's CI rollup, draft and conflict state, conversation-resolution
+  enforcement, the `graphite-queue` label and pending P0-P2 ledger findings, and
+  exits 0 ready, 1 blocked or 3 unknown. It never writes to GitHub or the
+  ledger.
+
+### Patch Changes
+
+- [`acbf645`](https://github.com/KingInYellows/yellow-plugins/commit/acbf6452ccaab28fd3c1a6afa1a783684a5d66fd)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Pin
+  `effort: medium` on the 34 sonnet agents that had no effort, so they no longer
+  run at whatever effort the launching session uses. After the CLAUDE-187 eval,
+  route agent-native-reviewer to `sonnet` / `medium`, the duplication and
+  ai-pattern scanners to `haiku` / `low`, knowledge-compounder's Context
+  Analyzer and Related Docs Finder to `haiku` / `low`, and the `/optimize` judge
+  to `sonnet` / `medium`.
+
+- [`d2b772c`](https://github.com/KingInYellows/yellow-plugins/commit/d2b772c187b5143891b8762245c9c3e6a369d335)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make the
+  `poll-new-threads` bats suite deterministic. Its tests asserted exact sleep
+  lengths while the script measured real `date +%s` time, so a second ticking
+  over on a slow runner shortened a sleep (`10` became `9`). `setup()` now stubs
+  a frozen `date`; the wall-clock tests keep their own fake clock.
+
 ## 3.11.0
 
 ### Minor Changes

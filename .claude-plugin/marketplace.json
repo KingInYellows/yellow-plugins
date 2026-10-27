@@ -14,7 +14,7 @@
     {
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
-      "version": "2.0.8",
+      "version": "2.0.9",
       "author": {
         "name": "KingInYellows"
       },
@@ -24,7 +24,7 @@
     {
       "name": "github-workflow",
       "description": "GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)",
-      "version": "0.3.6",
+      "version": "0.3.7",
       "author": {
         "name": "KingInYellows"
       },
@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.11.5",
+      "version": "2.11.6",
       "author": {
         "name": "KingInYellows"
       },
@@ -64,7 +64,7 @@
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains",
-      "version": "3.0.8",
+      "version": "3.0.9",
       "author": {
         "name": "KingInYellows"
       },
@@ -74,7 +74,7 @@
     {
       "name": "yellow-jules",
       "description": "Google Jules integration (experimental) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -84,7 +84,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.11.0",
+      "version": "3.12.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -114,7 +114,7 @@
     {
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
-      "version": "1.9.4",
+      "version": "1.9.5",
       "author": {
         "name": "KingInYellows"
       },
@@ -124,7 +124,7 @@
     {
       "name": "yellow-ci",
       "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
-      "version": "1.5.9",
+      "version": "1.5.10",
       "author": {
         "name": "KingInYellows"
       },
@@ -174,7 +174,7 @@
     {
       "name": "yellow-docs",
       "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
-      "version": "1.4.0",
+      "version": "1.4.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -204,7 +204,7 @@
     {
       "name": "yellow-goal",
       "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets, run zero-spend stub scenarios, and forward a user-only approval-gated real run. Never imports the engine.",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "author": {
         "name": "KingInYellows"
       },

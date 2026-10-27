@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.11.6
+
+### Patch Changes
+
+- [`5469d7f`](https://github.com/KingInYellows/yellow-plugins/commit/5469d7f31858770b9f4390638e64aba84a499f12)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Documentation
+  cleanup. `learnings-researcher` now names `/review:all` instead of the retired
+  `/review:review-all`. The gt-workflow, yellow-ci, and yellow-devin READMEs
+  document `/gt-merge`, `/ci:report-linear`, `/ci:setup-self-hosted`, and
+  `/devin:review-prs`, which shipped without README entries. The github-workflow
+  README links the stacked-PR plan at its `plans/complete/` path.
+
+- [`a3100cc`](https://github.com/KingInYellows/yellow-plugins/commit/a3100cc3191e8ed21edfd5b203c71d492bbbdfb6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Pin the
+  goal-gen engine to 0.4.0 (annotated tag `v0.4.0` at `63647f1`,
+  `goal-gen-0.4.0.tgz` SHA-256 `e95639e3…ba78`). 0.4.0 splits the engine's
+  models by role: extraction on Sonnet, action attempts on Haiku, and retries
+  after a failed attempt on Sonnet. The approval-gated real run is unchanged.
+  `/setup:all` now reports READY only for engine version 0.4.0.
+
+- [`acbf645`](https://github.com/KingInYellows/yellow-plugins/commit/acbf6452ccaab28fd3c1a6afa1a783684a5d66fd)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Pin
+  `effort: medium` on the 34 sonnet agents that had no effort, so they no longer
+  run at whatever effort the launching session uses. After the CLAUDE-187 eval,
+  route agent-native-reviewer to `sonnet` / `medium`, the duplication and
+  ai-pattern scanners to `haiku` / `low`, knowledge-compounder's Context
+  Analyzer and Related Docs Finder to `haiku` / `low`, and the `/optimize` judge
+  to `sonnet` / `medium`.
+
 ## 2.11.5
 
 ### Patch Changes

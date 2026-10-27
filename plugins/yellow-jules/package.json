@@ -1,6 +1,6 @@
 {
   "name": "yellow-jules",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
   "scripts": {

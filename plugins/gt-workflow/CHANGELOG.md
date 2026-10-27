@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.9
+
+### Patch Changes
+
+- [`5469d7f`](https://github.com/KingInYellows/yellow-plugins/commit/5469d7f31858770b9f4390638e64aba84a499f12)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Documentation
+  cleanup. `learnings-researcher` now names `/review:all` instead of the retired
+  `/review:review-all`. The gt-workflow, yellow-ci, and yellow-devin READMEs
+  document `/gt-merge`, `/ci:report-linear`, `/ci:setup-self-hosted`, and
+  `/devin:review-prs`, which shipped without README entries. The github-workflow
+  README links the stacked-PR plan at its `plans/complete/` path.
+
 ## 2.0.8
 
 ### Patch Changes
