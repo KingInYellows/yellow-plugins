@@ -30,6 +30,11 @@ engines:
   markdownlint:
     exclude_paths:
       - "docs/solutions/**"
+      # Model-swap prompt fixtures are the system-prompt bytes (frontmatter
+      # stripped at run time), not docs. MD041 (no H1 — a heading would be
+      # part of the prompt), MD040 (language-less fences are the exact reply
+      # shape), and MD033 (angle-bracket placeholders) are structural.
+      - "scripts/eval/model-swap/fixtures/**"
 exclude_paths:
   - ".changeset/**"
   - "plans/**"
