@@ -36,13 +36,24 @@ if [ -z "$tools" ]; then
     n == 1 && t { t = 0 }' "$agent")
 fi
 [ -n "$tools" ] || { printf 'run-one: no tools for %s\n' "$agent" >&2; exit 2; }
+# Approve Read/Grep/Glob only under <workdir>, plus Read of <prompt-file>'s
+# directory (a replay prompt points the reviewer at its .patch there): a
+# fixture that names a host path (~/.ssh/...) gets a permission denial instead
+# of the file. Other tools keep their bare names.
+prompt_dir=$(cd "$(dirname "$prompt_file")" && pwd -P) || exit 1
+case $prompt_dir in *[,\(\)]*) printf 'run-one: prompt dir %s has a comma or parenthesis\n' "$prompt_dir" >&2; exit 2 ;; esac
+allowed=$(printf '%s' "$tools" | awk -v RS=, -v pd="$prompt_dir" '{ gsub(/^[ \t\n]+|[ \t\n]+$/, "") }
+  $0 == "" { next }
+  $0 == "Read" { $0 = "Read(./**),Read(/" pd "/**)" }
+  $0 == "Grep" || $0 == "Glob" { $0 = $0 "(./**)" }
+  { printf "%s%s", s, $0; s = "," }')
 # Keep the parent session's effort, memory and extra CLAUDE.md out of the run.
 unset CLAUDE_EFFORT CLAUDE_CODE_EFFORT_LEVEL CLAUDE_COWORK_MEMORY_PATH_OVERRIDE \
   CLAUDE_MEMORY_STORES CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD CLAUDE_ADDITIONAL_DIRECTORIES
 start=$(date +%s)
 (cd "$workdir" && timeout 1200 claude -p --setting-sources "" --strict-mcp-config \
   --disable-slash-commands --model "$model" --effort "$effort" \
-  --tools "$tools" --allowedTools "$tools" --system-prompt-file "$sys" \
+  --tools "$tools" --allowedTools "$allowed" --system-prompt-file "$sys" \
   --output-format json --no-session-persistence "$(cat "$prompt_file")") \
   >"$out.tmp" 2>"$out_dir/$id.err"
 rc=$?

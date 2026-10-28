@@ -52,12 +52,15 @@ an output with another fingerprint as missing.
 ## How it runs
 
 `run-one.sh` runs the agent body (frontmatter stripped) as the system prompt
-with the agent's own `tools:` list. It passes explicit `--model` and `--effort`
-and disables settings, MCP servers, slash commands and memory, so model and
-effort are the only variables. Project `CLAUDE.md` files still load. Agents
-listed with `preload_skills` get those `SKILL.md` bodies appended, which is what
-`skills:` frontmatter does. `--plugin-dir` is not used: in cloud sessions it did
-not register plugin agents.
+with the agent's own `tools:` list. `Read`, `Grep` and `Glob` are approved only
+under the run's working directory (`Read(./**)` and the like), and `Read` also
+under the prompt file's directory, where a replay's `.patch` lives, so a fixture
+that names a host path such as `~/.ssh/...` gets a permission denial instead of
+the file. It passes explicit `--model` and `--effort` and disables settings, MCP
+servers, slash commands and memory, so model and effort are the only variables.
+Project `CLAUDE.md` files still load. Agents listed with `preload_skills` get
+those `SKILL.md` bodies appended, which is what `skills:` frontmatter does.
+`--plugin-dir` is not used: in cloud sessions it did not register plugin agents.
 
 The orchestrator blocks that `/review:pr` injects (`<standards-paths>`,
 `<rule-vocabulary>`) are not supplied, so agents run in standalone mode.
