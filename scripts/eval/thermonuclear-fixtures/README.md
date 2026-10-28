@@ -56,10 +56,22 @@ without the finding being right.
   a newer `codex` on PATH, install 0.157.0 elsewhere and point `CODEX_BIN` at
   it. Then run
   `node scripts/eval/thermonuclear-fixtures/check-installed-skill.js` on the
-  installed `SKILL.md` path from its report. To invoke the skill, copy your
-  Codex `auth.json` into the kept `CODEX_HOME` and run one `codex exec` turn in
-  a scratch git repo with the fixture diff committed, then check that
-  `git status --porcelain` is empty.
+  installed `SKILL.md` path from its report. To invoke the skill, reuse the kept
+  profile and the same binary, or the run can skip the installed copy
+  (`KEPT_CODEX_HOME` is the profile path from the report, `REPO` this checkout):
+
+  ```bash
+  cp ~/.codex/auth.json "$KEPT_CODEX_HOME/" # never print it
+  cd "$(mktemp -d)" && git init -q && cp "$REPO/plugins/yellow-review/tests/fixtures/thermonuclear/wrapper-indirection.diff" . \
+    && git add . && git commit -qm fixture
+  CODEX_HOME="$KEPT_CODEX_HOME" "$CODEX_BIN" exec --disable remote_plugin -s workspace-write \
+    'Use the yellow-review:yellow-thermonuclear-review skill to review wrapper-indirection.diff. Report findings only.'
+  git status --porcelain # must print nothing
+  ```
+
+  `workspace-write` is deliberate: a clean tree then tests the skill's
+  report-only rail, not the sandbox. Expect the indirection finding.
+
 - **Cursor:** needs the Cursor editor. Place the plugin at
   `~/.cursor/plugins/local/yellow-review/` (on Windows, the Windows profile's
   `.cursor`, not WSL's), reload the window, and confirm
@@ -67,7 +79,11 @@ without the finding being right.
   `cursor/skills/yellow-thermonuclear-review/SKILL.md` in that copy, the path
   `.cursor-plugin/plugin.json` points Cursor at. The Claude Code copy under
   `skills/` fails the frontmatter check by design (`user-invocable: false`).
-  Then invoke the skill by name on one fixture diff.
+  Before invoking, remove or disable every other `yellow-review` Cursor can see:
+  Cursor imports Claude Code's installed plugins and its own marketplace copies,
+  does not log which same-named plugin wins, and lets a marketplace install take
+  precedence over a local copy. Then invoke the skill by name on one fixture
+  diff.
 
 Results so far: [`results-2026-10-26.md`](results-2026-10-26.md) (fixture eval,
 Claude Code smoke, Codex discovery) and
