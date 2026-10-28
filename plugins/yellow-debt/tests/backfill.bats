@@ -164,3 +164,26 @@ field() {
   run debt_backfill_todos
   [ "$status" -eq 1 ]
 }
+
+@test "backfill keeps present lines byte-for-byte, quoted ids included" {
+  f=todos/debt/009-pending-high-quoted.md
+  printf -- "---\nid: '009'\n# a hand note\nstatus: pending\nseverity: high\naudit_date: '2026-02-13'\nanchor_hash: '00000009'\ncategory: complexity\naffected_files:\n  - a.ts:1\n---\n# Q\n" > "$f"
+  run debt_backfill_todo "$f"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Backfilled priority in"* ]]
+  grep -qx "id: '009'" "$f"
+  grep -qx "# a hand note" "$f"
+  grep -qx "anchor_hash: '00000009'" "$f"
+  grep -qx "audit_date: '2026-02-13'" "$f"
+  grep -qx "priority: p2" "$f"
+}
+
+@test "backfill refuses a blank field it cannot replace in place" {
+  f=todos/debt/019-pending-low-comment.md
+  printf -- '---\nid: # filled later\nstatus: pending\nseverity: low\npriority: p4\n---\n# C\n' > "$f"
+  cp "$f" "$WORK/before"
+  run --separate-stderr debt_backfill_todo "$f"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"cannot replace"* ]]
+  cmp "$f" "$WORK/before"
+}

@@ -458,7 +458,7 @@ transition_todo_state() {
 # Usage: debt_backfill_todo FILE
 debt_backfill_todo() {
   local file="$1" lock_dir="$1.lock" base name_id name_status name_sev
-  local result added missing new_fm body
+  local result added missing body
 
   debt_refuse_symlinked_path "$file" || return 1
   base="${file##*/}"
@@ -488,20 +488,13 @@ debt_backfill_todo() {
     {"critical": "p1", "high": "p2", "medium": "p3", "low": "p4"} as $prio
     | (. // {}) as $fm
     | if ($fm | type) != "object" then error("frontmatter is not a mapping") else . end
-    | [ ($fm.id | blank | if . then "id" else empty end),
-        ($fm.status | blank | if . then "status" else empty end),
-        ($fm.severity | blank | if . then "severity" else empty end),
-        ($fm.priority | blank | if . then "priority" else empty end) ] as $added
-    | ($fm
-       | (if (.id | blank) then del(.id) else . end)
-       | (if (.status | blank) then .status = $st else . end)
-       | (if (.severity | blank) then .severity = $sev else . end)
-       | (if (.priority | blank)
-          then .priority = ($prio[.severity | tostring] // $prio[$sev])
-          else . end)) as $out
-    | {fm: $out, added: $added,
-       missing: [ ($fm.category | blank | if . then "category" else empty end),
-                  ($fm.affected_files | blank | if . then "affected_files" else empty end) ]}
+    | ($fm.severity | if blank then $sev else tostring end) as $s
+    | {id: $id, status: $st, severity: $sev,
+       priority: ($prio[$s] // $prio[$sev])} as $derived
+    | {added: [ "id", "status", "severity", "priority"
+                | select($fm[.] | blank) ],
+       values: $derived,
+       missing: [ "category", "affected_files" | select($fm[.] | blank) ]}
     ' 2>/dev/null) || {
     printf '[debt] Could not parse the frontmatter of %s; edit it by hand\n' "$base" >&2
     return 1
@@ -514,17 +507,38 @@ debt_backfill_todo() {
   fi
   [ -n "$added" ] || return 0
 
-  new_fm=$(printf '%s' "$result" | yq -y '.fm') || return 1
-  # Quote the id by hand: a YAML dumper leaves `009` bare (not valid octal),
-  # and YAML 1.2 readers then load it as the number 9. The name check above
-  # limits it to digits.
-  case ", $added," in
-    *", id,"*) new_fm="id: '$name_id'"$'\n'"$new_fm" ;;
-  esac
+  # Edit the text rather than re-dump it: a YAML dumper writes a present
+  # string such as '009' bare, and YAML 1.2 readers then load the number 9.
+  # Drop each blank key's own line, then append the derived values, which are
+  # digits or fixed words. The id is quoted so it stays a string.
+  local fm_text key val line expected got
+  fm_text=$(awk 'NR == 1 { next } /^---$/ { exit } { print }' "$file")
+  for key in $(printf '%s' "$result" | jq -r '.added[]'); do
+    fm_text=$(printf '%s\n' "$fm_text" \
+      | grep -Ev "^${key}:[[:space:]]*(null|~|''|\"\")?[[:space:]]*\$") || true
+    if printf '%s\n' "$fm_text" | grep -q "^${key}:"; then
+      printf '[debt] %s writes %s in a form the backfill cannot replace; edit it by hand\n' "$base" "$key" >&2
+      return 1
+    fi
+    val=$(printf '%s' "$result" | jq -r --arg k "$key" '.values[$k]') || return 1
+    [ "$key" != id ] || val="'$val'"
+    line="$key: $val"
+    if [ -n "$fm_text" ]; then fm_text="$fm_text"$'\n'"$line"; else fm_text="$line"; fi
+  done
+
+  # The edited block must read back with the derived values.
+  expected=$(printf '%s' "$result" | jq -cS '.values as $v | [.added[] | {(.): $v[.]}] | add') || return 1
+  got=$(printf '%s\n' "$fm_text" | yq -cS --argjson want "$expected" \
+    '. as $fm | [$want | keys[] | {(.): $fm[.]}] | add' 2>/dev/null) || got=""
+  if [ "$got" != "$expected" ]; then
+    printf '[debt] Backfill of %s did not read back cleanly; edit it by hand\n' "$base" >&2
+    return 1
+  fi
+
   body=$(awk '/^---$/{if(++c==2) {p=1; next}} p' "$file")
   {
     printf '%s\n' '---'
-    printf '%s\n' "$new_fm"
+    printf '%s\n' "$fm_text"
     printf '%s\n' '---'
     [ -z "$body" ] || printf '%s\n' "$body"
   } | debt_write_file "$file" || return 1
