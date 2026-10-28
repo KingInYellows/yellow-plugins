@@ -49,15 +49,42 @@ without the finding being right.
   tool, as `/review:pr` does. yellow-review does not load without both
   dependencies, and `--agent` is no substitute: the main-thread agent does not
   get its `skills:` preload.
-- **Codex:** `pnpm smoke:codex -- --plugin yellow-review --keep-temp` installs
-  into a temporary `CODEX_HOME` and checks app-server discovery. Then run
+- **Codex:** `pnpm smoke:codex --plugin yellow-review --keep-temp` installs into
+  a temporary `CODEX_HOME` and checks app-server discovery. Do not put `--`
+  before the flags: the repo's pinned pnpm 8.15 passes it through and the script
+  fails with "Unknown argument". The script accepts only Codex CLI 0.157.0; with
+  a newer `codex` on PATH, install 0.157.0 elsewhere and point `CODEX_BIN` at
+  it. Then run
   `node scripts/eval/thermonuclear-fixtures/check-installed-skill.js` on the
-  installed `SKILL.md` path from its report. Invoking the skill needs Codex
-  credentials.
-- **Cursor:** needs the Cursor editor. Place the plugin at
-  `~/.cursor/plugins/local/yellow-review/` in an isolated profile, reload,
-  confirm `yellow-thermonuclear-review` is listed, run
-  `check-installed-skill.js` on the copy Cursor loaded, and invoke the skill by
-  name on one fixture diff.
+  installed `SKILL.md` path from its report. To invoke the skill, reuse the kept
+  profile and the same binary, or the run can skip the installed copy
+  (`KEPT_CODEX_HOME` is the profile path from the report, `REPO` this checkout):
 
-Results so far: [`results-2026-10-26.md`](results-2026-10-26.md).
+  ```bash
+  cp ~/.codex/auth.json "$KEPT_CODEX_HOME/" # never print it
+  cd "$(mktemp -d)" && git init -q && cp "$REPO/plugins/yellow-review/tests/fixtures/thermonuclear/wrapper-indirection.diff" . \
+    && git add . && git commit -qm fixture
+  CODEX_HOME="$KEPT_CODEX_HOME" "${CODEX_BIN:-codex}" exec --disable remote_plugin -s workspace-write \
+    'Use the yellow-review:yellow-thermonuclear-review skill to review wrapper-indirection.diff. Report findings only.'
+  git status --porcelain # must print nothing
+  ```
+
+  `workspace-write` is deliberate: a clean tree then tests the skill's
+  report-only rail, not the sandbox. Expect the indirection finding.
+
+- **Cursor:** needs the Cursor editor. Place the plugin at
+  `~/.cursor/plugins/local/yellow-review/` (on Windows, the Windows profile's
+  `.cursor`, not WSL's), reload the window, and confirm
+  `yellow-thermonuclear-review` is listed. Run `check-installed-skill.js` on
+  `cursor/skills/yellow-thermonuclear-review/SKILL.md` in that copy, the path
+  `.cursor-plugin/plugin.json` points Cursor at. The Claude Code copy under
+  `skills/` fails the frontmatter check by design (`user-invocable: false`).
+  Before invoking, remove or disable every other `yellow-review` Cursor can see:
+  Cursor imports Claude Code's installed plugins and its own marketplace copies,
+  does not log which same-named plugin wins, and lets a marketplace install take
+  precedence over a local copy. Then invoke the skill by name on one fixture
+  diff.
+
+Results so far: [`results-2026-10-26.md`](results-2026-10-26.md) (fixture eval,
+Claude Code smoke, Codex discovery) and
+[`results-2026-10-28.md`](results-2026-10-28.md) (Codex invocation, Cursor).

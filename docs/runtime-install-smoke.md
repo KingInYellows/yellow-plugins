@@ -46,11 +46,11 @@ polluting real state.
 
 ```bash
 pnpm smoke:install                       # T0 validate + T1 install, every marketplace plugin
-pnpm smoke:install -- --help             # options
-pnpm smoke:install -- --dry-run          # print the plan; no claude, no temp dirs
-pnpm smoke:install -- --plugin yellow-core   # one plugin only
-pnpm smoke:install -- --tier 0           # validate only (fast, no install)
-pnpm smoke:install -- --keep-temp        # retain the temp dir for debugging
+pnpm smoke:install --help                # options
+pnpm smoke:install --dry-run             # print the plan; no claude, no temp dirs
+pnpm smoke:install --plugin yellow-core  # one plugin only
+pnpm smoke:install --tier 0              # validate only (fast, no install)
+pnpm smoke:install --keep-temp           # retain the temp dir for debugging
 ```
 
 ### Tiers
