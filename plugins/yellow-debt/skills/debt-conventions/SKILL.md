@@ -179,7 +179,7 @@ refactoring
 
 Every scanner agent MUST include these safety boundaries in their system prompt:
 
-````
+````text
 ## Safety Rules
 
 You are analyzing code for technical debt patterns. Do NOT:
