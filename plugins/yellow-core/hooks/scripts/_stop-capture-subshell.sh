@@ -46,8 +46,12 @@ fi
 # writes `attachment` records (prompt_snapshot with the full system prompt and
 # tool schemas, skill and MCP listings, memory files) that can run to hundreds
 # of KB and would otherwise fill the tail. Lines that are not JSON objects
-# with a `type` pass through unchanged. The scan is bounded to the last
-# TAIL_SCAN_LINES lines, so a window with no dialogue yields an empty tail.
+# with a `type` pass through unchanged.
+# The scan starts at the last TAIL_SCAN_LINES lines and doubles until it holds
+# TAIL_LINES records, already exceeds the byte cap, covers the whole file, or
+# reaches TAIL_SCAN_MAX_LINES. A fixed window let a run of non-dialogue
+# records push every dialogue line out, and empty tails from different
+# sessions share a content hash, so drain dedup dropped all but one.
 # If the jq filter fails, fall back to the raw tail minus attachment lines.
 # After redaction the staged tail is capped at TAIL_MAX_BYTES, keeping the
 # newest whole lines; the Jev shadow gets the uncapped tail so it still sees
@@ -56,19 +60,34 @@ fi
 # cleanup); silently produce empty tail in that case.
 TAIL_LINES=100
 TAIL_SCAN_LINES=1000
+TAIL_SCAN_MAX_LINES=128000
 TAIL_MAX_BYTES=98304
 TAIL_RAW=""
 if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
-  # shellcheck disable=SC2016  # $l is a jq variable, not a shell one.
-  if ! TAIL_RAW=$(tail -n "$TAIL_SCAN_LINES" -- "$TRANSCRIPT" 2>/dev/null \
-      | jq -Rr '. as $l | (try fromjson catch null) as $j
-          | if ($j | type) == "object" and ($j | has("type")) then
-              if $j.type == "user" or $j.type == "assistant" then $l else empty end
-            else $l end' 2>/dev/null \
-      | tail -n "$TAIL_LINES"); then
-    TAIL_RAW=$(tail -n "$TAIL_LINES" -- "$TRANSCRIPT" 2>/dev/null \
-      | grep -v '^{"type":"attachment"' || printf '')
-  fi
+  TOTAL_LINES=$(wc -l < "$TRANSCRIPT" 2>/dev/null | tr -d ' ') || TOTAL_LINES=0
+  scan=$TAIL_SCAN_LINES
+  while :; do
+    # shellcheck disable=SC2016  # $l is a jq variable, not a shell one.
+    if ! TAIL_RAW=$(tail -n "$scan" -- "$TRANSCRIPT" 2>/dev/null \
+        | jq -Rr '. as $l | (try fromjson catch null) as $j
+            | if ($j | type) == "object" and ($j | has("type")) then
+                if $j.type == "user" or $j.type == "assistant" then $l else empty end
+              else $l end' 2>/dev/null \
+        | tail -n "$TAIL_LINES"); then
+      TAIL_RAW=$(tail -n "$TAIL_LINES" -- "$TRANSCRIPT" 2>/dev/null \
+        | grep -v '^{"type":"attachment"' || printf '')
+      break
+    fi
+    # `wc -l` misses an unterminated last line, hence -gt rather than -ge.
+    [ "$scan" -gt "${TOTAL_LINES:-0}" ] && break
+    [ "$scan" -ge "$TAIL_SCAN_MAX_LINES" ] && break
+    if [ -n "$TAIL_RAW" ]; then
+      [ "$(printf '%s\n' "$TAIL_RAW" | wc -l)" -ge "$TAIL_LINES" ] && break
+      [ "$(printf '%s' "$TAIL_RAW" | wc -c)" -gt "$TAIL_MAX_BYTES" ] && break
+    fi
+    scan=$((scan * 2))
+    [ "$scan" -gt "$TAIL_SCAN_MAX_LINES" ] && scan=$TAIL_SCAN_MAX_LINES
+  done
 fi
 
 # Redact secrets BEFORE capping, hashing or writing: a byte cut taken first
