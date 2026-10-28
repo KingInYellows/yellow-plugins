@@ -36,12 +36,16 @@ if [ -z "$tools" ]; then
     n == 1 && t { t = 0 }' "$agent")
 fi
 [ -n "$tools" ] || { printf 'run-one: no tools for %s\n' "$agent" >&2; exit 2; }
-# Approve Read/Grep/Glob only under <workdir>: a fixture that names a host
-# path (~/.ssh/...) gets a permission denial instead of the file. Other tools
-# keep their bare names.
-allowed=$(printf '%s' "$tools" | awk -v RS=, '{ gsub(/^[ \t\n]+|[ \t\n]+$/, "") }
+# Approve Read/Grep/Glob only under <workdir>, plus Read of <prompt-file>'s
+# directory (a replay prompt points the reviewer at its .patch there): a
+# fixture that names a host path (~/.ssh/...) gets a permission denial instead
+# of the file. Other tools keep their bare names.
+prompt_dir=$(cd "$(dirname "$prompt_file")" && pwd -P) || exit 1
+case $prompt_dir in *[,\(\)]*) printf 'run-one: prompt dir %s has a comma or parenthesis\n' "$prompt_dir" >&2; exit 2 ;; esac
+allowed=$(printf '%s' "$tools" | awk -v RS=, -v pd="$prompt_dir" '{ gsub(/^[ \t\n]+|[ \t\n]+$/, "") }
   $0 == "" { next }
-  $0 == "Read" || $0 == "Grep" || $0 == "Glob" { $0 = $0 "(./**)" }
+  $0 == "Read" { $0 = "Read(./**),Read(/" pd "/**)" }
+  $0 == "Grep" || $0 == "Glob" { $0 = $0 "(./**)" }
   { printf "%s%s", s, $0; s = "," }')
 # Keep the parent session's effort, memory and extra CLAUDE.md out of the run.
 unset CLAUDE_EFFORT CLAUDE_CODE_EFFORT_LEVEL CLAUDE_COWORK_MEMORY_PATH_OVERRIDE \
