@@ -13,6 +13,18 @@ and this project adheres to
 
 ---
 
+## [2.1.28] - 2026-10-28
+
+### Fixed
+
+- **yellow-review 3.12.1** — `review-ledger.sh summary` now reports `skipped`,
+  the count of ledger records the fold could not read, and a write whose fold
+  skipped records removes the `.pending` sidecar so the fast path cannot report
+  the ledger as clear. When `skipped` is above 0, `check-merge-ready` reports
+  the ledger as `partial` and lists it under `unknowns`, `/review:sweep` prints
+  `Merge: unknown (<n> unreadable ledger records)`, and `/review:sweep-all`
+  lists the PR as merge readiness unknown (CLAUDE-190).
+
 ## [2.1.27] - 2026-10-27
 
 ### Added
