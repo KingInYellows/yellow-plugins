@@ -158,6 +158,13 @@ def case_tree(wt, commit, c):
     """A per-run tree at commit with the case's `files` written and, with `commit`, committed."""
     fresh_worktree(wt, commit)
     for path, text in c.get("files", {}).items():
+        # The commit may hold symlinks; never follow one out of the tree.
+        cur = wt
+        for part in path.split("/"):
+            cur = os.path.join(cur, part)
+            if os.path.islink(cur):
+                sys.exit("case %s: file path %s goes through symlink %s"
+                         % (c.get("id"), path, os.path.relpath(cur, wt)))
         os.makedirs(os.path.dirname(os.path.join(wt, path)) or wt, exist_ok=True)
         with open(os.path.join(wt, path), "w", encoding="utf-8") as handle:
             handle.write(text)
