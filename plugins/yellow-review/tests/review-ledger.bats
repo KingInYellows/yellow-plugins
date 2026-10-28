@@ -1015,26 +1015,52 @@ require_universal_ctags() {
 
 @test "summary reports per-PR counts from the sidecar, and folds on a size mismatch" {
   observe "$BASE" "[$(finding a.sh 2), $(finding a.sh 3 '{"owner":"human"}')]" >/dev/null
-  [ "$("$RL" summary --all | jq -c '."12"')" = '{"pending":1,"attention":1,"merge_blocking":1}' ]
+  [ "$("$RL" summary --all | jq -c '."12"')" = '{"pending":1,"attention":1,"merge_blocking":1,"skipped":0}' ]
   printf 'garbage-line\n' >>"$LEDGER_DIR/$LEDGER_PR.jsonl"
-  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":1,"attention":1,"merge_blocking":1}' ]
+  [ "$("$RL" summary 12 | jq -c '."12" | del(.skipped)')" = '{"pending":1,"attention":1,"merge_blocking":1}' ]
   [ "$("$RL" summary 99)" = '{}' ]
 }
 
 @test "summary reports a clean review (empty observe) as zero, not as missing" {
   observe "$BASE" "[]" >/dev/null
   [ ! -f "$LEDGER_DIR/$LEDGER_PR.jsonl" ]
-  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":0,"attention":0,"merge_blocking":0}' ]
-  [ "$("$RL" summary --all | jq -c '."12"')" = '{"pending":0,"attention":0,"merge_blocking":0}' ]
+  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":0,"attention":0,"merge_blocking":0,"skipped":0}' ]
+  [ "$("$RL" summary --all | jq -c '."12"')" = '{"pending":0,"attention":0,"merge_blocking":0,"skipped":0}' ]
 }
 
 @test "summary counts only pending P0-P2 findings as merge-blocking" {
   observe "$BASE" "[$(finding a.sh 2 '{"severity":"P1"}'), $(finding a.sh 3 '{"severity":"P3"}'), $(finding a.sh 4 '{"severity":"P0","owner":"human"}')]" >/dev/null
-  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":2,"attention":1,"merge_blocking":1}' ]
+  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":2,"attention":1,"merge_blocking":1,"skipped":0}' ]
   for id in $(fold | jq -r '.findings[] | select(.state == "open") | .finding_id'); do
     transition "$id" dismissed --reason "not a defect" >/dev/null
   done
-  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":0,"attention":1,"merge_blocking":0}' ]
+  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":0,"attention":1,"merge_blocking":0,"skipped":0}' ]
+}
+
+@test "CLAUDE-190: summary reports skipped records, so a corrupt pending finding is not read as clear" {
+  observe "$BASE" "[$(finding a.sh 2 '{"severity":"P1"}'), $(finding a.sh 3 '{"severity":"P1"}')]" >/dev/null
+  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":2,"attention":0,"merge_blocking":2,"skipped":0}' ]
+  f="$LEDGER_DIR/$LEDGER_PR.jsonl"
+  # Corrupt the first finding's transition record, a line in the middle of the
+  # file, so tail repair leaves it alone and the fold skips it.
+  n=$(grep -n '"type":"transition"' "$f" | head -n 1 | cut -d: -f1)
+  [ "$n" -lt "$(wc -l <"$f")" ]
+  awk -v n="$n" 'NR == n { print "{not json"; next } { print }' "$f" >|"$f.x" && mv "$f.x" "$f"
+  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":1,"attention":0,"merge_blocking":1,"skipped":1}' ]
+  [ "$("$RL" summary --all | jq -c '."12".skipped')" = 1 ]
+  # Dismissing the readable finding leaves nothing pending; a write whose fold
+  # skipped a record removes the sidecar, so the fast path cannot report clear.
+  id=$(fold | jq -r '.findings[0].finding_id')
+  transition "$id" dismissed --reason "not a defect" >/dev/null
+  [ ! -e "$LEDGER_DIR/$LEDGER_PR.pending" ]
+  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":0,"attention":0,"merge_blocking":0,"skipped":1}' ]
+}
+
+@test "CLAUDE-190: once nothing is pending the sidecar fast path reports skipped 0" {
+  observe "$BASE" "[$(finding a.sh 2 '{"severity":"P3","owner":"human"}')]" >/dev/null
+  read -r p _ _ <"$LEDGER_DIR/$LEDGER_PR.pending"
+  [ "$p" = 0 ]
+  [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":0,"attention":1,"merge_blocking":0,"skipped":0}' ]
 }
 
 @test "observe mints and echoes a run id when none is given" {

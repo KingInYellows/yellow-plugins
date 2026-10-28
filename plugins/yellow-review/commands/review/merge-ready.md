@@ -69,7 +69,7 @@ Print one row per check, then the contract line. Mark each row `ok`, `blocks` or
   Reviews:     <reviewDecision>; changes requested by <logins or "nobody">
   Resolution:  conversation resolution <enforced | not enforced | unknown>
   CI:          <ci.state>; failing: <names>; pending: <names>
-  Ledger:      <mergeBlocking> pending P0-P2 findings | none | other repo | unavailable
+  Ledger:      <mergeBlocking> pending P0-P2 findings[; <skipped> unreadable records] | none | other repo | unavailable
   Queue:       graphite-queue <present | absent>
 
 MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens or none> queued=<true|false|unknown>
@@ -82,8 +82,10 @@ MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens
   for them.
 - `Ledger: none` is normal in a clone that never ran `/review:pr` and does not
   block; neither does `other repo`, a checkout of a different repository whose
-  ledger is not read. `unavailable` is an unknown. Name `/review:triage <PR#>`
-  when the ledger blocks.
+  ledger is not read. `unavailable` is an unknown, and so is `partial` (the
+  ledger has unreadable records, any of which may be a pending finding): add the
+  `skipped` count to the row. Name `/review:triage <PR#>` when the ledger
+  blocks.
 - For `blocked`, end with the next step for each blocker: `/review:resolve` for
   threads, the reviewer for changes requested, the failing check names for CI, a
   rebase for conflicts.

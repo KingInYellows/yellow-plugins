@@ -410,9 +410,9 @@ Located at `skills/pr-review-workflow/scripts/`:
   `unresolved_threads`, `changes_requested`, `review_required`, `ci_failing`,
   `ci_pending`, `ledger_findings`), `unknowns` (`pr_state`, `threads`,
   `reviews`, `ci`, `mergeable`, `merge_state` for a `BLOCKED` or `BEHIND` merge
-  state, `ledger` when the PR's ledger files cannot be summarized) and the
-  detail behind each. Exits 0 ready, 1 blocked, 3 unknown, 2 usage; give it a
-  Bash `timeout` of 420000 ms
+  state, `ledger` when the PR's ledger files cannot be summarized or the summary
+  skipped unreadable records) and the detail behind each. Exits 0 ready, 1
+  blocked, 3 unknown, 2 usage; give it a Bash `timeout` of 420000 ms
 - **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with an
   idempotency marker; skips when our latest recent comment carries a marker for
   this thread and only bot comments follow it, and reports that disposition. An

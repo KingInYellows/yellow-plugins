@@ -15,12 +15,15 @@
 #    "conversationResolution":"enforced|not_enforced|unknown",
 #    "ci":{"state":"SUCCESS|PENDING|EXPECTED|FAILURE|ERROR|NONE"|null,
 #          "failing":[names],"pending":[names],"truncated":bool},
-#    "ledger":{"status":"read|none|other_repo|unavailable","mergeBlocking":N|null}}
+#    "ledger":{"status":"read|partial|none|other_repo|unavailable",
+#              "mergeBlocking":N|null,"skipped":N|null}}
 # blockers holds fixed tokens: not_open, draft, conflicts, unresolved_threads,
 # changes_requested, review_required, ci_failing, ci_pending, ledger_findings.
 # unknowns names what could not be read: pr_state, threads, reviews, ci,
 # mergeable (GitHub reports UNKNOWN while it is still computing the merge),
-# ledger (the PR has ledger files but the summary failed),
+# ledger (the PR has ledger files but the summary failed, or status partial:
+# the summary skipped unreadable records, any of which may be a pending
+# finding; mergeBlocking still counts the records that were read),
 # merge_state (mergeStateStatus is BLOCKED or BEHIND: GitHub refuses the merge
 # for a reason this gate may not see, such as a required check that never
 # reported on the head or a base branch that must be merged in first, so the
@@ -71,7 +74,7 @@ esac
 
 # all_unknown: the full report shape with nothing read; built without jq.
 all_unknown() {
-    printf '{"pr":%s,"head":null,"state":null,"verdict":"unknown","blockers":[],"unknowns":["pr_state","threads","reviews","ci"],"isDraft":null,"mergeable":null,"mergeStateStatus":null,"queued":null,"threads":null,"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown","ci":{"state":null,"failing":[],"pending":[],"truncated":false},"ledger":{"status":"unavailable","mergeBlocking":null}}\n' "$PR_NUMBER"
+    printf '{"pr":%s,"head":null,"state":null,"verdict":"unknown","blockers":[],"unknowns":["pr_state","threads","reviews","ci"],"isDraft":null,"mergeable":null,"mergeStateStatus":null,"queued":null,"threads":null,"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown","ci":{"state":null,"failing":[],"pending":[],"truncated":false},"ledger":{"status":"unavailable","mergeBlocking":null,"skipped":null}}\n' "$PR_NUMBER"
 }
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -178,6 +181,7 @@ fi
 # the summary would otherwise create the ledger directory.
 LEDGER_STATUS=none
 LEDGER_BLOCKING=null
+LEDGER_SKIPPED=null
 COMMON_DIR=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || COMMON_DIR=""
 if [ -n "$COMMON_DIR" ]; then
     ORIGIN=$(git config --get remote.origin.url 2>/dev/null) || ORIGIN=""
@@ -194,6 +198,11 @@ if [ -n "$COMMON_DIR" ]; then
             && "$LEDGER_LIB" summary "$PR_NUMBER" >"$WORK/ledger" 2>"$WORK/ledger.err" \
             && LEDGER_BLOCKING=$(jq -e --arg pr "$PR_NUMBER" '.[$pr].merge_blocking | numbers' "$WORK/ledger" 2>/dev/null); then
             LEDGER_STATUS=read
+            LEDGER_SKIPPED=$(jq -e --arg pr "$PR_NUMBER" '.[$pr].skipped // 0 | numbers' "$WORK/ledger" 2>/dev/null) || LEDGER_SKIPPED=0
+            if [ "$LEDGER_SKIPPED" -gt 0 ]; then
+                LEDGER_STATUS=partial
+                note "ledger has $LEDGER_SKIPPED unreadable records; ledger unknown"
+            fi
         else
             LEDGER_BLOCKING=null
             note "ledger summary unavailable; ledger unknown: $(head -c 200 "$WORK/ledger.err" 2>/dev/null | tr '\n' ' ')"
@@ -209,7 +218,8 @@ jq -n \
     --slurpfile t "$WORK/threads" \
     --slurpfile b "$WORK/blockers" \
     --arg lstatus "$LEDGER_STATUS" \
-    --argjson lblocking "$LEDGER_BLOCKING" '
+    --argjson lblocking "$LEDGER_BLOCKING" \
+    --argjson lskipped "$LEDGER_SKIPPED" '
   ($s[0].data.repository.pullRequest // {}) as $p
   | ($p.commits.nodes[0].commit // {}) as $c
   | ($c.statusCheckRollup) as $roll
@@ -241,7 +251,7 @@ jq -n \
           | (.name // .context)],
         truncated: ($roll.contexts.pageInfo.hasNextPage // false)
       },
-      ledger: {status: $lstatus, mergeBlocking: $lblocking}
+      ledger: {status: $lstatus, mergeBlocking: $lblocking, skipped: $lskipped}
     }
   | .blockers = [
       (if .state != null and .state != "OPEN" then "not_open" else empty end),
@@ -261,7 +271,7 @@ jq -n \
       (if $stateok and (.ci.state | IN("SUCCESS","NONE","PENDING","EXPECTED","FAILURE","ERROR")) then empty else "ci" end),
       (if $stateok and .mergeable == "UNKNOWN" then "mergeable" else empty end),
       (if $stateok and (.mergeStateStatus | IN("BLOCKED","BEHIND")) then "merge_state" else empty end),
-      (if .ledger.status == "unavailable" then "ledger" else empty end)
+      (if .ledger.status | IN("unavailable", "partial") then "ledger" else empty end)
     ]
   | .verdict = (if (.blockers | length) > 0 then "blocked"
                 elif (.unknowns | length) > 0 then "unknown"

@@ -1657,13 +1657,15 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
 
 @test "sweep: a missing ledger is never reported merge-ready" {
   sweep_flat=$(flat "$SWEEP")
-  grep -qF 'pending P0-P2 findings)` only when an existing ledger was read and' <<<"$sweep_flat"
+  grep -qF 'pending P0-P2 findings)` only when an existing ledger was read, `merge_blocking` is 0 and `skipped` is 0.' <<<"$sweep_flat"
+  grep -qF '`unknown (<skipped> unreadable ledger records)`' <<<"$sweep_flat"
   grep -qF 'empty array), so it reads `unknown (no ledger)` when `summary` returned `{}`:' <<<"$sweep_flat"
 }
 
 @test "sweep-all: PRs without a readable ledger are listed as merge readiness unknown" {
   grep -q '^Merge readiness unknown (no readable ledger): ' "$SWEEP_ALL"
-  grep -q 'a PR is never treated as merge-ready without a ledger' "$SWEEP_ALL"
+  grep -qF 'a PR is never treated as merge-ready without a ledger' <<<"$(flat "$SWEEP_ALL")"
+  grep -qF 'whose entry has `skipped` above 0 (unreadable records)' <<<"$(flat "$SWEEP_ALL")"
 }
 
 @test "review-pr/review-all: version-only plugin.json edits do not trigger plugin reviewers" {

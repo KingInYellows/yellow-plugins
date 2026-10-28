@@ -407,9 +407,11 @@ Then read the counts:
 "${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh" summary <PR#>
 ```
 
-The output is `{"<PR#>": {"pending": N, "attention": M, "merge_blocking": K}}`,
+The output is
+`{"<PR#>": {"pending": N, "attention": M, "merge_blocking": K, "skipped": S}}`,
 or `{}` when the PR has no ledger. `merge_blocking` counts the pending findings
-of severity P0, P1 or P2. Keep all three numbers for Step 4.
+of severity P0, P1 or P2; `skipped` counts ledger records that could not be
+read, any of which may be a pending finding. Keep all four numbers for Step 4.
 
 ### Step 4: Final summary
 
@@ -427,9 +429,11 @@ Print the summary:
 
 Print `Ledger:  none` when `summary` returned `{}` and `Ledger:  unavailable`
 when it failed. `Merge:` reads `ready (no pending P0-P2 findings)` only when an
-existing ledger was read and `merge_blocking` is 0. A clean review still writes
-a ledger record (an empty array), so it reads `unknown (no ledger)` when
-`summary` returned `{}`: `/review:pr` failed before its write. It reads
+existing ledger was read, `merge_blocking` is 0 and `skipped` is 0. When
+`skipped` is above 0 and `merge_blocking` is 0 it reads
+`unknown (<skipped> unreadable ledger records)`. A clean review still writes a
+ledger record (an empty array), so it reads `unknown (no ledger)` when `summary`
+returned `{}`: `/review:pr` failed before its write. It reads
 `unknown (ledger unavailable)` when `summary` failed or Step 3b was skipped.
 Findings pending at merge are stranded (the ledger refuses writes to a closed
 PR). The row reports the ledger only; it never changes the exit code or the
