@@ -316,6 +316,19 @@ If synthesis fails:
 2. Re-run `/debt:audit` to retry synthesis
 3. Check logs for specific error messages
 
+If an older todo lacks `id`, `status`, `severity` or `priority` (it was written
+before the current todo format), backfill them from the file name from the
+repository root, with `PLUGIN` set to the installed yellow-debt directory:
+
+```bash
+CLAUDE_PLUGIN_ROOT="$PLUGIN" bash -c '. "$CLAUDE_PLUGIN_ROOT/lib/validate.sh" && debt_backfill_todos'
+```
+
+`debt_backfill_todos` adds only missing or empty fields, never changes a present
+one, and takes the same per-todo lock as state transitions. It reports todos
+missing `category` or `affected_files`, which cannot be derived, for a hand
+edit.
+
 ## License
 
 MIT
