@@ -49,15 +49,26 @@ without the finding being right.
   tool, as `/review:pr` does. yellow-review does not load without both
   dependencies, and `--agent` is no substitute: the main-thread agent does not
   get its `skills:` preload.
-- **Codex:** `pnpm smoke:codex -- --plugin yellow-review --keep-temp` installs
-  into a temporary `CODEX_HOME` and checks app-server discovery. Then run
+- **Codex:** `pnpm smoke:codex --plugin yellow-review --keep-temp` installs into
+  a temporary `CODEX_HOME` and checks app-server discovery. Do not put `--`
+  before the flags: the repo's pinned pnpm 8.15 passes it through and the script
+  fails with "Unknown argument". The script accepts only Codex CLI 0.157.0; with
+  a newer `codex` on PATH, install 0.157.0 elsewhere and point `CODEX_BIN` at
+  it. Then run
   `node scripts/eval/thermonuclear-fixtures/check-installed-skill.js` on the
-  installed `SKILL.md` path from its report. Invoking the skill needs Codex
-  credentials.
+  installed `SKILL.md` path from its report. To invoke the skill, copy your
+  Codex `auth.json` into the kept `CODEX_HOME` and run one `codex exec` turn in
+  a scratch git repo with the fixture diff committed, then check that
+  `git status --porcelain` is empty.
 - **Cursor:** needs the Cursor editor. Place the plugin at
-  `~/.cursor/plugins/local/yellow-review/` in an isolated profile, reload,
-  confirm `yellow-thermonuclear-review` is listed, run
-  `check-installed-skill.js` on the copy Cursor loaded, and invoke the skill by
-  name on one fixture diff.
+  `~/.cursor/plugins/local/yellow-review/` (on Windows, the Windows profile's
+  `.cursor`, not WSL's), reload the window, and confirm
+  `yellow-thermonuclear-review` is listed. Run `check-installed-skill.js` on
+  `cursor/skills/yellow-thermonuclear-review/SKILL.md` in that copy, the path
+  `.cursor-plugin/plugin.json` points Cursor at. The Claude Code copy under
+  `skills/` fails the frontmatter check by design (`user-invocable: false`).
+  Then invoke the skill by name on one fixture diff.
 
-Results so far: [`results-2026-10-26.md`](results-2026-10-26.md).
+Results so far: [`results-2026-10-26.md`](results-2026-10-26.md) (fixture eval,
+Claude Code smoke, Codex discovery) and
+[`results-2026-10-28.md`](results-2026-10-28.md) (Codex invocation, Cursor).
