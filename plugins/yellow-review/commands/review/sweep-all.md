@@ -399,8 +399,10 @@ Read every PR's residual ledger counts in one call:
 "${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh" summary --all
 ```
 
-It prints `{"<PR#>": {"pending": N, "attention": M, "merge_blocking": K}, …}`
-for every ledger in this clone. A ledger that fails to fold emits
+It prints
+`{"<PR#>": {"pending": N, "attention": M, "merge_blocking": K, "skipped": S}, …}`
+for every ledger in this clone. `skipped` counts records the fold could not
+read, any of which may be a pending finding. A ledger that fails to fold emits
 `"<PR#>": null` for that entry while the command still exits 0 — a per-row
 failure, not a call failure. For each row, the `Residual` cell is
 `<pending>/<attention>`, `—` when the PR has no ledger, and `?` when its entry
@@ -438,9 +440,9 @@ to pick up reviewer replies and late comments.
 After the totals line, print one line naming the attempted PRs whose
 `merge_blocking` is above 0, and a second naming the attempted PRs with no
 `summary` entry (a `/review:pr` that failed before its ledger write leaves none)
-or a `null` entry, or whose `summary` call failed. Print neither line when it
-would be empty; a PR is never treated as merge-ready without a ledger that was
-read:
+or a `null` entry, whose entry has `skipped` above 0 (unreadable records), or
+whose `summary` call failed. Print neither line when it would be empty; a PR is
+never treated as merge-ready without a ledger that was read:
 
 ```text
 Not merge-ready (pending P0-P2 findings): #123 (2), #127 (1) — run /review:triage <PR#> before merging

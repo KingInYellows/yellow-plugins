@@ -229,8 +229,28 @@ state_body() {
   export MR_LEDGER='{"7":{"pending":3,"attention":0,"merge_blocking":2}}'
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 1 ]
-  [ "$(jq -c .ledger <<<"$output")" = '{"status":"read","mergeBlocking":2}' ]
+  [ "$(jq -c .ledger <<<"$output")" = '{"status":"read","mergeBlocking":2,"skipped":0}' ]
   [ "$(jq -c .blockers <<<"$output")" = '["ledger_findings"]' ]
+}
+
+@test "CLAUDE-190: a ledger with skipped records is partial and unknown, not ready" {
+  with_ledger_files
+  export MR_LEDGER='{"7":{"pending":0,"attention":0,"merge_blocking":0,"skipped":1}}'
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .ledger <<<"$output")" = '{"status":"partial","mergeBlocking":0,"skipped":1}' ]
+  [ "$(jq -c .unknowns <<<"$output")" = '["ledger"]' ]
+  [ "$(jq -r .verdict <<<"$output")" = unknown ]
+  [[ "$stderr" == *"1 unreadable records"* ]]
+}
+
+@test "CLAUDE-190: skipped records do not hide the read findings' blocker" {
+  with_ledger_files
+  export MR_LEDGER='{"7":{"pending":2,"attention":0,"merge_blocking":1,"skipped":2}}'
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["ledger_findings"]' ]
+  [ "$(jq -c .unknowns <<<"$output")" = '["ledger"]' ]
 }
 
 @test "a PR with no ledger files is none, and the library is not called" {

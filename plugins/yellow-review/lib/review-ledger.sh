@@ -972,10 +972,16 @@ rl_fold_file() {
   jq -R -s -c "$RL_FOLD_JQ" "$file"
 }
 
-# Refresh <pr>.pending from a fold. Caller holds the lock.
+# Refresh <pr>.pending from a fold. Caller holds the lock. A fold that
+# skipped records has no trustworthy counts (a skipped record may be a
+# pending finding), so it removes the sidecar instead and readers fold.
 rl_refresh_sidecar() {
   local dir="$1" pr="$2" fold="$3" f bytes
   f="$dir/$pr.jsonl"
+  if [ "$(printf '%s' "$fold" | jq '.skipped // 0')" != 0 ]; then
+    rm -f -- "$dir/$pr.pending"
+    return 0
+  fi
   bytes=0
   [ -f "$f" ] && bytes=$(rl_file_size "$f")
   rl_atomic_write "$dir/$pr.pending" "$(printf '%s' "$fold" | jq -r '"\(.pending) \(.attention)"') $bytes"$'\n'
@@ -2185,16 +2191,18 @@ cmd_refresh_state() {
 
 # Per-PR counts: the sidecar when its byte count matches and nothing is
 # pending, else a fold. merge_blocking (pending P0-P2 findings) is not in the
-# sidecar, so a PR with pending findings always folds.
+# sidecar, so a PR with pending findings always folds. skipped counts the
+# records the fold could not read; the sidecar exists only for a fold that
+# skipped none, so the fast path reports 0.
 rl_summary_one() {
   local d="$1" pr="$2" p a b fold
   if [ -f "$d/$pr.pending" ] && read -r p a b <"$d/$pr.pending" && [[ "$p$a$b" =~ ^[0-9]+$ ]] &&
     [ "$p" = 0 ] && [ "$b" = "$(rl_file_size "$d/$pr.jsonl")" ]; then
-    printf '{"pending":0,"attention":%s,"merge_blocking":0}' "$a"
+    printf '{"pending":0,"attention":%s,"merge_blocking":0,"skipped":0}' "$a"
     return 0
   fi
   fold=$(rl_read_fold "$pr") || return 1
-  printf '%s' "$fold" | jq -c '{pending, attention, merge_blocking}'
+  printf '%s' "$fold" | jq -c '{pending, attention, merge_blocking, skipped}'
 }
 
 cmd_summary() {
