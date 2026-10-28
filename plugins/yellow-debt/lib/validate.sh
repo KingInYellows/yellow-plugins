@@ -446,6 +446,135 @@ transition_todo_state() {
   return 0
 }
 
+# --- Frontmatter backfill ---------------------------------------------------
+# Todos written before the current schema can lack fields the commands read.
+# id, status and severity come from the file name (already checked against
+# DEBT_TODO_NAME_RE) and priority from severity. A field that is present is
+# never changed; a mismatch between name and frontmatter is a transition
+# repair, not a backfill. category and affected_files cannot be derived, so a
+# todo missing them is reported and left for a hand edit.
+# Prints a line per todo it changes. Returns 1 when the todo could not be read
+# or written.
+# Usage: debt_backfill_todo FILE
+debt_backfill_todo() {
+  local file="$1" lock_dir="$1.lock" base name_id name_status name_sev
+  local result added missing body
+
+  debt_refuse_symlinked_path "$file" || return 1
+  base="${file##*/}"
+  if ! [[ "$base" =~ $DEBT_TODO_NAME_RE ]]; then
+    printf '[debt] Refusing todo whose name does not fit the todo pattern\n' >&2
+    return 1
+  fi
+  name_id="${base%%-*}" name_status="${BASH_REMATCH[1]}" name_sev="${BASH_REMATCH[2]}"
+
+  debt_acquire_lock "$lock_dir" || return 1
+  trap 'rmdir -- "$lock_dir" 2>/dev/null || true; trap - RETURN' RETURN
+
+  if [ -L "$file" ] || [ ! -f "$file" ]; then
+    printf '[debt] File not found inside lock\n' >&2
+    return 1
+  fi
+  # Without both delimiters extract_frontmatter would read the body as YAML.
+  if [ "$(head -n 1 -- "$file")" != '---' ] \
+      || [ "$(grep -c '^---$' -- "$file")" -lt 2 ]; then
+    printf '[debt] %s has no frontmatter block; edit it by hand\n' "$base" >&2
+    return 1
+  fi
+
+  result=$(extract_frontmatter "$file" | yq -c \
+    --arg id "$name_id" --arg st "$name_status" --arg sev "$name_sev" '
+    def blank: . == null or . == "";
+    {"critical": "p1", "high": "p2", "medium": "p3", "low": "p4"} as $prio
+    | (. // {}) as $fm
+    | if ($fm | type) != "object" then error("frontmatter is not a mapping") else . end
+    | ($fm.severity | if blank then $sev else tostring end) as $s
+    | {id: $id, status: $st, severity: $sev,
+       priority: ($prio[$s] // $prio[$sev])} as $derived
+    | {added: [ "id", "status", "severity", "priority"
+                | select($fm[.] | blank) ],
+       values: $derived,
+       missing: [ "category", "affected_files" | select($fm[.] | blank) ]}
+    ' 2>/dev/null) || {
+    printf '[debt] Could not parse the frontmatter of %s; edit it by hand\n' "$base" >&2
+    return 1
+  }
+
+  added=$(printf '%s' "$result" | jq -r '.added | join(", ")') || return 1
+  missing=$(printf '%s' "$result" | jq -r '.missing | join(", ")') || return 1
+  if [ -n "$missing" ]; then
+    printf '[debt] Warning: %s lacks %s, which cannot be derived; add it by hand\n' "$base" "$missing" >&2
+  fi
+  [ -n "$added" ] || return 0
+
+  # Edit the text rather than re-dump it: a YAML dumper writes a present
+  # string such as '009' bare, and YAML 1.2 readers then load the number 9.
+  # Drop each blank key's own line, then append the derived values, which are
+  # digits or fixed words. The id is quoted so it stays a string.
+  local fm_text key val line expected got
+  fm_text=$(awk 'NR == 1 { next } /^---$/ { exit } { print }' "$file")
+  for key in $(printf '%s' "$result" | jq -r '.added[]'); do
+    fm_text=$(printf '%s\n' "$fm_text" \
+      | grep -Ev "^${key}:[[:space:]]*(null|~|''|\"\")?[[:space:]]*\$") || true
+    if printf '%s\n' "$fm_text" | grep -q "^${key}:"; then
+      printf '[debt] %s writes %s in a form the backfill cannot replace; edit it by hand\n' "$base" "$key" >&2
+      return 1
+    fi
+    val=$(printf '%s' "$result" | jq -r --arg k "$key" '.values[$k]') || return 1
+    [ "$key" != id ] || val="'$val'"
+    line="$key: $val"
+    if [ -n "$fm_text" ]; then fm_text="$fm_text"$'\n'"$line"; else fm_text="$line"; fi
+  done
+
+  # The edited block must read back with the derived values.
+  expected=$(printf '%s' "$result" | jq -cS '.values as $v | [.added[] | {(.): $v[.]}] | add') || return 1
+  got=$(printf '%s\n' "$fm_text" | yq -cS --argjson want "$expected" \
+    '. as $fm | [$want | keys[] | {(.): $fm[.]}] | add' 2>/dev/null) || got=""
+  if [ "$got" != "$expected" ]; then
+    printf '[debt] Backfill of %s did not read back cleanly; edit it by hand\n' "$base" >&2
+    return 1
+  fi
+
+  body=$(awk '/^---$/{if(++c==2) {p=1; next}} p' "$file")
+  {
+    printf '%s\n' '---'
+    printf '%s\n' "$fm_text"
+    printf '%s\n' '---'
+    [ -z "$body" ] || printf '%s\n' "$body"
+  } | debt_write_file "$file" || return 1
+  printf '[debt] Backfilled %s in %s\n' "$added" "$file"
+}
+
+# Run debt_backfill_todo over every well-named regular todo in todos/debt/.
+# Symlinks and names outside the todo pattern are skipped and counted. Returns
+# 1 when any todo failed. Run from the git root.
+# Usage: debt_backfill_todos
+debt_backfill_todos() {
+  local f base total=0 failed=0 skipped=0
+  command -v yq >/dev/null 2>&1 || {
+    printf '[debt] Error: yq is required but not installed\n' >&2; return 1; }
+  debt_refuse_symlinks todos todos/debt || return 1
+  if [ ! -d todos/debt ]; then
+    printf '[debt] todos/debt/ not found in %s\n' "$PWD" >&2
+    return 1
+  fi
+  for f in todos/debt/*.md; do
+    [ -e "$f" ] || [ -L "$f" ] || continue
+    base="${f##*/}"
+    if [ -L "$f" ] || [ ! -f "$f" ] || ! debt_todo_name_ok "$base"; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+    total=$((total + 1))
+    debt_backfill_todo "$f" || failed=$((failed + 1))
+  done
+  if [ "$skipped" -gt 0 ]; then
+    printf '[debt] Warning: skipped %d file(s) that are not regular, well-named todos\n' "$skipped" >&2
+  fi
+  printf '[debt] Checked %d todo(s); %d failed\n' "$total" "$failed"
+  [ "$failed" -eq 0 ]
+}
+
 # --- Finding fingerprints -------------------------------------------------
 # A re-audit must recognise a finding that already has a kept todo. Line
 # numbers drift between LLM runs, so identity is the flagged code itself, with
