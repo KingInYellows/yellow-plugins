@@ -191,6 +191,60 @@ _wait_for_file() {
   run ! grep -q 'prompt_snapshot' <<< "$tail"
 }
 
+@test "capture scans past 1000 lines when non-dialogue records bury the dialogue" {
+  STAGING=$(_expected_staging_dir)
+  {
+    for i in $(seq 1 50); do
+      printf '{"type":"user","message":{"role":"user","content":"msg-%03d"}}\n' "$i"
+    done
+    for _ in $(seq 1 3000); do
+      printf '%s\n' '{"type":"progress","data":{"type":"hook_progress"}}'
+    done
+  } > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  [ "$(printf '%s\n' "$tail" | wc -l)" -eq 50 ]
+  grep -q 'msg-001' <<< "$tail"
+  grep -q 'msg-050' <<< "$tail"
+  run ! grep -q 'hook_progress' <<< "$tail"
+}
+
+@test "capture widening scan stops at the last 100 dialogue records" {
+  STAGING=$(_expected_staging_dir)
+  {
+    for i in $(seq 1 150); do
+      printf '{"type":"assistant","message":{"role":"assistant","content":"msg-%03d"}}\n' "$i"
+    done
+    for _ in $(seq 1 2500); do
+      printf '%s\n' '{"type":"attachment","attachment":{"type":"prompt_snapshot"}}'
+    done
+  } > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  [ "$(printf '%s\n' "$tail" | wc -l)" -eq 100 ]
+  grep -q 'msg-051' <<< "$tail"
+  grep -q 'msg-150' <<< "$tail"
+  run ! grep -q 'msg-050' <<< "$tail"
+}
+
+@test "buried dialogue from two sessions stages distinct content hashes" {
+  STAGING=$(_expected_staging_dir)
+  for sid in sess-a sess-b; do
+    {
+      printf '{"type":"user","message":{"role":"user","content":"only-%s"}}\n' "$sid"
+      for _ in $(seq 1 1500); do
+        printf '%s\n' '{"type":"queue-operation","operation":"enqueue"}'
+      done
+    } > "$TRANSCRIPT_FILE"
+    bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$sid" "$STAGING" "$PROJECT_DIR"
+  done
+  jq -r '.transcript_tail' "$STAGING/pending/sess-a.jsonl" | grep -q 'only-sess-a'
+  jq -r '.transcript_tail' "$STAGING/pending/sess-b.jsonl" | grep -q 'only-sess-b'
+  hash_a=$(jq -r '.content_hash' "$STAGING/pending/sess-a.jsonl")
+  hash_b=$(jq -r '.content_hash' "$STAGING/pending/sess-b.jsonl")
+  [ -n "$hash_a" ] && [ "$hash_a" != "$hash_b" ]
+}
+
 @test "capture writes an entry for a tail larger than one argv string" {
   STAGING=$(_expected_staging_dir)
   big=$(head -c 200000 /dev/zero | tr '\0' 'a')
