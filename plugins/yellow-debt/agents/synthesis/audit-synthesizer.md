@@ -1,6 +1,5 @@
 ---
 name: audit-synthesizer
-# prettier-ignore
 description: "Merge scanner outputs, deduplicate findings, score severity, and generate reports. Use when synthesizing results from multiple debt scanners."
 model: sonnet
 effort: medium
@@ -27,9 +26,9 @@ findings, apply confidence-rubric gates, and generate audit reports with
 actionable todos.
 
 Reference `debt-conventions` skill for: JSON schema (v2.0), severity scoring,
-effort estimation, category definitions, confidence-rubric thresholds, and todo
-file template. The synthesizer reads v2.0 scanner outputs; older artifacts must
-be regenerated.
+effort estimation, category definitions, confidence-rubric thresholds, and
+todo file template. The synthesizer reads v2.0 scanner outputs; older
+artifacts must be regenerated.
 
 ## Synthesis Workflow
 
@@ -75,50 +74,53 @@ Apply category-specific confidence gates per the `debt-conventions` rubric
 | `duplication`   | 0.70                  |
 | `ai-pattern`    | 0.60                  |
 
-**Evaluation order (deterministic).** Apply these checks in this exact order per
-finding; the first rule that fires decides the outcome:
+**Evaluation order (deterministic).** Apply these checks in this exact order
+per finding; the first rule that fires decides the outcome:
 
 1. **Severity normalization.** Lowercase the `severity` value before any
-   comparison: `severity = severity.lower()`. Without this, an LLM scanner that
-   emits `"Critical"` or `"CRITICAL"` would silently fail the case-sensitive
-   string comparison below. Log
+   comparison: `severity = severity.lower()`. Without this, an LLM scanner
+   that emits `"Critical"` or `"CRITICAL"` would silently fail the
+   case-sensitive string comparison below. Log
    `[synthesizer] Warning: severity "<original>" normalized to "<lower>"` to
    stderr when a normalization was needed so the casing drift is observable.
-2. **Confidence presence, type, and range.** If `confidence` is missing, `null`,
-   not a number, or outside the range `[0.0, 1.0]`, suppress the finding with
-   reason `missing_or_invalid_confidence` (recorded in `suppressed[]`) and log
-   `[synthesizer] Warning: <reviewer> emitted finding with missing/invalid confidence; suppressing`
-   to stderr. This check runs BEFORE the severity exception so a critical
-   finding with `confidence: null` cannot reach the `confidence ≥ 0.50`
-   comparison and crash a type-strict implementation or coerce silently in a
-   permissive one. The range guard additionally prevents an out-of-range value
-   such as `2.5` from passing all category gates (since `2.5 ≥` any threshold)
-   and prevents a negative value such as `-0.5` from failing all gates when it
+2. **Confidence presence, type, and range.** If `confidence` is missing,
+   `null`, not a number, or outside the range `[0.0, 1.0]`, suppress the
+   finding with reason `missing_or_invalid_confidence` (recorded in
+   `suppressed[]`) and log
+   `[synthesizer] Warning: <reviewer> emitted finding with missing/invalid confidence; suppressing` to stderr.
+   This check runs BEFORE the severity exception so a critical finding with
+   `confidence: null` cannot reach the `confidence ≥ 0.50` comparison and
+   crash a type-strict implementation or coerce silently in a permissive
+   one. The range guard additionally prevents an out-of-range value such as
+   `2.5` from passing all category gates (since `2.5 ≥` any threshold) and
+   prevents a negative value such as `-0.5` from failing all gates when it
    should be suppressed as malformed scanner output. Stop.
-3. **Severity exception (highest priority among numeric-confidence checks).** If
-   `severity == "critical"` and `confidence ≥ 0.50`, the finding survives the
-   gate regardless of category. This is the Wave 2 P0-at-anchor-50 exception
+3. **Severity exception (highest priority among numeric-confidence checks).**
+   If `severity == "critical"` and `confidence ≥ 0.50`, the finding survives
+   the gate regardless of category. This is the Wave 2
+   P0-at-anchor-50 exception
    (`RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md`).
-   **Increment `stats.survived_severity_exception` by 1** for each finding that
-   exits via this rule (so the counter matches what is documented in the stats
-   schema below — without this, the counter is always 0 and gate bypasses are
-   invisible to operators). Stop; do not apply rule 4 or rule 5 (the inner
-   per-finding evaluation rules — Step 4 and Step 5 of the outer workflow are
-   different scopes and remain part of the same pipeline).
+   **Increment `stats.survived_severity_exception` by 1** for each finding
+   that exits via this rule (so the counter matches what is documented in
+   the stats schema below — without this, the counter is always 0 and gate
+   bypasses are invisible to operators). Stop; do not apply rule 4 or
+   rule 5 (the inner per-finding evaluation rules — Step 4 and Step 5 of
+   the outer workflow are different scopes and remain part of the same
+   pipeline).
 4. **Missing-failure-scenario bump.** If the finding has
-   `failure_scenario == null`, add `+0.05` to the category threshold for this
-   finding only. The bump compensates for the missing concrete-failure signal —
-   a v2.0 record may legitimately emit `null` rather than fabricate a scenario.
-   This is a permanent calibration mechanism.
+   `failure_scenario == null`, add `+0.05` to the category threshold for
+   this finding only. The bump compensates for the missing concrete-failure
+   signal — a v2.0 record may legitimately emit `null` rather than fabricate
+   a scenario. This is a permanent calibration mechanism.
 5. **Category gate.** Compare `confidence` against the (possibly bumped)
    category threshold from the table above. If `confidence ≥ threshold`, the
    finding survives. Otherwise, suppress with reason
    `below_category_gate:<category>` (recorded in `suppressed[]`).
 
-**Unknown category default.** If the finding's `category` is not one of the five
-rows in the table above, apply a conservative default gate of `0.80` and log
-`[synthesizer] Warning: unknown category "<cat>"; applying default gate 0.80` to
-stderr. This prevents a future category from silently passing all findings or
+**Unknown category default.** If the finding's `category` is not one of the
+five rows in the table above, apply a conservative default gate of `0.80`
+and log `[synthesizer] Warning: unknown category "<cat>"; applying default gate 0.80` to stderr.
+This prevents a future category from silently passing all findings or
 silently suppressing all findings depending on dictionary defaults.
 
 Suppressed findings are preserved in a separate `suppressed[]` array on the
@@ -138,8 +140,8 @@ Record gate stats:
 
 Count existing pending todos and confirm their deletion via AskUserQuestion, but
 do not delete yet: Step 5a runs first, so a failure there leaves the existing
-pending todos in place. `debt_pending_todos` lists a todo only when its file
-name and its frontmatter both say `pending`. An unanchored `*-pending-*.md` also
+pending todos in place. `debt_pending_todos` lists a todo only when its file name
+and its frontmatter both say `pending`. An unanchored `*-pending-*.md` also
 matches a `ready` todo whose slug contains `-pending-`, and a file renamed
 `-pending-` whose frontmatter says `wont_fix` is a closed todo that must not be
 deleted (it is reported on stderr as `Leaving …`; copy those lines into the
@@ -164,11 +166,11 @@ If "No": stop. If "Yes", remember it and continue with 5a; Step 5b deletes.
 A finding the user already closed (`wont-fix`, `complete`, `deleted`) or has
 accepted (`ready`, `in-progress`) must not come back as a new pending todo. A
 `deferred` todo does not suppress: that finding comes back as a new pending todo
-while the code still has the problem. Match by code, not by line numbers:
-scanner line ranges drift between runs.
+while the code still has the problem. Match by code, not by line numbers: scanner line ranges drift
+between runs.
 
-First clear any file a cloned repository may have planted at the path the Write
-tool is about to use (`rm` removes a symlink, not its target):
+First clear any file a cloned repository may have planted at the path the
+Write tool is about to use (`rm` removes a symlink, not its target):
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
@@ -183,9 +185,9 @@ __YELLOW_DEBT_BASH__
 
 Then write the surviving findings from Step 4 (after Step 2 deduplication) to
 `.debt/surviving-findings.json` with the Write tool, as a JSON array of the
-in-memory v2.0 records (each needs `category` and `file.path`; `file.lines` is
-needed to match). Then run the matcher. It writes `.debt/fingerprints.json` and
-prints one `skipped:` line per matched finding:
+in-memory v2.0 records (each needs `category` and `file.path`; `file.lines`
+is needed to match). Then run the matcher. It writes `.debt/fingerprints.json`
+and prints one `skipped:` line per matched finding:
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
@@ -199,15 +201,15 @@ __YELLOW_DEBT_BASH__
 
 If the block exits non-zero, stop and report its stderr: do not read
 `.debt/fingerprints.json`, which the block removes first. A `Warning:` line on
-stderr means some kept todos or findings could not be matched and may resurface;
-include it in the report. Set `stats.skipped_kept` to the number of `skipped:`
-lines.
+stderr means some kept todos or findings could not be matched and may
+resurface; include it in the report. Set `stats.skipped_kept` to the number of
+`skipped:` lines.
 
 Read `.debt/fingerprints.json`. Drop every entry with `skip: true` from the
 surviving list and record it in `skipped_kept[]` (finding index, `kept_id`,
-`status`, `match`). Keep each remaining entry's `fingerprint` and `anchor_hash`
-for Step 7. A finding with a tie, an unreadable range, or no match resurfaces as
-a new pending todo.
+`status`, `match`). Keep each remaining entry's `fingerprint` and
+`anchor_hash` for Step 7. A finding with a tie, an unreadable range, or no
+match resurfaces as a new pending todo.
 
 #### 5b. Delete the pending todos
 
@@ -246,11 +248,10 @@ Create `docs/audits/YYYY-MM-DD-audit-report.md`:
 
 ### 7. Generate Todo Files
 
-**Iterate only over the surviving findings list from Step 4 and Step 5a — do NOT
-include entries from `suppressed[]` or `skipped_kept[]`.** The suppressed array
-is preserved on the audit report for calibration review, not for todo
-generation. A finding that was gated out at Step 4 must not become a pending
-todo at Step 7.
+**Iterate only over the surviving findings list from Step 4 and Step 5a — do
+NOT include entries from `suppressed[]` or `skipped_kept[]`.** The suppressed array is preserved on the audit
+report for calibration review, not for todo generation. A finding that was
+gated out at Step 4 must not become a pending todo at Step 7.
 
 Format: `todos/debt/NNN-pending-SEVERITY-slug[-HASH].md`
 
@@ -258,17 +259,17 @@ Format: `todos/debt/NNN-pending-SEVERITY-slug[-HASH].md`
   `todos/debt/` (run the block below once, then count up from its output)
 - `SEVERITY`: critical/high/medium/low
 - `slug`: kebab-case derived from the v2.0 `finding` string (40 chars max)
-- `HASH`: the first 8 hex digits after `fp/v1:` in the finding's `fingerprint`
-  from `.debt/fingerprints.json`; omit the `-HASH` segment when the fingerprint
-  is `null`
+- `HASH`: the first 8 hex digits after `fp/v1:` in the finding's
+  `fingerprint` from `.debt/fingerprints.json`; omit the `-HASH` segment when
+  the fingerprint is `null`
 
 Existing todos keep their ids. A new todo that reused a number would collide
 with a kept file, so take the next free ids from every `*.md` under
 `todos/debt/`, not only the well-named ones. Run this once with the number of
-findings left after Step 5a in place of `<count>`; it prints that many free ids,
-one per line (they can skip a number a directory or symlink holds). Give each
-finding the id on the matching line, in the order of the findings, and use the
-printed text verbatim:
+findings left after Step 5a in place of `<count>`; it prints that many free
+ids, one per line (they can skip a number a directory or symlink holds). Give
+each finding the id on the matching line, in the order of the findings, and use
+the printed text verbatim:
 
 ```bash
 # lib/validate.sh is bash-only: run this block in bash even when the Bash
@@ -282,31 +283,32 @@ __YELLOW_DEBT_BASH__
 
 #### v2.0 → todo frontmatter mapping (write side)
 
-The v2.0 in-memory record uses `file: { path, lines }` (single object) and flat
-`finding`/`fix` strings. The on-disk todo frontmatter format (documented in the
-README "Todo File Format" section, read by `debt-fixer.md` Step 3) intentionally
-uses the stable on-disk `affected_files: - path:lines` array key — this is a
-live contract with the existing fixer scope-validator, not a migration holdover.
-Map the in-memory v2.0 fields to the on-disk frontmatter as follows:
+The v2.0 in-memory record uses `file: { path, lines }` (single object) and
+flat `finding`/`fix` strings. The on-disk todo frontmatter format
+(documented in the README "Todo File Format" section, read by
+`debt-fixer.md` Step 3) intentionally uses the stable on-disk
+`affected_files: - path:lines` array key — this is a live contract with
+the existing fixer scope-validator, not a migration holdover. Map the in-memory v2.0 fields to the
+on-disk frontmatter as follows:
 
-| v2.0 in-memory field  | On-disk todo frontmatter key   | Mapping rule                                                                                                                                                                                                           |
-| --------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `file.path`           | `affected_files[0]` prefix     | `affected_files: \n  - <file.path>:<file.lines>` (single-element array)                                                                                                                                                |
-| `file.lines`          | `affected_files[0]` suffix     | (combined with path above)                                                                                                                                                                                             |
-| `finding`             | H1 title + `## Finding` body   | Direct (see README todo template for example)                                                                                                                                                                          |
-| `fix`                 | `## Fix` body                  | Direct body text                                                                                                                                                                                                       |
-| `failure_scenario`    | `## Failure Scenario` body     | Empty body when scanner emitted `null`                                                                                                                                                                                 |
-| `confidence`          | `confidence:` frontmatter      | Float 0.0–1.0, written as-is                                                                                                                                                                                           |
-| `category`            | `category:` frontmatter        | Direct                                                                                                                                                                                                                 |
-| `severity`            | `severity:` and `priority:`    | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4                                                                                                                                          |
-| (shell-derived)       | `fingerprint:` frontmatter     | `fp/v1:<16 hex>` from `.debt/fingerprints.json` (Step 5a); single-quoted; omit when `null`                                                                                                                             |
-| (shell-derived)       | `resurfaced_from:` frontmatter | The id from `.debt/fingerprints.json` when a `deferred` todo has the same fingerprint (the finding came back); single-quoted; omit when `null`. The field is a record for readers of the file; no command reads it yet |
-| (shell-derived)       | `anchor_hash:` frontmatter     | Hash of the first substantive flagged line (20+ bytes once blanks are folded) from `.debt/fingerprints.json`; single-quoted, since an all-digit hash would otherwise parse as a number; omit when `null`               |
-| (synthesizer-derived) | `scanner:` frontmatter         | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template  |
+| v2.0 in-memory field | On-disk todo frontmatter key | Mapping rule                                |
+| -------------------- | ---------------------------- | ------------------------------------------- |
+| `file.path`          | `affected_files[0]` prefix   | `affected_files: \n  - <file.path>:<file.lines>` (single-element array) |
+| `file.lines`         | `affected_files[0]` suffix   | (combined with path above)                  |
+| `finding`            | H1 title + `## Finding` body | Direct (see README todo template for example) |
+| `fix`                | `## Fix` body                | Direct body text                          |
+| `failure_scenario`   | `## Failure Scenario` body   | Empty body when scanner emitted `null`      |
+| `confidence`         | `confidence:` frontmatter    | Float 0.0–1.0, written as-is                |
+| `category`           | `category:` frontmatter      | Direct                                      |
+| `severity`           | `severity:` and `priority:`  | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4 |
+| (shell-derived)      | `fingerprint:` frontmatter   | `fp/v1:<16 hex>` from `.debt/fingerprints.json` (Step 5a); single-quoted; omit when `null` |
+| (shell-derived)      | `resurfaced_from:` frontmatter | The id from `.debt/fingerprints.json` when a `deferred` todo has the same fingerprint (the finding came back); single-quoted; omit when `null`. The field is a record for readers of the file; no command reads it yet |
+| (shell-derived)      | `anchor_hash:` frontmatter   | Hash of the first substantive flagged line (20+ bytes once blanks are folded) from `.debt/fingerprints.json`; single-quoted, since an all-digit hash would otherwise parse as a number; omit when `null` |
+| (synthesizer-derived) | `scanner:` frontmatter      | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template |
 
-This mapping preserves the existing `debt-fixer.md` scope-validator (the
-`yq -r '.affected_files[]'` calls in `debt-fixer.md`) without changes — the
-fixer reads the on-disk frontmatter, not the in-memory v2.0 record.
+This mapping preserves the existing `debt-fixer.md` scope-validator
+(the `yq -r '.affected_files[]'` calls in `debt-fixer.md`) without changes — the fixer reads
+the on-disk frontmatter, not the in-memory v2.0 record.
 
 **CRITICAL SECURITY - Slug Derivation**:
 
