@@ -64,7 +64,7 @@ without the finding being right.
   cp ~/.codex/auth.json "$KEPT_CODEX_HOME/" # never print it
   cd "$(mktemp -d)" && git init -q && cp "$REPO/plugins/yellow-review/tests/fixtures/thermonuclear/wrapper-indirection.diff" . \
     && git add . && git commit -qm fixture
-  CODEX_HOME="$KEPT_CODEX_HOME" "$CODEX_BIN" exec --disable remote_plugin -s workspace-write \
+  CODEX_HOME="$KEPT_CODEX_HOME" "${CODEX_BIN:-codex}" exec --disable remote_plugin -s workspace-write \
     'Use the yellow-review:yellow-thermonuclear-review skill to review wrapper-indirection.diff. Report findings only.'
   git status --porcelain # must print nothing
   ```
