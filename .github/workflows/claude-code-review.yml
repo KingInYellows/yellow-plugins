@@ -37,18 +37,31 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@v1
+        # Third-party action with write scopes: pin to a commit, not the
+        # mutable v1 tag.
+        uses: anthropics/claude-code-action@6fed3ca145920b639991cb756090506e1bcaf515 # v1.0.245
+        # --model below pins only the parent session. The code-review plugin
+        # launches its own haiku, sonnet and opus subagents by family alias, so
+        # pin what each alias resolves to. The action forwards exactly these
+        # three variables to the Claude CLI. v1.0.245 installs Claude Code
+        # 2.1.293, the first release that knows all three 5.5 IDs. Do not use
+        # CLAUDE_CODE_SUBAGENT_MODEL: it would put every subagent on one model
+        # and collapse the plugin's tiering.
+        env:
+          ANTHROPIC_DEFAULT_OPUS_MODEL: claude-opus-5-5
+          ANTHROPIC_DEFAULT_SONNET_MODEL: claude-sonnet-5-5
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: claude-haiku-5-5
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Cloud agents (cursor[bot]) push PR branches; allow that bot so review
           # runs on synchronize without a manual re-trigger.
-          allowed_bots: "cursor,graphite-app"
+          allowed_bots: 'cursor,graphite-app'
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          # Pin the model so the action's default cannot drift onto a
+          # Pin a full model ID, not an alias, so the action's default (or an
+          # alias moving to a new release) cannot shift the review onto a
           # pricier model and drain the subscription token's limits.
-          claude_args: '--model sonnet'
+          claude_args: '--model claude-sonnet-5-5'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-
