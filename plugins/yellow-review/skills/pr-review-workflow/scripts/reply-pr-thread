@@ -8,7 +8,8 @@
 #   {"replied":false,"skipped":"already-replied","disposition":"...","threadId":"PRRT_..."}
 #     (skipped when our latest marked comment in the thread's last 10 carries
 #     a marker for this thread and every comment after it is from a Bot
-#     author; "disposition" is the one found. Our own unmarked comments do
+#     author or is our own bare "@coderabbitai resolve" hand-back;
+#     "disposition" is the one found. Our own unmarked comments do
 #     not count as a marker, so a bot account's own acknowledgement cannot
 #     hide it, but a later comment from our own human account is new input.
 #     The one exception: a prior disagree or unclear marker never blocks a
@@ -190,8 +191,9 @@ fi
 # when gh authenticates as a bot account its own acknowledgement (also
 # viewerDidAuthor) cannot displace the marker comment, and a bot-authored
 # marker still counts. Only comments after it by a Bot author (an
-# acknowledgement) are ignored; a human, our own human account or an
-# unreadable author is new input, so the reply is posted. Any disposition
+# acknowledgement) are ignored, and so is our own bare "@coderabbitai resolve"
+# from handback-pr-thread; a human, any other comment from our own human
+# account or an unreadable author is new input, so the reply is posted. Any disposition
 # counts: a re-run after a crash (reply posted, resolve failed) must not post
 # a contradictory reply. The exception is an upgrade from a reply that left
 # the thread open (disagree, unclear) to one that lets the caller resolve it
@@ -207,7 +209,10 @@ if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
         | select($n[.].viewerDidAuthor == true)
         | select(($n[.].body // "") | sub("\\s+$"; "") | test($re))] | last) as $i
     | select($i != null)
-    | select($n[$i + 1:] | all(((.author // {}) | if type == "object" then .__typename else null end) == "Bot"))
+    | select($n[$i + 1:] | all(
+        (((.author // {}) | if type == "object" then .__typename else null end) == "Bot")
+        or (.viewerDidAuthor == true
+            and ((.body // "") | if type == "string" then gsub("^\\s+|\\s+$"; "") else "" end) == "@coderabbitai resolve")))
     | $n[$i]
     | (.body // "") | sub("\\s+$"; "")
     | capture($re)
