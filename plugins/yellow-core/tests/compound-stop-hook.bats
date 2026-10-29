@@ -423,3 +423,28 @@ _dialogue() {
   [ ! -e "$STAGING/capture-marks/$SESSION_ID.lock" ]
   [ ! -e "$PROJECT_DIR/INJECTED" ]
 }
+
+@test "capture reads only the transcript bytes its ordering mark records" {
+  STAGING=$(_expected_staging_dir)
+  shim="$PROJECT_DIR/shim"
+  mkdir -p "$shim"
+  real_tail=$(command -v tail)
+  # The first tail call appends a turn, as Claude Code would mid-read.
+  cat > "$shim/tail" <<EOF
+#!/usr/bin/env bash
+if [ ! -e "$PROJECT_DIR/appended" ]; then
+  : > "$PROJECT_DIR/appended"
+  printf '%s\\n' '{"type":"assistant","message":{"role":"assistant","content":"SECOND_TURN"}}' >> "$TRANSCRIPT_FILE"
+fi
+exec $real_tail "\$@"
+EOF
+  chmod +x "$shim/tail"
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"FIRST_TURN"}}' > "$TRANSCRIPT_FILE"
+  PATH="$shim:$PATH" bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  grep -q 'FIRST_TURN' <<< "$tail"
+  run ! grep -q 'SECOND_TURN' <<< "$tail"
+  # The next capture sees the grown transcript and replaces the entry.
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl" | grep -q 'SECOND_TURN'
+}

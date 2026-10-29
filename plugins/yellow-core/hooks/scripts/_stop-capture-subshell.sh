@@ -60,7 +60,10 @@ fi
 # The transcript file may be missing or unreadable (race with Claude Code
 # cleanup); that yields an empty tail, which is not staged (see below).
 # TRANSCRIPT_BYTES is the size before the read: transcripts only grow, so it
-# orders overlapping captures of one session.
+# orders overlapping captures of one session. Every read is bounded to those
+# bytes, so two captures with one mark hold the same dialogue: the plain tail
+# is kept only when the file did not grow while it was read, otherwise the
+# read is redone through `head -c`.
 TAIL_LINES=100
 TAIL_SCAN_LINES=1000
 TAIL_SCAN_MAX_LINES=128000
@@ -70,9 +73,17 @@ TRANSCRIPT_BYTES=0
 if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
   TRANSCRIPT_BYTES=$(wc -c < "$TRANSCRIPT" 2>/dev/null | tr -d ' ') || TRANSCRIPT_BYTES=0
   TOTAL_LINES=$(wc -l < "$TRANSCRIPT" 2>/dev/null | tr -d ' ') || TOTAL_LINES=0
+  SNAP_EXACT=1
+  _snapshot_lines() {
+    if [ "$SNAP_EXACT" = 1 ]; then
+      tail -n "$1" -- "$TRANSCRIPT"
+    else
+      head -c "$TRANSCRIPT_BYTES" -- "$TRANSCRIPT" | tail -n "$1"
+    fi
+  }
   scan=$TAIL_SCAN_LINES
   while :; do
-    if ! TAIL_RAW=$(tail -n "$scan" -- "$TRANSCRIPT" 2>/dev/null \
+    if ! TAIL_RAW=$(_snapshot_lines "$scan" 2>/dev/null \
         | jq -Rr 'select((try fromjson catch null)
             | type == "object" and (.type == "user" or .type == "assistant"))' 2>/dev/null \
         | tail -n "$TAIL_LINES"); then
@@ -80,11 +91,18 @@ if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
       # strips; anything left means the last line is still being written.
       # Drop it before the attachment filter, which could remove it first.
       drop_last=0
-      [ -n "$(tail -c 1 -- "$TRANSCRIPT" 2>/dev/null)" ] && drop_last=1
-      TAIL_RAW=$(tail -n "$TAIL_LINES" -- "$TRANSCRIPT" 2>/dev/null \
+      [ -n "$(head -c "$TRANSCRIPT_BYTES" -- "$TRANSCRIPT" 2>/dev/null | tail -c 1)" ] \
+        && drop_last=1
+      TAIL_RAW=$(head -c "$TRANSCRIPT_BYTES" -- "$TRANSCRIPT" 2>/dev/null \
+        | tail -n "$TAIL_LINES" \
         | if [ "$drop_last" = 1 ]; then sed '$d'; else cat; fi \
         | grep -v '^{"type":"attachment"' || printf '')
       break
+    fi
+    if [ "$SNAP_EXACT" = 1 ] \
+        && [ "$(wc -c < "$TRANSCRIPT" 2>/dev/null | tr -d ' ')" != "$TRANSCRIPT_BYTES" ]; then
+      SNAP_EXACT=0
+      continue
     fi
     # `wc -l` misses an unterminated last line, hence -gt rather than -ge.
     [ "$scan" -gt "${TOTAL_LINES:-0}" ] && break
