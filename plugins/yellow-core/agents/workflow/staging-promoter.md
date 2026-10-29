@@ -1,7 +1,7 @@
 ---
 name: staging-promoter
 description: Promote a vetted compound-staging entry to docs/solutions/<category>/<slug>.md and append a one-line index entry to MEMORY.md's Session Notes section. Use when invoked by staging-reviewer with a fully-vetted entry; never asks for confirmation (frontmatter-enforced).
-model: sonnet
+model: haiku
 effort: medium
 memory: project
 tools:
