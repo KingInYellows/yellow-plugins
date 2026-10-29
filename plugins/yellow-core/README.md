@@ -164,7 +164,8 @@ Three hooks run automatically once the plugin is enabled:
   handed the queue to `staging-reviewer`. Those entries are retried but
   reaped after 7 days, so set `COMPOUND_DRAIN_MODEL=sonnet` if the warning
   repeats.
-- **Stop** — captures the session transcript tail into that queue. With
+- **Stop** — captures the last user and assistant records of the session
+  transcript into that queue, skipping a session with none. With
   `COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` set, it also asks
   TypeSafe's Jev model whether the session looks worth keeping and logs the
   latest answer per session under `jev-shadow/` without changing what is queued. This sends

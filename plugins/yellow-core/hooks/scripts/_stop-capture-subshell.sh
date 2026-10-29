@@ -42,41 +42,67 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 # Read up to TAIL_LINES dialogue records of the transcript (PII cap per D12).
-# Only `user` and `assistant` records are kept: Claude Code 2.1.300+ also
-# writes `attachment` records (prompt_snapshot with the full system prompt and
-# tool schemas, skill and MCP listings, memory files) that can run to hundreds
-# of KB and would otherwise fill the tail. Lines that are not JSON objects
-# with a `type` pass through unchanged.
+# Only lines that parse as JSON objects of type `user` or `assistant` are
+# kept, the same records jev_project_dialogue projects: Claude Code 2.1.300+
+# also writes `attachment` records (prompt_snapshot with the full system
+# prompt and tool schemas, skill and MCP listings, memory files) that can run
+# to hundreds of KB, and passthrough text lines would take dialogue slots.
+# A half-written final line does not parse, so it is dropped too.
 # The scan starts at the last TAIL_SCAN_LINES lines and doubles until it holds
 # TAIL_LINES records, already exceeds the byte cap, covers the whole file, or
 # reaches TAIL_SCAN_MAX_LINES. A fixed window let a run of non-dialogue
-# records push every dialogue line out, and empty tails from different
-# sessions share a content hash, so drain dedup dropped all but one.
-# If the jq filter fails, fall back to the raw tail minus attachment lines.
+# records push every dialogue line out.
+# If the jq filter fails, fall back to the raw tail minus attachment lines and
+# minus an unterminated final line.
 # After redaction the staged tail is capped at TAIL_MAX_BYTES, keeping the
 # newest whole lines; the Jev shadow gets the uncapped tail so it still sees
 # whole records and applies its own cap.
 # The transcript file may be missing or unreadable (race with Claude Code
-# cleanup); silently produce empty tail in that case.
+# cleanup); that yields an empty tail, which is not staged (see below).
+# TRANSCRIPT_BYTES is the size before the read: transcripts only grow, so it
+# orders overlapping captures of one session. Every read is bounded to those
+# bytes, so two captures with one mark hold the same dialogue: the plain tail
+# is kept only when the file did not grow while it was read, otherwise the
+# read is redone through `head -c`.
 TAIL_LINES=100
 TAIL_SCAN_LINES=1000
 TAIL_SCAN_MAX_LINES=128000
 TAIL_MAX_BYTES=98304
 TAIL_RAW=""
+TRANSCRIPT_BYTES=0
 if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
+  TRANSCRIPT_BYTES=$(wc -c < "$TRANSCRIPT" 2>/dev/null | tr -d ' ') || TRANSCRIPT_BYTES=0
   TOTAL_LINES=$(wc -l < "$TRANSCRIPT" 2>/dev/null | tr -d ' ') || TOTAL_LINES=0
+  SNAP_EXACT=1
+  _snapshot_lines() {
+    if [ "$SNAP_EXACT" = 1 ]; then
+      tail -n "$1" -- "$TRANSCRIPT"
+    else
+      head -c "$TRANSCRIPT_BYTES" -- "$TRANSCRIPT" | tail -n "$1"
+    fi
+  }
   scan=$TAIL_SCAN_LINES
   while :; do
-    # shellcheck disable=SC2016  # $l is a jq variable, not a shell one.
-    if ! TAIL_RAW=$(tail -n "$scan" -- "$TRANSCRIPT" 2>/dev/null \
-        | jq -Rr '. as $l | (try fromjson catch null) as $j
-            | if ($j | type) == "object" and ($j | has("type")) then
-                if $j.type == "user" or $j.type == "assistant" then $l else empty end
-              else $l end' 2>/dev/null \
+    if ! TAIL_RAW=$(_snapshot_lines "$scan" 2>/dev/null \
+        | jq -Rr 'select((try fromjson catch null)
+            | type == "object" and (.type == "user" or .type == "assistant"))' 2>/dev/null \
         | tail -n "$TAIL_LINES"); then
-      TAIL_RAW=$(tail -n "$TAIL_LINES" -- "$TRANSCRIPT" 2>/dev/null \
+      # `tail -c 1` of a newline-terminated file is a newline, which $()
+      # strips; anything left means the last line is still being written.
+      # Drop it before the attachment filter, which could remove it first.
+      drop_last=0
+      [ -n "$(head -c "$TRANSCRIPT_BYTES" -- "$TRANSCRIPT" 2>/dev/null | tail -c 1)" ] \
+        && drop_last=1
+      TAIL_RAW=$(head -c "$TRANSCRIPT_BYTES" -- "$TRANSCRIPT" 2>/dev/null \
+        | tail -n "$TAIL_LINES" \
+        | if [ "$drop_last" = 1 ]; then sed '$d'; else cat; fi \
         | grep -v '^{"type":"attachment"' || printf '')
       break
+    fi
+    if [ "$SNAP_EXACT" = 1 ] \
+        && [ "$(wc -c < "$TRANSCRIPT" 2>/dev/null | tr -d ' ')" != "$TRANSCRIPT_BYTES" ]; then
+      SNAP_EXACT=0
+      continue
     fi
     # `wc -l` misses an unterminated last line, hence -gt rather than -ge.
     [ "$scan" -gt "${TOTAL_LINES:-0}" ] && break
@@ -100,6 +126,10 @@ if [ "$(printf '%s' "$TAIL_REDACTED" | wc -c)" -gt "$TAIL_MAX_BYTES" ]; then
     *$'\n'*) TAIL_REDACTED=${TAIL_REDACTED#*$'\n'} ;;
   esac
 fi
+
+# Nothing to stage. Empty tails from different sessions share a content hash,
+# so drain dedup would drop all but one of them anyway.
+[ -n "$TAIL_REDACTED" ] || exit 0
 
 # Content hash (sha256) for fast dedup at drain time. Hash of the REDACTED
 # tail so identical post-redaction sessions collide.
@@ -148,6 +178,39 @@ if [ -f "$JEV_LIB" ]; then
   fi
 fi
 
+# Two Stop events close together start two captures of one session, and the
+# older one can finish last. capture-marks/<session> holds the transcript size
+# of the newest published capture; a capture that read a smaller transcript
+# skips publishing so it cannot replace a newer pending entry, or re-stage
+# older dialogue after the drain took the newer one. The check and the
+# publish run under a per-session mkdir lock. A lock older than a minute
+# belongs to a capture that died holding it; a separate reclaim lock makes
+# sure only that stale lock is removed, never a fresh one another waiter just
+# took. A capture that cannot get the lock within five seconds does not
+# publish: the holder is publishing, and the next Stop captures again.
+MARK_DIR="${STAGING_DIR}/capture-marks"
+MARK="${MARK_DIR}/${SESSION_ID}"
+LOCK="${MARK}.lock"
+( umask 077; mkdir -p "$MARK_DIR" ) 2>/dev/null || true
+_lock_stale() { [ -n "$(find "$LOCK" -maxdepth 0 -mmin +1 2>/dev/null)" ]; }
+tries=0
+while ! mkdir "$LOCK" 2>/dev/null; do
+  tries=$((tries + 1))
+  [ "$tries" -gt 50 ] && exit 0
+  if _lock_stale && mkdir "${LOCK}.reclaim" 2>/dev/null; then
+    _lock_stale && { rmdir "$LOCK" 2>/dev/null || true; }
+    rmdir "${LOCK}.reclaim" 2>/dev/null || true
+    continue
+  fi
+  sleep 0.1
+done
+# Single quotes: LOCK holds a project path and must never become trap source.
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+PREV_BYTES=$(cat "$MARK" 2>/dev/null) || PREV_BYTES=0
+case "$PREV_BYTES" in '' | *[!0-9]*) PREV_BYTES=0 ;; esac
+case "$TRANSCRIPT_BYTES" in '' | *[!0-9]*) TRANSCRIPT_BYTES=0 ;; esac
+[ "$PREV_BYTES" -gt "$TRANSCRIPT_BYTES" ] && exit 0
+
 # Atomic write: tmp/ then mv to pending/. The tmp/ and pending/ subdirs are
 # siblings under STAGING_DIR — guaranteed same filesystem — so rename(2) is
 # atomic. cs_atomic_jsonl_write handles the tmp + mv internally; we just
@@ -158,6 +221,13 @@ PENDING_PATH="${STAGING_DIR}/pending/${SESSION_ID}.jsonl"
 # caller is responsible for line termination.
 cs_atomic_jsonl_write "$PENDING_PATH" "${ENTRY}
 " || exit 0
+cs_atomic_jsonl_write "$MARK" "$TRANSCRIPT_BYTES" || true
+# Marks share the pending entries' 7-day TTL.
+find "$MARK_DIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
+# Release before the Jev shadow request, which can outlast the waiters' five
+# seconds. Clear the trap first so it cannot remove a later capture's lock.
+trap - EXIT
+rmdir "$LOCK" 2>/dev/null || true
 
 if [ "$JEV_ON" = 1 ]; then
   # Raw tail: the lib redacts the projected text itself, because redacting
