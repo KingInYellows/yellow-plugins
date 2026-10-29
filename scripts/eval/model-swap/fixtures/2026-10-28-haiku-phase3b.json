@@ -50,6 +50,7 @@
    "env": {
     "PATH": "{repo}/scripts/eval/model-swap/fixtures/2026-10-28-phase3b/bin:{PATH}"
    },
+   "fixtures": ["scripts/eval/model-swap/fixtures/2026-10-28-phase3b/bin/semgrep"],
    "prompt": "{context}\n",
    "expect": {
     "sv1": {
@@ -230,6 +231,7 @@
     "AGENT_BROWSER_SESSION": "{rid}",
     "AGENT_BROWSER_EXECUTABLE_PATH": "/opt/pw-browsers/chromium"
    },
+   "fixtures": ["scripts/eval/model-swap/fixtures/2026-10-28-phase3b/app"],
    "expect": {
     "tr1": {
      "match": [
@@ -326,6 +328,7 @@
     "PATH": "{repo}/scripts/eval/model-swap/fixtures/2026-10-28-phase3b/bin:{PATH}",
     "CLAUDE_PLUGIN_ROOT": "{repo}/plugins/yellow-codex"
    },
+   "fixtures": ["scripts/eval/model-swap/fixtures/2026-10-28-phase3b/bin/codex", "scripts/eval/model-swap/fixtures/2026-10-28-phase3b/codex"],
    "expect": {
     "cx-findings": {
      "match": [
