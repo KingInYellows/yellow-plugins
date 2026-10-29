@@ -448,3 +448,14 @@ EOF
   bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
   jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl" | grep -q 'SECOND_TURN'
 }
+
+@test "capture does not publish while another capture holds a fresh lock" {
+  STAGING=$(_expected_staging_dir)
+  mkdir -p "$STAGING/capture-marks/$SESSION_ID.lock"
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"LOCKED_OUT"}}' > "$TRANSCRIPT_FILE"
+  run bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  [ "$status" -eq 0 ]
+  [ ! -e "$STAGING/pending/$SESSION_ID.jsonl" ]
+  # The holder's lock is left alone.
+  [ -d "$STAGING/capture-marks/$SESSION_ID.lock" ]
+}

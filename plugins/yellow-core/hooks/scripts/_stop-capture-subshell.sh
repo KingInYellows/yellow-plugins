@@ -184,26 +184,28 @@ fi
 # skips publishing so it cannot replace a newer pending entry, or re-stage
 # older dialogue after the drain took the newer one. The check and the
 # publish run under a per-session mkdir lock. A lock older than a minute
-# belongs to a capture that died holding it; after five seconds without the
-# lock the capture publishes anyway, as before this check existed.
+# belongs to a capture that died holding it; a separate reclaim lock makes
+# sure only that stale lock is removed, never a fresh one another waiter just
+# took. A capture that cannot get the lock within five seconds does not
+# publish: the holder is publishing, and the next Stop captures again.
 MARK_DIR="${STAGING_DIR}/capture-marks"
 MARK="${MARK_DIR}/${SESSION_ID}"
 LOCK="${MARK}.lock"
 ( umask 077; mkdir -p "$MARK_DIR" ) 2>/dev/null || true
+_lock_stale() { [ -n "$(find "$LOCK" -maxdepth 0 -mmin +1 2>/dev/null)" ]; }
 tries=0
 while ! mkdir "$LOCK" 2>/dev/null; do
   tries=$((tries + 1))
-  [ "$tries" -gt 50 ] && break
-  if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
-    rmdir "$LOCK" 2>/dev/null || true
+  [ "$tries" -gt 50 ] && exit 0
+  if _lock_stale && mkdir "${LOCK}.reclaim" 2>/dev/null; then
+    _lock_stale && { rmdir "$LOCK" 2>/dev/null || true; }
+    rmdir "${LOCK}.reclaim" 2>/dev/null || true
     continue
   fi
   sleep 0.1
 done
-if [ "$tries" -le 50 ]; then
-  # Single quotes: LOCK holds a project path and must never become trap source.
-  trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
-fi
+# Single quotes: LOCK holds a project path and must never become trap source.
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
 PREV_BYTES=$(cat "$MARK" 2>/dev/null) || PREV_BYTES=0
 case "$PREV_BYTES" in '' | *[!0-9]*) PREV_BYTES=0 ;; esac
 case "$TRANSCRIPT_BYTES" in '' | *[!0-9]*) TRANSCRIPT_BYTES=0 ;; esac
