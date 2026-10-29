@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Eval stand-in for the Codex CLI: codex-reviewer's contract check feeds the
+# agent a canned `codex exec` result instead of a live OpenAI review. The
+# response is picked by the file the reviewed diff adds (src/codex_case_<x>.py)
+# and read from ../codex/<x>.json; case "argerr" fails like a CLI flag drift.
+here=$(cd "$(dirname "$0")/.." && pwd -P)
+[ "${1:-}" = exec ] || { printf 'codex-cli 0.144.6\n'; exit 0; }
+shift
+out= prompt=$1
+while [ $# -gt 0 ]; do
+  case $1 in -o|--output-last-message) out=$2; shift ;; esac
+  shift
+done
+diff_file=$(printf '%s' "$prompt" | grep -o '/[^ ]*' | sed 's/[.,]$//' | while read -r f; do [ -f "$f" ] && { printf '%s\n' "$f"; break; }; done)
+case_id=$(grep -o 'src/codex_case_[a-z]*\.py' "$diff_file" 2>/dev/null | head -n1 | sed 's/.*codex_case_//; s/\.py$//')
+case $case_id in
+  argerr) printf "error: unexpected argument '--ephemeral' found\n\nUsage: codex exec [OPTIONS] [PROMPT]\n" >&2; exit 2 ;;
+  '') printf 'codex stand-in: no case file in the diff\n' >&2; exit 1 ;;
+esac
+root=$(git rev-parse --show-toplevel)
+sed "s#@ROOT@#$root#g" "$here/codex/$case_id.json" >"$out"
+printf '{"type":"thread.started"}\n{"type":"turn.completed"}\n'

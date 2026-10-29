@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><title>Orders</title></head>
+<body>
+<h1>Orders</h1>
+<main id="orders">Loading orders…</main>
+<script>
+  const data = undefined;
+  try {
+    document.getElementById('orders').textContent = data.orders.map(o => o.id).join(', ');
+  } catch (e) {
+    console.error('Failed to render orders: ' + e);
+    document.getElementById('orders').textContent = 'Something went wrong. Please try again later.';
+  }
+</script>
+</body></html>
