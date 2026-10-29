@@ -68,6 +68,47 @@ def fingerprint(*parts):
     return h.hexdigest()[:16]
 
 
+def walk_error(err):
+    raise err
+
+
+def listed_files(rel):
+    """The files under one `fixtures` entry: the file itself, or a directory's files."""
+    path = os.path.join(REPO, rel)
+    if os.path.isdir(path):
+        return sorted(os.path.join(d, f) for d, _, fs in os.walk(path, onerror=walk_error,
+                                                                 followlinks=True) for f in fs)
+    if os.path.isfile(path):
+        return [path]
+    sys.exit("prepare: fixture not found: %s" % rel)
+
+
+def fixture_files(rel):
+    """listed_files, refusing any that resolves outside the repo."""
+    files = listed_files(rel)
+    root = os.path.realpath(REPO) + os.sep
+    escaped = [os.path.relpath(f, REPO) for f in files if not os.path.realpath(f).startswith(root)]
+    if escaped:
+        sys.exit("prepare: fixture resolves outside the repo: %s" % ", ".join(escaped))
+    return files
+
+
+def fixture_parts(agent):
+    """Content hash of the agent's `fixtures` (repo-relative files or directories),
+    as a fingerprint part: an edited stand-in CLI or canned response reruns its rows.
+    Empty when the agent lists none, so other specs keep their fingerprints."""
+    if not agent.get("fixtures"):
+        return []
+    h = hashlib.sha256()
+    for f in (f for rel in agent["fixtures"] for f in fixture_files(rel)):
+        with open(f, "rb") as handle:
+            data = handle.read()
+        # The exec bit matters too: a stand-in without it fails differently.
+        name = os.path.relpath(f, REPO).encode()
+        h.update(b"%d:%s%d%d:" % (len(name), name, os.access(f, os.X_OK), len(data)) + data)
+    return [h.hexdigest()]
+
+
 def plant(wt, p):
     path = os.path.join(wt, p["file"])
     with open(path, encoding="utf-8") as handle:
@@ -228,6 +269,7 @@ def check_spec(spec):
     bad = [n for n in names if not isinstance(n, str) or not re.fullmatch(SAFE_NAME, n) or ".." in n]
     paths = [*(a["file"] for a in spec["agents"].values()),
              *(f for a in spec["agents"].values() for f in a.get("preload_skills", [])),
+             *(f for a in spec["agents"].values() for f in a.get("fixtures", [])),
              *(p["file"] for r in spec["replays"] for p in r["plants"]),
              *(f for s in spec["scans"] for f in s["files"]),
              *(p["file"] for s in spec["scans"] for p in s.get("plants", [])),
@@ -273,6 +315,8 @@ def prepare(spec_path, work):
     with open(spec_path, encoding="utf-8") as handle:
         spec = json.load(handle)
     check_spec(spec)
+    # Hashed before anything under <work> changes: a missing fixture stops here.
+    fixtures = {aid: fixture_parts(agent) for aid, agent in spec["agents"].items()}
     for sub in ("wt", "prompts", "out"):
         os.makedirs(os.path.join(work, sub), exist_ok=True)
     rows = []
@@ -332,7 +376,7 @@ def prepare(spec_path, work):
                         rid = "%s-%s-%s-%s-r%d" % (aid, cid, c["model"], c["effort"], rep)
                         fp = fingerprint(agent["expect"][cid], cases[cid], spec["prompt_commit"],
                                          c["model"], c["effort"], sys_prompt, prompt,
-                                         agent.get("env", {}), agent.get("isolated", False))
+                                         agent.get("env", {}), agent.get("isolated", False), *fixtures[aid])
                         wt = os.path.join(work, "wt", "prompt")
                         if agent.get("isolated"):
                             # The agent writes files, so each run gets its own tree. A run
@@ -351,7 +395,7 @@ def prepare(spec_path, work):
                                      sys_prompt, os.path.join(work, "wt", "replay", r["id"]), c["model"], c["effort"],
                                      prompt, aid, r["id"],
                                      fingerprint(agent, r, c["model"], c["effort"], sys_prompt, prompt,
-                                                 os.path.join(work, "prompts", r["id"] + ".patch"))])
+                                                 os.path.join(work, "prompts", r["id"] + ".patch"), *fixtures[aid])])
                     continue
                 for s in spec["scans"]:
                     if "scans" in agent and s["id"] not in agent["scans"]:
@@ -369,7 +413,7 @@ def prepare(spec_path, work):
                     with open(prompt, "w", encoding="utf-8") as handle:
                         handle.write(SCAN_PROMPT.format(name=name))
                     rows.append([rid, sys_prompt, wt, c["model"], c["effort"], prompt, aid, s["id"],
-                                 fingerprint(agent, s, c["model"], c["effort"], sys_prompt, prompt)])
+                                 fingerprint(agent, s, c["model"], c["effort"], sys_prompt, prompt, *fixtures[aid])])
     dupes = sorted({r[0] for r in rows if [x[0] for x in rows].count(r[0]) > 1})
     if dupes:
         sys.exit("prepare: these run ids collide; rename an agent or target id: %s" % ", ".join(dupes))
