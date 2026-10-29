@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.11.7
+
+### Patch Changes
+
+- [#1436](https://github.com/KingInYellows/yellow-plugins/pull/1436)
+  [`0b24dbc`](https://github.com/KingInYellows/yellow-plugins/commit/0b24dbc9fb146448ae548e2973908230dc2cb85c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Eval-gated
+  model swaps from the Phase 3 leftovers eval (CLAUDE-194): `scan-verifier`
+  moves to haiku/low, `staging-promoter` to haiku/medium, and
+  `audit-synthesizer` from opus/high to sonnet/medium. `/semgrep:fix` Step 9 now
+  treats a verifier answer with no `Verification:` verdict (empty or refused)
+  like "Cannot verify" and offers to commit with the new
+  `unverified (no verifier result)` trailer, instead of reading it as a pass.
+
+- [#1467](https://github.com/KingInYellows/yellow-plugins/pull/1467)
+  [`90f1373`](https://github.com/KingInYellows/yellow-plugins/commit/90f137342accb8238da807bbf3f034fe7054a709)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop capture
+  keeps only user and assistant records, so text lines no longer take dialogue
+  slots and a half-written final line is dropped. A tail with no dialogue is not
+  staged, and an older capture of a session that finishes after a newer one no
+  longer replaces or re-stages its entry (CLAUDE-199).
+
+- [`85056c4`](https://github.com/KingInYellows/yellow-plugins/commit/85056c4af8b80437abe0e4b1ace51f1e9b43cb9f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The Stop hook
+  capture no longer stages an empty transcript tail when the last 1000
+  transcript lines are mostly non-dialogue records (attachments, progress, queue
+  operations). The scan window now doubles until it holds 100 dialogue records,
+  passes the 96 KiB byte cap, covers the whole file, or reaches 128000 lines.
+  Empty tails from different sessions shared one content hash, so drain dedup
+  could drop all but one of them (CLAUDE-148).
+
 ## 2.11.6
 
 ### Patch Changes
