@@ -10,8 +10,10 @@ Grades each candidate model against golden findings, not a model judge:
   lizard reports over the spec's CCN or length limit, or (`golden.planted`)
   the regions planted into the files for the agent's `lane`.
 - prompt: a fixed context goes to a sub-task prompt (a compounder extractor,
-  the optimize judge); each case passes when the reply hits every `match`
-  regex and no `not` regex, or ranks the `lowest` candidate last.
+  the optimize judge) or a whole agent; each case passes when the reply hits
+  every `match` regex and no `not` regex, or ranks the `lowest` candidate
+  last, and (for an `isolated` agent) the files it leaves meet the case's
+  `files` and `no_files` checks.
 
   eval.py prepare <spec.json> <work-dir>   worktrees, diffs, prompts, matrix
   eval.py run <work-dir> [-j N] [--dry-run] run the matrix (spends usage)
@@ -25,6 +27,7 @@ import argparse
 import collections
 import concurrent.futures
 import csv
+import glob
 import hashlib
 import json
 import os
@@ -151,6 +154,62 @@ def case_context(c):
     return "\n".join(lines).strip() + "\n"
 
 
+def case_tree(wt, commit, c):
+    """A per-run tree at commit with the case's `files` written and, with `commit`, committed."""
+    fresh_worktree(wt, commit)
+    for path, text in c.get("files", {}).items():
+        # The commit may hold symlinks; never follow one out of the tree.
+        cur = wt
+        for part in path.split("/"):
+            cur = os.path.join(cur, part)
+            if os.path.islink(cur):
+                sys.exit("case %s: file path %s goes through symlink %s"
+                         % (c.get("id"), path, os.path.relpath(cur, wt)))
+        os.makedirs(os.path.dirname(os.path.join(wt, path)) or wt, exist_ok=True)
+        with open(os.path.join(wt, path), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    if c.get("commit"):
+        git("add", "-A", cwd=wt)
+        git("-c", "user.name=Eval Fixture", "-c", "user.email=eval@example.invalid",
+            "commit", "--quiet", "--allow-empty", "-m", c["commit"], cwd=wt)
+
+
+def output_fingerprint(work, rid):
+    try:
+        with open(os.path.join(work, "out", rid + ".json"), encoding="utf-8") as handle:
+            return json.load(handle).get("eval_fingerprint")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def run_env(agent, rid, wt):
+    """The agent's `env` with {repo}, {wt}, {rid} and {PATH} filled in."""
+    env = dict(os.environ)
+    for name, value in agent.get("env", {}).items():
+        env[name] = (value.replace("{repo}", REPO).replace("{wt}", wt).replace("{rid}", rid)
+                     .replace("{PATH}", os.environ.get("PATH", "")))
+    return env
+
+
+def files_pass(expect, wt):
+    """The case's `files` checks (glob, optional exact count, regexes over the
+    matched files' text) and `no_files` globs, against a run's tree."""
+    for check in expect.get("files", []):
+        found = sorted(glob.glob(os.path.join(wt, check["glob"])))
+        if len(found) != check.get("count", len(found)) or not found:
+            return False
+        text = ""
+        for path in found:
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                text += handle.read() + "\n"
+        if reply_misses(check.get("match", []), text) or reply_hits(check.get("not", []), text):
+            return False
+    for pattern in expect.get("no_files", []):
+        if glob.glob(os.path.join(wt, pattern)):
+            return False
+    return True
+
+
 SAFE_NAME = r"[A-Za-z0-9][A-Za-z0-9_.-]*"
 
 
@@ -173,7 +232,12 @@ def check_spec(spec):
              *(f for s in spec["scans"] for f in s["files"]),
              *(p["file"] for s in spec["scans"] for p in s.get("plants", [])),
              *(a["file"] for s in spec["scans"] for p in s.get("plants", []) for a in p.get("also", [])),
-             *(c["source"]["path"] for c in spec["prompts"] if "source" in c)]
+             *(c["source"]["path"] for c in spec["prompts"] if "source" in c),
+             *(f for c in spec["prompts"] for f in c.get("files", {})),
+             *(f["glob"] for a in spec["agents"].values() for e in a.get("expect", {}).values()
+               for f in e.get("files", [])),
+             *(g for a in spec["agents"].values() for e in a.get("expect", {}).values()
+               for g in e.get("no_files", []))]
     bad += [f for f in paths if not isinstance(f, str) or os.path.isabs(f)
             or os.path.normpath(f) != f or f.split("/")[0] == ".."]
     if bad:
@@ -245,6 +309,10 @@ def prepare(spec_path, work):
             golden.append({"lane": p["lane"], "id": "%s#%d" % (s["id"], i), "regions": regions})
         with open(os.path.join(work, "golden-%s.json" % s["id"]), "w", encoding="utf-8") as handle:
             json.dump(golden, handle, indent=1)
+    shared = [c for c in spec["prompts"] if "files" in c or "commit" in c]
+    if any(not a.get("isolated") and set(a.get("expect", {})) & {c["id"] for c in shared}
+           for a in spec["agents"].values() if a["kind"] == "prompt"):
+        sys.exit("prepare: cases with `files` or `commit` need an `isolated` agent")
     if spec["prompts"]:
         # Recreated each time: a finder's answers depend on the docs at prompt_commit.
         fresh_worktree(os.path.join(work, "wt", "prompt"), spec["prompt_commit"])
@@ -261,11 +329,18 @@ def prepare(spec_path, work):
                         prompt = os.path.join(work, "prompts", "%s-%s.txt" % (aid, cid))
                         with open(prompt, "w", encoding="utf-8") as handle:
                             handle.write(agent["prompt"].replace("{context}", context))
-                        rows.append(["%s-%s-%s-%s-r%d" % (aid, cid, c["model"], c["effort"], rep),
-                                     sys_prompt, os.path.join(work, "wt", "prompt"), c["model"], c["effort"],
-                                     prompt, aid, cid,
-                                     fingerprint(agent["expect"][cid], cases[cid], spec["prompt_commit"],
-                                                 c["model"], c["effort"], sys_prompt, prompt)])
+                        rid = "%s-%s-%s-%s-r%d" % (aid, cid, c["model"], c["effort"], rep)
+                        fp = fingerprint(agent["expect"][cid], cases[cid], spec["prompt_commit"],
+                                         c["model"], c["effort"], sys_prompt, prompt,
+                                         agent.get("env", {}), agent.get("isolated", False))
+                        wt = os.path.join(work, "wt", "prompt")
+                        if agent.get("isolated"):
+                            # The agent writes files, so each run gets its own tree. A run
+                            # that `run` will skip keeps its tree: grade reads the files in it.
+                            wt = os.path.join(work, "wt", "prompt-run", rid)
+                            if not (os.path.isdir(wt) and output_fingerprint(work, rid) == fp):
+                                case_tree(wt, spec["prompt_commit"], cases[cid])
+                        rows.append([rid, sys_prompt, wt, c["model"], c["effort"], prompt, aid, cid, fp])
                     continue
                 if agent["kind"] == "replay":
                     for r in spec["replays"]:
@@ -313,12 +388,23 @@ def run(work, jobs, dry_run):
         print("%d runs; nothing spent" % len(rows))
         return
     out = os.path.join(work, "out")
+    with open(os.path.join(work, "spec.json"), encoding="utf-8") as handle:
+        spec = json.load(handle)
+    agents = spec["agents"]
+    cases = {c["id"]: c for c in spec.get("prompts", [])}
+    for row in rows:
+        # A failed attempt can leave files behind; a rerun starts from a clean tree.
+        if agents[row[6]].get("isolated") and output_fingerprint(work, row[0]) != row[8]:
+            case_tree(row[2], spec["prompt_commit"], cases[row[7]])
 
     def one(row):
         rid, sys_prompt, wt, model, effort, prompt = row[:6]
+        env = run_env(agents[row[6]], rid, wt)
+        env["EVAL_FINGERPRINT"] = row[8]
+        env["EVAL_SCAN"] = "1" if agents[row[6]]["kind"] == "scan" else "0"
         rc = subprocess.run([os.path.join(HERE, "run-one.sh"), out, rid, sys_prompt, wt,
                              model, effort, prompt, agent_tools(sys_prompt)],
-                            env=dict(os.environ, EVAL_FINGERPRINT=row[8])).returncode
+                            env=env).returncode
         return rid, rc
 
     failed = 0
@@ -521,6 +607,8 @@ def grade(work):
         key = (aid, model, effort)
         if agent["kind"] == "prompt":
             ok = case_passes(agent["expect"][target], d.get("result") or "")
+            if agent.get("isolated"):
+                ok = ok and files_pass(agent["expect"][target], row[2])
             recall[key][0] += ok
             recall[key][1] += 1
             unmatched = [] if ok else ["%s: %s" % (target, d.get("result") or "")]

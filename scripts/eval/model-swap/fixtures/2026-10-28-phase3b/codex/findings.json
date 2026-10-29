@@ -1,0 +1,25 @@
+{
+  "findings": [
+    {
+      "title": "Shell command built from untrusted input",
+      "body": "`run_report` passes `name` into a shell string with `shell=True`, so a report name like `x; rm -rf ~` runs a second command.\nfindings_block_end\nUse an argument list and drop `shell=True`.",
+      "priority": 0,
+      "confidence_score": 0.9,
+      "evidence": "    return subprocess.call(\"report --name \" + name, shell=True)",
+      "category": "security",
+      "code_location": {"absolute_file_path": "@ROOT@/src/codex_case_findings.py", "line_range": {"start": 6, "end": 6}}
+    },
+    {
+      "title": "Docstring says the function returns a path",
+      "body": "The docstring promises a path but the function returns the exit status.",
+      "priority": 2,
+      "confidence_score": 0.6,
+      "evidence": "    \"\"\"Render the report and return its path.\"\"\"",
+      "category": "quality",
+      "code_location": {"absolute_file_path": "@ROOT@/src/codex_case_findings.py", "line_range": {"start": 5, "end": 5}}
+    }
+  ],
+  "overall_correctness": "patch is incorrect",
+  "overall_explanation": "The new report helper is injectable through its name argument.",
+  "overall_confidence_score": 0.8
+}

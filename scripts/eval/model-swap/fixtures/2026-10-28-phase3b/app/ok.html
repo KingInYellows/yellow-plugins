@@ -1,0 +1,11 @@
+<!doctype html>
+<html><head><title>Settings</title></head>
+<body>
+<h1>Settings</h1>
+<form id="f" onsubmit="event.preventDefault(); document.getElementById('msg').textContent = 'Saved ' + document.getElementById('name').value;">
+  <label for="name">Display name</label>
+  <input id="name" name="name" required>
+  <button type="submit">Save</button>
+</form>
+<p id="msg"></p>
+</body></html>
