@@ -42,6 +42,7 @@ elif [ "$rc" -eq 0 ]; then
   case "$key" in
     reply-pr-thread) printf '{"replied":true,"commentId":"PRRC_1","threadId":"%s"}\n' "$tid" ;;
     resolve-pr-thread) printf '{"resolved":true,"threadId":"%s"}\n' "$tid" ;;
+    handback-pr-thread) printf '{"handedBack":true,"commentId":"PRRC_2","threadId":"%s"}\n' "$tid" ;;
     find) printf '{"exists":false}\n' ;;
     file-followup-issue) printf '{"number":12,"url":"https://github.com/o/r/issues/12","created":true}\n' ;;
   esac
@@ -50,7 +51,7 @@ fi
 exit "$rc"
 STUB
   chmod +x "$BIN/stage-stub"
-  for s in file-followup-issue reply-pr-thread resolve-pr-thread; do
+  for s in file-followup-issue reply-pr-thread handback-pr-thread resolve-pr-thread; do
     ln -s stage-stub "$BIN/$s"
   done
   SCRIPT="$BIN/apply-thread-actions"
@@ -100,6 +101,9 @@ stub_io() {
     '{"threadId":"PRRT_a","disposition":"oos","reply":{"body":"tracked in {{issue}}"}}' \
     '{"threadId":"PRRT_a","disposition":"fixed","reply":{"body":""}}' \
     '{"threadId":"PRRT_a","disposition":"fixed","resolve":"yes"}' \
+    '{"threadId":"PRRT_a","disposition":"fixed","handback":true}' \
+    '{"threadId":"PRRT_a","disposition":"fixed","resolve":false,"handback":true}' \
+    '{"threadId":"PRRT_a","disposition":"fixed","resolve":true,"handback":"yes"}' \
     'not json'; do
     printf '%s\n' "$bad" >"$PLAN"
     run "$SCRIPT" o/r 7 "$PLAN" "$RESULTS"
@@ -242,6 +246,73 @@ P
   [ "$status" -eq 0 ]
   [ "$(jq -r 'select(.threadId=="PRRT_a") | [.resolve.status, (.resolve.exit|tostring), .resolve.reason, .outcome] | join(",")' "$RESULTS")" = "failed,3,permission,stopped" ]
   grep -qx 'resolve-pr-thread PRRT_b' "$CALL_LOG"
+}
+
+# --- CodeRabbit hand-back ---
+
+@test "a handback thread runs handback-pr-thread between the reply and the resolve" {
+  cat >"$PLAN" <<'P'
+{"threadId":"PRRT_a","disposition":"fixed","reply":{"body":"Fixed in abc1234."},"resolve":true,"handback":true}
+{"threadId":"PRRT_b","disposition":"fixed","reply":{"body":"Fixed in abc1234."},"resolve":true}
+P
+  stub_io handback-pr-thread PRRT_a 1 out '{"handedBack":false,"skipped":"not-coderabbit","threadId":"PRRT_a"}'
+  run "$SCRIPT" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 0 ]
+  expected='reply-pr-thread PRRT_a fixed <file>
+handback-pr-thread PRRT_a
+resolve-pr-thread PRRT_a
+reply-pr-thread PRRT_b fixed <file>
+resolve-pr-thread PRRT_b'
+  [ "$(cat "$CALL_LOG")" = "$expected" ]
+  [ "$(jq -r 'select(.threadId=="PRRT_a") | [.handback.status, .handback.reason, .resolve.status, .outcome] | join(",")' "$RESULTS")" = "skipped,not-coderabbit,resolved,complete" ]
+  [ "$(jq -r 'select(.threadId=="PRRT_b") | .handback | tostring' "$RESULTS")" = "null" ]
+}
+
+@test "a failed hand-back still resolves the thread" {
+  printf '%s\n' '{"threadId":"PRRT_a","disposition":"fixed","reply":{"body":"Fixed in abc1234."},"resolve":true,"handback":true}' >"$PLAN"
+  stub_rc handback-pr-thread PRRT_a 3
+  stub_io handback-pr-thread PRRT_a 1 err 'reason=permission'
+  run "$SCRIPT" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 0 ]
+  grep -qx 'resolve-pr-thread PRRT_a' "$CALL_LOG"
+  [ "$(jq -r '[.handback.status, (.handback.exit|tostring), .handback.reason, .resolve.status, .outcome] | join(",")' "$RESULTS")" = "failed,3,permission,resolved,complete" ]
+}
+
+@test "a hand-back exit 4 stops the write phase before the resolve" {
+  cat >"$PLAN" <<'P'
+{"threadId":"PRRT_a","disposition":"fixed","reply":{"body":"Fixed in abc1234."},"resolve":true,"handback":true}
+{"threadId":"PRRT_b","disposition":"fixed","reply":{"body":"Fixed in abc1234."},"resolve":true}
+P
+  stub_rc handback-pr-thread PRRT_a 4
+  stub_io handback-pr-thread PRRT_a 1 err 'reason=rate-limit'
+  run --separate-stderr "$SCRIPT" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 4 ]
+  [ "$output" = "apply threads=2 done=1 skipped=0 issues_created=0 stopped=rate-limit" ]
+  ! grep -q 'resolve-pr-thread' "$CALL_LOG"
+  [ "$(jq -r 'select(.threadId=="PRRT_a") | [.handback.status, .handback.reason, (.resolve|tostring), .outcome] | join(",")' "$RESULTS")" = "failed,rate-limit,null,stopped" ]
+  [ "$(jq -r 'select(.threadId=="PRRT_b") | .outcome' "$RESULTS")" = "not-attempted" ]
+}
+
+@test "a withheld resolve skips the hand-back too" {
+  printf '%s\n' '{"threadId":"PRRT_a","disposition":"fixed","reply":{"body":"Fixed in abc1234."},"resolve":true,"handback":true}' >"$PLAN"
+  stub_io reply-pr-thread PRRT_a 1 out '{"replied":false,"skipped":"already-replied","disposition":"disagree","threadId":"PRRT_a"}'
+  run "$SCRIPT" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 0 ]
+  ! grep -q 'handback-pr-thread' "$CALL_LOG"
+  [ "$(jq -r '[(.handback|tostring), .resolve.status] | join(",")' "$RESULTS")" = "null,withheld" ]
+}
+
+@test "a budget stop after the hand-back resumes at the resolve" {
+  printf '%s\n' '{"threadId":"PRRT_a","disposition":"unclear","resolve":true,"handback":true}' >"$PLAN"
+  export YELLOW_REVIEW_APPLY_BUDGET=0
+  run "$SCRIPT" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 5 ]
+  [ "$(jq -r 'select(.outcome=="partial") | .handback.status' "$RESULTS")" = "posted" ]
+  run "$SCRIPT" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$CALL_LOG")" = "handback-pr-thread PRRT_a
+resolve-pr-thread PRRT_a" ]
+  [ "$(jq -r 'select(.outcome=="complete") | [.handback.status, .resolve.status] | join(",")' "$RESULTS")" = "posted,resolved" ]
 }
 
 # --- Stop rules ---
