@@ -351,6 +351,22 @@ _dialogue() {
   run ! grep -q 'HALF_WRIT' <<< "$tail"
 }
 
+@test "capture fallback keeps the last whole record before a half-written attachment" {
+  STAGING=$(_expected_staging_dir)
+  shim="$PROJECT_DIR/shim"
+  mkdir -p "$shim"
+  real_jq=$(command -v jq)
+  printf '#!/usr/bin/env bash\ncase "$*" in *fromjson*) exit 1 ;; esac\nexec %s "$@"\n' "$real_jq" > "$shim/jq"
+  chmod +x "$shim/jq"
+  {
+    printf '%s\n' '{"type":"user","message":{"role":"user","content":"WHOLE_RECORD"}}'
+    printf '%s' '{"type":"attachment","attachment":{"type":"prompt_snap'
+  } > "$TRANSCRIPT_FILE"
+  PATH="$shim:$PATH" bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  grep -q 'WHOLE_RECORD' <<< "$tail"
+}
+
 @test "capture stages nothing when the tail holds no dialogue" {
   STAGING=$(_expected_staging_dir)
   for _ in $(seq 1 20); do

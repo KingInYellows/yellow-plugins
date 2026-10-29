@@ -76,13 +76,14 @@ if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
         | jq -Rr 'select((try fromjson catch null)
             | type == "object" and (.type == "user" or .type == "assistant"))' 2>/dev/null \
         | tail -n "$TAIL_LINES"); then
-      TAIL_RAW=$(tail -n "$TAIL_LINES" -- "$TRANSCRIPT" 2>/dev/null \
-        | grep -v '^{"type":"attachment"' || printf '')
       # `tail -c 1` of a newline-terminated file is a newline, which $()
       # strips; anything left means the last line is still being written.
-      if [ -n "$(tail -c 1 -- "$TRANSCRIPT" 2>/dev/null)" ]; then
-        TAIL_RAW=$(printf '%s\n' "$TAIL_RAW" | sed '$d')
-      fi
+      # Drop it before the attachment filter, which could remove it first.
+      drop_last=0
+      [ -n "$(tail -c 1 -- "$TRANSCRIPT" 2>/dev/null)" ] && drop_last=1
+      TAIL_RAW=$(tail -n "$TAIL_LINES" -- "$TRANSCRIPT" 2>/dev/null \
+        | if [ "$drop_last" = 1 ]; then sed '$d'; else cat; fi \
+        | grep -v '^{"type":"attachment"' || printf '')
       break
     fi
     # `wc -l` misses an unterminated last line, hence -gt rather than -ge.
