@@ -302,6 +302,19 @@ P
   [ "$(jq -r '[(.handback|tostring), .resolve.status] | join(",")' "$RESULTS")" = "null,withheld" ]
 }
 
+@test "a budget stop after the hand-back resumes at the resolve" {
+  printf '%s\n' '{"threadId":"PRRT_a","disposition":"unclear","resolve":true,"handback":true}' >"$PLAN"
+  export YELLOW_REVIEW_APPLY_BUDGET=0
+  run "$SCRIPT" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 5 ]
+  [ "$(jq -r 'select(.outcome=="partial") | .handback.status' "$RESULTS")" = "posted" ]
+  run "$SCRIPT" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$CALL_LOG")" = "handback-pr-thread PRRT_a
+resolve-pr-thread PRRT_a" ]
+  [ "$(jq -r 'select(.outcome=="complete") | [.handback.status, .resolve.status] | join(",")' "$RESULTS")" = "posted,resolved" ]
+}
+
 # --- Stop rules ---
 
 @test "exit 4 stops every later write and marks the rest not attempted" {

@@ -209,7 +209,7 @@ stop_budget() {
     STOPPED=budget
     # A partial row lets the re-run resume this thread after its last
     # finished stage, and keeps an issue it created counted.
-    if [ "$ISSUE_J" != null ] || [ "$REPLY_DONE" -eq 1 ]; then
+    if [ "$ISSUE_J" != null ] || [ "$REPLY_DONE" -eq 1 ] || [ "$HANDBACK_J" != null ]; then
         write_row partial
     fi
     summary
@@ -280,6 +280,8 @@ while IFS= read -r LINE; do
             not-permitted) FIXED_REPLY=$NOT_FILED_TEXT ;;
         esac
         ISSUE_J=$(printf '%s' "$PREV" | jq -c '.issue')
+        # Any recorded hand-back is final: it is best effort and never repeated.
+        HANDBACK_J=$(printf '%s' "$PREV" | jq -c '.handback')
         case "$(printf '%s' "$PREV" | jq -r '.reply.status // empty')" in
             posted|skipped)
                 REPLY_J=$(printf '%s' "$PREV" | jq -c '.reply')
@@ -382,7 +384,7 @@ while IFS= read -r LINE; do
             # An earlier reply of another disposition stands: stay open.
             RESOLVE_J=$(jq -cn --arg d "$POSTED_AS" '{status: "withheld", postedAs: $d}')
         else
-            if [ "$WANT_HANDBACK" = "true" ]; then
+            if [ "$WANT_HANDBACK" = "true" ] && [ "$HANDBACK_J" = null ]; then
                 budget_allows "$COST_HANDBACK" || stop_budget
                 run_stage handback-pr-thread "$TID"
                 case "$RC" in

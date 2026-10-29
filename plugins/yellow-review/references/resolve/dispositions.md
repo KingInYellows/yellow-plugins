@@ -408,8 +408,9 @@ never waits on the budget: both scripts screen text before any `gh` call, so a
 refusal costs seconds. When the budget runs out the script writes a `partial`
 row for a thread stopped between stages and exits 5. Running the same command
 again skips threads with a final row, resumes a `partial` thread after its last
-finished stage, and counts issues those rows created toward `--issue-cap`. With
-real `gh` latency of a few seconds per stage, one run covers dozens of threads.
+finished stage (a recorded hand-back is never repeated), and counts issues those
+rows created toward `--issue-cap`. With real `gh` latency of a few seconds per
+stage, one run covers dozens of threads.
 
 ## Verify
 
