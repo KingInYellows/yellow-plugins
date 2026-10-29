@@ -48,7 +48,8 @@ fi
 
 Full scans use the `p/default` registry ruleset, or `$YELLOW_SEMGREP_CONFIG`
 when the user has set it. Never use `--config auto`: semgrep refuses it under
-`--metrics off`.
+`--metrics off`. If `YELLOW_SEMGREP_CONFIG` is `auto`, stop and ask the user to
+set a specific ruleset instead.
 
 If `--changed-only`, pass changed files as positional arguments using a bash array:
 

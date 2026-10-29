@@ -93,7 +93,8 @@ semgrep automatically via pipx (preferred) or pip. Or install manually:
 **"Cannot create auto config when metrics are off"** — Every scan runs with
 `--metrics off`, so the plugin never uses `--config auto`. Full scans use the
 `p/default` registry ruleset; set `YELLOW_SEMGREP_CONFIG` (for example
-`p/owasp-top-ten` or a local rules file) to use another one.
+`p/owasp-top-ten` or a local rules file) to use another one. Do not set it to
+`auto`; the scan and verifier refuse that value for the same reason.
 
 **"MCP tools not found"** — The MCP server is built into the semgrep binary
 (v1.146.0+). Ensure semgrep is up to date: `pipx upgrade semgrep`. Run

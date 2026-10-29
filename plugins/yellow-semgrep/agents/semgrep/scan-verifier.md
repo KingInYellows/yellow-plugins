@@ -52,7 +52,9 @@ when the ruleset does not include it:
 semgrep scan --config "${YELLOW_SEMGREP_CONFIG:-p/default}" --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}"
 ```
 
-Never use `--config auto`: semgrep refuses it under `--metrics off`.
+Never use `--config auto`: semgrep refuses it under `--metrics off`. If
+`YELLOW_SEMGREP_CONFIG` is `auto`, report "Cannot verify — YELLOW_SEMGREP_CONFIG
+is auto; set a specific ruleset" instead of scanning.
 
 See `semgrep-conventions` skill for stderr handling pattern — never use
 `2>/dev/null`.

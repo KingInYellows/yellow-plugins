@@ -47,6 +47,17 @@ describe('yellow-semgrep scan flags', () => {
     }
   });
 
+  it('adds the target rule to the verifier scan', () => {
+    const verifier = scanLines.filter(
+      ({ where }) => where === 'agents/semgrep/scan-verifier.md'
+    );
+    expect(verifier.length).toBeGreaterThan(0);
+    for (const { line } of verifier) {
+      expect(line).toContain(FULL_SCAN_CONFIG);
+      expect(line).toContain('--config "r/${CHECK_ID}"');
+    }
+  });
+
   it('runs full scans and the post-fix verifier with the shared default', () => {
     for (const file of [
       'commands/semgrep/scan.md',
