@@ -68,34 +68,44 @@ def fingerprint(*parts):
     return h.hexdigest()[:16]
 
 
+def walk_error(err):
+    raise err
+
+
+def listed_files(rel):
+    """The files under one `fixtures` entry: the file itself, or a directory's files."""
+    path = os.path.join(REPO, rel)
+    if os.path.isdir(path):
+        return sorted(os.path.join(d, f) for d, _, fs in os.walk(path, onerror=walk_error,
+                                                                 followlinks=True) for f in fs)
+    if os.path.isfile(path):
+        return [path]
+    sys.exit("prepare: fixture not found: %s" % rel)
+
+
+def fixture_files(rel):
+    """listed_files, refusing any that resolves outside the repo."""
+    files = listed_files(rel)
+    root = os.path.realpath(REPO) + os.sep
+    escaped = [os.path.relpath(f, REPO) for f in files if not os.path.realpath(f).startswith(root)]
+    if escaped:
+        sys.exit("prepare: fixture resolves outside the repo: %s" % ", ".join(escaped))
+    return files
+
+
 def fixture_parts(agent):
     """Content hash of the agent's `fixtures` (repo-relative files or directories),
     as a fingerprint part: an edited stand-in CLI or canned response reruns its rows.
     Empty when the agent lists none, so other specs keep their fingerprints."""
     if not agent.get("fixtures"):
         return []
-
-    def walk_error(err):
-        raise err
-
     h = hashlib.sha256()
-    for rel in agent["fixtures"]:
-        path = os.path.join(REPO, rel)
-        if os.path.isdir(path):
-            files = sorted(os.path.join(d, f) for d, _, fs in os.walk(path, onerror=walk_error,
-                                                                      followlinks=True) for f in fs)
-        elif os.path.isfile(path):
-            files = [path]
-        else:
-            sys.exit("prepare: fixture not found: %s" % rel)
-        for f in files:
-            if not os.path.realpath(f).startswith(os.path.realpath(REPO) + os.sep):
-                sys.exit("prepare: fixture resolves outside the repo: %s" % os.path.relpath(f, REPO))
-            with open(f, "rb") as handle:
-                data = handle.read()
-            # The exec bit matters too: a stand-in without it fails differently.
-            name = os.path.relpath(f, REPO).encode()
-            h.update(b"%d:%s%d%d:" % (len(name), name, os.access(f, os.X_OK), len(data)) + data)
+    for f in (f for rel in agent["fixtures"] for f in fixture_files(rel)):
+        with open(f, "rb") as handle:
+            data = handle.read()
+        # The exec bit matters too: a stand-in without it fails differently.
+        name = os.path.relpath(f, REPO).encode()
+        h.update(b"%d:%s%d%d:" % (len(name), name, os.access(f, os.X_OK), len(data)) + data)
     return [h.hexdigest()]
 
 
