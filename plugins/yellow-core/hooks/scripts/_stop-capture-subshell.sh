@@ -182,8 +182,8 @@ while ! mkdir "$LOCK" 2>/dev/null; do
   sleep 0.1
 done
 if [ "$tries" -le 50 ]; then
-  # shellcheck disable=SC2064  # LOCK is fixed; expand it now.
-  trap "rmdir '$LOCK' 2>/dev/null || true" EXIT
+  # Single quotes: LOCK holds a project path and must never become trap source.
+  trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
 fi
 PREV_BYTES=$(cat "$MARK" 2>/dev/null) || PREV_BYTES=0
 case "$PREV_BYTES" in '' | *[!0-9]*) PREV_BYTES=0 ;; esac

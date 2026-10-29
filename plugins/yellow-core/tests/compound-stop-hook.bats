@@ -398,3 +398,12 @@ _dialogue() {
   jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl" | grep -q 'AFTER_STALE_LOCK'
   [ ! -e "$STAGING/capture-marks/$SESSION_ID.lock" ]
 }
+
+@test "capture releases its lock when the staging path holds shell quotes" {
+  STAGING="$PROJECT_DIR/it's \$(touch INJECTED)"
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"QUOTED_PATH"}}' > "$TRANSCRIPT_FILE"
+  (cd "$PROJECT_DIR" && bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR")
+  jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl" | grep -q 'QUOTED_PATH'
+  [ ! -e "$STAGING/capture-marks/$SESSION_ID.lock" ]
+  [ ! -e "$PROJECT_DIR/INJECTED" ]
+}
