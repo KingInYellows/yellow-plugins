@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.9.6
+
+### Patch Changes
+
+- [`e0f0af6`](https://github.com/KingInYellows/yellow-plugins/commit/e0f0af615bf392dfed5db8bec92e97b4ff104740)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `debt_backfill_todos` to `lib/validate.sh`: it fills a missing `id`, `status`,
+  `severity` or `priority` in older todos from the file name, never changes a
+  present value, and reports todos missing `category` or `affected_files` for a
+  hand edit (CLAUDE-4).
+
+- [#1436](https://github.com/KingInYellows/yellow-plugins/pull/1436)
+  [`0b24dbc`](https://github.com/KingInYellows/yellow-plugins/commit/0b24dbc9fb146448ae548e2973908230dc2cb85c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Eval-gated
+  model swaps from the Phase 3 leftovers eval (CLAUDE-194): `scan-verifier`
+  moves to haiku/low, `staging-promoter` to haiku/medium, and
+  `audit-synthesizer` from opus/high to sonnet/medium. `/semgrep:fix` Step 9 now
+  treats a verifier answer with no `Verification:` verdict (empty or refused)
+  like "Cannot verify" and offers to commit with the new
+  `unverified (no verifier result)` trailer, instead of reading it as a pass.
+
 ## 1.9.5
 
 ### Patch Changes

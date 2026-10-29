@@ -1,5 +1,27 @@
 # Changelog
 
+## 4.2.9
+
+### Patch Changes
+
+- [#1436](https://github.com/KingInYellows/yellow-plugins/pull/1436)
+  [`0b24dbc`](https://github.com/KingInYellows/yellow-plugins/commit/0b24dbc9fb146448ae548e2973908230dc2cb85c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Eval-gated
+  model swaps from the Phase 3 leftovers eval (CLAUDE-194): `scan-verifier`
+  moves to haiku/low, `staging-promoter` to haiku/medium, and
+  `audit-synthesizer` from opus/high to sonnet/medium. `/semgrep:fix` Step 9 now
+  treats a verifier answer with no `Verification:` verdict (empty or refused)
+  like "Cannot verify" and offers to commit with the new
+  `unverified (no verifier result)` trailer, instead of reading it as a pass.
+
+- [#1461](https://github.com/KingInYellows/yellow-plugins/pull/1461)
+  [`00b823c`](https://github.com/KingInYellows/yellow-plugins/commit/00b823c9fefe7cf1601483e30e3eda815ffb09e9)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop pairing
+  `--config auto` with `--metrics off`, which current semgrep refuses.
+  `/semgrep:scan` and the post-fix `scan-verifier` now scan with the `p/default`
+  ruleset (override with `YELLOW_SEMGREP_CONFIG`); the verifier also adds the
+  target rule so it is always checked (CLAUDE-195).
+
 ## 4.2.8
 
 ### Patch Changes
