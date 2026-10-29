@@ -88,6 +88,8 @@ If you previously used `DEVIN_API_TOKEN` with an `apk_` key:
 | `/devin:tag`        | Add, remove, or list session tags                                                    |
 | `/devin:review-prs` | Find Devin PRs for the current repo, review them, and remediate                      |
 
+Arguments and examples for each command: [docs/commands.md](docs/commands.md).
+
 ## Agents
 
 | Agent                | Description                                            |
