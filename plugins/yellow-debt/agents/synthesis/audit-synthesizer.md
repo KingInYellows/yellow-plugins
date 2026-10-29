@@ -1,8 +1,8 @@
 ---
 name: audit-synthesizer
 description: "Merge scanner outputs, deduplicate findings, score severity, and generate reports. Use when synthesizing results from multiple debt scanners."
-model: opus
-effort: high
+model: sonnet
+effort: medium
 background: true
 skills:
   - debt-conventions
