@@ -57,6 +57,14 @@ _wait_for_file() {
   [ -f "$path" ]
 }
 
+# Helper: one user record per argument. Only dialogue records are staged.
+_dialogue() {
+  local text
+  for text in "$@"; do
+    jq -nc --arg t "$text" '{type: "user", message: {role: "user", content: $t}}'
+  done
+}
+
 # --- Recursion guard ---
 
 @test "stop hook exits silently when COMPOUND_DRAIN_IN_PROGRESS=1" {
@@ -84,7 +92,7 @@ _wait_for_file() {
 # --- Capture happy path ---
 
 @test "stop hook captures transcript tail to pending JSONL" {
-  printf 'line one\nline two with normal text\n' > "$TRANSCRIPT_FILE"
+  _dialogue 'line one' 'line two with normal text' > "$TRANSCRIPT_FILE"
   STAGING=$(_expected_staging_dir)
   run bash "$STOP_HOOK" <<< "$(_hook_stdin)"
   [ "$status" -eq 0 ]
@@ -95,7 +103,7 @@ _wait_for_file() {
 }
 
 @test "stop hook redacts secrets before writing JSONL" {
-  printf 'config:\npassword=hunter2longvalue\nend\n' > "$TRANSCRIPT_FILE"
+  _dialogue 'config:' 'password=hunter2longvalue' 'end' > "$TRANSCRIPT_FILE"
   STAGING=$(_expected_staging_dir)
   bash "$STOP_HOOK" <<< "$(_hook_stdin)" >/dev/null
   _wait_for_file "$STAGING/pending/$SESSION_ID.jsonl" 5
@@ -105,7 +113,7 @@ _wait_for_file() {
 }
 
 @test "stop hook redacts Bearer tokens" {
-  printf 'header: Bearer abc123def456ghi789jkl0\n' > "$TRANSCRIPT_FILE"
+  _dialogue 'header: Bearer abc123def456ghi789jkl0' > "$TRANSCRIPT_FILE"
   STAGING=$(_expected_staging_dir)
   bash "$STOP_HOOK" <<< "$(_hook_stdin)" >/dev/null
   _wait_for_file "$STAGING/pending/$SESSION_ID.jsonl" 5
@@ -114,7 +122,7 @@ _wait_for_file() {
 }
 
 @test "stop hook writes content_hash for dedup" {
-  printf 'consistent input\n' > "$TRANSCRIPT_FILE"
+  _dialogue 'consistent input' > "$TRANSCRIPT_FILE"
   STAGING=$(_expected_staging_dir)
   bash "$STOP_HOOK" <<< "$(_hook_stdin)" >/dev/null
   _wait_for_file "$STAGING/pending/$SESSION_ID.jsonl" 5
@@ -150,11 +158,10 @@ _wait_for_file() {
 
 @test "capture subshell handles missing transcript gracefully" {
   STAGING=$(_expected_staging_dir)
-  bash "$CAPTURE_SCRIPT" "/nonexistent/transcript.jsonl" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
-  # Should still write a JSONL with empty transcript_tail.
-  [ -f "$STAGING/pending/$SESSION_ID.jsonl" ]
-  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
-  [ "$tail" = "" ]
+  run bash "$CAPTURE_SCRIPT" "/nonexistent/transcript.jsonl" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  [ "$status" -eq 0 ]
+  # An empty tail is not staged.
+  [ ! -e "$STAGING/pending/$SESSION_ID.jsonl" ]
 }
 
 @test "capture keeps user and assistant records and drops attachments" {
@@ -170,7 +177,7 @@ _wait_for_file() {
   tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
   echo "$tail" | grep -q 'USER_DIALOGUE'
   echo "$tail" | grep -q 'ASSISTANT_DIALOGUE'
-  echo "$tail" | grep -q 'plain text line'
+  run ! grep -q 'plain text line' <<< "$tail"
   run ! grep -q 'SYSTEM_PROMPT_NOISE' <<< "$tail"
   run ! grep -q 'TOOL_SCHEMA_NOISE' <<< "$tail"
   run ! grep -q 'queue-operation' <<< "$tail"
@@ -297,4 +304,97 @@ _wait_for_file() {
   tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
   grep -q 'USER_DIALOGUE' <<< "$tail"
   run ! grep -q 'SYSTEM_PROMPT_NOISE' <<< "$tail"
+}
+
+@test "capture does not let non-dialogue text lines take dialogue slots" {
+  STAGING=$(_expected_staging_dir)
+  for i in $(seq 1 150); do
+    printf '{"type":"user","message":{"role":"user","content":"msg-%03d"}}\n' "$i"
+    printf 'plain text line %03d\n' "$i"
+    printf '%s\n' '"a JSON string"' '{"no_type":true}'
+  done > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  [ "$(printf '%s\n' "$tail" | wc -l)" -eq 100 ]
+  grep -q 'msg-051' <<< "$tail"
+  grep -q 'msg-150' <<< "$tail"
+  run ! grep -q 'msg-050' <<< "$tail"
+  run ! grep -q 'plain text line' <<< "$tail"
+  run ! grep -q 'no_type' <<< "$tail"
+}
+
+@test "capture drops a half-written final line" {
+  STAGING=$(_expected_staging_dir)
+  {
+    printf '%s\n' '{"type":"user","message":{"role":"user","content":"WHOLE_RECORD"}}'
+    printf '%s' '{"type":"assistant","message":{"role":"assistant","content":"HALF_WRIT'
+  } > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  [ "$tail" = '{"type":"user","message":{"role":"user","content":"WHOLE_RECORD"}}' ]
+}
+
+@test "capture fallback drops a half-written final line" {
+  STAGING=$(_expected_staging_dir)
+  shim="$PROJECT_DIR/shim"
+  mkdir -p "$shim"
+  real_jq=$(command -v jq)
+  printf '#!/usr/bin/env bash\ncase "$*" in *fromjson*) exit 1 ;; esac\nexec %s "$@"\n' "$real_jq" > "$shim/jq"
+  chmod +x "$shim/jq"
+  {
+    printf '%s\n' '{"type":"user","message":{"role":"user","content":"WHOLE_RECORD"}}'
+    printf '%s' '{"type":"assistant","message":{"role":"assistant","content":"HALF_WRIT'
+  } > "$TRANSCRIPT_FILE"
+  PATH="$shim:$PATH" bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  grep -q 'WHOLE_RECORD' <<< "$tail"
+  run ! grep -q 'HALF_WRIT' <<< "$tail"
+}
+
+@test "capture stages nothing when the tail holds no dialogue" {
+  STAGING=$(_expected_staging_dir)
+  for _ in $(seq 1 20); do
+    printf '%s\n' '{"type":"attachment","attachment":{"type":"prompt_snapshot"}}'
+  done > "$TRANSCRIPT_FILE"
+  run bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  [ "$status" -eq 0 ]
+  [ ! -e "$STAGING/pending/$SESSION_ID.jsonl" ]
+}
+
+@test "an older capture finishing last does not replace a newer pending entry" {
+  STAGING=$(_expected_staging_dir)
+  older="$PROJECT_DIR/older.jsonl"
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"FIRST_TURN"}}' > "$older"
+  {
+    cat "$older"
+    printf '%s\n' '{"type":"assistant","message":{"role":"assistant","content":"SECOND_TURN"}}'
+  } > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  # The older capture read the transcript when it held only the first turn.
+  bash "$CAPTURE_SCRIPT" "$older" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl" | grep -q 'SECOND_TURN'
+  # Once the drain takes the newer entry, the older one is not re-staged.
+  rm -f "$STAGING/pending/$SESSION_ID.jsonl"
+  bash "$CAPTURE_SCRIPT" "$older" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  [ ! -e "$STAGING/pending/$SESSION_ID.jsonl" ]
+  [ ! -e "$STAGING/capture-marks/$SESSION_ID.lock" ]
+}
+
+@test "a newer capture replaces an older pending entry" {
+  STAGING=$(_expected_staging_dir)
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"FIRST_TURN"}}' > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  printf '%s\n' '{"type":"assistant","message":{"role":"assistant","content":"SECOND_TURN"}}' >> "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl" | grep -q 'SECOND_TURN'
+}
+
+@test "capture clears a stale per-session lock left by a dead capture" {
+  STAGING=$(_expected_staging_dir)
+  mkdir -p "$STAGING/capture-marks/$SESSION_ID.lock"
+  touch -t 202001010000 "$STAGING/capture-marks/$SESSION_ID.lock"
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"AFTER_STALE_LOCK"}}' > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl" | grep -q 'AFTER_STALE_LOCK'
+  [ ! -e "$STAGING/capture-marks/$SESSION_ID.lock" ]
 }

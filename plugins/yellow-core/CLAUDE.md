@@ -241,6 +241,10 @@ PreCompact 3s (`catalog/plugins/yellow-core.json`).
   `~/.claude/projects/<slug>/compound-staging/` as sensitive — do not relocate
   to a tracked directory; the recommended `.gitignore` entry is
   `compound-staging/`.
+- **One pending entry per session, newest wins.** Two captures of one session
+  can overlap. `capture-marks/<session>` records the transcript size of the
+  newest published capture, and a capture that read a smaller transcript does
+  not publish. The marks share the 7-day TTL.
 - **Async via disowned subshells only.** The plugin manifest does NOT use an
   `async: true` hook schema field (Claude Code's remote validator rejects it —
   confirmed via deepen-plan validation). Non-blocking behavior comes entirely
