@@ -12,6 +12,11 @@
     "model": "haiku",
     "effort": "medium",
     "reps": 2
+   },
+   {
+    "model": "sonnet",
+    "effort": "medium",
+    "reps": 2
    }
   ]
  },
