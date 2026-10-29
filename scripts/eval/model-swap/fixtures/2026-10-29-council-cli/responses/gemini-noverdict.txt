@@ -1,0 +1,4 @@
+I looked at the change. The helper reads the retry count from the environment
+and falls back to three attempts, which seems reasonable. I did not find
+anything blocking in src/council_case_noverdict.py, though the backoff could
+be jittered.

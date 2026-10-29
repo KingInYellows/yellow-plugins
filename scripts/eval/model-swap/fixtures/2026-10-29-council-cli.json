@@ -1,0 +1,260 @@
+{
+ "$comment": "CLAUDE-200 gemini-reviewer / opencode-reviewer effort eval, 2026-10-29. Both wrappers run as isolated prompt agents against a council pack (the spawn prompt council.md sends), with bin/agy and bin/opencode first on PATH: they replay a canned CLI reply picked by the src/council_case_<x>.py file in the pack's diff and log every call to the run tree's eval-cli.log. A case passes on the agent's key=value return plus that log (one CLI call with the documented flags, the pack written verbatim with its INGEST_TOKEN last, the OpenCode session deleted once). The 2026-10-29-council-cli-real.json spec runs the same agents against the real CLIs on a machine that has them.",
+ "prompt_commit": "0b24dbc",
+ "configs": {
+  "council": [
+   {
+    "model": "haiku",
+    "effort": "low",
+    "reps": 3
+   },
+   {
+    "model": "haiku",
+    "effort": "medium",
+    "reps": 3
+   },
+   {
+    "model": "sonnet",
+    "effort": "medium",
+    "reps": 2
+   }
+  ]
+ },
+ "agents": {
+  "gm": {
+   "file": "plugins/yellow-council/agents/review/gemini-reviewer.md",
+   "kind": "prompt",
+   "configs": "council",
+   "preload_skills": [
+    "plugins/yellow-council/skills/council-patterns/SKILL.md"
+   ],
+   "isolated": true,
+   "fence": false,
+   "prompt": "{context}",
+   "env": {
+    "PATH": "{repo}/scripts/eval/model-swap/fixtures/2026-10-29-council-cli/bin:{PATH}",
+    "EVAL_CLI_LOG": "{wt}/eval-cli.log"
+   },
+   "expect": {
+    "gm-revise": {
+     "match": [
+      "^verdict=REVISE$",
+      "^confidence=HIGH$",
+      "^summary=.*hardcodes a GitHub token",
+      "^fenced_output_path=/tmp/council-gemini-fenced-\\S+$",
+      "(?s)^findings_block_begin$.*\\[P1\\] src/council_case_revise\\.py:4.*--- redacted credential at line \\d+ ---.*\\[P2\\] src/council_case_revise\\.py:9.*^findings_block_end$"
+     ],
+     "not": [
+      "ghp_EVAL"
+     ],
+     "files": [
+      {
+       "glob": "eval-cli.log",
+       "match": [
+        "^agy argv: \\[--sandbox\\] \\[--print-timeout\\] \\[630s\\] \\[-p\\] \\[Read the file /tmp/council-gemini-pack-[^/]+/pack\\.txt ",
+        "^agy cwd: /tmp/council-gemini-pack-",
+        "^agy pack: case=\\w+ token=[0-9a-f]{16} sentinel=yes format=yes$"
+       ],
+       "not": [
+        "(?s)agy argv: \\[--sandbox\\].*agy argv: \\[--sandbox\\]",
+        "dangerously"
+       ]
+      }
+     ]
+    },
+    "gm-quota": {
+     "match": [
+      "^verdict=QUOTA_EXHAUSTED$",
+      "^confidence=N/A$",
+      "^summary=Gemini quota exhausted .*resets in 3h12m",
+      "^fenced_output_path=/dev/null$"
+     ],
+     "not": [
+      "^verdict=(APPROVE|REVISE|ERROR)"
+     ],
+     "files": [
+      {
+       "glob": "eval-cli.log",
+       "match": [
+        "^agy pack: case=quota token=[0-9a-f]{16} sentinel=yes"
+       ],
+       "not": [
+        "(?s)agy argv: \\[--sandbox\\].*agy argv: \\[--sandbox\\]"
+       ]
+      }
+     ]
+    },
+    "gm-notoken": {
+     "match": [
+      "^verdict=ERROR$",
+      "^confidence=N/A$",
+      "^summary=Pack ingestion could not be verified"
+     ],
+     "not": [
+      "^verdict=APPROVE"
+     ],
+     "files": [
+      {
+       "glob": "eval-cli.log",
+       "match": [
+        "^agy pack: case=notoken token=[0-9a-f]{16} sentinel=yes"
+       ]
+      }
+     ]
+    },
+    "gm-noverdict": {
+     "match": [
+      "^verdict=UNKNOWN$",
+      "^confidence=LOW$",
+      "^summary=.*backoff could be jittered",
+      "^fenced_output_path=/tmp/council-gemini-fenced-\\S+$"
+     ],
+     "not": [
+      "^verdict=(APPROVE|REVISE|ERROR)"
+     ],
+     "files": [
+      {
+       "glob": "eval-cli.log",
+       "match": [
+        "^agy argv: \\[--sandbox\\] \\[--print-timeout\\] \\[630s\\] \\[-p\\] \\[Read the file /tmp/council-gemini-pack-[^/]+/pack\\.txt ",
+        "^agy cwd: /tmp/council-gemini-pack-",
+        "^agy pack: case=\\w+ token=[0-9a-f]{16} sentinel=yes format=yes$"
+       ],
+       "not": [
+        "(?s)agy argv: \\[--sandbox\\].*agy argv: \\[--sandbox\\]",
+        "dangerously"
+       ]
+      }
+     ]
+    }
+   }
+  },
+  "oc": {
+   "file": "plugins/yellow-council/agents/review/opencode-reviewer.md",
+   "kind": "prompt",
+   "configs": "council",
+   "preload_skills": [
+    "plugins/yellow-council/skills/council-patterns/SKILL.md"
+   ],
+   "isolated": true,
+   "fence": false,
+   "prompt": "{context}",
+   "env": {
+    "PATH": "{repo}/scripts/eval/model-swap/fixtures/2026-10-29-council-cli/bin:{PATH}",
+    "EVAL_CLI_LOG": "{wt}/eval-cli.log"
+   },
+   "expect": {
+    "oc-revise": {
+     "match": [
+      "^verdict=REVISE$",
+      "^confidence=MEDIUM$",
+      "^summary=.*commits an API key",
+      "^fenced_output_path=/tmp/council-opencode-fenced-\\S+$",
+      "(?s)^findings_block_begin$.*\\[P1\\] src/council_case_revise\\.py:4.*--- redacted credential at line \\d+ ---.*\\[P3\\] src/council_case_revise\\.py:7.*^findings_block_end$"
+     ],
+     "not": [
+      "sk-ant-api03-EVAL"
+     ],
+     "files": [
+      {
+       "glob": "eval-cli.log",
+       "match": [
+        "^opencode run argv: \\[--format\\] \\[json\\] \\[--variant\\] \\[high\\] \\[--print-logs\\] \\[--log-level\\] \\[ERROR\\] \\[--model\\] \\[openrouter/deepseek/deepseek-v4-pro\\] \\[<pack \\d+ bytes>\\]$",
+        "^opencode pack: case=\\w+ sentinel=yes$",
+        "^opencode session delete ses_7QxEvalStubSession42$"
+       ],
+       "not": [
+        "(?s)opencode run argv:.*opencode run argv:",
+        "(?s)session delete.*session delete",
+        "dangerously"
+       ]
+      }
+     ]
+    },
+    "oc-model": {
+     "match": [
+      "^verdict=UNAVAILABLE$",
+      "^confidence=N/A$",
+      "^summary=OpenCode model openrouter/deepseek/deepseek-v4-pro is unavailable.*opencode auth login --provider openrouter"
+     ],
+     "not": [
+      "^verdict=(APPROVE|REVISE|ERROR)"
+     ],
+     "files": [
+      {
+       "glob": "eval-cli.log",
+       "match": [
+        "^opencode run argv: \\[--format\\] \\[json\\] \\[--variant\\] \\[high\\] \\[--print-logs\\] \\[--log-level\\] \\[ERROR\\] \\[--model\\] \\[openrouter/deepseek/deepseek-v4-pro\\] \\[<pack \\d+ bytes>\\]$",
+        "^opencode pack: case=\\w+ sentinel=yes$",
+        "^opencode session delete ses_7QxEvalStubSession42$"
+       ],
+       "not": [
+        "(?s)opencode run argv:.*opencode run argv:",
+        "(?s)session delete.*session delete",
+        "dangerously"
+       ]
+      }
+     ]
+    },
+    "oc-noverdict": {
+     "match": [
+      "^verdict=UNKNOWN$",
+      "^confidence=LOW$",
+      "^summary=.*backoff could be jittered",
+      "^fenced_output_path=/tmp/council-opencode-fenced-\\S+$"
+     ],
+     "not": [
+      "^verdict=(APPROVE|REVISE|ERROR)"
+     ],
+     "files": [
+      {
+       "glob": "eval-cli.log",
+       "match": [
+        "^opencode run argv: \\[--format\\] \\[json\\] \\[--variant\\] \\[high\\] \\[--print-logs\\] \\[--log-level\\] \\[ERROR\\] \\[--model\\] \\[openrouter/deepseek/deepseek-v4-pro\\] \\[<pack \\d+ bytes>\\]$",
+        "^opencode pack: case=\\w+ sentinel=yes$",
+        "^opencode session delete ses_7QxEvalStubSession42$"
+       ],
+       "not": [
+        "(?s)opencode run argv:.*opencode run argv:",
+        "(?s)session delete.*session delete",
+        "dangerously"
+       ]
+      }
+     ]
+    }
+   }
+  }
+ },
+ "replays": [],
+ "scans": [],
+ "prompts": [
+  {
+   "id": "gm-revise",
+   "text": "You are Gemini, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_revise.py b/src/council_case_revise.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_revise.py\n@@ -0,0 +1,9 @@\n+import requests\n+\n+\n+API_TOKEN = \"ghp_EVALfakeTOKEN000000000000000000000000\"\n+\n+\n+def fetch(url):\n+    headers = {\"Authorization\": \"token \" + API_TOKEN}\n+    return requests.get(url, headers=headers)\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
+  },
+  {
+   "id": "gm-quota",
+   "text": "You are Gemini, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_quota.py b/src/council_case_quota.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_quota.py\n@@ -0,0 +1,2 @@\n+def add(a, b):\n+    return a + b\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
+  },
+  {
+   "id": "gm-notoken",
+   "text": "You are Gemini, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_notoken.py b/src/council_case_notoken.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_notoken.py\n@@ -0,0 +1,2 @@\n+def greet(name):\n+    return \"hello \" + name\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
+  },
+  {
+   "id": "gm-noverdict",
+   "text": "You are Gemini, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_noverdict.py b/src/council_case_noverdict.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_noverdict.py\n@@ -0,0 +1,12 @@\n+import os\n+import time\n+\n+\n+def retry(fn):\n+    attempts = int(os.environ.get(\"RETRIES\", \"3\"))\n+    for i in range(attempts):\n+        try:\n+            return fn()\n+        except OSError:\n+            time.sleep(2 ** i)\n+    return fn()\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
+  },
+  {
+   "id": "oc-revise",
+   "text": "You are OpenCode, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_revise.py b/src/council_case_revise.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_revise.py\n@@ -0,0 +1,9 @@\n+import anthropic\n+\n+\n+ANTHROPIC_KEY = \"sk-ant-api03-EVALfakeKEY0000000000000000000\"\n+\n+\n+def fetch(model):\n+    client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)\n+    return client.models.retrieve(model)\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
+  },
+  {
+   "id": "oc-model",
+   "text": "You are OpenCode, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_model.py b/src/council_case_model.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_model.py\n@@ -0,0 +1,2 @@\n+def mul(a, b):\n+    return a * b\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
+  },
+  {
+   "id": "oc-noverdict",
+   "text": "You are OpenCode, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_noverdict.py b/src/council_case_noverdict.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_noverdict.py\n@@ -0,0 +1,12 @@\n+import os\n+import time\n+\n+\n+def retry(fn):\n+    attempts = int(os.environ.get(\"RETRIES\", \"3\"))\n+    for i in range(attempts):\n+        try:\n+            return fn()\n+        except OSError:\n+            time.sleep(2 ** i)\n+    return fn()\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
+  }
+ ]
+}

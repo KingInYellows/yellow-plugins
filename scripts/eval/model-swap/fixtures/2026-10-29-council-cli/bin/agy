@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Eval stand-in for the Antigravity CLI (agy): gemini-reviewer's effort eval
+# feeds the agent a canned `agy -p` reply instead of a live Gemini review.
+# The reply is picked by the file the pack's diff adds
+# (src/council_case_<x>.py) and read from ../responses/gemini-<x>.txt. Like
+# the real CLI it reads the pack from the file the -p prompt names and echoes
+# the pack's final INGEST_TOKEN line. Every call is logged to $EVAL_CLI_LOG.
+here=$(cd "$(dirname "$0")/.." && pwd -P)
+log=${EVAL_CLI_LOG:-/dev/null}
+{ printf 'agy argv:'; for a in "$@"; do printf ' [%s]' "$a"; done; printf '\n'; } >>"$log"
+[ "${1:-}" = --version ] && { printf 'agy 1.0.2\n'; exit 0; }
+prompt=
+while [ $# -gt 0 ]; do
+  case $1 in -p|--print|--prompt) prompt=${2:-}; shift ;; esac
+  shift
+done
+printf 'agy cwd: %s\n' "$PWD" >>"$log"
+pack=$(printf '%s' "$prompt" | grep -o '/[^ ]*pack\.txt' | head -n1)
+if [ ! -f "$pack" ]; then
+  printf 'agy pack: missing\n' >>"$log"
+  printf 'I could not find a pack file to review.\n'
+  exit 0
+fi
+token=$(tail -n1 "$pack" | sed -n 's/^INGEST_TOKEN: \([0-9a-f]*\)$/\1/p')
+case_id=$(grep -o 'src/council_case_[a-z]*\.py' "$pack" | head -n1 | sed 's/.*council_case_//; s/\.py$//')
+sentinel=no
+grep -q '^PACK-SENTINEL: end of council pack body$' "$pack" && sentinel=yes
+format=no
+grep -q '^## Required Output Format$' "$pack" && format=yes
+printf 'agy pack: case=%s token=%s sentinel=%s format=%s\n' "$case_id" "${token:-none}" "$sentinel" "$format" >>"$log"
+case $case_id in
+  quota)
+    printf 'Error: RESOURCE_EXHAUSTED: You have exhausted your quota for gemini-3-pro. Try again in 3h12m.\n' >&2
+    exit 1 ;;
+  notoken) token= ;;  # a CLI that answered without reading the pack to its end
+  '') printf 'agy stub: no case file in the pack\n' >&2; exit 1 ;;
+esac
+[ -n "$token" ] && printf 'INGEST_TOKEN: %s\n\n' "$token"
+cat "$here/responses/gemini-$case_id.txt"
