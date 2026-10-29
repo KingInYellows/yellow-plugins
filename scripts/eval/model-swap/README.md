@@ -45,7 +45,12 @@ an output with another fingerprint as missing.
   reply hits every `match` regex and no `not` regex, or, for `lowest`, scores
   every one of the case's `candidates` and gives that one the lowest
   `weighted_score`. Cases run in a worktree at `prompt_commit`, so a finder can
-  search the repo there without seeing the fixtures.
+  search the repo there without seeing the fixtures. An `isolated` prompt agent
+  (one that writes files) gets its own tree per run, with the case's `files`
+  written into it (and committed when the case sets `commit` to a message); the
+  case then also passes only when the tree meets its `files` checks (each a
+  `glob`, an optional exact `count`, and `match` / `not` regexes over the
+  matched files) and none of its `no_files` globs match.
 - **Everything else.** `grade` writes the findings that match no plant to
   `unmatched-findings.txt`. Judge those by hand for false positives.
 
@@ -76,15 +81,19 @@ Add a spec under `fixtures/`, or extend one:
   → `new` replacement that must match once, or `fold_description`;
 - a `scans` entry: a commit, a file list and optional `plants` (each with a
   `lane`);
-- a `prompts` entry for `prompt` agents, which name a stand-in `file`, a
-  `prompt` template with `{context}`, and an `expect` map from case id to
-  checks.
+- a `prompts` entry for `prompt` agents, which name a stand-in or agent `file`,
+  a `prompt` template with `{context}`, and an `expect` map from case id to
+  checks. `fence: false` passes the context unfenced (for an agent whose
+  dispatch prompt is the context). `env` sets variables for the run; `{repo}`,
+  `{wt}`, `{rid}` and `{PATH}` are filled in, so
+  `"PATH": "{repo}/<fixtures>/bin:{PATH}"` puts stand-in CLIs first.
 
 An agent's optional `replays` or `scans` list limits it to those targets.
 
 ## Results
 
-| Date       | Spec                                    | Write-up                                                                                                                                                                                                                                                           |
-| ---------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-10-22 | `fixtures/2026-10-22-haiku-phase2.json` | CLAUDE-163 comment: comment-analyzer and project-standards-reviewer pass at `haiku` / `medium`; complexity-scanner passes at `haiku` / `low`; `haiku` / `low` fails for both reviewers                                                                             |
-| 2026-10-26 | `fixtures/2026-10-26-haiku-phase3.json` | CLAUDE-187 comment: agent-native-reviewer passes at `sonnet` / `medium`; agent-cli-readiness-reviewer stays on Opus; duplication and ai-pattern scanners pass at `haiku` / `low`; compounder analyzer and finder pass at `haiku` / `low`; judge pinned to `sonnet` |
+| Date       | Spec                                     | Write-up                                                                                                                                                                                                                                                           |
+| ---------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-10-22 | `fixtures/2026-10-22-haiku-phase2.json`  | CLAUDE-163 comment: comment-analyzer and project-standards-reviewer pass at `haiku` / `medium`; complexity-scanner passes at `haiku` / `low`; `haiku` / `low` fails for both reviewers                                                                             |
+| 2026-10-26 | `fixtures/2026-10-26-haiku-phase3.json`  | CLAUDE-187 comment: agent-native-reviewer passes at `sonnet` / `medium`; agent-cli-readiness-reviewer stays on Opus; duplication and ai-pattern scanners pass at `haiku` / `low`; compounder analyzer and finder pass at `haiku` / `low`; judge pinned to `sonnet` |
+| 2026-10-28 | `fixtures/2026-10-28-haiku-phase3b.json` | CLAUDE-194: scan-verifier passes at `haiku` / `low`; staging-promoter passes at `haiku` / `medium` (Sonnet overwrote an existing doc); audit-synthesizer passes at `sonnet` / `medium`; git-history-analyzer, codex-reviewer and test-runner stay on Sonnet        |

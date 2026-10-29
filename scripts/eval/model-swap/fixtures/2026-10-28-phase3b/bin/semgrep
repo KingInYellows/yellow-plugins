@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Eval shim: semgrep 1.182 refuses `--config auto` with `--metrics off`
+# ("Cannot create auto config when metrics are off"), which scan-verifier's
+# Step 1 passes. Swap in p/default so the eval measures the model, not that
+# CLI break (tracked separately), then run the real semgrep.
+args=()
+prev=
+for a in "$@"; do
+  if [ "$prev" = --config ] && [ "$a" = auto ]; then a=p/default; fi
+  [ "$a" = --config=auto ] && a=--config=p/default
+  args+=("$a")
+  prev=$a
+done
+self_dir=$(cd "$(dirname "$0")" && pwd -P)
+real=$(PATH=$(printf '%s' "$PATH" | tr ':' '\n' | grep -vxF "$self_dir" | paste -sd: -) command -v semgrep) || {
+  printf 'semgrep shim: no real semgrep on PATH\n' >&2; exit 127; }
+exec "$real" "${args[@]}"
