@@ -877,6 +877,13 @@ CodeRabbit refuses the command from the PR author when the repository sets
 `YELLOW_REVIEW_CODERABBIT_HANDBACK=0` turns the hand-back off. Step 8 retries
 call `resolve-pr-thread` only.
 
+`reply-pr-thread` ignores the viewer's own bare hand-back comment when it looks
+for a prior marker, so a re-run after a failed resolve still skips the
+disposition reply. CodeRabbit's own docs disagree on thread scope: the review
+commands reference says a thread reply resolves only that thread, while the
+commands guide says the command works only top level. Either way a thread reply
+can never close another thread, and the resolve that follows closes this one.
+
 ## Reply hygiene
 
 - Outcome first: `Fixed in abc1234.`, `Already addressed: src/a.ts:42.`,
