@@ -46,6 +46,11 @@ fi
 
 ### Step 4: Run Local Scan
 
+Full scans use the `p/default` registry ruleset, or `$YELLOW_SEMGREP_CONFIG`
+when the user has set it. Never use `--config auto`: semgrep refuses it under
+`--metrics off`. If `YELLOW_SEMGREP_CONFIG` is `auto`, stop and ask the user to
+set a specific ruleset instead.
+
 If `--changed-only`, pass changed files as positional arguments using a bash array:
 
 ```bash
@@ -53,13 +58,13 @@ file_args=()
 while IFS= read -r file; do
   [ -n "$file" ] && file_args+=("$file")
 done <<< "$CHANGED_FILES"
-semgrep scan --config auto --json --metrics off "${file_args[@]}"
+semgrep scan --config "${YELLOW_SEMGREP_CONFIG:-p/default}" --json --metrics off "${file_args[@]}"
 ```
 
 If scanning the full workspace (no `--changed-only`):
 
 ```bash
-semgrep scan --config auto --json --metrics off
+semgrep scan --config "${YELLOW_SEMGREP_CONFIG:-p/default}" --json --metrics off
 ```
 
 See `semgrep-conventions` skill for stderr handling pattern.
