@@ -190,8 +190,8 @@ Spawn `scan-verifier` agent via the Agent tool:
 
 The agent will:
 
-1. Re-scan with `--config auto` (covers the target rule + all others in one
-   pass)
+1. Re-scan with the full-scan ruleset plus `r/{check_id}` (covers the target
+   rule + all others in one pass)
 2. Report: PASS (finding gone, no findings at modified lines), FAIL (finding
    still present), or WARNING (findings at the lines the fix modified — a
    warning signal, not proven regression, since the agent has no pre-fix
