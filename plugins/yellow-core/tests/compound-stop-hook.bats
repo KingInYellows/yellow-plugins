@@ -459,3 +459,26 @@ EOF
   # The holder's lock is left alone.
   [ -d "$STAGING/capture-marks/$SESSION_ID.lock" ]
 }
+
+@test "capture releases its lock before the Jev shadow request" {
+  STAGING=$(_expected_staging_dir)
+  shim="$PROJECT_DIR/shim"
+  mkdir -p "$shim"
+  # The fake curl records whether the capture lock exists during the request.
+  cat > "$shim/curl" <<EOF
+#!/usr/bin/env bash
+cat > /dev/null
+if [ -e "$STAGING/capture-marks/$SESSION_ID.lock" ]; then
+  echo held > "$PROJECT_DIR/lock-state"
+else
+  echo free > "$PROJECT_DIR/lock-state"
+fi
+exit 1
+EOF
+  chmod +x "$shim/curl"
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"SHADOW_TURN"}}' > "$TRANSCRIPT_FILE"
+  PATH="$shim:$PATH" COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key \
+    bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl" | grep -q 'SHADOW_TURN'
+  [ "$(cat "$PROJECT_DIR/lock-state")" = free ]
+}

@@ -224,6 +224,10 @@ cs_atomic_jsonl_write "$PENDING_PATH" "${ENTRY}
 cs_atomic_jsonl_write "$MARK" "$TRANSCRIPT_BYTES" || true
 # Marks share the pending entries' 7-day TTL.
 find "$MARK_DIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
+# Release before the Jev shadow request, which can outlast the waiters' five
+# seconds. Clear the trap first so it cannot remove a later capture's lock.
+trap - EXIT
+rmdir "$LOCK" 2>/dev/null || true
 
 if [ "$JEV_ON" = 1 ]; then
   # Raw tail: the lib redacts the projected text itself, because redacting
