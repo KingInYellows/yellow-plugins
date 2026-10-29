@@ -29,6 +29,6 @@ Run `/devin:setup` after first install or token rotation to verify credentials.
 
 ## See Also
 
-- [Plugin README](../../README.md) — install instructions, MCP servers, and
+- [Plugin README](../README.md) — install instructions, MCP servers, and
   troubleshooting
 - `devin-workflows` skill — shared V3 API patterns and error handling
