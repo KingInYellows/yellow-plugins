@@ -426,6 +426,10 @@ Located at `skills/pr-review-workflow/scripts/`:
   60 s) and retries once; a required wait over 90 s exits 4. After exit 4, stop
   mutating. The contract's "Script exit codes" and "Pacing and rate limits"
   sections in `references/resolve/dispositions.md` are authoritative.
+- **handback-pr-thread** `<PRRT_id>` — Replies `@coderabbitai resolve` in a
+  thread CodeRabbit opened (once) so CodeRabbit records it resolved; skips any
+  other thread. Exit codes as reply-pr-thread, without 6 (contract "CodeRabbit
+  hand-back")
 - **apply-thread-actions** — Runs the resolve write phase from a JSONL plan
   (contract "Batch apply")
 - **file-followup-issue** `<owner/repo> <pr> <PRRT_id> <title-file> <body-file>`

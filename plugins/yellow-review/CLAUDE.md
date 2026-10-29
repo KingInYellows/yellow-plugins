@@ -121,7 +121,7 @@ all scripts), `stack-traversal` (shared by `/review:all` and
 `thermonuclear-reviewer`; the only Codex/Cursor-distributed skill). None is
 user-invocable.
 
-### Scripts (18)
+### Scripts (19)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
@@ -134,10 +134,14 @@ the resolve scripts: `references/resolve/dispositions.md`.
   readers above with a PR-state and CI read and the ledger summary; exits 0
   ready, 1 blocked, 3 unknown
 - `apply-thread-actions` — the Step 7 write phase in one call: runs the three
-  scripts below per thread from a JSONL plan; exit 4 stops, exit 5 resumes
+  scripts below (plus `handback-pr-thread`) per thread from a JSONL plan; exit 4
+  stops, exit 5 resumes
 - `reply-pr-thread`, `resolve-pr-thread`, `file-followup-issue` — write to
   GitHub with idempotency markers; exit 3/4 are distinct from 1; text-screened
   scripts exit 6 on refusal and 7 on a permanent GitHub refusal
+- `handback-pr-thread` — posts `@coderabbitai resolve` (whole body, no marker,
+  unscreened) in CodeRabbit-opened threads before the resolve; idempotent via
+  the viewer's recent comments, best effort in the write phase
 - `check-resolve-text` — refuse credential-like, image, `@` mention or
   foreign-URL text; exit 6
 - `pr-review-delta check` | `record` — zero-token change check against seen

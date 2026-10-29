@@ -1,0 +1,167 @@
+#!/bin/sh
+# Hand a CodeRabbit review thread back to CodeRabbit before it is resolved.
+# Usage: handback-pr-thread <PRRT_id>
+#   Posts a reply whose whole body is "@coderabbitai resolve" when the
+#   thread's first comment is by the CodeRabbit bot, so CodeRabbit records the
+#   thread as resolved itself and does not reopen it or comment on it again.
+#   The caller still resolves the thread with resolve-pr-thread afterwards:
+#   CodeRabbit refuses the command when the PR author runs it and the repo
+#   sets reviews.auto_approvals.allow_author_approval to false.
+# Output: JSON to stdout:
+#   {"handedBack":true,"commentId":"PRRC_...","threadId":"PRRT_..."}
+#   {"handedBack":false,"skipped":"<reason>","threadId":"PRRT_..."}
+#     reasons: not-coderabbit (first comment by anyone else), resolved (the
+#     thread is already resolved), already-handed-back (one of the viewer's
+#     last 10 comments in the thread is the command), disabled
+#     (YELLOW_REVIEW_CODERABBIT_HANDBACK=0; no gh call is made).
+# Exit codes: 1 other failure (including a non-JSON response),
+#             2 usage: wrong argument count or invalid thread ID,
+#             3 not found or permission (stderr carries a
+#               reason=not-found|permission line),
+#             4 rate limited or timed out (stderr carries a
+#               reason=rate-limit|timeout line): a second rate limit after the
+#               one retry the whole script gets, a wait over 90 s, or a gh
+#               call that exceeded YELLOW_REVIEW_GH_TIMEOUT (not retried: the
+#               reply may have posted; a re-run skips via the pre-check),
+#             7 not authenticated (stderr carries a reason=auth line).
+# Env: YELLOW_REVIEW_CODERABBIT_HANDBACK (default 1; 0 turns the hand-back
+#        off), and YELLOW_REVIEW_PACE_SECONDS, YELLOW_REVIEW_RATE_LIMIT_WAIT
+#        and YELLOW_REVIEW_GH_TIMEOUT as in reply-pr-thread, so the worst
+#        case is also 3 x 60 + 90 + 10 = 280 s.
+# Contract: references/resolve/dispositions.md
+
+set -eu
+
+# GraphQL reports the CodeRabbit GitHub App (coderabbitai[bot]) as this login.
+CODERABBIT_LOGIN=coderabbitai
+COMMAND='@coderabbitai resolve'
+
+usage() {
+    printf 'Usage: handback-pr-thread <PRRT_id>\n' >&2
+    exit 2
+}
+
+[ $# -eq 1 ] || usage
+THREAD_ID="$1"
+case "$THREAD_ID" in
+    PRRT_*) ;;
+    *) printf 'Error: Invalid thread ID format. Expected PRRT_ prefix, got: %s\n' "$THREAD_ID" >&2; exit 2 ;;
+esac
+case "${THREAD_ID#PRRT_}" in
+    ''|*[!A-Za-z0-9_-]*) printf 'Error: Invalid characters in thread ID: %s\n' "$THREAD_ID" >&2; exit 2 ;;
+esac
+
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
+
+skip() {
+    jq -nc --arg id "$THREAD_ID" --arg r "$1" '{handedBack: false, skipped: $r, threadId: $id}'
+    exit 0
+}
+
+[ "${YELLOW_REVIEW_CODERABBIT_HANDBACK:-1}" = 0 ] && skip disabled
+
+command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found.\n' >&2; exit 1; }
+
+# shellcheck source=../../../lib/gh-graphql.sh
+. "$(dirname -- "$0")/../../../lib/gh-graphql.sh"
+
+WORK_DIR=$(mktemp -d) || { printf 'Error: mktemp failed.\n' >&2; exit 1; }
+trap 'rm -rf "$WORK_DIR"' EXIT
+gg_init "$WORK_DIR"
+POST_BODY="$WORK_DIR/post-body"
+printf '%s' "$COMMAND" >"$POST_BODY"
+
+# Run a GraphQL call; one rate-limit retry is shared by the whole script so
+# the call fits the caller's Bash timeout. Exits 3/4/7/1 on failure.
+RETRIED=0
+call_with_retry() {
+    _label="$1"; shift
+    while :; do
+        if gg_call "$@" && jq -e '(.errors // []) | length == 0' "$GG_RESP" >/dev/null 2>&1; then
+            return 0
+        fi
+        if [ "$GG_EXIT" -eq 124 ]; then
+            printf 'Error: gh timed out after %ss on %s for %s; not retried.\nreason=timeout\n' "$GG_TIMEOUT" "$_label" "$THREAD_ID" >&2
+            exit 4
+        fi
+        if gg_is_rate_limited; then
+            _w=$(gg_rate_limit_wait)
+            if [ "$_w" -gt "$GG_MAX_WAIT_SECONDS" ]; then
+                printf 'Error: GitHub rate limit on %s for %s; the %ss wait is over the %ss cap, not retried.\nreason=rate-limit\n' "$_label" "$THREAD_ID" "$_w" "$GG_MAX_WAIT_SECONDS" >&2
+                exit 4
+            fi
+            if [ "$RETRIED" = 1 ]; then
+                printf 'Error: GitHub rate limit on %s for %s; the one retry is already spent (would wait %ss).\nreason=rate-limit\n' "$_label" "$THREAD_ID" "$_w" >&2
+                exit 4
+            fi
+            printf '[handback-pr-thread] Rate limited on %s; retrying in %ss.\n' "$_label" "$_w" >&2
+            sleep "$_w"
+            RETRIED=1
+            continue
+        fi
+        if gg_is_auth_failure; then
+            printf 'Error: GitHub rejected the credentials on %s for %s; sign in again.\nreason=auth\n' "$_label" "$THREAD_ID" >&2
+            exit 7
+        fi
+        if _reason=$(gg_reason); then
+            printf 'Error: Thread not found or not permitted (%s): %s\nreason=%s\n' "$_label" "$THREAD_ID" "$_reason" >&2
+            exit 3
+        fi
+        _detail=$(head -c 300 "$GG_ERR")
+        [ -n "$_detail" ] || _detail=$(head -c 300 "$GG_RESP")
+        printf 'Error: GraphQL %s failed for %s: %s\n' "$_label" "$THREAD_ID" "$_detail" >&2
+        exit 1
+    done
+}
+
+# --- Pre-check: who opened the thread, and was it already handed back? ---
+# shellcheck disable=SC2016
+PRECHECK='
+query HandbackPrecheck($threadId: ID!) {
+  node(id: $threadId) {
+    ... on PullRequestReviewThread {
+      id
+      isResolved
+      first: comments(first: 1) { nodes { author { __typename login } } }
+      recent: comments(last: 10) { nodes { viewerDidAuthor body } }
+    }
+  }
+}'
+call_with_retry precheck -f threadId="$THREAD_ID" -f query="$PRECHECK"
+
+if ! jq -e '.data.node.id' "$GG_RESP" >/dev/null 2>&1; then
+    printf 'Error: Thread not found: %s\nreason=not-found\n' "$THREAD_ID" >&2
+    exit 3
+fi
+# A jq failure must not read as "not CodeRabbit" or "not handed back yet".
+if ! STATE=$(jq -r --arg login "$CODERABBIT_LOGIN" --arg cmd "$COMMAND" '
+    .data.node as $t
+    | ($t.first.nodes[0].author // {}) as $a
+    | if (($a.__typename // "") != "Bot") or (($a.login // "") != $login) then "not-coderabbit"
+      elif $t.isResolved == true then "resolved"
+      elif any($t.recent.nodes[]; .viewerDidAuthor == true
+               and ((.body // "") | gsub("^\\s+|\\s+$"; "")) == $cmd) then "already-handed-back"
+      else "post" end
+  ' "$GG_RESP" 2>/dev/null); then
+    printf 'Error: could not read thread %s; not posting.\n' "$THREAD_ID" >&2
+    exit 1
+fi
+[ "$STATE" = post ] || skip "$STATE"
+
+# --- Post the command as the whole reply ---
+# shellcheck disable=SC2016
+MUTATION='
+mutation HandbackReply($threadId: ID!, $body: String!) {
+  addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $threadId, body: $body }) {
+    comment { id }
+  }
+}'
+call_with_retry reply -f threadId="$THREAD_ID" -F "body=@$POST_BODY" -f query="$MUTATION"
+gg_pace
+
+COMMENT_ID=$(jq -r '.data.addPullRequestReviewThreadReply.comment.id // empty' "$GG_RESP")
+if [ -z "$COMMENT_ID" ]; then
+    printf 'Error: Reply mutation returned no comment for %s.\n' "$THREAD_ID" >&2
+    exit 1
+fi
+jq -nc --arg id "$THREAD_ID" --arg cid "$COMMENT_ID" '{handedBack: true, commentId: $cid, threadId: $id}'
