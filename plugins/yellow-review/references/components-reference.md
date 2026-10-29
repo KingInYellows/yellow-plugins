@@ -194,11 +194,15 @@ flags, exit codes, trust-boundary rules and library behavior.
   `references/resolve/dispositions.md`)
 - `apply-thread-actions [--issue-cap <n>] <owner/repo> <pr> <plan.jsonl> <results.jsonl>`
   — Run `/review:resolve` Step 7 for one PR from a JSONL plan: per thread
-  `file-followup-issue`, `reply-pr-thread`, `resolve-pr-thread` with the
-  contract's fallbacks, one result row per thread. Exit 4 stops every write and
-  marks the rest `not-attempted`; exit 5 means the 540 s
-  `YELLOW_REVIEW_APPLY_BUDGET` ran out and a re-run with the same files resumes
-  (contract "Batch apply")
+  `file-followup-issue`, `reply-pr-thread`, `handback-pr-thread` (CodeRabbit
+  threads, best effort), `resolve-pr-thread` with the contract's fallbacks, one
+  result row per thread. Exit 4 stops every write and marks the rest
+  `not-attempted`; exit 5 means the 540 s `YELLOW_REVIEW_APPLY_BUDGET` ran out
+  and a re-run with the same files resumes (contract "Batch apply")
+- `handback-pr-thread <PRRT_id>` — Reply `@coderabbitai resolve` in a thread
+  CodeRabbit opened, once, so CodeRabbit marks it resolved itself; skips other
+  threads (contract "CodeRabbit hand-back"). Exit codes as `reply-pr-thread`,
+  without 6
 - `resolve-pr-thread <PRRT_id>` — Resolve a single review thread via GitHub
   GraphQL mutation; exit 3 (`reason=permission|not-found`) and 4 (rate limit, or
   a timed-out `gh` call, which may have changed state; same for
@@ -449,9 +453,9 @@ parameter expansion, not `dirname`.
 `lib/resolve-text.sh` (text screen) before posting and exit 6 on a refusal.
 `reply-pr-thread` and `file-followup-issue` exit 7 on a permanent GitHub refusal
 (not authenticated; for the issue script also no permission or Issues disabled).
-`reply-pr-thread` and `resolve-pr-thread` also source `lib/gh-graphql.sh`.
-`commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`
-and `lib/verify-run.sh`.
+`reply-pr-thread`, `handback-pr-thread` and `resolve-pr-thread` also source
+`lib/gh-graphql.sh`. `commit-resolve-fixes` and `run-verify-command` source
+`lib/resolve-paths.sh` and `lib/verify-run.sh`.
 
 All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes and
@@ -534,10 +538,10 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   (`rg_is_rate_limited`, `rg_is_auth_failure`, `rg_is_permission_denied`) the
   scripts share; test a rate limit before a permission failure, since a
   secondary rate limit is also an HTTP 403.
-- `lib/gh-graphql.sh` (POSIX sh, sourced by `reply-pr-thread` and
-  `resolve-pr-thread`) — the shared GraphQL call (bounded by
-  `YELLOW_REVIEW_GH_TIMEOUT`), rate-limit wait and not-found/permission
-  classification behind their exit codes 3 and 4
+- `lib/gh-graphql.sh` (POSIX sh, sourced by `reply-pr-thread`,
+  `handback-pr-thread` and `resolve-pr-thread`) — the shared GraphQL call
+  (bounded by `YELLOW_REVIEW_GH_TIMEOUT`), rate-limit wait and
+  not-found/permission classification behind their exit codes 3 and 4
 - `lib/verify-run.sh` (bash, sourced by `run-verify-command` and
   `commit-resolve-fixes`) — timeout, process-group and redacted-log helpers for
   the verify run; `vr_timeout_bin` accepts only a `timeout`/`gtimeout` that
@@ -696,8 +700,9 @@ in the transcript (Ctrl-O) on a second `/review:pr` run within the hour.
 - `apply-thread-actions.bats` — stub stage scripts beside a copy of the script:
   order, fallbacks, exit 4 stop and budget resume
 - `get-pr-comments.bats`, `get-pr-blockers.bats`, `reply-pr-thread.bats`,
-  `resolve-pr-thread.bats`, `file-followup-issue.bats`,
-  `check-resolve-text.bats`, `pr-changed-ranges.bats`, `poll-new-threads.bats`,
+  `handback-pr-thread.bats`, `resolve-pr-thread.bats`,
+  `file-followup-issue.bats`, `check-resolve-text.bats`,
+  `pr-changed-ranges.bats`, `poll-new-threads.bats`,
   `check-addressed-evidence.bats`, `read-resolve-config.bats`,
   `pr-review-delta.bats` — GraphQL fixtures in `tests/fixtures/`, fake `gh` in
   `tests/mocks/gh`
