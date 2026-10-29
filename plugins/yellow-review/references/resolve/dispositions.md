@@ -319,7 +319,8 @@ phase failed.
    verified SHA. `NOOP` or a failure downgrades every `fixed` thread to
    `unclear`; the other lanes still run.
 3. **Phase C, per thread, serial.** Issue (only `oos`), then reply
-   (`reply-pr-thread`), then resolve (`resolve-pr-thread`), where the lane
+   (`reply-pr-thread`), then, for a CodeRabbit thread, the hand-back
+   (`handback-pr-thread`), then resolve (`resolve-pr-thread`), where the lane
    allows it. `/review:resolve` runs the whole phase through
    `apply-thread-actions` (Batch apply below).
 
@@ -353,6 +354,7 @@ thread in write order:
 | `issue`       | `{title, body}`; `oos` only, for a GitHub follow-up. A Linear issue is filed before the plan is written |
 | `reply`       | `{body, plain?}`; omitted when the lane posts nothing. `plain` is the Reply hygiene fallback            |
 | `resolve`     | `true` when the lane resolves the thread                                                                |
+| `handback`    | `true` for a CodeRabbit thread (see CodeRabbit hand-back); only beside `resolve: true`                  |
 
 `{{issue}}` in `reply.body` or `reply.plain` becomes `#N` from the issue stage,
 so it is allowed only beside `issue`. Any other key, a bad value or a repeated
@@ -374,28 +376,32 @@ after the previous one exited 0, with these fallbacks:
 - `already-replied` skip: resolve only when the reported disposition equals the
   planned one; otherwise the resolve is `withheld`
   (`reply posted as <d> (open)`).
-- Exit 1, 2 or 3 from any stage stops that thread's later stages and the script
-  goes on to the next thread. Exit 4 stops every write: the current thread's row
-  records the failed stage, every remaining thread gets a row with `outcome`
-  `not-attempted` and `reason`, and the script exits 4 with `reason=rate-limit`
-  or `reason=timeout` on stderr (a missing or unknown child reason counts as
-  `rate-limit`). Pacing and rate limits below then applies as for a single
-  script.
+- Hand-back: runs only when the resolve would run (never for a `withheld` or
+  `not-attempted` resolve). It is best effort: exit 1, 3 or 7 records a `failed`
+  hand-back and the resolve still runs. Exit 4 follows the stop rule below.
+- Exit 1, 2 or 3 from any other stage stops that thread's later stages and the
+  script goes on to the next thread. Exit 4 stops every write: the current
+  thread's row records the failed stage, every remaining thread gets a row with
+  `outcome` `not-attempted` and `reason`, and the script exits 4 with
+  `reason=rate-limit` or `reason=timeout` on stderr (a missing or unknown child
+  reason counts as `rate-limit`). Pacing and rate limits below then applies as
+  for a single script.
 
 Each row is
-`{threadId, disposition, finalDisposition, issue, reply, resolve, outcome}`. A
-stage record is `null` when the plan did not ask for that stage, else has a
-`status` (`filed`, `found`, `over-cap`, `not-permitted`, `posted`, `skipped`,
-`resolved`, `withheld`, `refused`, `failed` or `not-attempted`) and, after a
-non-zero exit, `exit` and the child's `reason`. `outcome` is `complete`,
-`stopped` (a stage did not succeed), `partial` or `not-attempted`.
-`finalDisposition` is `unclear` after any issue fallback. The last stdout line
-is
+`{threadId, disposition, finalDisposition, issue, reply, handback, resolve, outcome}`.
+A stage record is `null` when the plan did not ask for that stage (or the
+hand-back never ran), else has a `status` (`filed`, `found`, `over-cap`,
+`not-permitted`, `posted`, `skipped`, `resolved`, `withheld`, `refused`,
+`failed` or `not-attempted`) and, after a non-zero exit, `exit` and the child's
+`reason`. A `skipped` hand-back carries the script's skip reason as `reason`.
+`outcome` is `complete`, `stopped` (a stage did not succeed), `partial` or
+`not-attempted`. `finalDisposition` is `unclear` after any issue fallback. The
+last stdout line is
 `apply threads=<n> done=<n> skipped=<n> issues_created=<n> stopped=<none|rate-limit|timeout|budget>`.
 
 **Time budget.** Stage worst cases (Bash timeouts below, plus 60 s each) are 420
-s for an issue, 340 s for a reply and 280 s for a resolve. A stage starts only
-when the run's elapsed time plus that worst case fits
+s for an issue, 340 s for a reply or hand-back and 280 s for a resolve. A stage
+starts only when the run's elapsed time plus that worst case fits
 `YELLOW_REVIEW_APPLY_BUDGET` (default and maximum 540 s); the first stage of a
 run always starts. A plain retry after exit 6 belongs to the refused stage and
 never waits on the budget: both scripts screen text before any `gh` call, so a
@@ -733,17 +739,18 @@ Long calls must fit the Bash tool (120 s default, 600 s maximum). Pass a
 `repass_wait_seconds`, or 0 after a pass that did not push), and 600000 ms for
 `commit-resolve-fixes` (hooks, submit and the head check). The settings are
 capped at 540 and 480 seconds. Each write-phase script (`file-followup-issue`,
-`reply-pr-thread`, `resolve-pr-thread`) runs as its own Bash call with a
-`timeout` of 420000 ms, and the next stage starts only after exit 0. A killed
-helper may have landed its mutation without printing its JSON or `reason=` line,
-so the budget must cover the worst case even when `YELLOW_REVIEW_GH_TIMEOUT` is
-set high. The setting is therefore clamped to 60 s per `gh` call (a larger valid
-value becomes 60; invalid, zero or over-4-digit values still fall back to 30),
-and the budget is derived from that cap:
+`reply-pr-thread`, `handback-pr-thread`, `resolve-pr-thread`) runs as its own
+Bash call with a `timeout` of 420000 ms, and the next stage starts only after
+exit 0. A killed helper may have landed its mutation without printing its JSON
+or `reason=` line, so the budget must cover the worst case even when
+`YELLOW_REVIEW_GH_TIMEOUT` is set high. The setting is therefore clamped to 60 s
+per `gh` call (a larger valid value becomes 60; invalid, zero or over-4-digit
+values still fall back to 30), and the budget is derived from that cap:
 
 | Script                | Worst case at 60 s per `gh` call                                                                                               |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `reply-pr-thread`     | pre-check, mutation and one retry (3 calls, 180 s) + 90 s rate-limit wait + 10 s pacing = 280 s                                |
+| `handback-pr-thread`  | pre-check, mutation and one retry (3 calls, 180 s) + 90 s rate-limit wait + 10 s pacing = 280 s                                |
 | `resolve-pr-thread`   | mutation and one retry (2 calls, 120 s) + 90 s wait + 10 s pacing = 220 s                                                      |
 | `file-followup-issue` | viewer lookup, issue list, thread link, create, post-create list and duplicate close (6 calls, never waits or retries) = 360 s |
 
@@ -850,6 +857,25 @@ Replies and issue bodies end with:
 - A marker counts only on a comment or issue authored by the viewer. A marker
   quoted inside someone else's comment never causes a skip.
 
+## CodeRabbit hand-back
+
+CodeRabbit keeps its own record of which of its threads are open, and a thread
+resolved only through GraphQL can be reopened or re-commented on its next
+review. A reply whose whole body is `@coderabbitai resolve` makes CodeRabbit
+resolve that one thread itself (a top-level PR comment would resolve every
+CodeRabbit thread, so the command is only ever posted as a thread reply).
+
+`handback-pr-thread <PRRT_id>` posts that reply when the thread's first comment
+is by the `coderabbitai` Bot and the thread is still open, and skips with
+`not-coderabbit`, `resolved` or `already-handed-back` (one of the viewer's last
+10 comments is the command) otherwise. It is the only write that carries an `@`
+mention, so it does not use `reply-pr-thread`, carries no marker and is not
+screened: its body is fixed. `resolve-pr-thread` still runs afterwards, because
+CodeRabbit refuses the command from the PR author when the repository sets
+`reviews.auto_approvals.allow_author_approval: false`.
+`YELLOW_REVIEW_CODERABBIT_HANDBACK=0` turns the hand-back off. Step 8 retries
+call `resolve-pr-thread` only.
+
 ## Reply hygiene
 
 - Outcome first: `Fixed in abc1234.`, `Already addressed: src/a.ts:42.`,
@@ -911,8 +937,8 @@ Replies and issue bodies end with:
   re-run of `reply-pr-thread` skips through its pre-check, and a re-run of
   `file-followup-issue` finds a created issue by its marker. In
   `get-pr-blockers` a timeout is a failed lookup (`lookupFailed`, exit 0).
-- Every exit 4 from `reply-pr-thread`, `resolve-pr-thread` and
-  `file-followup-issue` prints a stderr line `reason=rate-limit` or
+- Every exit 4 from `reply-pr-thread`, `handback-pr-thread`, `resolve-pr-thread`
+  and `file-followup-issue` prints a stderr line `reason=rate-limit` or
   `reason=timeout` (the same style as `reason=not-found` on exit 3). Read that
   line; never infer the cause from the message text.
 - After any exit 4 from those three scripts, stop mutating: a timed-out call may
@@ -949,6 +975,7 @@ exception: it exits 1 on any failure, usage included.
 | Script                 | 0                                                        | 2                                                                                                          | 3                                                                                                  | 4                                                                                                                  | 5                           | 6                                                         | 7                                                                                                               |
 | ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `reply-pr-thread`      | replied or skipped                                       | usage / unreadable, empty or over-long body                                                                | not found or permission (stderr `reason=not-found` or `reason=permission`)                         | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the reply may have posted)         | —                           | text refused or scan failed                               | not authenticated (HTTP 401; `reason=auth`)                                                                     |
+| `handback-pr-thread`   | posted or skipped                                        | usage                                                                                                      | not found or permission (stderr `reason=...` as above)                                             | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the reply may have posted)         | —                           | —                                                         | not authenticated (HTTP 401; `reason=auth`)                                                                     |
 | `resolve-pr-thread`    | resolved                                                 | usage                                                                                                      | not found or permission (stderr `reason=...` as above)                                             | rate limited (`reason=rate-limit`), or `gh` timed out (`reason=timeout`)                                           | —                           | —                                                         | —                                                                                                               |
 | `file-followup-issue`  | created or found                                         | usage / unreadable title or body file / thread belongs to a different pull request                         | thread not found (`reason=not-found`)                                                              | rate limited (no retry; `reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; a create may have filed) | —                           | text refused or scan failed                               | not authenticated, not permitted to file, or Issues disabled (`reason=auth`, `permission` or `issues-disabled`) |
 | `commit-resolve-fixes` | `PUSHED` or `NOOP`; with `--check-ranges`, the check ran | usage (with `--check-ranges`: unreadable or malformed ranges file, non-canonical path)                     | staged mismatch, refused path or PR file list unavailable (with `--check-ranges`: the diff failed) | commit failed, or undone (a hook changed or left files)                                                            | submit failed or timed out  | head not verified, or a verify call timed out             | rate limited listing the PR's changed files (`reason=rate-limit`; nothing staged)                               |

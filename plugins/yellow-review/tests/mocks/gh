@@ -20,6 +20,10 @@
 #                                        ghostafter marker-then-comment windows,
 #                                        bot-account viewer: botself/botmarker,
 #                                        own human account: ownafter)
+#   HandbackPrecheck / HandbackReply     PRRT_hb_* thread ids pick the
+#                                        scenario (first-comment author,
+#                                        resolved, prior command, missing
+#                                        thread, rate limit, forbidden reply)
 #   latestOpinionatedReviews             MOCK_GH_BLOCKERS_{FAIL,FIXTURE}
 #   MergeReadyState                      MOCK_GH_MR_BODY, MOCK_GH_MR_FAIL
 #   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES;
@@ -293,6 +297,58 @@ case "$ALL_ARGS" in
       printf 'HTTP 403: Forbidden\n' >&2
       exit 1
     fi
+    exit 0
+    ;;
+  *"Handback"*)
+    # handback-pr-thread: HandbackPrecheck, then HandbackReply. Must stay
+    # above the reply arms, which also match addPullRequestReviewThreadReply.
+    case "$ALL_ARGS" in
+      *"HandbackReply"*)
+        bump handback_reply >/dev/null
+        for a in "$@"; do
+          case "$a" in body=@*) cat "${a#body=@}" >| "${PAGE_STATE_DIR}/mock_gh_handback_body" ;; esac
+        done
+        case "$ALL_ARGS" in
+          *"PRRT_hb_forbidden"*)
+            MOCK_BODY='{"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}'
+            http "HTTP/2.0 200 OK" ""
+            printf 'gh: Resource not accessible by integration\n' >&2
+            exit 1
+            ;;
+        esac
+        MOCK_BODY='{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_hb"}}}}'
+        http "HTTP/2.0 200 OK" ""
+        exit 0
+        ;;
+    esac
+    bump handback_precheck >/dev/null
+    _cr='{"__typename":"Bot","login":"coderabbitai"}'
+    _author=$_cr
+    _resolved=false
+    _recent='[{"viewerDidAuthor":false,"body":"Consider a guard here."}]'
+    case "$ALL_ARGS" in
+      *"PRRT_hb_missing"*)
+        MOCK_BODY='{"data":{"node":null}}'
+        http "HTTP/2.0 200 OK" ""
+        exit 0
+        ;;
+      *"PRRT_hb_rl"*)
+        MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+        http "HTTP/2.0 429 Too Many Requests" "Retry-After: 0"
+        printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+        exit 1
+        ;;
+      *"PRRT_hb_human"*) _author='{"__typename":"User","login":"coderabbitai"}' ;;
+      *"PRRT_hb_otherbot"*) _author='{"__typename":"Bot","login":"chatgpt-codex-connector"}' ;;
+      *"PRRT_hb_ghost"*) _author=null ;;
+      *"PRRT_hb_resolved"*) _resolved=true ;;
+      *"PRRT_hb_done"*) _recent='[{"viewerDidAuthor":true,"body":"Fixed in abc1234."},{"viewerDidAuthor":true,"body":"@coderabbitai resolve\r\n"},{"viewerDidAuthor":false,"body":"Comments resolved."}]' ;;
+      *"PRRT_hb_quoted"*) _recent='[{"viewerDidAuthor":false,"body":"@coderabbitai resolve"},{"viewerDidAuthor":true,"body":"Please @coderabbitai resolve later."}]' ;;
+    esac
+    _tid=$(printf '%s' "$ALL_ARGS" | sed -n 's/.*threadId=\(PRRT_[A-Za-z0-9_-]*\).*/\1/p')
+    MOCK_BODY=$(jq -nc --arg id "$_tid" --argjson a "$_author" --argjson r "$_resolved" --argjson recent "$_recent" \
+      '{data:{node:{id:$id, isResolved:$r, first:{nodes:[{author:$a}]}, recent:{nodes:$recent}}}}')
+    http "HTTP/2.0 200 OK" ""
     exit 0
     ;;
   *"ReplyPrecheck"*)

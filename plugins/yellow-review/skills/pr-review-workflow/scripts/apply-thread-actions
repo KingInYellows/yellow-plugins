@@ -6,7 +6,8 @@
 #       {"threadId":"PRRT_...","disposition":"fixed|addressed|oos|disagree|unclear",
 #        "issue":{"title":"...","body":"..."},   (oos only; GitHub follow-up)
 #        "reply":{"body":"...","plain":"..."},  (plain: optional refusal fallback)
-#        "resolve":true}
+#        "resolve":true,
+#        "handback":true}                       (only beside resolve; CodeRabbit threads)
 #     "{{issue}}" in a reply body or plain text becomes "#N" from the issue
 #     stage, so it is allowed only when "issue" is present.
 #   results.jsonl: one row is appended per thread (see the contract's
@@ -19,6 +20,8 @@
 # Per thread it runs file-followup-issue, then reply-pr-thread, then
 # resolve-pr-thread, each only after the previous stage exited 0, with the
 # fallbacks the contract gives for exit 6, exit 7 and an already-replied skip.
+# A "handback" thread runs handback-pr-thread just before its resolve; that
+# stage is best effort: only its exit 4 stops anything.
 # Stdout: one final line
 #   apply threads=<n> done=<n> skipped=<n> issues_created=<n> stopped=<none|rate-limit|timeout|budget>
 # Exit codes: 0 every thread has a final row (stage failures are in the rows),
@@ -34,7 +37,7 @@
 #               re-run resumes it after its last finished stage.
 # Env: YELLOW_REVIEW_APPLY_BUDGET (default 540, clamped to 0..540) — seconds
 #      of stage time per run. A stage starts only when the elapsed time plus
-#      its worst case (issue 420 s, reply 340 s, resolve 280 s, from the
+#      its worst case (issue 420 s, reply and hand-back 340 s, resolve 280 s, from the
 #      contract's "Bash timeouts") fits; the first stage of a run always
 #      starts, so each run makes progress and ends inside the caller's
 #      600000 ms Bash timeout. The child scripts read their own env as usual.
@@ -45,6 +48,7 @@ set -eu
 COST_ISSUE=420
 COST_REPLY=340
 COST_RESOLVE=280
+COST_HANDBACK=340
 OVER_CAP_TEXT='Out of scope for this PR. The automatic follow-up issue limit for this run was reached, so no issue was filed. Leaving open.'
 NOT_FILED_TEXT='Not filed: follow-up issues cannot be created in this repository. Leaving open for a human.'
 
@@ -107,7 +111,7 @@ def uses_issue: [(.reply.body // ""), (.reply.plain // "")] | any(contains("{{is
 type == "array"
 and all(.[];
   type == "object"
-  and ((keys - ["threadId", "disposition", "issue", "reply", "resolve"]) == [])
+  and ((keys - ["threadId", "disposition", "issue", "reply", "resolve", "handback"]) == [])
   and (.threadId | type == "string" and test("^PRRT_[A-Za-z0-9_-]+$"))
   and (.disposition | IN("fixed", "addressed", "oos", "disagree", "unclear"))
   and ((has("issue") | not) or (.disposition == "oos" and (.issue | type == "object"
@@ -115,6 +119,8 @@ and all(.[];
         and ((keys - ["title", "body"]) == []))))
   and ((has("reply") | not) or (.reply | textok))
   and ((has("resolve") | not) or (.resolve | type == "boolean"))
+  and ((has("handback") | not) or (.handback | type == "boolean"))
+  and (((.handback // false) | not) or (.resolve == true))
   and ((uses_issue | not) or has("issue")))
 and ((map(.threadId) | length) == (map(.threadId) | unique | length))'
 if ! jq -s -e "$PLAN_CHECK" "$PLAN" >/dev/null 2>"$WORK/jq-err"; then
@@ -177,8 +183,9 @@ summary() {
 write_row() {
     jq -cn --arg id "$TID" --arg d "$DISP" --arg fd "$FINAL" --arg outcome "$1" \
         --argjson issue "$ISSUE_J" --argjson reply "$REPLY_J" --argjson resolve "$RESOLVE_J" \
+        --argjson handback "$HANDBACK_J" \
         '{threadId: $id, disposition: $d, finalDisposition: $fd, issue: $issue,
-          reply: $reply, resolve: $resolve, outcome: $outcome}' >>"$RESULTS"
+          reply: $reply, handback: $handback, resolve: $resolve, outcome: $outcome}' >>"$RESULTS"
 }
 
 # stop_rate <reason>: exit 4 handling for the current thread and the rest.
@@ -251,12 +258,14 @@ while IFS= read -r LINE; do
     ISSUE_J=null
     REPLY_J=null
     RESOLVE_J=null
+    HANDBACK_J=null
     ISSUE_REF=""
     PLAIN_USED=false
     POSTED_AS=""
     HAS_ISSUE=$(printf '%s' "$LINE" | jq -r 'has("issue")')
     HAS_REPLY=$(printf '%s' "$LINE" | jq -r 'has("reply")')
     WANT_RESOLVE=$(printf '%s' "$LINE" | jq -r '.resolve // false')
+    WANT_HANDBACK=$(printf '%s' "$LINE" | jq -r '.handback // false')
     OK=1
     FIXED_REPLY=""
     REPLY_DONE=0
@@ -373,6 +382,17 @@ while IFS= read -r LINE; do
             # An earlier reply of another disposition stands: stay open.
             RESOLVE_J=$(jq -cn --arg d "$POSTED_AS" '{status: "withheld", postedAs: $d}')
         else
+            if [ "$WANT_HANDBACK" = "true" ]; then
+                budget_allows "$COST_HANDBACK" || stop_budget
+                run_stage handback-pr-thread "$TID"
+                case "$RC" in
+                    0) HANDBACK_J=$(jq -c 'if .handedBack == true then {status: "posted"}
+                                           else {status: "skipped", reason: .skipped} end' "$WORK/out") ;;
+                    4) HANDBACK_J=$(stage_fail_json failed); stop_rate "$REASON" ;;
+                    # Best effort: the resolve below closes the thread anyway.
+                    *) HANDBACK_J=$(stage_fail_json failed) ;;
+                esac
+            fi
             budget_allows "$COST_RESOLVE" || stop_budget
             run_stage resolve-pr-thread "$TID"
             case "$RC" in
