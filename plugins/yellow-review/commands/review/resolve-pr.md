@@ -740,6 +740,10 @@ thread, so no text reaches a command line:
   contract's "Reply hygiene"), posted once if the body is refused.
 - `resolve: true` only when the lane resolves the thread. A dropped
   non-actionable thread has `resolve` and no `reply`.
+- `handback: true` beside `resolve: true` when Step 3's first comment has author
+  `coderabbitai` and `authorType` `Bot`: the script posts
+  `@coderabbitai resolve` in the thread before resolving it, so CodeRabbit does
+  not reopen it.
 - `fixed` replies cite the short SHA kept from Step 6's `PUSHED` result. With no
   stored SHA the thread is `unclear`; never substitute `git rev-parse`.
 - For an `oos` → `fixed`/`addressed` upgrade, find the old follow-up number
@@ -766,9 +770,9 @@ Interactive runs omit it:
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/apply-thread-actions" --issue-cap "<n>" "<owner/repo>" "<PR#>" "<plan-file>" "<results-file>"
 ```
 
-It runs `file-followup-issue`, `reply-pr-thread` and `resolve-pr-thread` per
-thread with the contract's fallbacks, and appends one row per thread to
-`<results-file>` (a fresh `mktemp` path per pass). Then:
+It runs `file-followup-issue`, `reply-pr-thread`, `handback-pr-thread` and
+`resolve-pr-thread` per thread with the contract's fallbacks, and appends one
+row per thread to `<results-file>` (a fresh `mktemp` path per pass). Then:
 
 - Exit 5 means its time budget ran out. Run the same command again, same plan
   and results file, until it exits 0 or 4.
