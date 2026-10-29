@@ -455,6 +455,13 @@ path_without_timeout() {
   [ ! -f "$CALLS" ]
 }
 
+@test "our own hand-back command after the marker still skips" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_handbackafter fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped, .disposition]')" = '[false,"already-replied","fixed"]' ]
+  [ ! -f "$CALLS" ]
+}
+
 @test "posts when a human comment follows our marker" {
   run --separate-stderr "$SCRIPT" PRRT_reply_humanafter fixed "$BODY"
   [ "$status" -eq 0 ]
