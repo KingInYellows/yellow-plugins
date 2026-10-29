@@ -86,7 +86,10 @@ Add a spec under `fixtures/`, or extend one:
   checks. `fence: false` passes the context unfenced (for an agent whose
   dispatch prompt is the context). `env` sets variables for the run; `{repo}`,
   `{wt}`, `{rid}` and `{PATH}` are filled in, so
-  `"PATH": "{repo}/<fixtures>/bin:{PATH}"` puts stand-in CLIs first.
+  `"PATH": "{repo}/<fixtures>/bin:{PATH}"` puts stand-in CLIs first. List
+  the stand-ins and canned responses the agent reads in `fixtures`
+  (repo-relative files or directories): their contents go into its rows'
+  fingerprints, so editing one reruns those rows instead of reusing old output.
 
 An agent's optional `replays` or `scans` list limits it to those targets.
 

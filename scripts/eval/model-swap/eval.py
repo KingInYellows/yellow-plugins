@@ -68,6 +68,30 @@ def fingerprint(*parts):
     return h.hexdigest()[:16]
 
 
+def fixture_parts(agent):
+    """Content hash of the agent's `fixtures` (repo-relative files or directories),
+    as a fingerprint part: an edited stand-in CLI or canned response reruns its rows.
+    Empty when the agent lists none, so other specs keep their fingerprints."""
+    if not agent.get("fixtures"):
+        return []
+    h = hashlib.sha256()
+    for rel in agent["fixtures"]:
+        path = os.path.join(REPO, rel)
+        if os.path.isdir(path):
+            files = sorted(os.path.join(d, f) for d, _, fs in os.walk(path) for f in fs)
+        elif os.path.isfile(path):
+            files = [path]
+        else:
+            sys.exit("prepare: fixture not found: %s" % rel)
+        for f in files:
+            with open(f, "rb") as handle:
+                data = handle.read()
+            # The exec bit matters too: a stand-in without it fails differently.
+            h.update(("%s\0%d\0" % (os.path.relpath(f, REPO), os.access(f, os.X_OK))).encode()
+                     + data + b"\0")
+    return [h.hexdigest()]
+
+
 def plant(wt, p):
     path = os.path.join(wt, p["file"])
     with open(path, encoding="utf-8") as handle:
@@ -228,6 +252,7 @@ def check_spec(spec):
     bad = [n for n in names if not isinstance(n, str) or not re.fullmatch(SAFE_NAME, n) or ".." in n]
     paths = [*(a["file"] for a in spec["agents"].values()),
              *(f for a in spec["agents"].values() for f in a.get("preload_skills", [])),
+             *(f for a in spec["agents"].values() for f in a.get("fixtures", [])),
              *(p["file"] for r in spec["replays"] for p in r["plants"]),
              *(f for s in spec["scans"] for f in s["files"]),
              *(p["file"] for s in spec["scans"] for p in s.get("plants", [])),
@@ -319,6 +344,7 @@ def prepare(spec_path, work):
     cases = {c["id"]: c for c in spec["prompts"]}
     for aid, agent in spec["agents"].items():
         sys_prompt = system_prompt_with_skills(aid, agent, work)
+        fixtures = fixture_parts(agent)
         for c in spec["configs"][agent["configs"]]:
             for rep in range(1, c["reps"] + 1):
                 if agent["kind"] == "prompt":
@@ -332,7 +358,7 @@ def prepare(spec_path, work):
                         rid = "%s-%s-%s-%s-r%d" % (aid, cid, c["model"], c["effort"], rep)
                         fp = fingerprint(agent["expect"][cid], cases[cid], spec["prompt_commit"],
                                          c["model"], c["effort"], sys_prompt, prompt,
-                                         agent.get("env", {}), agent.get("isolated", False))
+                                         agent.get("env", {}), agent.get("isolated", False), *fixtures)
                         wt = os.path.join(work, "wt", "prompt")
                         if agent.get("isolated"):
                             # The agent writes files, so each run gets its own tree. A run
@@ -351,7 +377,7 @@ def prepare(spec_path, work):
                                      sys_prompt, os.path.join(work, "wt", "replay", r["id"]), c["model"], c["effort"],
                                      prompt, aid, r["id"],
                                      fingerprint(agent, r, c["model"], c["effort"], sys_prompt, prompt,
-                                                 os.path.join(work, "prompts", r["id"] + ".patch"))])
+                                                 os.path.join(work, "prompts", r["id"] + ".patch"), *fixtures)])
                     continue
                 for s in spec["scans"]:
                     if "scans" in agent and s["id"] not in agent["scans"]:
@@ -369,7 +395,7 @@ def prepare(spec_path, work):
                     with open(prompt, "w", encoding="utf-8") as handle:
                         handle.write(SCAN_PROMPT.format(name=name))
                     rows.append([rid, sys_prompt, wt, c["model"], c["effort"], prompt, aid, s["id"],
-                                 fingerprint(agent, s, c["model"], c["effort"], sys_prompt, prompt)])
+                                 fingerprint(agent, s, c["model"], c["effort"], sys_prompt, prompt, *fixtures)])
     dupes = sorted({r[0] for r in rows if [x[0] for x in rows].count(r[0]) > 1})
     if dupes:
         sys.exit("prepare: these run ids collide; rename an agent or target id: %s" % ", ".join(dupes))
