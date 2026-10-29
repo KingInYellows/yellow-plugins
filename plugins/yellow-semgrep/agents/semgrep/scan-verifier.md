@@ -44,11 +44,15 @@ lines the fix modified.
 
 ### Step 1: Combined Scan
 
-Run a single `--config auto` scan (covers the target rule and all others):
+Run a single scan with the full-scan ruleset (`p/default`, or
+`$YELLOW_SEMGREP_CONFIG` when set), plus the target rule so it is checked even
+when the ruleset does not include it:
 
 ```bash
-semgrep scan --config auto --json --metrics off "${FILE_PATH}"
+semgrep scan --config "${YELLOW_SEMGREP_CONFIG:-p/default}" --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}"
 ```
+
+Never use `--config auto`: semgrep refuses it under `--metrics off`.
 
 See `semgrep-conventions` skill for stderr handling pattern — never use
 `2>/dev/null`.
