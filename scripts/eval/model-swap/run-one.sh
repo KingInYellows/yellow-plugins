@@ -9,9 +9,9 @@
 # default to the agent's `tools:` list. Writes <out-dir>/<run-id>.json (the
 # CLI's JSON result plus eval_rc, eval_wall_s and eval_fingerprint) and skips
 # a run whose output already exists with the same $EVAL_FINGERPRINT (eval.py
-# sets it from every run input), so a stopped matrix resumes. A file the run
-# writes to <workdir>/.debt/scanner-output/ is copied to
-# <out-dir>/<run-id>.scan.json.
+# sets it from every run input), so a stopped matrix resumes. With
+# EVAL_SCAN=1 (eval.py sets it for scan rows), a file the run writes to
+# <workdir>/.debt/scanner-output/ is copied to <out-dir>/<run-id>.scan.json.
 set -u
 [ $# -ge 7 ] || { printf 'usage: %s <out-dir> <run-id> <agent.md> <workdir> <model> <effort> <prompt-file> [tools]\n' "$0" >&2; exit 2; }
 out_dir=$1 id=$2 agent=$3 workdir=$4 model=$5 effort=$6 prompt_file=$7 tools=${8:-}
@@ -24,7 +24,9 @@ fi
 mkdir -p "$out_dir"
 # Scanner output from an earlier attempt must not be graded as this one's.
 rm -f "$out" "$out_dir/$id.scan.json"
-find "$workdir/.debt/scanner-output" -maxdepth 1 -name '*.json' -delete 2>/dev/null
+scan_row=${EVAL_SCAN:-0}
+# Only a scan row owns .debt/scanner-output; for others it is fixture input.
+[ "$scan_row" = 1 ] && find "$workdir/.debt/scanner-output" -maxdepth 1 -name '*.json' -delete 2>/dev/null
 sys=$(mktemp) || exit 1
 trap 'rm -f "$sys"' EXIT
 # Body after the second `---` line.
@@ -58,10 +60,13 @@ start=$(date +%s)
   >"$out.tmp" 2>"$out_dir/$id.err"
 rc=$?
 wall=$(($(date +%s) - start))
-scan=$(find "$workdir/.debt/scanner-output" -maxdepth 1 -name '*.json' -print -quit 2>/dev/null)
+scan=
 scan_ok=1
-# A scanner worktree has .debt/scanner-output; its run must write a file there.
-[ -d "$workdir/.debt/scanner-output" ] && [ -z "$scan" ] && scan_ok=0
+if [ "$scan_row" = 1 ]; then
+  scan=$(find "$workdir/.debt/scanner-output" -maxdepth 1 -name '*.json' -print -quit 2>/dev/null)
+  # A scan run must write a file there.
+  [ -z "$scan" ] && scan_ok=0
+fi
 if [ -n "$scan" ]; then
   # A truncated or non-object scanner file fails the run so it reruns.
   jq -e 'type == "object"' "$scan" >/dev/null 2>&1 && cp "$scan" "$out_dir/$id.scan.json" || scan_ok=0
