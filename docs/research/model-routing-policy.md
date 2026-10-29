@@ -125,6 +125,16 @@ graded on the reply and on the files the run leaves):
 research-conductor stays on Opus: it needs its live MCP search sources, which
 the cloud eval cannot reach.
 
+Council CLI wrappers (CLAUDE-200; eval on 2026-10-29 with
+`scripts/eval/model-swap/fixtures/2026-10-29-council-cli.json`, stand-in `agy`
+and `opencode` that log every call, confirmed against the real CLIs with
+`2026-10-29-council-cli-real.json`):
+
+| Agent                              | Model / effort                    | Reason                                                                                                                                                                                                                                                             |
+| ---------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `yellow-council` gemini-reviewer   | sonnet / medium (was haiku / low) | Sonnet 8/8. Haiku passed 4/12 at `low` and 7/12 at `medium`: in 4 of 12 runs at each effort it never called `agy` and returned its own review of the pack, and it swapped the canonical redaction awk for an ad-hoc `sed` (one `low` run leaked the planted token) |
+| `yellow-council` opencode-reviewer | sonnet / medium (was haiku / low) | Sonnet 6/6. Haiku passed 3/9 at `low` and 6/9 at `medium`, the misses being a skipped CLI call, prose in place of the `verdict=` contract and the same ad-hoc redaction                                                                                            |
+
 All 34 sonnet agents that had no `effort:` now pin `medium`, which is what they
 ran at under a 5.5 session's default effort, so V5 is clean.
 `knowledge-compounder` stays exempt: orchestration only, with the heavy work in
@@ -262,7 +272,6 @@ set for scanners. Candidates:
     6 vitest (Haiku failed the contract check on 2026-10-28).
 - **Opus → Sonnet:** research-conductor, in a run with its MCP sources.
 - **Other:**
-  - gemini-reviewer and opencode-reviewer effort to `medium`.
   - The compounder's Category Classifier, after its category definitions are
     sharpened; its Solution Extractor and Prevention Strategist are synthesis.
   - Conditional Opus reviewers in `/flow:work`.

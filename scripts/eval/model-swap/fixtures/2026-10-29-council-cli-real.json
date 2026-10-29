@@ -1,116 +1,108 @@
 {
- "$comment": "CLAUDE-200 real-CLI confirmation run: same wrappers, with bin-real/ first on PATH, whose agy and opencode log each call to eval-cli.log and then exec the real CLI. Needs agy (signed in) and opencode (with the default openrouter/deepseek/deepseek-v4-pro model or COUNCIL_OPENCODE_MODEL set) on PATH. Spends the CLIs' own quota as well as Claude usage.",
- "prompt_commit": "0b24dbc",
- "configs": {
-  "council": [
-   {
-    "model": "haiku",
-    "effort": "low",
-    "reps": 2
-   },
-   {
-    "model": "haiku",
-    "effort": "medium",
-    "reps": 2
-   },
-   {
-    "model": "sonnet",
-    "effort": "medium",
-    "reps": 2
-   }
+  "$comment": "CLAUDE-200 real-CLI confirmation run: same wrappers, with bin-real/ first on PATH, whose agy and opencode log each call to eval-cli.log and then exec the real CLI. Needs agy (signed in) and opencode (with the default openrouter/deepseek/deepseek-v4-pro model or COUNCIL_OPENCODE_MODEL set) on PATH. Spends the CLIs' own quota as well as Claude usage.",
+  "prompt_commit": "0b24dbc",
+  "configs": {
+    "council": [
+      {
+        "model": "haiku",
+        "effort": "low",
+        "reps": 2
+      },
+      {
+        "model": "haiku",
+        "effort": "medium",
+        "reps": 2
+      },
+      {
+        "model": "sonnet",
+        "effort": "medium",
+        "reps": 2
+      }
+    ]
+  },
+  "agents": {
+    "gmr": {
+      "file": "plugins/yellow-council/agents/review/gemini-reviewer.md",
+      "kind": "prompt",
+      "configs": "council",
+      "preload_skills": ["plugins/yellow-council/skills/council-patterns/SKILL.md"],
+      "isolated": true,
+      "fence": false,
+      "prompt": "{context}",
+      "env": {
+        "PATH": "{repo}/scripts/eval/model-swap/fixtures/2026-10-29-council-cli/bin-real:{PATH}",
+        "EVAL_CLI_LOG": "{wt}/eval-cli.log"
+      },
+      "expect": {
+        "gm-real": {
+          "match": [
+            "^verdict=(APPROVE|REVISE|REJECT)$",
+            "^confidence=(HIGH|MEDIUM|LOW)$",
+            "^summary=\\S",
+            "(?s)^findings_block_begin$.*src/council_case_real\\.py:\\d+.*^findings_block_end$",
+            "^fenced_output_path=/tmp/council-gemini-fenced-\\S+$"
+          ],
+          "files": [
+            {
+              "glob": "eval-cli.log",
+              "match": [
+                "^agy argv: \\[--sandbox\\] \\[--print-timeout\\] \\[630s\\] \\[-p\\] ",
+                "^agy pack: token=[0-9a-f]{16}$",
+                "^agy exit: 0$"
+              ],
+              "not": ["(?s)agy argv: \\[--sandbox\\].*agy argv: \\[--sandbox\\]"]
+            }
+          ]
+        }
+      }
+    },
+    "ocr": {
+      "file": "plugins/yellow-council/agents/review/opencode-reviewer.md",
+      "kind": "prompt",
+      "configs": "council",
+      "preload_skills": ["plugins/yellow-council/skills/council-patterns/SKILL.md"],
+      "isolated": true,
+      "fence": false,
+      "prompt": "{context}",
+      "env": {
+        "PATH": "{repo}/scripts/eval/model-swap/fixtures/2026-10-29-council-cli/bin-real:{PATH}",
+        "EVAL_CLI_LOG": "{wt}/eval-cli.log"
+      },
+      "expect": {
+        "oc-real": {
+          "match": [
+            "^verdict=(APPROVE|REVISE|REJECT)$",
+            "^confidence=(HIGH|MEDIUM|LOW)$",
+            "^summary=\\S",
+            "(?s)^findings_block_begin$.*src/council_case_real\\.py:\\d+.*^findings_block_end$",
+            "^fenced_output_path=/tmp/council-opencode-fenced-\\S+$"
+          ],
+          "files": [
+            {
+              "glob": "eval-cli.log",
+              "match": [
+                "^opencode run argv: \\[run\\] \\[--format\\] \\[json\\] \\[--variant\\] \\[high\\] \\[--print-logs\\] \\[--log-level\\] \\[ERROR\\]",
+                "^opencode run exit: 0$",
+                "^opencode session argv: \\[session\\] \\[delete\\] \\[ses_\\w+\\]$",
+                "^opencode session exit: 0$"
+              ],
+              "not": ["(?s)opencode run argv:.*opencode run argv:"]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "replays": [],
+  "scans": [],
+  "prompts": [
+    {
+      "id": "gm-real",
+      "text": "You are Gemini, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_real.py b/src/council_case_real.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_real.py\n@@ -0,0 +1,10 @@\n+import subprocess\n+\n+\n+def archive(path):\n+    \"\"\"Tar up a user-supplied directory.\"\"\"\n+    subprocess.run(\"tar czf out.tgz \" + path, shell=True, check=True)\n+\n+\n+def ratio(done, total):\n+    return done / total\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
+    },
+    {
+      "id": "oc-real",
+      "text": "You are OpenCode, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_real.py b/src/council_case_real.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_real.py\n@@ -0,0 +1,10 @@\n+import subprocess\n+\n+\n+def archive(path):\n+    \"\"\"Tar up a user-supplied directory.\"\"\"\n+    subprocess.run(\"tar czf out.tgz \" + path, shell=True, check=True)\n+\n+\n+def ratio(done, total):\n+    return done / total\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
+    }
   ]
- },
- "agents": {
-  "gmr": {
-   "file": "plugins/yellow-council/agents/review/gemini-reviewer.md",
-   "kind": "prompt",
-   "configs": "council",
-   "preload_skills": [
-    "plugins/yellow-council/skills/council-patterns/SKILL.md"
-   ],
-   "isolated": true,
-   "fence": false,
-   "prompt": "{context}",
-   "env": {
-    "PATH": "{repo}/scripts/eval/model-swap/fixtures/2026-10-29-council-cli/bin-real:{PATH}",
-    "EVAL_CLI_LOG": "{wt}/eval-cli.log"
-   },
-   "expect": {
-    "gm-real": {
-     "match": [
-      "^verdict=(APPROVE|REVISE|REJECT)$",
-      "^confidence=(HIGH|MEDIUM|LOW)$",
-      "^summary=\\S",
-      "(?s)^findings_block_begin$.*src/council_case_real\\.py:\\d+.*^findings_block_end$",
-      "^fenced_output_path=/tmp/council-gemini-fenced-\\S+$"
-     ],
-     "files": [
-      {
-       "glob": "eval-cli.log",
-       "match": [
-        "^agy argv: \\[--sandbox\\] \\[--print-timeout\\] \\[630s\\] \\[-p\\] ",
-        "^agy pack: token=[0-9a-f]{16}$",
-        "^agy exit: 0$"
-       ],
-       "not": [
-        "(?s)agy argv: \\[--sandbox\\].*agy argv: \\[--sandbox\\]"
-       ]
-      }
-     ]
-    }
-   }
-  },
-  "ocr": {
-   "file": "plugins/yellow-council/agents/review/opencode-reviewer.md",
-   "kind": "prompt",
-   "configs": "council",
-   "preload_skills": [
-    "plugins/yellow-council/skills/council-patterns/SKILL.md"
-   ],
-   "isolated": true,
-   "fence": false,
-   "prompt": "{context}",
-   "env": {
-    "PATH": "{repo}/scripts/eval/model-swap/fixtures/2026-10-29-council-cli/bin-real:{PATH}",
-    "EVAL_CLI_LOG": "{wt}/eval-cli.log"
-   },
-   "expect": {
-    "oc-real": {
-     "match": [
-      "^verdict=(APPROVE|REVISE|REJECT)$",
-      "^confidence=(HIGH|MEDIUM|LOW)$",
-      "^summary=\\S",
-      "(?s)^findings_block_begin$.*src/council_case_real\\.py:\\d+.*^findings_block_end$",
-      "^fenced_output_path=/tmp/council-opencode-fenced-\\S+$"
-     ],
-     "files": [
-      {
-       "glob": "eval-cli.log",
-       "match": [
-        "^opencode run argv: \\[run\\] \\[--format\\] \\[json\\] \\[--variant\\] \\[high\\] \\[--print-logs\\] \\[--log-level\\] \\[ERROR\\]",
-        "^opencode run exit: 0$",
-        "^opencode session argv: \\[session\\] \\[delete\\] \\[ses_\\w+\\]$",
-        "^opencode session exit: 0$"
-       ],
-       "not": [
-        "(?s)opencode run argv:.*opencode run argv:"
-       ]
-      }
-     ]
-    }
-   }
-  }
- },
- "replays": [],
- "scans": [],
- "prompts": [
-  {
-   "id": "gm-real",
-   "text": "You are Gemini, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_real.py b/src/council_case_real.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_real.py\n@@ -0,0 +1,10 @@\n+import subprocess\n+\n+\n+def archive(path):\n+    \"\"\"Tar up a user-supplied directory.\"\"\"\n+    subprocess.run(\"tar czf out.tgz \" + path, shell=True, check=True)\n+\n+\n+def ratio(done, total):\n+    return done / total\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
-  },
-  {
-   "id": "oc-real",
-   "text": "You are OpenCode, a code reviewer performing an INDEPENDENT analysis.\nDo not reference what other reviewers might say. Only report findings you can\ncite with a file:line reference. Do not write any files; analyze only.\n\n## Task: review\n### Diff (HEAD vs main)\n```diff\ndiff --git a/src/council_case_real.py b/src/council_case_real.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/council_case_real.py\n@@ -0,0 +1,10 @@\n+import subprocess\n+\n+\n+def archive(path):\n+    \"\"\"Tar up a user-supplied directory.\"\"\"\n+    subprocess.run(\"tar czf out.tgz \" + path, shell=True, check=True)\n+\n+\n+def ratio(done, total):\n+    return done / total\n```\nPACK-SENTINEL: end of council pack body\n\n## Required Output Format\nVerdict: APPROVE | REVISE | REJECT\nConfidence: HIGH | MEDIUM | LOW\nFindings:\n- [P1|P2|P3] file:line — <80-char summary>\n  Evidence: \"<exact quoted line from file>\"\n[repeat per finding; if none: write \"Findings: none\"]\nSummary: <2-3 sentences in your own words>\n\n## Rules\n- P1 = security/correctness blocker; P2 = quality issue; P3 = style/nit\n- Cite file paths relative to repository root\n- If a finding has no quotable line (e.g., \"missing function\"), write `Evidence: N/A — <reason>`\n- The `Verdict:` line is required and must appear exactly as shown\n"
-  }
- ]
 }

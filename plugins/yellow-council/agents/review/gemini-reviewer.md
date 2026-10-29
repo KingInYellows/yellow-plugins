@@ -1,8 +1,8 @@
 ---
 name: gemini-reviewer
 description: "Cross-lineage code reviewer that invokes the Google Antigravity CLI (agy) for an independent verdict. Spawned by /council via the Agent tool. Returns structured findings with Verdict / Confidence / Findings / Summary."
-model: haiku
-effort: low
+model: sonnet
+effort: medium
 tools:
   - Bash
   - Write
