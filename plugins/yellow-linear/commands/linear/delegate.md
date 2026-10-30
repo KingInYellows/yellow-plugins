@@ -28,7 +28,8 @@ terminal with `authorize`: this command finds a covering grant, previews it, and
 asks before launching. With no covering grant it prints the terminal command and
 stops without contacting Jules. `yellow-jules` is deprecated: Jules accepts new
 sessions only until 2026-11-11 and shuts down 2026-12-31, so when it resolves
-as the provider, say so before the preview.
+as the provider, say so before the preview, and stop after 2026-11-11 (see
+`READY_JULES`).
 
 ## Arguments
 
@@ -213,13 +214,16 @@ Decide the provider:
 <!-- linear-delegate-providers:start -->
 - **`READY_CURSOR`** → provider = `cursor`.
 - **`READY_DEVIN`** → provider = `devin`.
-- **`READY_JULES`** → provider = `jules`. Build the Step 4 packet, skip Steps
-  5-6, and go to Step 7's **Jules** branch, which carries its own grant preview
-  and confirmation.
+- **`READY_JULES`** → provider = `jules`. First run `date -u +%Y%m%d`; if it
+  prints a number greater than `20261111`, stop before Step 4 and say Jules is
+  read-only and refuses new sessions, so nothing was sent. Otherwise build the
+  Step 4 packet, skip Steps 5-6, and go to Step 7's **Jules** branch, which
+  carries its own grant preview and confirmation.
 - **`CONFLICT`** → if `--provider` was given (`cursor`, `devin`, or `jules`),
   use it only if `classification.providers[<requested>].enabled` is `true`
   (this is the ONLY state `--provider` may override). An accepted `jules`
-  override follows `READY_JULES`: build the Step 4 packet, skip Steps 5-6, and
+  override follows `READY_JULES`, including its date cutoff: build the Step 4
+  packet, skip Steps 5-6, and
   go to Step 7's **Jules** branch. If the requested
   provider is not enabled, or `--provider` was not given, stop, print the
   fenced `detail`, and tell the user to disable the extra providers or pass

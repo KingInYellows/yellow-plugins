@@ -34,7 +34,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-cursor`       | Cursor Cloud Agent delegation — launch, track, and manage remote coding agents via a typed CLI (pilot Cursor distribution target)      | 10 commands, 2 skills                          |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns                                       | 7 agents, 6 commands, 2 skills, 1 hook         |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, orchestrate plan-implement-review chains (legacy — see yellow-cursor)   | 1 agent, 9 commands, 1 skill, 1 MCP            |
-| `yellow-jules`        | Google Jules integration (deprecated: read-only 2026-11-11, off 2026-12-31) — delegate, supervise, and review sessions under grants     | 10 commands, 2 skills                          |
+| `yellow-jules`        | Google Jules integration (deprecated: read-only after 2026-11-11, off 2026-12-31) — delegate, supervise, review sessions under grants   | 10 commands, 2 skills                          |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 2 skills                |
 | `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup/request, stub run, approval-gated real run that may spend)                  | 4 commands                                     |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |

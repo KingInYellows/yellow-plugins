@@ -24,7 +24,13 @@ Before anything else, tell the user in one short paragraph: Google is winding
 Jules down, sessions can be finished only until 2026-11-11, Jules is read-only
 after that and shuts down 2026-12-31, and they should export their data with
 Jules Tools (`npm install -g @google/jules`, `jules login`) to a private folder
-outside any repository. Then continue with the workflow below.
+outside any repository.
+
+Then run `date -u +%Y%m%d`. If it prints a number greater than `20261111`,
+stop: Jules is read-only and refuses new sessions, so say that nothing was
+sent and that existing sessions can still be read with `/jules:status` and
+staged with `/jules:collect` until 2026-12-31. Otherwise continue with the
+workflow below.
 
 ## Workflow
 
