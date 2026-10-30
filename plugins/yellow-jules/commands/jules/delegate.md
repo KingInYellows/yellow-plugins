@@ -18,6 +18,14 @@ real launch needs a grant written by `authorize` in a terminal; this command
 finds a covering grant, shows a preview, and asks before using it. Nothing is
 sent until the user confirms.
 
+## Deprecation notice
+
+Before anything else, tell the user in one short paragraph: Google is winding
+Jules down, sessions can be finished only until 2026-11-11, Jules is read-only
+after that and shuts down 2026-12-31, and they should export their data with
+Jules Tools (`npm install -g @google/jules`, `jules login`) to a private folder
+outside any repository. Then continue with the workflow below.
+
 ## Workflow
 
 ### Step 1: Validate Arguments

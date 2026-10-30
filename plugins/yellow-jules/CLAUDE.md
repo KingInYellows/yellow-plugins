@@ -1,5 +1,11 @@
 # yellow-jules Plugin
 
+> **Deprecated (2026-10-30).** Jules accepts session work only until 2026-11-11,
+> is read-only after, and shuts down 2026-12-31. Do not extend this plugin; fix
+> only what blocks finishing or collecting existing sessions. The commands warn
+> the user (see the "Deprecation notice" step in `setup` and `delegate`).
+> Removal follows the shutdown.
+
 Google Jules integration, **experimental**, the third member of the
 `remote-agent` capability group (yellow-cursor is preferred). All vendor
 integration lives in a typed TypeScript CLI (`src/` → compiled `dist/cli.js`);

@@ -1,5 +1,15 @@
 # yellow-jules
 
+> **Deprecated.** Google is winding Jules down: you can finish sessions until
+> **2026-11-11**, after which Jules is read-only, and it shuts down on
+> **2026-12-31** ([Jules changelog](https://jules.google/docs/changelog/)).
+> Finish or abandon live sessions before 2026-11-11 and export your Jules data
+> with Jules Tools (`npm install -g @google/jules`, then `jules login`) to a
+> private folder outside any repository — the export includes environment
+> variable values. A successor that runs the Antigravity CLI (`agy`) locally on
+> your Google AI Pro sign-in is planned; this plugin will be removed after
+> 2026-12-31.
+
 Google Jules integration for Claude Code and Codex — **experimental**. Hand a
 task to a Jules session, review its plan, answer its questions, and stage what
 it produces for local review. Every write happens under a **grant** you create

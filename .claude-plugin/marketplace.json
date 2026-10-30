@@ -73,7 +73,7 @@
     },
     {
       "name": "yellow-jules",
-      "description": "Google Jules integration (experimental) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
+      "description": "Google Jules integration (deprecated: Jules is read-only from 2026-11-11 and shuts down 2026-12-31) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
       "version": "0.4.1",
       "author": {
         "name": "KingInYellows"

@@ -26,7 +26,9 @@ the existing `/devin:delegate` command). The experimental `yellow-jules`
 provider launches through its own CLI under a grant the owner wrote in a
 terminal with `authorize`: this command finds a covering grant, previews it, and
 asks before launching. With no covering grant it prints the terminal command and
-stops without contacting Jules.
+stops without contacting Jules. `yellow-jules` is deprecated: Jules accepts new
+sessions only until 2026-11-11 and shuts down 2026-12-31, so when it resolves
+as the provider, say so before the preview.
 
 ## Arguments
 
