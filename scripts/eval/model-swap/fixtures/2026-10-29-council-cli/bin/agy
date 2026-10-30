@@ -4,7 +4,10 @@
 # The reply is picked by the file the pack's diff adds
 # (src/council_case_<x>.py) and read from ../responses/gemini-<x>.txt. Like
 # the real CLI it reads the pack from the file the -p prompt names and echoes
-# the pack's final INGEST_TOKEN line. Every call is logged to $EVAL_CLI_LOG.
+# the pack's final INGEST_TOKEN line. Every call is logged to $EVAL_CLI_LOG,
+# including pack=match|mismatch: whether the pack minus that final line is the
+# case's spawn prompt (the gm-<x> prompt in the spec) byte for byte, ignoring
+# trailing newlines.
 here=$(cd "$(dirname "$0")/.." && pwd -P)
 log=${EVAL_CLI_LOG:-/dev/null}
 { printf 'agy argv:'; for a in "$@"; do printf ' [%s]' "$a"; done; printf '\n'; } >>"$log"
@@ -27,7 +30,11 @@ sentinel=no
 grep -q '^PACK-SENTINEL: end of council pack body$' "$pack" && sentinel=yes
 format=no
 grep -q '^## Required Output Format$' "$pack" && format=yes
-printf 'agy pack: case=%s token=%s sentinel=%s format=%s\n' "$case_id" "${token:-none}" "$sentinel" "$format" >>"$log"
+body=$(if [ -n "$token" ]; then sed '$d' "$pack"; else cat "$pack"; fi)
+want=$(jq -r --arg id "gm-$case_id" '.prompts[] | select(.id == $id) | .text' "$here.json")
+match=mismatch
+[ -n "$want" ] && [ "$body" = "$want" ] && match=match
+printf 'agy pack: case=%s token=%s sentinel=%s format=%s pack=%s\n' "$case_id" "${token:-none}" "$sentinel" "$format" "$match" >>"$log"
 case $case_id in
   quota)
     printf 'Error: RESOURCE_EXHAUSTED: You have exhausted your quota for gemini-3-pro. Try again in 3h12m.\n' >&2
