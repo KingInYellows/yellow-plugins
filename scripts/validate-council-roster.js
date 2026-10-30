@@ -213,6 +213,9 @@ const LEDGER_EXCLUDED_DIRS = [
   'plans',
   'tests',
   'fixtures',
+  // Model-swap eval specs are dated records of what ran; a roster change must
+  // not rewrite them.
+  'scripts/eval/model-swap/fixtures',
   'docs/research',
   'docs/brainstorms',
   'docs/spikes',
