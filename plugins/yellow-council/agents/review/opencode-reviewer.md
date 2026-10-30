@@ -409,8 +409,11 @@ CLI_EXIT="<literal CLI_EXIT value>"
 SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID != null) | .part.snapshot.sessionID' "$OUTPUT_FILE" 2>/dev/null | head -1)
 
 # --- Extract assistant text from JSON event stream ---
-# OpenCode emits multiple `text` events per turn (streaming chunks).
-# Concatenate all of them in order:
+# Each `text` event is one completed text part, never a streaming delta:
+# opencode run emits it only once the part has `time.end` (checked in the
+# 1.18.34 and 1.19.5 binaries, CLAUDE-205). A turn with tool calls has one part
+# per stretch of prose, so join them one per line, in order; a credential
+# cannot straddle two events, and the line-based redaction below sees it whole.
 ASSISTANT_TEXT=$(jq -r 'select(.type=="text") | .part.text' "$OUTPUT_FILE" 2>/dev/null | tr -d '\000')
 
 if [ -z "$ASSISTANT_TEXT" ]; then
