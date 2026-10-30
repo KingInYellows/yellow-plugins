@@ -289,7 +289,7 @@ _dialogue() {
   run ! grep -q 'SSSSSSSSSS' <<< "$tail"
 }
 
-@test "capture falls back to the raw tail without attachments when jq filtering fails" {
+@test "capture stages nothing when the jq dialogue filter fails" {
   STAGING=$(_expected_staging_dir)
   shim="$PROJECT_DIR/shim"
   mkdir -p "$shim"
@@ -300,10 +300,10 @@ _dialogue() {
     printf '%s\n' '{"type":"attachment","attachment":{"type":"prompt_snapshot","systemPrompt":["SYSTEM_PROMPT_NOISE"]}}'
     printf '%s\n' '{"type":"user","message":{"role":"user","content":"USER_DIALOGUE"}}'
   } > "$TRANSCRIPT_FILE"
-  PATH="$shim:$PATH" bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
-  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
-  grep -q 'USER_DIALOGUE' <<< "$tail"
-  run ! grep -q 'SYSTEM_PROMPT_NOISE' <<< "$tail"
+  run env PATH="$shim:$PATH" bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  [ "$status" -eq 0 ]
+  [ ! -e "$STAGING/pending/$SESSION_ID.jsonl" ]
+  [ ! -e "$STAGING/capture-marks/$SESSION_ID" ]
 }
 
 @test "capture does not let non-dialogue text lines take dialogue slots" {
@@ -332,39 +332,6 @@ _dialogue() {
   bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
   tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
   [ "$tail" = '{"type":"user","message":{"role":"user","content":"WHOLE_RECORD"}}' ]
-}
-
-@test "capture fallback drops a half-written final line" {
-  STAGING=$(_expected_staging_dir)
-  shim="$PROJECT_DIR/shim"
-  mkdir -p "$shim"
-  real_jq=$(command -v jq)
-  printf '#!/usr/bin/env bash\ncase "$*" in *fromjson*) exit 1 ;; esac\nexec %s "$@"\n' "$real_jq" > "$shim/jq"
-  chmod +x "$shim/jq"
-  {
-    printf '%s\n' '{"type":"user","message":{"role":"user","content":"WHOLE_RECORD"}}'
-    printf '%s' '{"type":"assistant","message":{"role":"assistant","content":"HALF_WRIT'
-  } > "$TRANSCRIPT_FILE"
-  PATH="$shim:$PATH" bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
-  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
-  grep -q 'WHOLE_RECORD' <<< "$tail"
-  run ! grep -q 'HALF_WRIT' <<< "$tail"
-}
-
-@test "capture fallback keeps the last whole record before a half-written attachment" {
-  STAGING=$(_expected_staging_dir)
-  shim="$PROJECT_DIR/shim"
-  mkdir -p "$shim"
-  real_jq=$(command -v jq)
-  printf '#!/usr/bin/env bash\ncase "$*" in *fromjson*) exit 1 ;; esac\nexec %s "$@"\n' "$real_jq" > "$shim/jq"
-  chmod +x "$shim/jq"
-  {
-    printf '%s\n' '{"type":"user","message":{"role":"user","content":"WHOLE_RECORD"}}'
-    printf '%s' '{"type":"attachment","attachment":{"type":"prompt_snap'
-  } > "$TRANSCRIPT_FILE"
-  PATH="$shim:$PATH" bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
-  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
-  grep -q 'WHOLE_RECORD' <<< "$tail"
 }
 
 @test "capture stages nothing when the tail holds no dialogue" {
