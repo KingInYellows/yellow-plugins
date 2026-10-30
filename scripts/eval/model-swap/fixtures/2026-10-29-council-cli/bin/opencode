@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Eval stand-in for the OpenCode CLI: opencode-reviewer's effort eval feeds
+# the agent a canned `opencode run --format json` event stream instead of a
+# live review. The reply is picked by the file the pack's diff adds
+# (src/council_case_<x>.py) and built from ../responses/opencode-<x>.txt.
+# `session delete` is recorded so the eval can check the cleanup. Every call
+# is logged to $EVAL_CLI_LOG (the pack argument as its byte count).
+here=$(cd "$(dirname "$0")/.." && pwd -P)
+log=${EVAL_CLI_LOG:-/dev/null}
+sid=ses_7QxEvalStubSession42
+case ${1:-} in
+  --version) printf '1.18.2\n'; exit 0 ;;
+  session)
+    printf 'opencode session %s %s\n' "${2:-}" "${3:-}" >>"$log"
+    [ "${2:-}" = delete ] && [ "${3:-}" = "$sid" ] && exit 0
+    printf 'Error: session not found\n' >&2; exit 1 ;;
+  run) shift ;;
+  *) printf 'opencode stub: unexpected command %s\n' "${1:-}" >&2; exit 2 ;;
+esac
+pack=
+{ printf 'opencode run argv:'
+  for a in "$@"; do
+    case $a in *$'\n'*) printf ' [<pack %s bytes>]' "${#a}"; pack=$a ;; *) printf ' [%s]' "$a" ;; esac
+  done
+  printf '\n'; } >>"$log"
+case_id=$(printf '%s' "$pack" | grep -o 'src/council_case_[a-z]*\.py' | head -n1 | sed 's/.*council_case_//; s/\.py$//')
+sentinel=no
+printf '%s\n' "$pack" | grep -q '^PACK-SENTINEL: end of council pack body$' && sentinel=yes
+printf 'opencode pack: case=%s sentinel=%s\n' "$case_id" "$sentinel" >>"$log"
+jq -cn --arg s "$sid" '{type: "step_start", part: {type: "step-start", snapshot: {sessionID: $s}}}'
+case $case_id in
+  model)
+    jq -cn --arg s "$sid" '{type: "error", sessionID: $s, error: {name: "UnknownError", data: {message: "Unexpected server error"}}}'
+    printf 'ERROR 2026-10-29T18:00:00 +2ms service=session ProviderModelNotFoundError: Model not found: openrouter/deepseek/deepseek-v4-pro.\n' >&2
+    exit 1 ;;
+  '') printf 'opencode stub: no case file in the pack\n' >&2; exit 1 ;;
+esac
+# Stream the reply as two text chunks, the way opencode splits a turn.
+f=$here/responses/opencode-$case_id.txt
+n=$(wc -l <"$f")
+h=$((n / 2))
+jq -cn --rawfile t <(head -n "$h" "$f") '{type: "text", part: {type: "text", text: $t}}'
+jq -cn --rawfile t <(tail -n +"$((h + 1))" "$f") '{type: "text", part: {type: "text", text: $t}}'
+jq -cn '{type: "step_finish", part: {type: "step-finish", reason: "stop"}}'
