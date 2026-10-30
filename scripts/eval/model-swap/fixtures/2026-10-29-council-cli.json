@@ -49,7 +49,7 @@
               "match": [
                 "^agy argv: \\[--sandbox\\] \\[--print-timeout\\] \\[630s\\] \\[-p\\] \\[Read the file /tmp/council-gemini-pack-[^/]+/pack\\.txt ",
                 "^agy cwd: /tmp/council-gemini-pack-",
-                "^agy pack: case=\\w+ token=[0-9a-f]{16} sentinel=yes format=yes$"
+                "^agy pack: case=\\w+ token=[0-9a-f]{16} sentinel=yes format=yes pack=match$"
               ],
               "not": ["(?s)agy argv: \\[--sandbox\\].*agy argv: \\[--sandbox\\]", "dangerously"]
             }
@@ -66,7 +66,7 @@
           "files": [
             {
               "glob": "eval-cli.log",
-              "match": ["^agy pack: case=quota token=[0-9a-f]{16} sentinel=yes"],
+              "match": ["^agy pack: case=quota token=[0-9a-f]{16} sentinel=yes format=yes pack=match$"],
               "not": ["(?s)agy argv: \\[--sandbox\\].*agy argv: \\[--sandbox\\]"]
             }
           ]
@@ -81,7 +81,7 @@
           "files": [
             {
               "glob": "eval-cli.log",
-              "match": ["^agy pack: case=notoken token=[0-9a-f]{16} sentinel=yes"]
+              "match": ["^agy pack: case=notoken token=[0-9a-f]{16} sentinel=yes format=yes pack=match$"]
             }
           ]
         },
@@ -99,7 +99,7 @@
               "match": [
                 "^agy argv: \\[--sandbox\\] \\[--print-timeout\\] \\[630s\\] \\[-p\\] \\[Read the file /tmp/council-gemini-pack-[^/]+/pack\\.txt ",
                 "^agy cwd: /tmp/council-gemini-pack-",
-                "^agy pack: case=\\w+ token=[0-9a-f]{16} sentinel=yes format=yes$"
+                "^agy pack: case=\\w+ token=[0-9a-f]{16} sentinel=yes format=yes pack=match$"
               ],
               "not": ["(?s)agy argv: \\[--sandbox\\].*agy argv: \\[--sandbox\\]", "dangerously"]
             }
@@ -134,7 +134,7 @@
               "glob": "eval-cli.log",
               "match": [
                 "^opencode run argv: \\[--format\\] \\[json\\] \\[--variant\\] \\[high\\] \\[--print-logs\\] \\[--log-level\\] \\[ERROR\\] \\[--model\\] \\[openrouter/deepseek/deepseek-v4-pro\\] \\[<pack \\d+ bytes>\\]$",
-                "^opencode pack: case=\\w+ sentinel=yes$",
+                "^opencode pack: case=\\w+ sentinel=yes pack=match$",
                 "^opencode session delete ses_7QxEvalStubSession42$"
               ],
               "not": [
@@ -157,7 +157,7 @@
               "glob": "eval-cli.log",
               "match": [
                 "^opencode run argv: \\[--format\\] \\[json\\] \\[--variant\\] \\[high\\] \\[--print-logs\\] \\[--log-level\\] \\[ERROR\\] \\[--model\\] \\[openrouter/deepseek/deepseek-v4-pro\\] \\[<pack \\d+ bytes>\\]$",
-                "^opencode pack: case=\\w+ sentinel=yes$",
+                "^opencode pack: case=\\w+ sentinel=yes pack=match$",
                 "^opencode session delete ses_7QxEvalStubSession42$"
               ],
               "not": [
@@ -181,7 +181,7 @@
               "glob": "eval-cli.log",
               "match": [
                 "^opencode run argv: \\[--format\\] \\[json\\] \\[--variant\\] \\[high\\] \\[--print-logs\\] \\[--log-level\\] \\[ERROR\\] \\[--model\\] \\[openrouter/deepseek/deepseek-v4-pro\\] \\[<pack \\d+ bytes>\\]$",
-                "^opencode pack: case=\\w+ sentinel=yes$",
+                "^opencode pack: case=\\w+ sentinel=yes pack=match$",
                 "^opencode session delete ses_7QxEvalStubSession42$"
               ],
               "not": [

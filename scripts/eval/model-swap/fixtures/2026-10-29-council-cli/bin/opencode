@@ -4,7 +4,9 @@
 # live review. The reply is picked by the file the pack's diff adds
 # (src/council_case_<x>.py) and built from ../responses/opencode-<x>.txt.
 # `session delete` is recorded so the eval can check the cleanup. Every call
-# is logged to $EVAL_CLI_LOG (the pack argument as its byte count).
+# is logged to $EVAL_CLI_LOG (the pack argument as its byte count), with
+# pack=match|mismatch: whether the pack argument is the case's spawn prompt
+# (the oc-<x> prompt in the spec) byte for byte, ignoring trailing newlines.
 here=$(cd "$(dirname "$0")/.." && pwd -P)
 log=${EVAL_CLI_LOG:-/dev/null}
 sid=ses_7QxEvalStubSession42
@@ -26,7 +28,10 @@ pack=
 case_id=$(printf '%s' "$pack" | grep -o 'src/council_case_[a-z]*\.py' | head -n1 | sed 's/.*council_case_//; s/\.py$//')
 sentinel=no
 printf '%s\n' "$pack" | grep -q '^PACK-SENTINEL: end of council pack body$' && sentinel=yes
-printf 'opencode pack: case=%s sentinel=%s\n' "$case_id" "$sentinel" >>"$log"
+want=$(jq -r --arg id "oc-$case_id" '.prompts[] | select(.id == $id) | .text' "$here.json")
+match=mismatch
+[ -n "$want" ] && [ "$pack" = "$want" ] && match=match
+printf 'opencode pack: case=%s sentinel=%s pack=%s\n' "$case_id" "$sentinel" "$match" >>"$log"
 jq -cn --arg s "$sid" '{type: "step_start", part: {type: "step-start", snapshot: {sessionID: $s}}}'
 case $case_id in
   model)
@@ -35,7 +40,9 @@ case $case_id in
     exit 1 ;;
   '') printf 'opencode stub: no case file in the pack\n' >&2; exit 1 ;;
 esac
-# Stream the reply as two text chunks, the way opencode splits a turn.
+# Emit the reply as two text parts, the way opencode splits a turn around a
+# tool call. Each real `text` event is a completed part, never a delta
+# (CLAUDE-205), so the split falls on a line boundary.
 f=$here/responses/opencode-$case_id.txt
 n=$(wc -l <"$f")
 h=$((n / 2))
