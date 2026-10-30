@@ -13,6 +13,51 @@ and this project adheres to
 
 ---
 
+## [2.1.29] - 2026-10-29
+
+### Added
+
+- **yellow-review 3.13.0** — `/review:resolve` hands CodeRabbit threads back to
+  CodeRabbit: before resolving a thread CodeRabbit opened, the write phase
+  replies `@coderabbitai resolve` in that thread (new `handback-pr-thread`
+  script, plan key `handback`), so CodeRabbit stops reopening it. The GraphQL
+  resolve still follows; `YELLOW_REVIEW_CODERABBIT_HANDBACK=0` turns the
+  hand-back off (CLAUDE-56).
+- **yellow-debt 1.9.6** — `debt_backfill_todos` in `lib/validate.sh` fills a
+  missing `id`, `status`, `severity` or `priority` in older todos from the file
+  name, never changes a present value, and reports todos missing `category` or
+  `affected_files` for a hand edit (CLAUDE-4).
+
+### Changed
+
+- **yellow-council 0.6.3** — gemini-reviewer and opencode-reviewer route to
+  `sonnet` / `medium` (were `haiku` / `low`). In the CLAUDE-200 eval, Haiku
+  sometimes skipped the CLI call or replaced the canonical credential-redaction
+  program; Sonnet followed the procedure in every run.
+- **yellow-core 2.11.7, yellow-debt 1.9.6, yellow-semgrep 4.2.9** — Eval-gated
+  model swaps from the Phase 3 leftovers eval (CLAUDE-194): `scan-verifier`
+  moves to haiku/low, `staging-promoter` to haiku/medium, and
+  `audit-synthesizer` from opus/high to sonnet/medium. `/semgrep:fix` Step 9
+  treats a verifier answer with no `Verification:` verdict like "Cannot verify"
+  and offers to commit with the new `unverified (no verifier result)` trailer,
+  instead of reading it as a pass.
+
+### Fixed
+
+- **yellow-core 2.11.7** — The Stop hook capture no longer stages an empty
+  transcript tail. Its scan window doubles until it holds 100 dialogue records,
+  passes the 96 KiB byte cap, covers the whole file, or reaches 128000 lines
+  (CLAUDE-148). Capture keeps only user and assistant records, drops a
+  half-written final line, skips tails with no dialogue, and an older capture of
+  a session no longer replaces a newer one (CLAUDE-199).
+- **yellow-semgrep 4.2.9** — `/semgrep:scan` and the post-fix `scan-verifier`
+  scan with the `p/default` ruleset (override with `YELLOW_SEMGREP_CONFIG`)
+  instead of `--config auto`, which current semgrep refuses alongside
+  `--metrics off`; the verifier also adds the target rule (CLAUDE-195).
+- **yellow-devin 3.0.10** — The command reference moved from
+  `commands/devin/README.md` to `docs/commands.md`, so Claude Code no longer
+  loads it as a stray `/devin:README` command (CLAUDE-201).
+
 ## [2.1.28] - 2026-10-28
 
 ### Fixed

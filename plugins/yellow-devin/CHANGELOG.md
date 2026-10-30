@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.0.10
+
+### Patch Changes
+
+- [#1466](https://github.com/KingInYellows/yellow-plugins/pull/1466)
+  [`b575e4d`](https://github.com/KingInYellows/yellow-plugins/commit/b575e4d43a6d7bd72c39b68c58232f3a9b716c2c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Move the
+  command reference table from `commands/devin/README.md` to `docs/commands.md`.
+  Claude Code loaded the old file as a stray `/devin:README` slash command
+  (CLAUDE-201).
+
 ## 3.0.9
 
 ### Patch Changes
