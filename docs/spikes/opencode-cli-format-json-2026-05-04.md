@@ -51,7 +51,7 @@ Source: <https://takopi.dev/reference/runners/opencode/stream-json-cheatsheet/>
 ASSISTANT_TEXT=$(jq -r 'select(.type=="text") | .part.text' "$OUTPUT_FILE" | tr -d '\000')
 ```
 
-Concatenate all `text` events for the full response. Multiple `text` events can be emitted per turn (streaming chunks).
+Concatenate all `text` events for the full response. A turn can emit several `text` events, but each is a completed text part, not a streaming delta: `opencode run` emits one only after the part has `time.end` (confirmed in the 1.18.34 and 1.19.5 binaries, CLAUDE-205).
 
 **Session ID extraction (jq):**
 ```bash
