@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Logging pass-through for the real OpenCode CLI: records each call's argv
+# (the pack argument as its byte count) to $EVAL_CLI_LOG, then runs the real
+# `opencode` (the next one on PATH after this directory) and logs its exit code.
+self=$(cd "$(dirname "$0")" && pwd -P)
+log=${EVAL_CLI_LOG:-/dev/null}
+real=$(IFS=:; for d in $PATH; do [ "$(cd "$d" 2>/dev/null && pwd -P)" = "$self" ] && continue; [ -x "$d/opencode" ] && { printf '%s/opencode' "$d"; break; }; done)
+[ -n "$real" ] || { printf 'opencode wrapper: real opencode not found on PATH\n' >&2; exit 127; }
+{ printf 'opencode %s argv:' "${1:-}"
+  for a in "$@"; do case $a in *$'\n'*) printf ' [<pack %s bytes>]' "${#a}" ;; *) printf ' [%s]' "$a" ;; esac; done
+  printf '\n'; } >>"$log"
+"$real" "$@"
+rc=$?
+printf 'opencode %s exit: %s\n' "${1:-}" "$rc" >>"$log"
+exit "$rc"

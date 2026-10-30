@@ -1,0 +1,8 @@
+Verdict: REVISE
+Confidence: MEDIUM
+Findings:
+- [P1] src/council_case_revise.py:4 — Anthropic key committed in plain text
+  Evidence: "ANTHROPIC_KEY = \"sk-ant-api03-EVALfakeKEY0000000000000000000\""
+- [P3] src/council_case_revise.py:7 — helper name does not say it calls the API
+  Evidence: "def fetch(model):"
+Summary: The diff commits an API key, which is a blocker. Rename the helper once the key moves to the environment.
