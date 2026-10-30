@@ -52,8 +52,12 @@ fi
 # TAIL_LINES records, already exceeds the byte cap, covers the whole file, or
 # reaches TAIL_SCAN_MAX_LINES. A fixed window let a run of non-dialogue
 # records push every dialogue line out.
-# If the jq filter fails, fall back to the raw tail minus attachment lines and
-# minus an unterminated final line.
+# If the filter pipeline fails, nothing is staged. The filter is what keeps
+# attachment and other non-dialogue records out, and `try fromjson` means bad
+# input alone does not fail it, so a failure points at a broken jq or a read
+# error. An unfiltered tail would hand the drain the prompt snapshot and
+# memory files; skipping loses only this capture, and a later Stop in the
+# session captures it again.
 # After redaction the staged tail is capped at TAIL_MAX_BYTES, keeping the
 # newest whole lines; the Jev shadow gets the uncapped tail so it still sees
 # whole records and applies its own cap.
@@ -87,16 +91,7 @@ if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
         | jq -Rr 'select((try fromjson catch null)
             | type == "object" and (.type == "user" or .type == "assistant"))' 2>/dev/null \
         | tail -n "$TAIL_LINES"); then
-      # `tail -c 1` of a newline-terminated file is a newline, which $()
-      # strips; anything left means the last line is still being written.
-      # Drop it before the attachment filter, which could remove it first.
-      drop_last=0
-      [ -n "$(head -c "$TRANSCRIPT_BYTES" -- "$TRANSCRIPT" 2>/dev/null | tail -c 1)" ] \
-        && drop_last=1
-      TAIL_RAW=$(head -c "$TRANSCRIPT_BYTES" -- "$TRANSCRIPT" 2>/dev/null \
-        | tail -n "$TAIL_LINES" \
-        | if [ "$drop_last" = 1 ]; then sed '$d'; else cat; fi \
-        | grep -v '^{"type":"attachment"' || printf '')
+      TAIL_RAW=""
       break
     fi
     if [ "$SNAP_EXACT" = 1 ] \

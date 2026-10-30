@@ -246,6 +246,12 @@ PreCompact 3s (`catalog/plugins/yellow-core.json`).
   newest published capture, and a capture that read a smaller transcript does
   not publish. A capture that cannot take the per-session lock within five
   seconds also skips publishing. The marks share the 7-day TTL.
+- **A failed dialogue filter stages nothing.** The Stop capture keeps only
+  `user` and `assistant` records, filtered by jq. If that pipeline fails (a
+  broken jq or a read error; malformed lines alone do not fail it), the capture
+  stages nothing rather than an unfiltered tail, which would carry attachment
+  records such as the prompt snapshot and memory files. That capture is lost; a
+  later Stop in the session captures it again.
 - **Async via disowned subshells only.** The plugin manifest does NOT use an
   `async: true` hook schema field (Claude Code's remote validator rejects it —
   confirmed via deepen-plan validation). Non-blocking behavior comes entirely
