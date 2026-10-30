@@ -251,7 +251,8 @@ PreCompact 3s (`catalog/plugins/yellow-core.json`).
   broken jq or a read error; malformed lines alone do not fail it), the capture
   stages nothing rather than an unfiltered tail, which would carry attachment
   records such as the prompt snapshot and memory files. That capture is lost; a
-  later Stop in the session captures it again.
+  later Stop in the session may recover the dialogue, within the usual
+  100-record and byte caps.
 - **Async via disowned subshells only.** The plugin manifest does NOT use an
   `async: true` hook schema field (Claude Code's remote validator rejects it —
   confirmed via deepen-plan validation). Non-blocking behavior comes entirely

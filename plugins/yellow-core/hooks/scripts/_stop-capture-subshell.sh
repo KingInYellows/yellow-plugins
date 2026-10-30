@@ -57,7 +57,7 @@ fi
 # input alone does not fail it, so a failure points at a broken jq or a read
 # error. An unfiltered tail would hand the drain the prompt snapshot and
 # memory files; skipping loses only this capture, and a later Stop in the
-# session captures it again.
+# session may recover the dialogue (within the same record and byte caps).
 # After redaction the staged tail is capped at TAIL_MAX_BYTES, keeping the
 # newest whole lines; the Jev shadow gets the uncapped tail so it still sees
 # whole records and applies its own cap.
