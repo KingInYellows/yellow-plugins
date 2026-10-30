@@ -1086,6 +1086,7 @@ timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
   >| "$OUTPUT_FILE" 2>| "$STDERR_FILE"
 CLI_EXIT=$?
 SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID != null) | .part.snapshot.sessionID' "$OUTPUT_FILE" 2>/dev/null | head -1)
+# One line per completed text part (opencode emits no deltas; CLAUDE-205).
 ASSISTANT_TEXT=$(jq -r 'select(.type=="text") | .part.text' "$OUTPUT_FILE" | tr -d '\000')
 if [ -n "$SESSION_ID" ]; then
   opencode session delete "$SESSION_ID" \
