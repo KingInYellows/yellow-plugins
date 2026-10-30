@@ -127,8 +127,8 @@ the cloud eval cannot reach.
 
 Council CLI wrappers (CLAUDE-200; eval on 2026-10-29 with
 `scripts/eval/model-swap/fixtures/2026-10-29-council-cli.json`, stand-in `agy`
-and `opencode` that log every call, confirmed against the real CLIs with
-`2026-10-29-council-cli-real.json`):
+and `opencode` that log every call; a rerun against the real CLIs is specified
+in `2026-10-29-council-cli-real.json` but has not produced results yet):
 
 | Agent                              | Model / effort                    | Reason                                                                                                                                                                                                                                                             |
 | ---------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
