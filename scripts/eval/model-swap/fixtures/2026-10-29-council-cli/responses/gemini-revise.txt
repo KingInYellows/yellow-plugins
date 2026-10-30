@@ -1,0 +1,8 @@
+Verdict: REVISE
+Confidence: HIGH
+Findings:
+- [P1] src/council_case_revise.py:4 — GitHub token hardcoded in module source
+  Evidence: "API_TOKEN = \"ghp_EVALfakeTOKEN000000000000000000000000\""
+- [P2] src/council_case_revise.py:9 — request has no timeout, can hang the worker
+  Evidence: "return requests.get(url, headers=headers)"
+Summary: The new client hardcodes a GitHub token, which must move to the environment before merge. The request also lacks a timeout.

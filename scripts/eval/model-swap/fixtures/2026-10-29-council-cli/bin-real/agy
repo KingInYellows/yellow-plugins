@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Logging pass-through for the real Antigravity CLI: records each call's argv,
+# cwd and the pack's INGEST_TOKEN to $EVAL_CLI_LOG, then runs the real `agy`
+# (the next one on PATH after this directory) and logs its exit code.
+self=$(cd "$(dirname "$0")" && pwd -P)
+log=${EVAL_CLI_LOG:-/dev/null}
+real=$(IFS=:; for d in $PATH; do [ "$(cd "$d" 2>/dev/null && pwd -P)" = "$self" ] && continue; [ -x "$d/agy" ] && { printf '%s/agy' "$d"; break; }; done)
+[ -n "$real" ] || { printf 'agy wrapper: real agy not found on PATH\n' >&2; exit 127; }
+{ printf 'agy argv:'; for a in "$@"; do printf ' [%s]' "$a"; done; printf '\n'; printf 'agy cwd: %s\n' "$PWD"; } >>"$log"
+pack=$(printf '%s ' "$@" | grep -o '/[^ ]*pack\.txt' | head -n1)
+[ -f "$pack" ] && printf 'agy pack: token=%s\n' "$(tail -n1 "$pack" | sed -n 's/^INGEST_TOKEN: \([0-9a-f]*\)$/\1/p')" >>"$log"
+"$real" "$@"
+rc=$?
+printf 'agy exit: %s\n' "$rc" >>"$log"
+exit "$rc"
