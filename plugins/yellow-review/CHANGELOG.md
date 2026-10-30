@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.13.0
+
+### Minor Changes
+
+- [#1468](https://github.com/KingInYellows/yellow-plugins/pull/1468)
+  [`42b77d9`](https://github.com/KingInYellows/yellow-plugins/commit/42b77d948f7c145c777966b14797f2642a5c860c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:resolve` hands CodeRabbit threads back to CodeRabbit: before
+  resolving a thread CodeRabbit opened, the write phase replies
+  `@coderabbitai resolve` in that thread (new `handback-pr-thread` script, plan
+  key `handback`), so CodeRabbit records the thread as resolved and stops
+  reopening it. The GraphQL resolve still follows;
+  `YELLOW_REVIEW_CODERABBIT_HANDBACK=0` turns the hand-back off (CLAUDE-56).
+
 ## 3.12.1
 
 ### Patch Changes

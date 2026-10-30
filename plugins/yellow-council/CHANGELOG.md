@@ -1,5 +1,18 @@
 # yellow-council
 
+## 0.6.3
+
+### Patch Changes
+
+- [#1469](https://github.com/KingInYellows/yellow-plugins/pull/1469)
+  [`870fe75`](https://github.com/KingInYellows/yellow-plugins/commit/870fe756116618e78d63277d74b9c77338b98d1b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Route
+  gemini-reviewer and opencode-reviewer to `sonnet` / `medium` (were `haiku` /
+  `low`). In the CLAUDE-200 eval, Haiku at either effort sometimes skipped the
+  CLI call and reviewed the pack itself, or replaced the canonical
+  credential-redaction program with an ad-hoc one; Sonnet followed the procedure
+  in every run.
+
 ## 0.6.2
 
 ### Patch Changes
