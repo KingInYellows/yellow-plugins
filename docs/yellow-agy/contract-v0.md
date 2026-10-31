@@ -108,8 +108,8 @@ local processes.
 - Every mutating call takes `--request-id` (generated when absent) and journals
   a reservation under the journal lock before it creates a worktree or spawns
   agy. The reservation holds the active-run claim: request id, operation, child
-  pid, the worktree `HEAD` before the turn, and a pre-turn snapshot commit.
-  The adapter builds the snapshot with a temporary index (`GIT_INDEX_FILE`,
+  pid, the worktree `HEAD` before the turn, and a pre-turn snapshot commit. The
+  adapter builds the snapshot with a temporary index (`GIT_INDEX_FILE`,
   `git add --all`, `git write-tree`, `git commit-tree`) and stores it under
   `refs/yellow-agy/<localId>/pre-turn`, so uncommitted and untracked work from
   earlier turns is captured without touching the branch or the real index.
@@ -121,10 +121,10 @@ local processes.
   the base. A turn reservation is settled as `INTERRUPTED`.
 - After `INTERRUPTED` or `TIMED_OUT`, the worktree may hold partial edits. The
   next `approve` or `reply` refuses with `requiresAttention` until the owner
-  passes `--keep-partial` (continue on top of them) or `--reset-partial`.
-  Reset runs `git reset --hard <pre-turn HEAD>` and `git clean -fd`, then
-  restores the snapshot's files with `git checkout <snapshot> -- .` followed by
-  `git reset`, so work from earlier turns comes back uncommitted as it was.
+  passes `--keep-partial` (continue on top of them) or `--reset-partial`. Reset
+  runs `git reset --hard <pre-turn HEAD>` and `git clean -fd`, then restores the
+  snapshot's files with `git checkout <snapshot> -- .` followed by `git reset`,
+  so work from earlier turns comes back uncommitted as it was.
 
 ## Permission profiles (`--settings` JSON)
 
