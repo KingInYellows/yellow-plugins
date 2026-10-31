@@ -395,11 +395,11 @@ Located at `skills/pr-review-workflow/scripts/`:
 - **get-pr-comments** `[--include-outdated] <owner/repo> <pr-number>` — Returns
   a JSON array of unresolved review threads (non-outdated only unless
   `--include-outdated`), with `isOutdated`, `viewerCanResolve`, `viewerCanReply`
-  per thread and `id`, `createdAt`, `viewerDidAuthor`, `authorType` per comment,
-  and `commentsTruncated` per thread (true when it has more comments than were
-  fetched, and a resolver must never resolve such a thread); exits 3 with the
-  partial array on stdout when the thread list is truncated (page cap, missing
-  cursor or the 270 s fetch deadline)
+  per thread and `id`, `createdAt`, `viewerDidAuthor`, `authorType`, `url` per
+  comment, and `commentsTruncated` per thread (true when it has more comments
+  than were fetched, and a resolver must never resolve such a thread); exits 3
+  with the partial array on stdout when the thread list is truncated (page cap,
+  missing cursor or the 270 s fetch deadline)
 - **get-pr-blockers** `<owner/repo> <pr-number>` — Reports `CHANGES_REQUESTED`
   reviews, `reviewDecision`, whether conversation resolution is enforced (read
   from the base branch and the default branch), and `lookupReason` when a lookup
@@ -413,6 +413,10 @@ Located at `skills/pr-review-workflow/scripts/`:
   state, `ledger` when the PR's ledger files cannot be summarized or the summary
   skipped unreadable records) and the detail behind each. Exits 0 ready, 1
   blocked, 3 unknown, 2 usage; give it a Bash `timeout` of 420000 ms
+- **sync-blocking-comment** `[--reasons <file>] <owner/repo> <pr> <resolution>`
+  — Keeps one sticky PR comment (marker line, edited in place) listing every
+  unresolved thread with a link and status, unless `<resolution>` is `enforced`;
+  exit codes as `handback-pr-thread` (contract "Blocking-threads comment")
 - **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with an
   idempotency marker; skips when our latest recent comment carries a marker for
   this thread and only bot comments follow it, and reports that disposition. An
