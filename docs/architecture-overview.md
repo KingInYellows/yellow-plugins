@@ -1,6 +1,6 @@
 # yellow-plugins Technical Overview
 
-`yellow-plugins` is a git-native Claude Code plugin marketplace (21 plugins)
+`yellow-plugins` is a git-native Claude Code plugin marketplace (22 plugins)
 plus the validation and release tooling that gates it. There is no published
 application server. Claude Code (and, opt-in, Codex/Cursor) loads the plugins;
 this repository authors, validates, and versions them.
@@ -57,7 +57,7 @@ convention:
 
 Byte-identity drift is gated by `pnpm validate:generated`.
 
-### The 21 plugins
+### The 22 plugins
 
 Source of truth for membership and order: `pluginOrder` in
 `catalog/catalog.json`. The grouping below is editorial.
@@ -114,7 +114,12 @@ Source of truth for membership and order: `pluginOrder` in
   cursor; not preferred).
 - **yellow-jules** — Google Jules via `@google/jules-sdk`, experimental and
   read-only for now (same `remote-agent` group; not preferred). A typed CLI
-  with a committed `dist/`, like yellow-cursor.
+  with a committed `dist/`, like yellow-cursor. Deprecated: Jules is
+  read-only after 2026-11-11 and shuts down 2026-12-31.
+- **yellow-agy** — Successor to yellow-jules: a local supervised delegate on
+  the Antigravity CLI (`agy`) under the owner's Google AI Pro sign-in,
+  including a WSL bridge. Scaffold for now (`/agy:setup` only); the CLI
+  follows `docs/yellow-agy/contract-v0.md`.
 - **yellow-goal** — Process-spawn bridge to an external `goal-gen` engine (never
   imports it).
 
