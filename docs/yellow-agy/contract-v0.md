@@ -127,8 +127,11 @@ local processes.
   uncommitted and untracked work from earlier turns is captured without touching
   the branch or the real index. Before that, `git write-tree` on the real index
   saves the staged state as `refs/yellow-agy/<localId>/pre-turn-index`. Ignored
-  untracked files (build output, `.env`) are not captured: they sit outside the
-  reset guarantee, and reset never removes them.
+  untracked files (build output, `.env`) are not captured and sit outside the
+  reset guarantee. `git clean -fd` leaves them alone, but `git reset --hard` or
+  `read-tree -u` can delete one that obstructs a tracked path, so reset first
+  checks for ignored paths that collide with a path in the pre-turn `HEAD` or
+  the snapshot, and refuses with `AGY_WORKTREE` when it finds any.
 - A retry with a request id whose operation already finished returns the
   recorded outcome and spawns nothing.
 - A claim whose pid is dead is stale. The next call settles it before doing
