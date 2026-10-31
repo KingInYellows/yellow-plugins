@@ -85,6 +85,16 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
       "category": "development"
     },
     {
+      "name": "yellow-agy",
+      "description": "Local supervised delegate on the Antigravity CLI (agy) under the owner's Google AI Pro sign-in — successor to yellow-jules (scaffold: setup checks only)",
+      "version": "0.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-agy",
+      "category": "development"
+    },
+    {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
       "version": "3.13.0",
@@ -233,6 +243,7 @@ exports[`manifest byte-identity baseline > plugin inventory (explicit sorted nam
 [
   "github-workflow",
   "gt-workflow",
+  "yellow-agy",
   "yellow-browser-test",
   "yellow-ci",
   "yellow-claudemod",
@@ -365,6 +376,31 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
   },
   "dependencies": [
     "yellow-core"
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-agy/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-agy",
+  "version": "0.1.0",
+  "description": "Local supervised delegate on the Antigravity CLI (agy) under the owner's Google AI Pro sign-in — successor to yellow-jules (scaffold: setup checks only)",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-agy",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "antigravity",
+    "agy",
+    "google",
+    "local-agent",
+    "delegation",
+    "ai-agent"
   ]
 }
 "
