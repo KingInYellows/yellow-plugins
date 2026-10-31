@@ -80,9 +80,11 @@ characters fails with `AGY_PROMPT_TOO_LONG` before anything spawns.
    state becomes `PLAN_PENDING`.
 2. `approve` (grant op `approve`): re-read the stored plan and confirm, then run
    an **implement turn**:
-   `agy -p "Implement the approved plan" --conversation <id> --mode accept-edits --output-format json --settings <implement profile>`.
-   The state becomes `IMPLEMENTED`, or `DENIED` / `TIMED_OUT` / `INTERRUPTED`
-   from the classification below.
+   `agy -p "Implement the approved plan" --conversation <id> --mode accept-edits --output-format json --settings <implement profile> [--sandbox]`,
+   where `--sandbox` is required whenever the profile grants test or lint
+   commands (see Permission profiles). Post-approval `reply` turns follow the
+   same rule. The state becomes `IMPLEMENTED`, or `DENIED` / `TIMED_OUT` /
+   `INTERRUPTED` from the classification below.
 3. `reply [--correction]`: another `--conversation` turn. In `PLAN_PENDING` it
    runs under the read-only profile without `--mode accept-edits`, so only
    `approve` can start implementation. After approval it uses the implement
@@ -137,6 +139,8 @@ Both profiles carry `{"useG1Credits": false}`.
   with `--mode accept-edits`. The repo's own test and lint commands named in the
   grant (`--allow-command`, which `authorize` validates against an allowlist
   pattern) are added only on a host where `--sandbox` is verified (hard rules).
+  Every turn that runs with those commands also passes `--sandbox`; the adapter
+  refuses to build an implement invocation that grants them without the flag.
 
 ## Result classification
 
