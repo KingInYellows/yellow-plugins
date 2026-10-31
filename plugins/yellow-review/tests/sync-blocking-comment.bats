@@ -130,8 +130,8 @@ gh_calls() {
   export SBC_THREADS
   run --separate-stderr "$SCRIPT" test/repo 7 unknown
   [ "$status" -eq 0 ]
-  ! grep -q 'please fix' "${BATS_TEST_TMPDIR}/posted_body"
-  ! grep -q '@' "${BATS_TEST_TMPDIR}/posted_body"
+  run -1 grep -q 'please fix' "${BATS_TEST_TMPDIR}/posted_body"
+  run -1 grep -q '@' "${BATS_TEST_TMPDIR}/posted_body"
   grep -q 'Could not confirm' "${BATS_TEST_TMPDIR}/posted_body"
 }
 
@@ -142,7 +142,7 @@ gh_calls() {
   [ "$status" -eq 0 ]
   body="${BATS_TEST_TMPDIR}/posted_body"
   grep -qF '| PRRT_x | `abc de.js:1` | `evilx` | open |' "$body"
-  ! grep -q 'javascript' "$body"
+  run -1 grep -q 'javascript' "$body"
 }
 
 @test "statuses come from the reasons file's fixed vocabulary" {
@@ -155,7 +155,7 @@ gh_calls() {
   grep -qF '`a:1` | `u` | disagree |' "$body"
   grep -qF '`b:2` | `u` | open |' "$body"
   grep -qF '`c:3` | `u` | open |' "$body"
-  ! grep -q 'script' "$body"
+  run -1 grep -q 'script' "$body"
 }
 
 @test "an existing marker comment by the viewer is edited in place" {
