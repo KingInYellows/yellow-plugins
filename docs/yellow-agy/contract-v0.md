@@ -36,9 +36,11 @@ Hard rules (tested, not just documented):
   `abandon` while a run is live fails with `AGY_BUSY`.
 - **agy never pushes.** `git push`, `gh` and any network-reaching command stay
   off every allowlist. Every agy child gets `GIT_CONFIG_COUNT=1`,
-  `GIT_CONFIG_KEY_0=core.hooksPath`, `GIT_CONFIG_VALUE_0=/dev/null`, so the
-  `git commit` agy runs fires no repo or global hooks. `collect` stages patches,
-  and the owner's stack provider opens the PR.
+  `GIT_CONFIG_KEY_0=core.hooksPath` and `GIT_CONFIG_VALUE_0=<null device>`
+  (`/dev/null` on POSIX hosts and inside WSL, `NUL` for native `agy.exe`), so
+  the `git commit` agy runs fires no repo or global hooks. On the WSL bridge
+  they are set inside the distro as `env` arguments, not through `WSLENV`.
+  `collect` stages patches, and the owner's stack provider opens the PR.
 - **No MCP servers in delegated runs.** agy starts every configured MCP server
   on every run, and the command allowlist doesn't govern their tools. A
   delegated run must start with none. If the adapter's probe finds no per-run
@@ -54,11 +56,11 @@ Hard rules (tested, not just documented):
 agy may be installed only in WSL. `setup` resolves one invocation and records it
 in the data dir:
 
-| Host                       | Invocation                                              | Worktree root                                                            |
-| -------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Linux / macOS / inside WSL | `agy` on `PATH`                                         | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
-| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u … agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
-| Windows native agy         | `agy.exe`                                               | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
+| Host                       | Invocation                                                                                                                              | Worktree root                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                         | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
+| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u … GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
+| Windows native agy         | `agy.exe`                                                                                                                               | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
 
 The worktree is created where agy runs. On the WSL bridge that means a WSL clone
 of the repo, never `/mnt/c`. The bridge always uses `wsl.exe --exec` (`-e`),
@@ -125,8 +127,9 @@ local processes.
   next `approve` or `reply` refuses with `requiresAttention` until the owner
   passes `--keep-partial` (continue on top of them) or `--reset-partial`. Reset
   runs `git reset --hard <pre-turn HEAD>` and `git clean -fd`, then restores the
-  snapshot's files with `git checkout <snapshot> -- .` followed by `git reset`,
-  so work from earlier turns comes back uncommitted as it was.
+  snapshot with `git read-tree --reset -u <snapshot>` followed by
+  `git reset --mixed <pre-turn HEAD>`, so work from earlier turns, deletions
+  included, comes back uncommitted as it was.
 
 ## Permission profiles (`--settings` JSON)
 
