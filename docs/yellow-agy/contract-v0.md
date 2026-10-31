@@ -16,10 +16,13 @@ Hard rules (tested, not just documented):
 
 - **Subscription auth only.** Every spawn scrubs `GEMINI_API_KEY`,
   `GOOGLE_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`,
-  `GOOGLE_APPLICATION_CREDENTIALS` and `AGY_ADC_AUTH` from the child env.
-  `setup` refuses with `AGY_AUTH_MODE` if any of them is set in the caller's
-  env, and with `AGY_OVERAGES` unless the global config has
-  `useG1Credits: false`. Every run's `--settings` also forces
+  `GOOGLE_APPLICATION_CREDENTIALS` and `AGY_ADC_AUTH` from the child env. On the
+  WSL bridge the Windows-side scrub isn't enough, because the distro can set
+  them itself or `WSLENV` can forward them, so the bridge runs
+  `env -u <each var> agy …` inside WSL. `setup` refuses with `AGY_AUTH_MODE` if
+  any of them is set in the caller's env or, on the bridge, in
+  `wsl.exe -d <distro> -e env`, and with `AGY_OVERAGES` unless the global config
+  has `useG1Credits: false`. Every run's `--settings` also forces
   `useG1Credits: false`.
 - **Unmodified binary, own sign-in.** The CLI never reads, copies or moves agy
   credential files. It doesn't proxy agy or embed it behind a network listener
@@ -38,15 +41,17 @@ Hard rules (tested, not just documented):
 agy may be installed only in WSL. `setup` resolves one invocation and records it
 in the data dir:
 
-| Host                       | Invocation                                     | Worktree root                                                            |
-| -------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
-| Linux / macOS / inside WSL | `agy` on `PATH`                                | `$XDG_DATA_HOME/yellow-agy/worktrees`                                    |
-| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -- agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
-| Windows native agy         | `agy.exe`                                      | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
+| Host                       | Invocation                                              | Worktree root                                                            |
+| -------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Linux / macOS / inside WSL | `agy` on `PATH`                                         | `$XDG_DATA_HOME/yellow-agy/worktrees`                                    |
+| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u … agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
+| Windows native agy         | `agy.exe`                                               | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
 
 The worktree is created where agy runs. On the WSL bridge that means a WSL clone
-of the repo, never `/mnt/c`. Argv is always an array, and stdin is closed except
-in `stream-json` mode (an open question).
+of the repo, never `/mnt/c`. The bridge always uses `wsl.exe --exec` (`-e`),
+never the `--` form, so no shell in the distro re-parses prompts or the
+`--settings` JSON. Argv is always an array, and stdin is closed except in
+`stream-json` mode (an open question).
 
 ## Run lifecycle
 
