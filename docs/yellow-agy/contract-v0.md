@@ -173,6 +173,15 @@ agy's `status` alone isn't trustworthy. Classify in this order:
 | `authentication required` on stderr                                                                     | `AGY_AUTH_REQUIRED`. The owner signs in interactively once                        | 1                                     |
 | exit 3 / `status: "ERROR"`, no auth message                                                             | `AGY_MODEL_ERROR` (quota exhaustion → `AGY_QUOTA`)                                | 1                                     |
 
+A Not `OK` turn (`SUCCESS` with a missing or unrecognized `finished_reason`) is
+still a settled turn. It settles its reservation as completed, journaling the
+usage and the observed `finished_reason`, and releases the active-run claim. The
+task keeps the stored `conversation_id` and advances as it would after `OK`: a
+plan turn moves to `PLAN_PENDING` and an implement turn to `IMPLEMENTED`. The
+result carries `requiresAttention`, so the owner reviews the output before
+approving or opening a PR. Until open question 3 pins the normal value, every
+successful turn takes this path.
+
 A turn that ends in `AGY_AUTH_REQUIRED`, `AGY_MODEL_ERROR` or `AGY_QUOTA`
 settles its reservation as terminal, journaling the code and any usage, and
 releases the active-run claim. The task keeps its pre-turn state (`PLAN_PENDING`
