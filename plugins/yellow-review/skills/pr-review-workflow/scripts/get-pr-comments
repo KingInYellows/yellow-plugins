@@ -5,8 +5,8 @@
 #   --include-outdated  also return unresolved threads whose anchor is outdated
 # Output: JSON array of thread objects to stdout. Each thread has threadId,
 #   path, line, startLine, comments[] (author, body, id, createdAt,
-#   viewerDidAuthor, authorType), commentCount, commentsTruncated (true when
-#   the thread has more comments than the 50 fetched), isOutdated,
+#   viewerDidAuthor, authorType, url), commentCount, commentsTruncated (true
+#   when the thread has more comments than the 50 fetched), isOutdated,
 #   viewerCanResolve, viewerCanReply, originalLine and originalStartLine (the
 #   anchor when the comment was made; line is null once a thread is outdated)
 #   and diffHunk (the first comment's hunk, capped at 2000 characters, else
@@ -141,6 +141,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
               createdAt
               viewerDidAuthor
               diffHunk
+              url
             }
           }
         }
@@ -310,7 +311,8 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUT
               id: .id,
               createdAt: .createdAt,
               viewerDidAuthor: (.viewerDidAuthor // false),
-              authorType: (.author.__typename // null)
+              authorType: (.author.__typename // null),
+              url: (.url // null)
             }
         ],
         commentCount: (.comments.totalCount // ((.comments.nodes // []) | length)),
