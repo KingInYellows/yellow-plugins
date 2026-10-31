@@ -120,10 +120,12 @@ local processes.
   a reservation under the journal lock before it creates a worktree or spawns
   agy. The reservation holds the active-run claim: request id, operation, child
   pid, the worktree `HEAD` before the turn, and a pre-turn snapshot commit. The
-  adapter builds the snapshot with a temporary index (`GIT_INDEX_FILE`,
-  `git add --all`, `git write-tree`, `git commit-tree`) and stores it under
-  `refs/yellow-agy/<localId>/pre-turn`, so uncommitted and untracked work from
-  earlier turns is captured without touching the branch or the real index.
+  adapter builds the snapshot with a temporary index (`GIT_INDEX_FILE`) seeded
+  from a copy of the real index, so tracked files that match `.gitignore` stay
+  in it. It then runs `git add --all`, `git write-tree` and `git commit-tree`,
+  and stores the result under `refs/yellow-agy/<localId>/pre-turn`, so
+  uncommitted and untracked work from earlier turns is captured without touching
+  the branch or the real index.
 - A retry with a request id whose operation already finished returns the
   recorded outcome and spawns nothing.
 - A claim whose pid is dead is stale. The next call settles it before doing
@@ -226,6 +228,10 @@ New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
    process per turn.
 5. Does a per-run `--settings` merge with or replace the global config, and
    which `toolPermission` value runs headless without prompting?
+6. How does agy's strict (non-regex) command matching treat arguments? Probe
+   `git diff -- <path>`, `git add <path>` and `git commit -m <message>` against
+   the profiles' `command(...)` rules, and use narrowly scoped `regex:` rules
+   only where a plain rule doesn't match.
 
 ## Non-goals for v0
 
