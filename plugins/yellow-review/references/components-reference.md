@@ -181,6 +181,11 @@ flags, exit codes, trust-boundary rules and library behavior.
   `review-ledger.sh summary`; prints one JSON report (verdict, `blockers`,
   `unknowns`, per-source detail) and exits 0 ready, 1 blocked, 3 unknown, 2
   usage. Worst case about 370 s (the callers' Bash timeout is 420000 ms)
+- `sync-blocking-comment [--reasons <file>] <owner/repo> <pr> <resolution>` —
+  `/review:resolve` Step 9: where conversation resolution is not enforced, keep
+  one sticky PR comment (marker line, edited in place) listing the unresolved
+  threads with links and the run's status for each; no reviewer prose, logins in
+  backticks. Worst case about 370 s (contract "Blocking-threads comment")
 - `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a thread with
   an idempotency marker (skips when our latest recent comment has a marker for
   the thread, any disposition, and only bot comments follow it). Which prior
