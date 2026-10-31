@@ -32,8 +32,8 @@ directory.
   at 0. The spike also forced `useG1Credits: false` on every run.
 - Quota: a plan plus implement pair used about 1.2% of the weekly Gemini 4 Argon
   bucket. `/usage` updates late.
-- The settings file was restored and its hash matches . The worktree and branch
-  were removed.
+- The settings file was restored and its hash matches the pre-spike hash. The
+  worktree and branch were removed.
 
 ## Traps the adapter must handle
 

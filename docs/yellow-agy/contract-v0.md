@@ -12,6 +12,11 @@ Pro sign-in. It keeps yellow-jules' authority model (owner-typed grants,
 controller epoch, locked journal) and its verbs, so `/linear:delegate` keeps its
 shape. It replaces the vendor session API with local child processes.
 
+Routing is an adapter-phase prerequisite, not part of v0: the delegate
+classifier gains `READY_AGY` and accepts `--provider agy`. `READY_JULES` and
+`--provider jules` keep working until yellow-jules is removed after 2026-12-31,
+and an explicit `--provider` always wins over the classifier.
+
 Hard rules (tested, not just documented):
 
 - **Subscription auth only.** Every spawn scrubs `GEMINI_API_KEY`,
@@ -53,8 +58,10 @@ Hard rules (tested, not just documented):
 
 ## Host bridge
 
-agy may be installed only in WSL. `setup` resolves one invocation and records it
-in the data dir:
+agy may be on `PATH` (including native `agy.exe` on Windows) or installed only
+in WSL. The hard rules apply on every host. `--sandbox` is unverified on native
+Windows, so test and lint commands stay off there. `setup` resolves one
+invocation and records it in the data dir:
 
 | Host                       | Invocation                                                                                                                              | Worktree root                                                            |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -133,7 +140,12 @@ local processes.
 
 ## Permission profiles (`--settings` JSON)
 
-Both profiles carry `{"useG1Credits": false}`.
+Both profiles carry `{"useG1Credits": false}`, `allowNonWorkspaceAccess: false`
+and an explicit `toolPermission` that is never `always-proceed`, so an owner's
+global setting can't widen a run past its allowlist or out of the worktree. The
+adapter probe confirms which `toolPermission` value runs headless without
+blocking on prompts. Until it does, `setup` refuses with `AGY_SETTINGS` when the
+owner's global config sets either key more loosely.
 
 - **read-only:**
   `permissions.allow: ["command(git status)", "command(git diff)", "command(git log)"]`.
@@ -154,9 +166,22 @@ agy's `status` alone isn't trustworthy. Classify in this order:
 | process killed by our deadline, or `finished_reason: "print_timeout"` (agy still says SUCCESS / exit 0) | `TIMED_OUT`                                                                       | 1, `AGY_TIMEOUT`, partial output kept |
 | owner cancel / SIGTERM, or `finished_reason: "interrupted"`                                             | `INTERRUPTED`                                                                     | 1, `AGY_INTERRUPTED`                  |
 | non-empty `denied_actions`                                                                              | `DENIED`. Report each denied action, and reply or re-authorize with a wider grant | 0 with `requiresAttention`            |
-| `status: "SUCCESS"`, empty `denied_actions`, finished normally                                          | `OK`                                                                              | 0                                     |
+| `status: "SUCCESS"`, empty `denied_actions`, verified normal `finished_reason`                          | `OK`                                                                              | 0                                     |
+| `status: "SUCCESS"`, empty `denied_actions`, `finished_reason` missing or unrecognized                  | Not `OK`. Report with partial output kept                                         | 0 with `requiresAttention`            |
 | `authentication required` on stderr                                                                     | `AGY_AUTH_REQUIRED`. The owner signs in interactively once                        | 1                                     |
 | exit 3 / `status: "ERROR"`, no auth message                                                             | `AGY_MODEL_ERROR` (quota exhaustion → `AGY_QUOTA`)                                | 1                                     |
+
+A turn that ends in `AGY_AUTH_REQUIRED`, `AGY_MODEL_ERROR` or `AGY_QUOTA`
+settles its reservation as terminal, journaling the code and any usage, and
+releases the active-run claim. The task keeps its pre-turn state (`PLAN_PENDING`
+stays `PLAN_PENDING`, `IMPLEMENTED` stays `IMPLEMENTED`). A failed `delegate`
+plan turn moves the task to `FAILED`, keeping the worktree and branch for
+`abandon`. Edits a failed implement turn left behind go through `--keep-partial`
+/ `--reset-partial`, like `INTERRUPTED`. A retry needs a new `--request-id`; the
+same id returns the recorded failure. The quota gate's `AGY_QUOTA_LOW` and
+`AGY_QUOTA_UNKNOWN` refuse before spawning, so they release the reservation with
+no turn and no state change. No quota is reserved ahead: the failed turn's
+journaled usage counts toward the gate's 15-minute window.
 
 `structured_output` is read only from turns that passed `--json-schema`, because
 a resumed turn repeats the previous turn's value. `WAITING` never showed up in
@@ -186,7 +211,7 @@ New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
 `AGY_AUTH_MODE`, `AGY_OVERAGES`, `AGY_AUTH_REQUIRED`, `AGY_BUSY`, `AGY_QUOTA`,
 `AGY_QUOTA_LOW`, `AGY_TIMEOUT`, `AGY_INTERRUPTED`, `AGY_DENIED`,
 `AGY_MODEL_ERROR`, `AGY_WORKTREE`, `AGY_BRIDGE`, `AGY_MCP`,
-`AGY_PROMPT_TOO_LONG`, `AGY_QUOTA_UNKNOWN`.
+`AGY_PROMPT_TOO_LONG`, `AGY_QUOTA_UNKNOWN`, `AGY_SETTINGS`.
 
 ## Open questions (probe in the adapter PR)
 
@@ -195,9 +220,12 @@ New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
    `setup` refuses with `AGY_MCP` (hard rules).
 2. Does `--sandbox` confine files and network under WSL2? Until it is shown to,
    the implement profile allows no test or lint commands (hard rules).
-3. What `finished_reason` value marks a normal completion?
+3. What `finished_reason` value marks a normal completion? Until it is pinned,
+   no run classifies as `OK` (fail closed).
 4. Is `--input-format stream-json` worth using for multi-turn runs? v0 uses one
    process per turn.
+5. Does a per-run `--settings` merge with or replace the global config, and
+   which `toolPermission` value runs headless without prompting?
 
 ## Non-goals for v0
 
