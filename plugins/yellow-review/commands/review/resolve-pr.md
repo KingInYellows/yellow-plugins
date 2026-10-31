@@ -868,6 +868,24 @@ HEAD_OID=$(gh pr view "<PR#>" --json headRefOid -q .headRefOid) || HEAD_OID=""
 A non-zero exit (an unreadable head is exit 2) adds the Notes line
 `review delta not recorded`; it never stops the run.
 
+**Blocking-threads comment.** Skip it when Step 3's fetch failed or was partial,
+`ratelimited=1`, `write_stopped=timeout`, the PR is no longer `OPEN`, or Step
+3's `conversationResolution` is `enforced`. Otherwise use the Write tool to put
+a JSON object at a `mktemp` path mapping each thread this run leaves blocking to
+its status (`disagree`, `unclear`, `human-held`, `needs-permission`,
+`not-found`, `verify-failed`, `not-attempted`), and run it as its own Bash call
+with a `timeout` of 420000 ms:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/sync-blocking-comment" --reasons "<reasons-file>" "<owner/repo>" "<PR#>" "<conversationResolution>"
+```
+
+It lists every unresolved thread GitHub reports, not only this run's. Exit 4
+with `reason=rate-limit` (or no reason) sets `ratelimited=1`; any other non-zero
+exit adds the Notes line `blocking-threads comment not updated (<reason>)`.
+Neither stops the run. Name a `created` or `updated` comment in Notes (contract
+"Blocking-threads comment").
+
 Report, per the contract: **Resolved** (by disposition, plus
 `resolved (non-actionable)`), **Blocking merge** (disagree/unclear, human-held,
 needs permission or not found, verify failed with the patch path, not attempted
