@@ -17,7 +17,10 @@ classifier gains `READY_AGY` and accepts `--provider agy`. `READY_JULES` and
 `--provider jules` keep working until yellow-jules is removed after 2026-12-31,
 and an explicit `--provider` always wins over the classifier.
 
-Hard rules (tested, not just documented):
+Hard rules. The spike tested the auth, bridge, permission and containment
+behavior; the rules that depend on open questions (MCP, sandbox,
+`finished_reason`, settings merge, command matching) are requirements the
+adapter verifies, and they fail closed until it does:
 
 - **Subscription auth only.** Every spawn scrubs `GEMINI_API_KEY`,
   `GOOGLE_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`,
@@ -97,13 +100,17 @@ characters fails with `AGY_PROMPT_TOO_LONG` before anything spawns.
 3. `reply [--correction]`: another `--conversation` turn. In `PLAN_PENDING` it
    runs under the read-only profile without `--mode accept-edits`, so only
    `approve` can start implementation. After approval it uses the implement
-   profile. A correction spends a corrective round (R31 counters, unchanged).
+   profile. A correction spends a corrective round (R31 counters, unchanged). A
+   `PLAN_PENDING` correction passes `--json-schema <plan.schema.json>` and
+   replaces the stored plan, so `approve` implements the corrected plan.
 4. `collect` (no live run): `git -C <worktree> format-patch <base>..HEAD` for
-   commits, then `git add --intent-to-add --all` and `git diff --binary HEAD`
-   for staged, unstaged and untracked changes, into `artifacts/<localId>/`.
-   Every artifact is scanned with yellow-jules' secret-shape layers; a hit sets
-   `secretShapedContent: true` and `requiresAttention`, and the owner reviews it
-   before the stack provider opens a PR.
+   commits, then, in a temporary `GIT_INDEX_FILE` seeded from the real index,
+   `git add --intent-to-add --all` and `git diff --binary HEAD`, leaving the
+   real index untouched, for staged, unstaged and untracked changes, into
+   `artifacts/<localId>/`. Every artifact is scanned with yellow-jules'
+   secret-shape layers; a hit sets `secretShapedContent: true` and
+   `requiresAttention`, and the owner reviews it before the stack provider opens
+   a PR.
 5. `abandon` (terminal-gated, no live run): run `collect` first so nothing is
    lost, settle the journal, `git worktree remove --force` the worktree, and
    keep the branch.
@@ -217,11 +224,13 @@ as needing a reply. Any other response is reported as is.
 ## Quota gate
 
 Before every model turn, run `agy -p "/usage" --output-format json` (no quota
-cost). `/usage` updates late, so the gate subtracts the journaled cost of turns
-from the last 15 minutes (or 2% per turn when a turn's cost is unknown) from the
-reported bucket. It refuses with `AGY_QUOTA_LOW` when the result is below the
-grant's `minQuotaPercent` (default 10), and with `AGY_QUOTA_UNKNOWN` when
-`/usage` fails or can't be parsed. Journal usage before and after each turn.
+cost) with the same per-run `--settings` profile as the turn it guards, so its
+MCP servers stay off. `/usage` updates late, so the gate subtracts the journaled
+cost of turns from the last 15 minutes (or 2% per turn when a turn's cost is
+unknown) from the reported bucket. It refuses with `AGY_QUOTA_LOW` when the
+result is below the grant's `minQuotaPercent` (default 10), and with
+`AGY_QUOTA_UNKNOWN` when `/usage` fails or can't be parsed. Journal usage before
+and after each turn.
 
 ## Output envelope, exit codes, error catalog, local state, grants
 

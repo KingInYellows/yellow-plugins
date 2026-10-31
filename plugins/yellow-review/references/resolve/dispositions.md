@@ -748,12 +748,13 @@ or `reason=` line, so the budget must cover the worst case even when
 per `gh` call (a larger valid value becomes 60; invalid, zero or over-4-digit
 values still fall back to 30), and the budget is derived from that cap:
 
-| Script                | Worst case at 60 s per `gh` call                                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `reply-pr-thread`     | pre-check, mutation and one retry (3 calls, 180 s) + 90 s rate-limit wait + 10 s pacing = 280 s                                |
-| `handback-pr-thread`  | pre-check, mutation and one retry (3 calls, 180 s) + 90 s rate-limit wait + 10 s pacing = 280 s                                |
-| `resolve-pr-thread`   | mutation and one retry (2 calls, 120 s) + 90 s wait + 10 s pacing = 220 s                                                      |
-| `file-followup-issue` | viewer lookup, issue list, thread link, create, post-create list and duplicate close (6 calls, never waits or retries) = 360 s |
+| Script                  | Worst case at 60 s per `gh` call                                                                                                       |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `reply-pr-thread`       | pre-check, mutation and one retry (3 calls, 180 s) + 90 s rate-limit wait + 10 s pacing = 280 s                                        |
+| `handback-pr-thread`    | pre-check, mutation and one retry (3 calls, 180 s) + 90 s rate-limit wait + 10 s pacing = 280 s                                        |
+| `resolve-pr-thread`     | mutation and one retry (2 calls, 120 s) + 90 s wait + 10 s pacing = 220 s                                                              |
+| `file-followup-issue`   | viewer lookup, issue list, thread link, create, post-create list and duplicate close (6 calls, never waits or retries) = 360 s         |
+| `sync-blocking-comment` | thread fetch at a 120 s deadline (`YELLOW_REVIEW_FETCH_DEADLINE`) + 3 comment-search pages + one write, never waits or retries = 360 s |
 
 The largest is 360 s; 420 s adds 60 s for `jq`, the credential scan and startup,
 and stays under the Bash tool's 600 s maximum. `apply-thread-actions` runs these
@@ -884,6 +885,35 @@ commands reference says a thread reply resolves only that thread, while the
 commands guide says the command works only top level. Either way a thread reply
 can never close another thread, and the resolve that follows closes this one.
 
+## Blocking-threads comment
+
+An open `disagree`, `unclear` or held thread blocks merge only when the base
+branch requires conversation resolution. Where `get-pr-blockers` reports
+`not_enforced` or `unknown`, Step 9 runs `sync-blocking-comment`, which keeps
+one PR comment listing every unresolved thread (outdated included, as in
+`check-merge-ready`), so the state is visible on the PR itself:
+
+- The comment's first line is `<!-- yellow-review:blocking-threads -->`. Only a
+  comment the viewer wrote whose whole first line is the marker counts, so a
+  quoted or forged marker is never edited. The search reads at most 3 pages of
+  100 PR comments; past that it writes nothing (`too-many-comments`) rather than
+  risk a duplicate.
+- The list comes from GitHub at the time of the call, not from local state, so
+  threads resolved by hand since the last run drop off. Statuses come from the
+  run's `--reasons` file, limited to `disagree`, `unclear`, `human-held`,
+  `needs-permission`, `not-found`, `verify-failed` and `not-attempted`; any
+  other thread shows `open`.
+- Rows hold no reviewer prose: a link to the thread's first comment (only an
+  `https://` URL; otherwise the thread ID), `path:line`, the opener's login in
+  backticks so nobody is mentioned, and the status. Backticks, pipes, angle
+  brackets and line breaks are stripped. At most 50 rows; the rest are counted.
+- An unchanged body is not rewritten. With nothing blocking, an existing comment
+  is edited to say so and none is created. `enforced`, and
+  `YELLOW_REVIEW_BLOCKING_COMMENT=0`, skip without a `gh` call. A comment left
+  from before the branch began enforcing resolution is not touched.
+- A partial thread list (`get-pr-comments` exit 3) writes nothing. A write that
+  timed out may have landed and is never retried in the run.
+
 ## Reply hygiene
 
 - Outcome first: `Fixed in abc1234.`, `Already addressed: src/a.ts:42.`,
@@ -971,25 +1001,27 @@ can never close another thread, and the resolve that follows closes this one.
 
 ## Script exit codes
 
-For `reply-pr-thread`, `resolve-pr-thread`, `file-followup-issue` and
-`check-resolve-text`, exit 1 is a non-usage failure (missing tool, `gh` or
-network failure, unexpected response) and exit 2 covers usage (and unreadable
-input files). Exit 6 means the text was refused (credential, image, mention,
-foreign URL, or a scan that did not run) and exit 7 is a permanent refusal from
-GitHub that a retry does not change. The distinct codes 3, 4, 6 and 7 are in the
-table below and are not failures to retry as exit 1. `get-pr-comments` is the
-exception: it exits 1 on any failure, usage included.
+For `reply-pr-thread`, `resolve-pr-thread`, `file-followup-issue`,
+`sync-blocking-comment` and `check-resolve-text`, exit 1 is a non-usage failure
+(missing tool, `gh` or network failure, unexpected response) and exit 2 covers
+usage (and unreadable input files). Exit 6 means the text was refused
+(credential, image, mention, foreign URL, or a scan that did not run) and exit 7
+is a permanent refusal from GitHub that a retry does not change. The distinct
+codes 3, 4, 6 and 7 are in the table below and are not failures to retry as
+exit 1. `get-pr-comments` is the exception: it exits 1 on any failure, usage
+included.
 
-| Script                 | 0                                                        | 2                                                                                                          | 3                                                                                                  | 4                                                                                                                  | 5                           | 6                                                         | 7                                                                                                               |
-| ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `reply-pr-thread`      | replied or skipped                                       | usage / unreadable, empty or over-long body                                                                | not found or permission (stderr `reason=not-found` or `reason=permission`)                         | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the reply may have posted)         | —                           | text refused or scan failed                               | not authenticated (HTTP 401; `reason=auth`)                                                                     |
-| `handback-pr-thread`   | posted or skipped                                        | usage                                                                                                      | not found or permission (stderr `reason=...` as above)                                             | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the reply may have posted)         | —                           | —                                                         | not authenticated (HTTP 401; `reason=auth`)                                                                     |
-| `resolve-pr-thread`    | resolved                                                 | usage                                                                                                      | not found or permission (stderr `reason=...` as above)                                             | rate limited (`reason=rate-limit`), or `gh` timed out (`reason=timeout`)                                           | —                           | —                                                         | —                                                                                                               |
-| `file-followup-issue`  | created or found                                         | usage / unreadable title or body file / thread belongs to a different pull request                         | thread not found (`reason=not-found`)                                                              | rate limited (no retry; `reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; a create may have filed) | —                           | text refused or scan failed                               | not authenticated, not permitted to file, or Issues disabled (`reason=auth`, `permission` or `issues-disabled`) |
-| `commit-resolve-fixes` | `PUSHED` or `NOOP`; with `--check-ranges`, the check ran | usage (with `--check-ranges`: unreadable or malformed ranges file, non-canonical path)                     | staged mismatch, refused path or PR file list unavailable (with `--check-ranges`: the diff failed) | commit failed, or undone (a hook changed or left files)                                                            | submit failed or timed out  | head not verified, or a verify call timed out             | rate limited listing the PR's changed files (`reason=rate-limit`; nothing staged)                               |
-| `run-verify-command`   | ran (`result`: pass, fail, timeout, skipped, reverted)   | usage / not trusted / refused path / change outside the list / setup failure / recovery patch unscreenable | —                                                                                                  | —                                                                                                                  | —                           | —                                                         | —                                                                                                               |
-| `apply-thread-actions` | every thread has a final row                             | usage / unreadable or invalid plan / symlinked or unparseable results file; nothing written                | —                                                                                                  | a stage exited 4; rest `not-attempted` (`reason=rate-limit` or `reason=timeout`)                                   | time budget reached; re-run | —                                                         | —                                                                                                               |
-| `check-resolve-text`   | clean                                                    | usage / unreadable file                                                                                    | —                                                                                                  | —                                                                                                                  | —                           | text refused or scan failed (wins over 2 when both occur) | —                                                                                                               |
+| Script                  | 0                                                        | 2                                                                                                          | 3                                                                                                  | 4                                                                                                                  | 5                           | 6                                                         | 7                                                                                                               |
+| ----------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `reply-pr-thread`       | replied or skipped                                       | usage / unreadable, empty or over-long body                                                                | not found or permission (stderr `reason=not-found` or `reason=permission`)                         | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the reply may have posted)         | —                           | text refused or scan failed                               | not authenticated (HTTP 401; `reason=auth`)                                                                     |
+| `handback-pr-thread`    | posted or skipped                                        | usage                                                                                                      | not found or permission (stderr `reason=...` as above)                                             | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the reply may have posted)         | —                           | —                                                         | not authenticated (HTTP 401; `reason=auth`)                                                                     |
+| `sync-blocking-comment` | written, unchanged or skipped                            | usage / unreadable or non-object reasons file                                                              | PR not found or not permitted to comment (`reason=...` as above)                                   | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the write may have landed)         | —                           | —                                                         | not authenticated (HTTP 401; `reason=auth`)                                                                     |
+| `resolve-pr-thread`     | resolved                                                 | usage                                                                                                      | not found or permission (stderr `reason=...` as above)                                             | rate limited (`reason=rate-limit`), or `gh` timed out (`reason=timeout`)                                           | —                           | —                                                         | —                                                                                                               |
+| `file-followup-issue`   | created or found                                         | usage / unreadable title or body file / thread belongs to a different pull request                         | thread not found (`reason=not-found`)                                                              | rate limited (no retry; `reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; a create may have filed) | —                           | text refused or scan failed                               | not authenticated, not permitted to file, or Issues disabled (`reason=auth`, `permission` or `issues-disabled`) |
+| `commit-resolve-fixes`  | `PUSHED` or `NOOP`; with `--check-ranges`, the check ran | usage (with `--check-ranges`: unreadable or malformed ranges file, non-canonical path)                     | staged mismatch, refused path or PR file list unavailable (with `--check-ranges`: the diff failed) | commit failed, or undone (a hook changed or left files)                                                            | submit failed or timed out  | head not verified, or a verify call timed out             | rate limited listing the PR's changed files (`reason=rate-limit`; nothing staged)                               |
+| `run-verify-command`    | ran (`result`: pass, fail, timeout, skipped, reverted)   | usage / not trusted / refused path / change outside the list / setup failure / recovery patch unscreenable | —                                                                                                  | —                                                                                                                  | —                           | —                                                         | —                                                                                                               |
+| `apply-thread-actions`  | every thread has a final row                             | usage / unreadable or invalid plan / symlinked or unparseable results file; nothing written                | —                                                                                                  | a stage exited 4; rest `not-attempted` (`reason=rate-limit` or `reason=timeout`)                                   | time budget reached; re-run | —                                                         | —                                                                                                               |
+| `check-resolve-text`    | clean                                                    | usage / unreadable file                                                                                    | —                                                                                                  | —                                                                                                                  | —                           | text refused or scan failed (wins over 2 when both occur) | —                                                                                                               |
 
 Report exit 3 as `needs permission` only for `reason=permission`, and as
 `not found` for `reason=not-found`; both leave the thread open (blocking).
@@ -1055,15 +1087,15 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 - `f` counts resolved `fixed` threads. `i` counts issues created (not dedupe
   hits). `b` counts open threads left blocking plus `CHANGES_REQUESTED`
   reviewers.
-- `ratelimited=1` means `reply-pr-thread`, `resolve-pr-thread` or
-  `file-followup-issue` exited 4 with `reason=rate-limit` (or no recognizable
-  reason), or `get-pr-blockers` reported `lookupReason: rate_limited` or
-  `resolutionLookupReason: rate_limited`, and mutations stopped. An exit 4 with
-  `reason=timeout` stops mutations too but leaves `ratelimited=0`.
-  `commit-resolve-fixes` exit 4 is a commit undo and never sets it.
-  `/review:resolve-stack` and `/review:sweep-all` then stop mutating: every
-  remaining PR is reported `not attempted (rate limit)` instead of hitting the
-  limit again.
+- `ratelimited=1` means `reply-pr-thread`, `resolve-pr-thread`,
+  `file-followup-issue` or `sync-blocking-comment` exited 4 with
+  `reason=rate-limit` (or no recognizable reason), or `get-pr-blockers` reported
+  `lookupReason: rate_limited` or `resolutionLookupReason: rate_limited`, and
+  mutations stopped. An exit 4 with `reason=timeout` stops mutations too but
+  leaves `ratelimited=0`. `commit-resolve-fixes` exit 4 is a commit undo and
+  never sets it. `/review:resolve-stack` and `/review:sweep-all` then stop
+  mutating: every remaining PR is reported `not attempted (rate limit)` instead
+  of hitting the limit again.
 - **Reading `ratelimited` (callers).** The contract is the LAST line of the
   captured output, and only when that last line fully matches the anchored form
   (one line, single spaces):

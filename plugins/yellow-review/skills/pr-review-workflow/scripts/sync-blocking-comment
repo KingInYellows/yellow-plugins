@@ -1,0 +1,294 @@
+#!/bin/sh
+# Keep one sticky PR comment listing the review threads that block merge, for
+# repositories where GitHub does not enforce conversation resolution (there an
+# open thread blocks merge only by convention). The comment is found by its
+# marker line among the viewer's own PR comments and edited in place.
+# Usage: sync-blocking-comment [--reasons <file>] <owner/repo> <pr-number> <resolution>
+#   <resolution>: conversationResolution from get-pr-blockers (enforced,
+#     not_enforced or unknown). enforced skips without a gh call: GitHub
+#     already stops the merge on open threads.
+#   --reasons <file>: optional JSON object mapping thread IDs to the status
+#     /review:resolve gave them: disagree, unclear, human-held,
+#     needs-permission, not-found, verify-failed, not-attempted. Any other
+#     value, or a thread missing from the file, shows as "open".
+# Every unresolved thread blocks, outdated ones included, as in
+# check-merge-ready; the list is read fresh from GitHub, so the comment holds
+# no local state. No blocking threads: an existing comment is edited to say
+# so; none is created.
+# The comment carries no reviewer prose: each row is a link to the thread's
+# first comment, the file and line, the opener's login in backticks (no
+# @-mention) and the status. At most 50 rows; the rest are counted.
+# Output: one JSON object on stdout:
+#   {"action":"created|updated|unchanged|skipped","reason":"..."|null,
+#    "commentId":"IC_..."|null,"blocking":N|null}
+#   skipped reasons: disabled (YELLOW_REVIEW_BLOCKING_COMMENT=0; no gh call),
+#   enforced, nothing-to-report (no blocking threads and no comment yet),
+#   too-many-comments (the comment search hit its page cap; nothing is
+#   written, so no duplicate is created).
+# Exit codes: 0 done (including every skip), 1 other failure (the thread list
+#   was partial or unreadable, a non-JSON response), 2 usage, 3 not found or
+#   permission (stderr reason=not-found|permission), 4 rate limited or timed
+#   out (stderr reason=rate-limit|timeout; a write that timed out may have
+#   landed, so it is never retried), 7 not authenticated (reason=auth).
+# Time bound: the thread fetch runs with YELLOW_REVIEW_FETCH_DEADLINE clamped
+#   to 120 s, then up to 3 comment-search pages and one write at 60 s per gh
+#   call at most (lib/resolve-gh.sh), about 370 s in all, inside the 420000 ms
+#   Bash tool timeout resolve-pr.md gives the call.
+# Contract: references/resolve/dispositions.md ("Blocking-threads comment")
+
+set -eu
+
+MARKER='<!-- yellow-review:blocking-threads -->'
+MAX_ROWS=50
+MAX_COMMENT_PAGES=3
+FETCH_DEADLINE=120
+
+note() { printf '[sync-blocking-comment] %s\n' "$1" >&2; }
+
+usage() {
+    printf 'Usage: sync-blocking-comment [--reasons <file>] <owner/repo> <pr-number> <enforced|not_enforced|unknown>\n' >&2
+    exit 2
+}
+
+REASONS_FILE=""
+if [ "${1:-}" = --reasons ]; then
+    [ $# -ge 2 ] || usage
+    REASONS_FILE="$2"
+    shift 2
+fi
+[ $# -eq 3 ] || usage
+case "${1:-}" in --*) usage ;; esac
+
+REPO="$1"
+PR_NUMBER="$2"
+RESOLUTION="$3"
+
+case "$REPO" in
+    */*/*|/*|*/) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+    */*) OWNER="${REPO%%/*}"; NAME="${REPO#*/}" ;;
+    *) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+esac
+case "$OWNER$NAME" in
+    *[!A-Za-z0-9._-]*) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+esac
+case "$PR_NUMBER" in
+    ''|0*|*[!0-9]*) printf 'Error: PR number must be a positive integer, got: %s\n' "$PR_NUMBER" >&2; exit 2 ;;
+esac
+[ "${#PR_NUMBER}" -le 9 ] || { printf 'Error: PR number too long: %s\n' "$PR_NUMBER" >&2; exit 2; }
+case "$RESOLUTION" in
+    enforced|not_enforced|unknown) ;;
+    *) printf 'Error: resolution must be enforced, not_enforced or unknown, got: %s\n' "$RESOLUTION" >&2; exit 2 ;;
+esac
+
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
+
+if [ -n "$REASONS_FILE" ]; then
+    if [ -L "$REASONS_FILE" ] || [ ! -f "$REASONS_FILE" ] || [ ! -r "$REASONS_FILE" ]; then
+        printf 'Error: cannot read reasons file: %s\n' "$REASONS_FILE" >&2
+        exit 2
+    fi
+    jq -e 'type == "object"' "$REASONS_FILE" >/dev/null 2>&1 || {
+        printf 'Error: reasons file is not a JSON object: %s\n' "$REASONS_FILE" >&2
+        exit 2
+    }
+fi
+
+skip() {
+    jq -nc --arg r "$1" --argjson n "${2:-null}" '{action: "skipped", reason: $r, commentId: null, blocking: $n}'
+    exit 0
+}
+
+[ "${YELLOW_REVIEW_BLOCKING_COMMENT:-1}" = 0 ] && skip disabled
+[ "$RESOLUTION" = enforced ] && skip enforced
+
+command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found.\n' >&2; exit 1; }
+
+HERE=$(dirname -- "$0")
+# shellcheck source=../../../lib/resolve-gh.sh
+. "$HERE/../../../lib/resolve-gh.sh"
+
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/sync-blocking-comment.XXXXXX") || { printf 'Error: mktemp failed.\n' >&2; exit 1; }
+trap 'rm -rf "$WORK"' EXIT
+
+# fail_gh <label>: classify the last gh failure ($WORK/err) and exit.
+fail_gh() {
+    if [ "$GH_RC" -eq 124 ]; then
+        printf 'Error: gh timed out after %ss on %s; not retried.\nreason=timeout\n' "$RG_GH_TIMEOUT" "$1" >&2
+        exit 4
+    fi
+    if rg_is_rate_limited "$WORK/err" \
+        || jq -e '[.errors[]? | (.type // ""), (.message // "")] | any(test("rate limit|RATE_LIMITED"; "i"))' "$WORK/resp" >/dev/null 2>&1; then
+        printf 'Error: GitHub rate limit on %s.\nreason=rate-limit\n' "$1" >&2
+        exit 4
+    fi
+    if rg_is_auth_failure "$WORK/err"; then
+        printf 'Error: GitHub rejected the credentials on %s; sign in again.\nreason=auth\n' "$1" >&2
+        exit 7
+    fi
+    if rg_is_permission_denied "$WORK/err" \
+        || jq -e 'any(.errors[]?; .type == "FORBIDDEN")' "$WORK/resp" >/dev/null 2>&1; then
+        printf 'Error: not permitted to %s on %s #%s.\nreason=permission\n' "$1" "$REPO" "$PR_NUMBER" >&2
+        exit 3
+    fi
+    if grep -qiE 'Could not resolve to a|NOT_FOUND|HTTP 404([^0-9]|$)' "$WORK/err" \
+        || jq -e 'any(.errors[]?; .type == "NOT_FOUND")' "$WORK/resp" >/dev/null 2>&1; then
+        printf 'Error: %s #%s not found (%s).\nreason=not-found\n' "$REPO" "$PR_NUMBER" "$1" >&2
+        exit 3
+    fi
+    printf 'Error: %s failed: %s\n' "$1" "$(head -c 300 "$WORK/err" | tr '\n' ' ')" >&2
+    exit 1
+}
+
+# gql <label> <gh api graphql args...>: run one call into $WORK/resp; a
+# failure or a GraphQL error exits through fail_gh.
+gql() {
+    _label="$1"; shift
+    GH_RC=0
+    rg_gh api graphql "$@" >"$WORK/resp" 2>"$WORK/err" || GH_RC=$?
+    if [ "$GH_RC" -eq 0 ] && jq -e '((.errors // []) | length) == 0' "$WORK/resp" >/dev/null 2>&1; then
+        return 0
+    fi
+    [ "$GH_RC" -ne 0 ] || GH_RC=1
+    fail_gh "$_label"
+}
+
+# --- Blocking threads, fresh from GitHub (outdated included) ---
+TRC=0
+YELLOW_REVIEW_FETCH_DEADLINE=$FETCH_DEADLINE "$HERE/get-pr-comments" --include-outdated "$REPO" "$PR_NUMBER" \
+    >"$WORK/threads" 2>"$WORK/threads.err" || TRC=$?
+if [ "$TRC" -ne 0 ] || ! jq -e 'type == "array"' "$WORK/threads" >/dev/null 2>&1; then
+    if grep -qi 'rate limit' "$WORK/threads.err"; then
+        printf 'Error: GitHub rate limit on the thread fetch.\nreason=rate-limit\n' >&2
+        exit 4
+    fi
+    [ "$TRC" -ne 3 ] || note 'thread list partial; comment not written'
+    printf 'Error: thread lookup failed (exit %s): %s\n' "$TRC" "$(head -c 300 "$WORK/threads.err" | tr '\n' ' ')" >&2
+    exit 1
+fi
+BLOCKING=$(jq 'length' "$WORK/threads")
+
+# --- The PR's head, node ID and the viewer's existing sticky comment ---
+# shellcheck disable=SC2016
+QUERY='
+query BlockingComment($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      id
+      headRefOid
+      comments(first: 100, after: $cursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id viewerDidAuthor body }
+      }
+    }
+  }
+}'
+PR_ID=""
+HEAD=""
+COMMENT_ID=""
+OLD_BODY_FILE="$WORK/old-body"
+CURSOR=""
+PAGE=0
+while :; do
+    PAGE=$((PAGE + 1))
+    if [ -z "$CURSOR" ]; then
+        gql 'comment search' -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" -F cursor=null -f query="$QUERY"
+    else
+        gql 'comment search' -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" -f cursor="$CURSOR" -f query="$QUERY"
+    fi
+    jq -e '.data.repository.pullRequest.id | strings' "$WORK/resp" >/dev/null 2>&1 || {
+        printf 'Error: %s #%s not found.\nreason=not-found\n' "$REPO" "$PR_NUMBER" >&2
+        exit 3
+    }
+    if [ "$PAGE" -eq 1 ]; then
+        PR_ID=$(jq -r '.data.repository.pullRequest.id' "$WORK/resp")
+        HEAD=$(jq -r '.data.repository.pullRequest.headRefOid // ""' "$WORK/resp")
+    fi
+    # The marker must be the whole first line of a comment the viewer wrote.
+    if jq -e --arg m "$MARKER" '
+        [.data.repository.pullRequest.comments.nodes[]?
+         | select(.viewerDidAuthor == true and ((.body // "") | split("\n")[0] | sub("\r$"; "")) == $m)][0]
+        | if . == null then false else . end' "$WORK/resp" >"$WORK/found" 2>/dev/null; then
+        COMMENT_ID=$(jq -r '.id' "$WORK/found")
+        jq -j '.body' "$WORK/found" >"$OLD_BODY_FILE"
+        break
+    fi
+    [ "$(jq -r '.data.repository.pullRequest.comments.pageInfo.hasNextPage // false' "$WORK/resp")" = true ] || break
+    if [ "$PAGE" -ge "$MAX_COMMENT_PAGES" ]; then
+        note "no marker in the first $((PAGE * 100)) comments; not writing, to avoid a duplicate"
+        skip too-many-comments "$BLOCKING"
+    fi
+    CURSOR=$(jq -r '.data.repository.pullRequest.comments.pageInfo.endCursor // empty' "$WORK/resp")
+    case "$CURSOR" in
+        ''|*[!a-zA-Z0-9+/=_-]*) printf 'Error: invalid comment cursor from GitHub.\n' >&2; exit 1 ;;
+    esac
+done
+
+[ -n "$COMMENT_ID" ] || [ "$BLOCKING" -gt 0 ] || skip nothing-to-report 0
+
+# --- Build the body (no reviewer prose; every field sanitized) ---
+if [ -n "$REASONS_FILE" ]; then
+    cp "$REASONS_FILE" "$WORK/reasons"
+else
+    printf '{}' >"$WORK/reasons"
+fi
+jq -r -j --arg m "$MARKER" --arg res "$RESOLUTION" --arg head "$HEAD" \
+    --argjson max "$MAX_ROWS" --slurpfile reasons "$WORK/reasons" '
+  def cell: tostring | gsub("[\r\n\t]"; " ") | gsub("[`|<>\\\\]"; "");
+  ["disagree","unclear","human-held","needs-permission","not-found","verify-failed","not-attempted"] as $vocab
+  | $reasons[0] as $r
+  | length as $n
+  | [ .[] | . as $t
+      | ($t.comments[0] // {}) as $c
+      | (($c.url // "") | if test("^https://[A-Za-z0-9.-]+/[^\\s()<>]+$") then . else "" end) as $u
+      | ($r[$t.threadId] // "") as $why
+      | {
+          link: (if $u == "" then ($t.threadId | cell) else "[thread](" + $u + ")" end),
+          where: (($t.path // "?" | cell) + (if ($t.line // $t.originalLine) != null then ":" + (($t.line // $t.originalLine) | tostring) else "" end)),
+          who: ($c.author // "ghost" | gsub("[^A-Za-z0-9_.\\[\\]-]"; "")),
+          status: ((if ($vocab | index($why)) != null then $why else "open" end)
+                   + (if $t.isOutdated == true then " (outdated)" else "" end))
+        } ] as $rows
+  | $m + "\n### Review threads blocking merge\n\n"
+  + (if $n == 0 then
+       "No open review threads block merge.\n"
+     else
+       (if $res == "not_enforced" then
+          "This repository does not require conversation resolution, so GitHub will not stop a merge while these threads are open."
+        else
+          "Could not confirm that this repository requires conversation resolution, so GitHub may not stop a merge while these threads are open."
+        end)
+       + " Resolve each one, or reply with why it can stay open, before merging.\n\n"
+       + "| Thread | File | Opened by | Status |\n| --- | --- | --- | --- |\n"
+       + ([$rows[:$max][] | "| " + .link + " | `" + .where + "` | `" + .who + "` | " + .status + " |\n"] | join(""))
+       + (if $n > $max then "\n…and " + (($n - $max) | tostring) + " more.\n" else "" end)
+     end)
+  + "\n<sub>Updated by yellow-review `/review:resolve`"
+  + (if ($head | test("^[0-9a-f]{12,40}$")) then " at `" + $head[0:12] + "`" else "" end)
+  + ". This comment is edited in place.</sub>\n"
+' "$WORK/threads" >"$WORK/body" || { printf 'Error: could not build the comment body.\n' >&2; exit 1; }
+
+if [ -n "$COMMENT_ID" ] && cmp -s "$WORK/body" "$OLD_BODY_FILE"; then
+    jq -nc --arg id "$COMMENT_ID" --argjson n "$BLOCKING" '{action: "unchanged", reason: null, commentId: $id, blocking: $n}'
+    exit 0
+fi
+
+# --- Write: edit the sticky comment in place, or create it ---
+if [ -n "$COMMENT_ID" ]; then
+    # shellcheck disable=SC2016
+    gql 'comment update' -f id="$COMMENT_ID" -F "body=@$WORK/body" -f query='
+mutation BlockingCommentUpdate($id: ID!, $body: String!) {
+  updateIssueComment(input: { id: $id, body: $body }) { issueComment { id } }
+}'
+    NEW_ID=$(jq -r '.data.updateIssueComment.issueComment.id // empty' "$WORK/resp")
+    ACTION=updated
+else
+    # shellcheck disable=SC2016
+    gql 'comment create' -f subjectId="$PR_ID" -F "body=@$WORK/body" -f query='
+mutation BlockingCommentCreate($subjectId: ID!, $body: String!) {
+  addComment(input: { subjectId: $subjectId, body: $body }) { commentEdge { node { id } } }
+}'
+    NEW_ID=$(jq -r '.data.addComment.commentEdge.node.id // empty' "$WORK/resp")
+    ACTION=created
+fi
+[ -n "$NEW_ID" ] || { printf 'Error: the %s returned no comment ID.\n' "$ACTION" >&2; exit 1; }
+jq -nc --arg a "$ACTION" --arg id "$NEW_ID" --argjson n "$BLOCKING" '{action: $a, reason: null, commentId: $id, blocking: $n}'
