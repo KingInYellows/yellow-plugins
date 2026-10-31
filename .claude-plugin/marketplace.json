@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.11.7",
+      "version": "2.11.8",
       "author": {
         "name": "KingInYellows"
       },
@@ -44,7 +44,7 @@
     {
       "name": "yellow-linear",
       "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
-      "version": "2.2.1",
+      "version": "2.2.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -74,7 +74,7 @@
     {
       "name": "yellow-jules",
       "description": "Google Jules integration (deprecated: Jules is read-only from 2026-11-11 and shuts down 2026-12-31) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
-      "version": "0.4.1",
+      "version": "0.4.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -84,7 +84,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.13.0",
+      "version": "3.14.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -194,7 +194,7 @@
     {
       "name": "yellow-council",
       "description": "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
-      "version": "0.6.3",
+      "version": "0.6.4",
       "author": {
         "name": "KingInYellows"
       },

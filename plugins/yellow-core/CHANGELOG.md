@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.11.8
+
+### Patch Changes
+
+- [#1523](https://github.com/KingInYellows/yellow-plugins/pull/1523)
+  [`772104d`](https://github.com/KingInYellows/yellow-plugins/commit/772104d9d246623e009d8aafa305a7e41efc0fe0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop capture
+  stages nothing when the jq dialogue filter fails, instead of an unfiltered raw
+  tail that could carry attachment records such as the prompt snapshot and
+  memory files. Documented under Known Limitations in yellow-core CLAUDE.md.
+
 ## 2.11.7
 
 ### Patch Changes
