@@ -15,7 +15,7 @@ validators in `scripts/`, the schemas in `schemas/`, and this file.
 ## Project Structure & Module Organization
 
 - `plugins/`: Installable plugins. Current plugin directories are
-  `github-workflow`, `gt-workflow`, `yellow-browser-test`, `yellow-ci`,
+  `github-workflow`, `gt-workflow`, `yellow-agy`, `yellow-browser-test`, `yellow-ci`,
   `yellow-claudemod`, `yellow-codex`, `yellow-composio`, `yellow-core`, `yellow-council`,
   `yellow-cursor`, `yellow-debt`, `yellow-devin`, `yellow-docs`,
   `yellow-goal`, `yellow-jules`, `yellow-linear`, `yellow-morph`,
