@@ -23,13 +23,15 @@ delegate commands come with the adapter, built to
 - None of `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`,
   `GOOGLE_CLOUD_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS` or `AGY_ADC_AUTH`
   set, in your shell or inside the WSL distro
-- `"useG1Credits": false` in `~/.gemini/antigravity-cli/settings.json`
+- `"useG1Credits": false` in `~/.gemini/antigravity-cli/settings.json`, with
+  `toolPermission` not set to `always-proceed` and `allowNonWorkspaceAccess` not
+  `true`
 
 ## Commands
 
 | Command      | What it does                                                          |
 | ------------ | --------------------------------------------------------------------- |
-| `/agy:setup` | Read-only check of agy location, version, auth variables and overages |
+| `/agy:setup` | Read-only check of agy location, version, auth variables and settings |
 
 ## Rules it keeps
 

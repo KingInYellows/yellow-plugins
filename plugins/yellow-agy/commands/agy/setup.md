@@ -88,14 +88,14 @@ if [ "$_agy_mode" = wsl ]; then
   printf 'in WSL:    %s\n' "${_agy_wsl_hits:-none}"
 fi
 
-printf '\n=== Overages (useG1Credits) ===\n'
+printf '\n=== Global settings (useG1Credits, permissions) ===\n'
 _agy_cfg=''
 case "$_agy_mode" in
   native) [ -f "$HOME/.gemini/antigravity-cli/settings.json" ] && _agy_cfg=$(cat "$HOME/.gemini/antigravity-cli/settings.json" 2>/dev/null) ;;
   wsl)    _agy_cfg=$(_agy_wsl sh -c 'cat "$HOME/.gemini/antigravity-cli/settings.json"' 2>/dev/null) ;;
 esac
 if [ "$_agy_mode" = none ]; then
-  printf 'useG1Credits: SKIPPED\n'
+  printf 'settings:  SKIPPED\n'
 elif [ -z "$_agy_cfg" ]; then
   printf 'useG1Credits: NO SETTINGS FILE\n'
 elif command -v node >/dev/null 2>&1; then
@@ -107,6 +107,10 @@ elif command -v node >/dev/null 2>&1; then
       try { cfg = JSON.parse(raw); } catch { process.stdout.write("useG1Credits: UNPARSEABLE\n"); return; }
       const v = cfg && cfg.useG1Credits;
       process.stdout.write(v === false ? "useG1Credits: false (ok)\n" : v === undefined ? "useG1Credits: NOT SET\n" : "useG1Credits: ON\n");
+      const tp = cfg && cfg.toolPermission;
+      process.stdout.write(tp === "always-proceed" ? "toolPermission: always-proceed LOOSE\n" : "toolPermission: " + (tp === undefined ? "not set" : String(tp)) + " (ok)\n");
+      const nw = cfg && cfg.allowNonWorkspaceAccess;
+      process.stdout.write(nw === true ? "allowNonWorkspaceAccess: true LOOSE\n" : "allowNonWorkspaceAccess: " + (nw === undefined ? "not set" : String(nw)) + " (ok)\n");
     });
   '
 else
@@ -135,7 +139,12 @@ Report each finding with its code, and stop at the first one that blocks:
    pinned off. Ask the owner to set `"useG1Credits": false` in
    `~/.gemini/antigravity-cli/settings.json` (inside WSL on the bridge) by hand.
    Every delegate run also forces it off, but setup requires it.
-5. **Ready:** report these facts:
+5. **Any `LOOSE` row** (`AGY_SETTINGS`): `toolPermission: always-proceed` runs
+   commands without prompting, and `allowNonWorkspaceAccess: true` lets agy edit
+   outside the worktree. Ask the owner to change them in the same file by hand.
+   Delegate runs pin both, but setup requires the global values to be no looser
+   until the adapter confirms how per-run settings merge.
+6. **Ready:** report these facts:
    - agy has no machine-readable auth mode, so confirm once with the owner that
      `agy` is signed in with their Google AI Pro account, and that running
      `/credits` inside `agy` shows 0 AI credits.
