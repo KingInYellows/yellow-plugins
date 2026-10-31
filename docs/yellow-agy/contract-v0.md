@@ -97,8 +97,8 @@ agy's `status` alone isn't trustworthy. Classify in this order:
 | `finished_reason: "print_timeout"` (agy still says SUCCESS / exit 0)           | `TIMED_OUT`                                                                       | 1, `AGY_TIMEOUT`, partial output kept |
 | non-empty `denied_actions`                                                     | `DENIED`. Report each denied action, and reply or re-authorize with a wider grant | 0 with `requiresAttention`            |
 | `status: "SUCCESS"`, empty `denied_actions`, finished normally                 | `OK`                                                                              | 0                                     |
-| exit 3 / `status: "ERROR"`                                                     | `AGY_MODEL_ERROR` (quota exhaustion → `AGY_QUOTA`)                                | 1                                     |
 | `authentication required` on stderr                                            | `AGY_AUTH_REQUIRED`. The owner signs in interactively once                        | 1                                     |
+| exit 3 / `status: "ERROR"`, no auth message                                    | `AGY_MODEL_ERROR` (quota exhaustion → `AGY_QUOTA`)                                | 1                                     |
 
 `structured_output` is read only from turns that passed `--json-schema`, because
 a resumed turn repeats the previous turn's value. `WAITING` never showed up in
