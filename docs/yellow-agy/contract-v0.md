@@ -125,7 +125,10 @@ local processes.
   in it. It then runs `git add --all`, `git write-tree` and `git commit-tree`,
   and stores the result under `refs/yellow-agy/<localId>/pre-turn`, so
   uncommitted and untracked work from earlier turns is captured without touching
-  the branch or the real index.
+  the branch or the real index. Before that, `git write-tree` on the real index
+  saves the staged state as `refs/yellow-agy/<localId>/pre-turn-index`. Ignored
+  untracked files (build output, `.env`) are not captured: they sit outside the
+  reset guarantee, and reset never removes them.
 - A retry with a request id whose operation already finished returns the
   recorded outcome and spawns nothing.
 - A claim whose pid is dead is stale. The next call settles it before doing
@@ -136,9 +139,10 @@ local processes.
   next `approve` or `reply` refuses with `requiresAttention` until the owner
   passes `--keep-partial` (continue on top of them) or `--reset-partial`. Reset
   runs `git reset --hard <pre-turn HEAD>` and `git clean -fd`, then restores the
-  snapshot with `git read-tree --reset -u <snapshot>` followed by
-  `git reset --mixed <pre-turn HEAD>`, so work from earlier turns, deletions
-  included, comes back uncommitted as it was.
+  snapshot with `git read-tree --reset -u <snapshot>` followed by the index-only
+  `git read-tree <pre-turn-index>`, so work from earlier turns, deletions
+  included, comes back with its staged and unstaged parts as they were. Both
+  refs are deleted once the reset or the next turn settles.
 
 ## Permission profiles (`--settings` JSON)
 
@@ -147,7 +151,11 @@ and an explicit `toolPermission` that is never `always-proceed`, so an owner's
 global setting can't widen a run past its allowlist or out of the worktree. The
 adapter probe confirms which `toolPermission` value runs headless without
 blocking on prompts. Until it does, `setup` refuses with `AGY_SETTINGS` when the
-owner's global config sets either key more loosely.
+owner's global config sets either key more loosely. The same applies to
+`agentMode`: `setup` refuses with `AGY_SETTINGS` when the global config sets a
+mode that auto-approves edits, such as `accept-edits`, unless the adapter probe
+shows that a per-run `--settings` replaces the global mode. Otherwise a plan or
+read-only reply could edit the worktree before `approve`.
 
 - **read-only:**
   `permissions.allow: ["command(git status)", "command(git diff)", "command(git log)"]`.
@@ -189,10 +197,12 @@ stays `PLAN_PENDING`, `IMPLEMENTED` stays `IMPLEMENTED`). A failed `delegate`
 plan turn moves the task to `FAILED`, keeping the worktree and branch for
 `abandon`. Edits a failed implement turn left behind go through `--keep-partial`
 / `--reset-partial`, like `INTERRUPTED`. A retry needs a new `--request-id`; the
-same id returns the recorded failure. The quota gate's `AGY_QUOTA_LOW` and
-`AGY_QUOTA_UNKNOWN` refuse before spawning, so they release the reservation with
-no turn and no state change. No quota is reserved ahead: the failed turn's
-journaled usage counts toward the gate's 15-minute window.
+same id returns the recorded failure. For `delegate`, the quota gate runs before
+the worktree is created, so a refusal leaves no worktree or branch behind. The
+quota gate's `AGY_QUOTA_LOW` and `AGY_QUOTA_UNKNOWN` refuse before spawning, so
+they release the reservation with no turn and no state change. No quota is
+reserved ahead: the failed turn's journaled usage counts toward the gate's
+15-minute window.
 
 `structured_output` is read only from turns that passed `--json-schema`, because
 a resumed turn repeats the previous turn's value. `WAITING` never showed up in
@@ -236,7 +246,8 @@ New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
 4. Is `--input-format stream-json` worth using for multi-turn runs? v0 uses one
    process per turn.
 5. Does a per-run `--settings` merge with or replace the global config, and
-   which `toolPermission` value runs headless without prompting?
+   which `toolPermission` value runs headless without prompting? Does it also
+   replace a global `agentMode`?
 6. How does agy's strict (non-regex) command matching treat arguments? Probe
    `git diff -- <path>`, `git add <path>` and `git commit -m <message>` against
    the profiles' `command(...)` rules, and use narrowly scoped `regex:` rules
