@@ -65,7 +65,9 @@ never the `--` form, so no shell in the distro re-parses prompts or the
    `agy -p "Implement the approved plan" --conversation <id> --mode accept-edits --output-format json --settings <implement profile>`.
    The state becomes `IMPLEMENTED`, or `DENIED` / `TIMED_OUT` / `INTERRUPTED`
    from the classification below.
-3. `reply [--correction]`: another `--conversation` turn under the implement
+3. `reply [--correction]`: another `--conversation` turn. In `PLAN_PENDING` it
+   runs under the read-only profile without `--mode accept-edits`, so only
+   `approve` can start implementation. After approval it uses the implement
    profile. A correction spends a corrective round (R31 counters, unchanged).
 4. `collect`: `git -C <worktree> format-patch <base>..HEAD`, plus `git diff` for
    uncommitted changes, into `artifacts/<localId>/`.
