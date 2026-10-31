@@ -98,25 +98,37 @@ if [ "$_agy_mode" = none ]; then
   printf 'settings:  SKIPPED\n'
 elif [ -z "$_agy_cfg" ]; then
   printf 'useG1Credits: NO SETTINGS FILE\n'
-elif command -v node >/dev/null 2>&1; then
-  printf '%s' "$_agy_cfg" | node -e '
-    let raw = "";
-    process.stdin.on("data", (c) => (raw += c));
-    process.stdin.on("end", () => {
-      let cfg;
-      try { cfg = JSON.parse(raw); } catch { process.stdout.write("useG1Credits: UNPARSEABLE\n"); return; }
-      const v = cfg && cfg.useG1Credits;
-      process.stdout.write(v === false ? "useG1Credits: false (ok)\n" : v === undefined ? "useG1Credits: NOT SET\n" : "useG1Credits: ON\n");
-      const tp = cfg && cfg.toolPermission;
-      process.stdout.write(tp === "always-proceed" ? "toolPermission: always-proceed LOOSE\n" : "toolPermission: " + (tp === undefined ? "not set" : String(tp)) + " (ok)\n");
-      const nw = cfg && cfg.allowNonWorkspaceAccess;
-      process.stdout.write(nw === true ? "allowNonWorkspaceAccess: true LOOSE\n" : "allowNonWorkspaceAccess: " + (nw === undefined ? "not set" : String(nw)) + " (ok)\n");
-    });
-  '
 else
-  printf 'useG1Credits: UNKNOWN (node not found)\n'
+  # One parser for both hosts. It reads the settings from _AGY_CFG when set
+  # (host node), else from the file in its own home (node inside WSL). The
+  # program goes in on stdin, so nothing crosses the bridge as an argument.
+  _agy_js='
+    const fs = require("fs"), os = require("os"), path = require("path");
+    let raw = process.env._AGY_CFG;
+    if (raw === undefined) {
+      try { raw = fs.readFileSync(path.join(os.homedir(), ".gemini/antigravity-cli/settings.json"), "utf8"); }
+      catch { raw = ""; }
+    }
+    let cfg;
+    try { cfg = JSON.parse(raw); } catch { process.stdout.write("useG1Credits: UNPARSEABLE\n"); process.exit(0); }
+    const v = cfg && cfg.useG1Credits;
+    process.stdout.write(v === false ? "useG1Credits: false (ok)\n" : v === undefined ? "useG1Credits: NOT SET\n" : "useG1Credits: ON\n");
+    const tp = cfg && cfg.toolPermission;
+    process.stdout.write(tp === "always-proceed" ? "toolPermission: always-proceed LOOSE\n" : "toolPermission: " + (tp === undefined ? "not set" : String(tp)) + " (ok)\n");
+    const nw = cfg && cfg.allowNonWorkspaceAccess;
+    process.stdout.write(nw === true ? "allowNonWorkspaceAccess: true LOOSE\n" : "allowNonWorkspaceAccess: " + (nw === undefined ? "not set" : String(nw)) + " (ok)\n");
+    const am = cfg && cfg.agentMode;
+    process.stdout.write(am !== undefined && /accept|auto|proceed|yolo|edit/i.test(String(am)) ? "agentMode: " + String(am) + " LOOSE\n" : "agentMode: " + (am === undefined ? "not set" : String(am)) + " (ok)\n");
+  '
+  if [ "$_agy_mode" = wsl ] && _agy_wsl sh -c 'command -v node' >/dev/null 2>&1; then
+    printf '%s' "$_agy_js" | _agy_wsl node - 2>/dev/null | tr -d '\r'
+  elif command -v node >/dev/null 2>&1; then
+    printf '%s' "$_agy_js" | _AGY_CFG="$_agy_cfg" node -
+  else
+    printf 'useG1Credits: UNKNOWN (node not found on the host or in WSL)\n'
+  fi
 fi
-unset _agy_floor _agy_distro _agy_vars _agy_vars_re _agy_mode _agy_path _agy_ver _agy_low _agy_hits _agy_wsl_hits _agy_cfg _v
+unset _agy_floor _agy_distro _agy_vars _agy_vars_re _agy_mode _agy_path _agy_ver _agy_low _agy_hits _agy_wsl_hits _agy_cfg _agy_js _v
 unset -f _agy_wsl
 ```
 
@@ -140,10 +152,12 @@ Report each finding with its code, and stop at the first one that blocks:
    `~/.gemini/antigravity-cli/settings.json` (inside WSL on the bridge) by hand.
    Every delegate run also forces it off, but setup requires it.
 5. **Any `LOOSE` row** (`AGY_SETTINGS`): `toolPermission: always-proceed` runs
-   commands without prompting, and `allowNonWorkspaceAccess: true` lets agy edit
-   outside the worktree. Ask the owner to change them in the same file by hand.
-   Delegate runs pin both, but setup requires the global values to be no looser
-   until the adapter confirms how per-run settings merge.
+   commands without prompting, `allowNonWorkspaceAccess: true` lets agy edit
+   outside the worktree, and an `agentMode` that auto-approves edits (such as
+   `accept-edits`) lets a plan turn edit the worktree before `approve`. Ask the
+   owner to change them in the same file by hand. Delegate runs pin each one,
+   but setup requires the global values to be no looser until the adapter
+   confirms how per-run settings merge.
 6. **Ready:** report these facts:
    - agy has no machine-readable auth mode, so confirm once with the owner that
      `agy` is signed in with their Google AI Pro account, and that running

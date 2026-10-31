@@ -24,8 +24,8 @@ delegate commands come with the adapter, built to
   `GOOGLE_CLOUD_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS` or `AGY_ADC_AUTH`
   set, in your shell or inside the WSL distro
 - `"useG1Credits": false` in `~/.gemini/antigravity-cli/settings.json`, with
-  `toolPermission` not set to `always-proceed` and `allowNonWorkspaceAccess` not
-  `true`
+  `toolPermission` not set to `always-proceed`, `allowNonWorkspaceAccess` not
+  `true`, and no `agentMode` that auto-approves edits (such as `accept-edits`)
 
 ## Commands
 

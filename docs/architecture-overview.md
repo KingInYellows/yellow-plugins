@@ -112,10 +112,10 @@ Source of truth for membership and order: `pluginOrder` in
   Cursor plugin).
 - **yellow-devin** — Legacy Devin.AI V3 API (same `remote-agent` group as
   cursor; not preferred).
-- **yellow-jules** — Google Jules via `@google/jules-sdk`, experimental and
-  read-only for now (same `remote-agent` group; not preferred). A typed CLI
-  with a committed `dist/`, like yellow-cursor. Deprecated: Jules is
-  read-only after 2026-11-11 and shuts down 2026-12-31.
+- **yellow-jules** — Google Jules via `@google/jules-sdk`, experimental; the
+  plugin itself is read-only (same `remote-agent` group; not preferred). A
+  typed CLI with a committed `dist/`, like yellow-cursor. Deprecated: the Jules
+  service becomes read-only on 2026-11-11 and shuts down on 2026-12-31.
 - **yellow-agy** — Successor to yellow-jules: a local supervised delegate on
   the Antigravity CLI (`agy`) under the owner's Google AI Pro sign-in,
   including a WSL bridge. Scaffold for now (`/agy:setup` only); the CLI

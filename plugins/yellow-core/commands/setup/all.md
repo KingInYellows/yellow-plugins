@@ -794,11 +794,12 @@ Scaffold successor to yellow-jules (setup checks only). Classify from Step 1's
 inside WSL, which this dashboard does not probe; `/agy:setup` is authoritative
 and also checks auth variables and overages.
 
-- READY: `agy` OK with a version of 1.4.11 or later — detail notes that
-  `/agy:setup` confirms subscription-only auth
-- PARTIAL: `agy` OK but older than 1.4.11 or unparseable, OR `agy` NOT FOUND
-  on a host where Step 1's `wsl.exe` row is OK — detail: "run `/agy:setup` to check
-  the WSL bridge"
+Never READY: the version row alone cannot confirm subscription-only auth,
+overages off, or the permission settings, so `/agy:setup` must run.
+
+- PARTIAL: `agy` OK with any version, OR `agy` NOT FOUND on a host where Step
+  1's `wsl.exe` row is OK — detail: "run `/agy:setup` to check auth, overages,
+  permissions and the WSL bridge"
 - NEEDS SETUP: `agy` NOT FOUND and the `wsl.exe` row is NOT FOUND
 
 **yellow-semgrep:**
