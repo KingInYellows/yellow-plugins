@@ -47,7 +47,9 @@ adapter verifies, and they fail closed until it does:
   `GIT_CONFIG_KEY_0=core.hooksPath` and `GIT_CONFIG_VALUE_0=<null device>`
   (`/dev/null` on POSIX hosts and inside WSL, `NUL` for native `agy.exe`), so
   the `git commit` agy runs fires no repo or global hooks. On the WSL bridge
-  they are set inside the distro as `env` arguments, not through `WSLENV`.
+  they are set inside the distro as `env` arguments, not through `WSLENV`. Every
+  spawn drops all other `GIT_*` variables (config overrides and repository
+  routing such as `GIT_DIR`), and the bridge unsets them inside the distro too.
   `collect` stages patches, and the owner's stack provider opens the PR.
 - **No MCP servers in delegated runs.** agy starts every configured MCP server
   on every run, and the command allowlist doesn't govern their tools. A

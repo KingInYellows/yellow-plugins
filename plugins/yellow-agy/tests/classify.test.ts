@@ -86,21 +86,18 @@ describe('classifyTurn', () => {
     expect(c.kind === 'UNVERIFIED' && c.finishedReason).toBe('stop');
   });
 
-  it('SUCCESS with a pinned normal reason is OK', () => {
-    expect(
-      classifyTurn(outcome({ json: { ...ok, finished_reason: 'stop' } }), [
-        'stop',
-      ]).kind
-    ).toBe('OK');
+  it('SUCCESS with a non-string finished_reason is UNVERIFIED', () => {
+    for (const bad of [null, 0, { x: 1 }]) {
+      expect(
+        classifyTurn(outcome({ json: { ...ok, finished_reason: bad } })).kind
+      ).toBe('UNVERIFIED');
+    }
   });
 
   it('SUCCESS with a non-zero exit is not OK', () => {
-    expect(
-      classifyTurn(
-        outcome({ exitCode: 3, json: { ...ok, finished_reason: 'stop' } }),
-        ['stop']
-      ).kind
-    ).toBe('MODEL_ERROR');
+    expect(classifyTurn(outcome({ exitCode: 3, json: ok })).kind).toBe(
+      'MODEL_ERROR'
+    );
   });
 
   it('authentication required on stderr is AUTH_REQUIRED', () => {

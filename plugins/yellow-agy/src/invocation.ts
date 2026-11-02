@@ -26,6 +26,19 @@ export const AUTH_MODE_VARS = [
 export const BRIDGE_UNSET_VARS = [
   ...AUTH_MODE_VARS,
   'GIT_CONFIG_PARAMETERS',
+  'GIT_CONFIG',
+  'GIT_CONFIG_GLOBAL',
+  'GIT_CONFIG_SYSTEM',
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_COMMON_DIR',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_NAMESPACE',
+  'GIT_EXEC_PATH',
+  'GIT_SSH',
+  'GIT_SSH_COMMAND',
 ] as const;
 
 /** Flags the CLI never passes, whatever the caller asks for. */
@@ -64,7 +77,11 @@ function hookConfig(nullDevice: string): Record<string, string> {
   };
 }
 
-/** A copy of `env` without the auth-mode variables or WSLENV forwarding. */
+/**
+ * A copy of `env` without the auth-mode variables, WSLENV forwarding, or any
+ * GIT_* variable (config overrides and repository routing such as GIT_DIR
+ * would point git somewhere other than the worktree).
+ */
 export function scrubEnv(
   env: Readonly<Record<string, string | undefined>>
 ): Record<string, string> {
@@ -74,7 +91,7 @@ export function scrubEnv(
     if (value === undefined) continue;
     // Windows env names are case-insensitive, so compare upper-cased.
     if (drop.has(key.toUpperCase())) continue;
-    if (key.toUpperCase().startsWith('GIT_CONFIG_')) continue;
+    if (key.toUpperCase().startsWith('GIT_')) continue;
     out[key] = value;
   }
   return out;
@@ -117,7 +134,9 @@ export function windowsCommandLineLength(
   let total = 0;
   for (const arg of [file, ...args]) {
     const needsQuotes = arg === '' || /[\s"]/.test(arg);
-    const escaped = arg.replace(/(\\*)"/g, '$1$1\\"');
+    let escaped = arg.replace(/(\\*)"/g, '$1$1\\"');
+    // Inside quotes, trailing backslashes are doubled before the closing quote.
+    if (needsQuotes) escaped = escaped.replace(/(\\+)$/, '$1$1');
     total += escaped.length + (needsQuotes ? 2 : 0) + 1;
   }
   return total - 1;
@@ -152,7 +171,18 @@ export function buildInvocation(
   }
 
   const wslCwd = options.cwd;
-  if (!wslCwd.startsWith('/') || wslCwd.startsWith('/mnt/')) {
+  // Reject . and .. segments so the string check below sees the real path.
+  // A symlink into /mnt can't be seen from here; the worktree root is the
+  // adapter's own directory and setup checks it with realpath inside WSL.
+  const segments = wslCwd.split('/');
+  if (
+    !wslCwd.startsWith('/') ||
+    wslCwd === '/mnt' ||
+    wslCwd.startsWith('/mnt/') ||
+    segments.some(
+      (seg, i) => seg === '.' || seg === '..' || (seg === '' && i > 0)
+    )
+  ) {
     throw new AgyError(
       'AGY_BRIDGE',
       `the bridge worktree must be an absolute path inside the WSL filesystem, not ${JSON.stringify(wslCwd)}`

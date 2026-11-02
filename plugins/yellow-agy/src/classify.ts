@@ -6,11 +6,10 @@
  */
 
 /**
- * `finished_reason` values verified to mean a normal completion. The 2026-11
- * probe showed agy 1.4.12 omits the key on a normal finish, so an absent
- * reason is OK; any string not listed here stays UNVERIFIED (fail closed).
+ * The 2026-11 probe showed agy 1.4.12 omits `finished_reason` on a normal
+ * finish, so only an absent key is OK. Any present value that isn't a known
+ * timeout or interrupt, including a non-string, stays UNVERIFIED.
  */
-export const NORMAL_FINISHED_REASONS: readonly string[] = [];
 
 export interface TurnOutcome {
   /** Process exit code, or null when killed by a signal. */
@@ -87,10 +86,7 @@ export function parseResult(stdout: string): AgyResult | undefined {
 const AUTH_RE = /authentication required/i;
 const QUOTA_RE = /\b(quota|rate limit|resource[_ ]exhausted|429)\b/i;
 
-export function classifyTurn(
-  outcome: TurnOutcome,
-  normalReasons: readonly string[] = NORMAL_FINISHED_REASONS
-): TurnClass {
+export function classifyTurn(outcome: TurnOutcome): TurnClass {
   const result = parseResult(outcome.stdout);
   const reason =
     typeof result?.finished_reason === 'string'
@@ -121,10 +117,12 @@ export function classifyTurn(
     result.status === 'SUCCESS' &&
     outcome.exitCode === 0
   ) {
-    if (reason === undefined || normalReasons.includes(reason)) {
-      return { kind: 'OK', result };
-    }
-    return { kind: 'UNVERIFIED', result, finishedReason: reason };
+    if (!('finished_reason' in result)) return { kind: 'OK', result };
+    return {
+      kind: 'UNVERIFIED',
+      result,
+      finishedReason: reason ?? JSON.stringify(result.finished_reason),
+    };
   }
   if (AUTH_RE.test(outcome.stderr)) {
     return { kind: 'AUTH_REQUIRED', ...withResult };

@@ -6,10 +6,11 @@
  * permission could slip into a run, so they throw instead of degrading.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_TOOL_PERMISSION = exports.IMPLEMENT_EXTRA_COMMANDS = exports.READ_ONLY_COMMANDS = void 0;
+exports.TOOL_PERMISSIONS = exports.DEFAULT_TOOL_PERMISSION = exports.IMPLEMENT_EXTRA_COMMANDS = exports.READ_ONLY_COMMANDS = void 0;
 exports.validateAllowCommand = validateAllowCommand;
 exports.readOnlyProfile = readOnlyProfile;
 exports.implementProfile = implementProfile;
+exports.assertSafeProfile = assertSafeProfile;
 exports.turnArgs = turnArgs;
 exports.usageArgs = usageArgs;
 const errors_1 = require("./errors");
@@ -99,7 +100,9 @@ function validateAllowCommand(command) {
     if (!COMMAND_RE.test(command) || command.length > 200) {
         throw new errors_1.AgyError('AGY_INVALID_INPUT', `--allow-command must be plain words without shell syntax: ${JSON.stringify(command)}`);
     }
-    const words = command.split(' ');
+    // Windows resolves executables case-insensitively, so compare lower-cased.
+    const lower = command.toLowerCase();
+    const words = lower.split(' ');
     const tool = words[0] ?? '';
     // The profile fixes the git commands; a grant can't add any (git -C . push).
     if (tool === 'git')
@@ -115,14 +118,20 @@ function validateAllowCommand(command) {
         }
     }
     for (const prefix of DENIED_COMMAND_PREFIXES) {
-        if (command === prefix || command.startsWith(`${prefix} `)) {
+        if (lower === prefix || lower.startsWith(`${prefix} `)) {
             throw new errors_1.AgyError('AGY_INVALID_INPUT', `--allow-command ${JSON.stringify(command)} is never allowed in a delegated run`);
         }
     }
     return command;
 }
+/** The probed values that run headless; always-proceed is never used. */
+exports.TOOL_PERMISSIONS = [
+    'request-review',
+    'strict',
+    'proceed-in-sandbox',
+];
 function checkToolPermission(value) {
-    if (value === '' || value === 'always-proceed') {
+    if (!exports.TOOL_PERMISSIONS.includes(value)) {
         throw new errors_1.AgyError('AGY_SETTINGS', `refusing to build a profile with toolPermission ${JSON.stringify(value)}`);
     }
 }
@@ -180,9 +189,99 @@ function implementProfile(options) {
         flags,
     };
 }
+const SETTINGS_KEYS = [
+    'useG1Credits',
+    'allowNonWorkspaceAccess',
+    'toolPermission',
+    'agentMode',
+    'enableTerminalSandbox',
+    'permissions',
+].sort();
+const FIXED_COMMANDS = new Set([
+    ...exports.READ_ONLY_COMMANDS,
+    ...exports.IMPLEMENT_EXTRA_COMMANDS,
+]);
+function badProfile(why) {
+    throw new errors_1.AgyError('AGY_SETTINGS', `refusing a turn profile: ${why}`);
+}
+/**
+ * Re-checks a profile at the argv boundary, so one built by hand can't widen
+ * a run past what the builders allow.
+ */
+function assertSafeProfile(profile) {
+    let parsed;
+    try {
+        parsed = JSON.parse(profile.settings);
+    }
+    catch {
+        badProfile('settings are not JSON');
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        badProfile('settings are not an object');
+    }
+    const v = parsed;
+    if (JSON.stringify(Object.keys(v).sort()) !== JSON.stringify(SETTINGS_KEYS)) {
+        badProfile('settings keys differ from the pinned set');
+    }
+    if (v['useG1Credits'] !== false)
+        badProfile('useG1Credits must be false');
+    if (v['allowNonWorkspaceAccess'] !== false) {
+        badProfile('allowNonWorkspaceAccess must be false');
+    }
+    checkToolPermission(String(v['toolPermission']));
+    const mode = v['agentMode'];
+    if (mode !== '' && mode !== 'accept-edits')
+        badProfile('unknown agentMode');
+    const perms = v['permissions'];
+    const allow = perms?.allow;
+    if (perms === null ||
+        typeof perms !== 'object' ||
+        Object.keys(perms).join() !== 'allow' ||
+        !Array.isArray(allow)) {
+        badProfile('permissions must hold only an allow list');
+    }
+    let extra = 0;
+    for (const rule of allow) {
+        const m = typeof rule === 'string' ? /^command\((.*)\)$/.exec(rule) : null;
+        if (m === null)
+            badProfile(`unexpected rule ${JSON.stringify(rule)}`);
+        const cmd = m[1] ?? '';
+        if (FIXED_COMMANDS.has(cmd)) {
+            if (mode !== 'accept-edits' &&
+                !exports.READ_ONLY_COMMANDS.includes(cmd)) {
+                badProfile(`${cmd} needs the implement profile`);
+            }
+            continue;
+        }
+        validateAllowCommand(cmd);
+        extra += 1;
+    }
+    const flags = profile.flags.join(' ');
+    const expected = mode === 'accept-edits'
+        ? `--mode accept-edits${extra > 0 ? ' --sandbox' : ''}`
+        : '';
+    if (flags !== expected)
+        badProfile(`flags ${JSON.stringify(flags)} don't match`);
+    if (v['enableTerminalSandbox'] !== extra > 0) {
+        badProfile('enableTerminalSandbox must be on exactly when extra commands are granted');
+    }
+    if (extra > 0 && mode !== 'accept-edits') {
+        badProfile('extra commands need the implement profile');
+    }
+}
 const CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 /** The agy argv (without the binary) for one model turn. */
 function turnArgs(options) {
+    assertSafeProfile(options.profile);
+    const implementing = options.profile.flags.includes('accept-edits');
+    if (options.jsonSchemaPath !== undefined && implementing) {
+        throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the plan schema belongs to read-only turns, not implement turns');
+    }
+    if (options.conversationId === undefined) {
+        if (options.jsonSchemaPath === undefined || implementing) {
+            throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the first turn is a read-only plan turn with the plan schema');
+        }
+    }
     if (options.prompt.trim() === '') {
         throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the prompt is empty');
     }
@@ -210,6 +309,7 @@ function turnArgs(options) {
 }
 /** The argv for the quota probe: same profile as the turn it guards, no model cost. */
 function usageArgs(profile) {
+    assertSafeProfile(profile);
     return [
         '-p',
         '/usage',

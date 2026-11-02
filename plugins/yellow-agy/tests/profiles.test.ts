@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { AgyError } from '../src/errors';
 import {
+  assertSafeProfile,
   implementProfile,
   readOnlyProfile,
   turnArgs,
@@ -135,6 +136,9 @@ describe('validateAllowCommand', () => {
     'npx some-package',
     'cargo publish',
     'make',
+    'GIT push',
+    'Git -C . push',
+    'NPM publish',
   ])('refuses %s', (c) => {
     expect(codeOf(() => validateAllowCommand(c))).toBe('AGY_INVALID_INPUT');
   });
@@ -192,6 +196,78 @@ describe('turnArgs', () => {
       '--print-timeout',
       '900s',
     ]);
+  });
+
+  it('refuses a first turn without the schema and a schema on an implement turn', () => {
+    const im = implementProfile({
+      ...tp,
+      allowCommands: [],
+      sandboxVerified: false,
+    });
+    expect(
+      codeOf(() =>
+        turnArgs({ prompt: 'x', profile: ro, printTimeoutSeconds: 1 })
+      )
+    ).toBe('AGY_INVALID_INPUT');
+    expect(
+      codeOf(() =>
+        turnArgs({
+          prompt: 'x',
+          profile: im,
+          conversationId: 'c',
+          jsonSchemaPath: '/s',
+          printTimeoutSeconds: 1,
+        })
+      )
+    ).toBe('AGY_INVALID_INPUT');
+  });
+
+  it('refuses a hand-built profile that widens the run', () => {
+    const base = JSON.parse(ro.settings);
+    const forged = (settings: unknown, flags: string[] = []) =>
+      codeOf(() =>
+        assertSafeProfile({ settings: JSON.stringify(settings), flags })
+      );
+    expect(forged({ ...base, useG1Credits: true })).toBe('AGY_SETTINGS');
+    expect(forged({ ...base, toolPermission: 'always-proceed' })).toBe(
+      'AGY_SETTINGS'
+    );
+    expect(forged({ ...base, extra: 1 })).toBe('AGY_SETTINGS');
+    expect(
+      forged({ ...base, permissions: { allow: ['command(git push)'] } })
+    ).toBe('AGY_INVALID_INPUT');
+    expect(
+      forged({ ...base, permissions: { allow: ['command(git commit)'] } })
+    ).toBe('AGY_SETTINGS');
+    expect(forged(base, ['--mode', 'accept-edits'])).toBe('AGY_SETTINGS');
+    expect(
+      codeOf(() =>
+        assertSafeProfile({
+          settings: ro.settings,
+          flags: ['--dangerously-skip-permissions'],
+        })
+      )
+    ).toBe('AGY_SETTINGS');
+    const sb = implementProfile({
+      ...tp,
+      allowCommands: ['pnpm test'],
+      sandboxVerified: true,
+    });
+    expect(
+      codeOf(() =>
+        assertSafeProfile({ ...sb, flags: ['--mode', 'accept-edits'] })
+      )
+    ).toBe('AGY_SETTINGS');
+    expect(codeOf(() => assertSafeProfile(sb))).toBeUndefined();
+  });
+
+  it('accepts only the probed toolPermission values', () => {
+    expect(codeOf(() => readOnlyProfile({ toolPermission: 'yolo' }))).toBe(
+      'AGY_SETTINGS'
+    );
+    expect(
+      codeOf(() => readOnlyProfile({ toolPermission: 'strict' }))
+    ).toBeUndefined();
   });
 
   it('refuses empty or flag-like prompts, bad conversation ids and timeouts', () => {

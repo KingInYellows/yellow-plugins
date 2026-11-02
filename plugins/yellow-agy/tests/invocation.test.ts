@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { AgyError } from '../src/errors';
 import {
   AUTH_MODE_VARS,
+  BRIDGE_UNSET_VARS,
   authModeVarsSet,
   buildInvocation,
   scrubEnv,
@@ -84,10 +85,7 @@ describe('buildInvocation', () => {
     );
     expect(inv.file).toBe('wsl.exe');
     expect(inv.cwd).toBeUndefined();
-    const unsets = [...AUTH_MODE_VARS, 'GIT_CONFIG_PARAMETERS'].flatMap((v) => [
-      '-u',
-      v,
-    ]);
+    const unsets = BRIDGE_UNSET_VARS.flatMap((v) => ['-u', v]);
     expect(inv.args).toEqual([
       '-d',
       'Ubuntu-24.04',
@@ -114,6 +112,46 @@ describe('buildInvocation', () => {
       baseEnv: {},
     });
     expect(inv.args.slice(0, 2)).toEqual(['--cd', '/home/o/w']);
+  });
+
+  it('scrubs every GIT_* variable, including repository routing', () => {
+    const inv = buildInvocation({ kind: 'posix' }, ['-p', 'x'], {
+      cwd: '/w',
+      baseEnv: {
+        GIT_DIR: '/elsewhere/.git',
+        GIT_WORK_TREE: '/e',
+        git_index_file: '/i',
+        KEEP: '1',
+      },
+    });
+    expect(inv.env['GIT_DIR']).toBeUndefined();
+    expect(inv.env['GIT_WORK_TREE']).toBeUndefined();
+    expect(inv.env['git_index_file']).toBeUndefined();
+    expect(inv.env['KEEP']).toBe('1');
+  });
+
+  it('wsl-bridge: refuses traversal segments that could reach /mnt', () => {
+    for (const cwd of [
+      '/home/o/../../mnt/c',
+      '/home/./o',
+      '/home//o',
+      '/mnt',
+    ]) {
+      expect(
+        codeOf(() =>
+          buildInvocation({ kind: 'wsl-bridge' }, ['-p', 'x'], {
+            cwd,
+            baseEnv: {},
+          })
+        )
+      ).toBe('AGY_BRIDGE');
+    }
+  });
+
+  it('counts doubled trailing backslashes in quoted Windows arguments', () => {
+    expect(windowsCommandLineLength('a', ['b c\\\\'])).toBe(
+      'a "b c\\\\\\\\"'.length
+    );
   });
 
   it('wsl-bridge: refuses /mnt paths, relative paths and odd distro names', () => {

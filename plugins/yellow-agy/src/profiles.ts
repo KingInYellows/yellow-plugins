@@ -124,7 +124,9 @@ export function validateAllowCommand(command: string): string {
       `--allow-command must be plain words without shell syntax: ${JSON.stringify(command)}`
     );
   }
-  const words = command.split(' ');
+  // Windows resolves executables case-insensitively, so compare lower-cased.
+  const lower = command.toLowerCase();
+  const words = lower.split(' ');
   const tool = words[0] ?? '';
   // The profile fixes the git commands; a grant can't add any (git -C . push).
   if (tool === 'git')
@@ -144,7 +146,7 @@ export function validateAllowCommand(command: string): string {
     }
   }
   for (const prefix of DENIED_COMMAND_PREFIXES) {
-    if (command === prefix || command.startsWith(`${prefix} `)) {
+    if (lower === prefix || lower.startsWith(`${prefix} `)) {
       throw new AgyError(
         'AGY_INVALID_INPUT',
         `--allow-command ${JSON.stringify(command)} is never allowed in a delegated run`
@@ -154,8 +156,15 @@ export function validateAllowCommand(command: string): string {
   return command;
 }
 
+/** The probed values that run headless; always-proceed is never used. */
+export const TOOL_PERMISSIONS = [
+  'request-review',
+  'strict',
+  'proceed-in-sandbox',
+] as const;
+
 function checkToolPermission(value: string): void {
-  if (value === '' || value === 'always-proceed') {
+  if (!(TOOL_PERMISSIONS as readonly string[]).includes(value)) {
     throw new AgyError(
       'AGY_SETTINGS',
       `refusing to build a profile with toolPermission ${JSON.stringify(value)}`
@@ -229,12 +238,98 @@ export function implementProfile(options: ImplementOptions): TurnProfile {
   };
 }
 
+const SETTINGS_KEYS = [
+  'useG1Credits',
+  'allowNonWorkspaceAccess',
+  'toolPermission',
+  'agentMode',
+  'enableTerminalSandbox',
+  'permissions',
+].sort();
+const FIXED_COMMANDS = new Set<string>([
+  ...READ_ONLY_COMMANDS,
+  ...IMPLEMENT_EXTRA_COMMANDS,
+]);
+
+function badProfile(why: string): never {
+  throw new AgyError('AGY_SETTINGS', `refusing a turn profile: ${why}`);
+}
+
+/**
+ * Re-checks a profile at the argv boundary, so one built by hand can't widen
+ * a run past what the builders allow.
+ */
+export function assertSafeProfile(profile: TurnProfile): void {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(profile.settings);
+  } catch {
+    badProfile('settings are not JSON');
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    badProfile('settings are not an object');
+  }
+  const v = parsed as Record<string, unknown>;
+  if (JSON.stringify(Object.keys(v).sort()) !== JSON.stringify(SETTINGS_KEYS)) {
+    badProfile('settings keys differ from the pinned set');
+  }
+  if (v['useG1Credits'] !== false) badProfile('useG1Credits must be false');
+  if (v['allowNonWorkspaceAccess'] !== false) {
+    badProfile('allowNonWorkspaceAccess must be false');
+  }
+  checkToolPermission(String(v['toolPermission']));
+  const mode = v['agentMode'];
+  if (mode !== '' && mode !== 'accept-edits') badProfile('unknown agentMode');
+  const perms = v['permissions'] as { allow?: unknown } | null;
+  const allow = perms?.allow;
+  if (
+    perms === null ||
+    typeof perms !== 'object' ||
+    Object.keys(perms).join() !== 'allow' ||
+    !Array.isArray(allow)
+  ) {
+    badProfile('permissions must hold only an allow list');
+  }
+  let extra = 0;
+  for (const rule of allow as unknown[]) {
+    const m = typeof rule === 'string' ? /^command\((.*)\)$/.exec(rule) : null;
+    if (m === null) badProfile(`unexpected rule ${JSON.stringify(rule)}`);
+    const cmd = m[1] ?? '';
+    if (FIXED_COMMANDS.has(cmd)) {
+      if (
+        mode !== 'accept-edits' &&
+        !READ_ONLY_COMMANDS.includes(cmd as never)
+      ) {
+        badProfile(`${cmd} needs the implement profile`);
+      }
+      continue;
+    }
+    validateAllowCommand(cmd);
+    extra += 1;
+  }
+  const flags = profile.flags.join(' ');
+  const expected =
+    mode === 'accept-edits'
+      ? `--mode accept-edits${extra > 0 ? ' --sandbox' : ''}`
+      : '';
+  if (flags !== expected)
+    badProfile(`flags ${JSON.stringify(flags)} don't match`);
+  if (v['enableTerminalSandbox'] !== extra > 0) {
+    badProfile(
+      'enableTerminalSandbox must be on exactly when extra commands are granted'
+    );
+  }
+  if (extra > 0 && mode !== 'accept-edits') {
+    badProfile('extra commands need the implement profile');
+  }
+}
+
 export interface TurnArgsOptions {
   readonly prompt: string;
   readonly profile: TurnProfile;
-  /** Absent for the first (plan) turn. */
+  /** Absent for the first (plan) turn, which must pass jsonSchemaPath. */
   readonly conversationId?: string;
-  /** Path to plan.schema.json; plan turns and PLAN_PENDING corrections only. */
+  /** Path to plan.schema.json; read-only plan turns and corrections only. */
   readonly jsonSchemaPath?: string;
   /** Seconds before agy stops the turn itself. */
   readonly printTimeoutSeconds: number;
@@ -244,6 +339,22 @@ const CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 /** The agy argv (without the binary) for one model turn. */
 export function turnArgs(options: TurnArgsOptions): string[] {
+  assertSafeProfile(options.profile);
+  const implementing = options.profile.flags.includes('accept-edits');
+  if (options.jsonSchemaPath !== undefined && implementing) {
+    throw new AgyError(
+      'AGY_INVALID_INPUT',
+      'the plan schema belongs to read-only turns, not implement turns'
+    );
+  }
+  if (options.conversationId === undefined) {
+    if (options.jsonSchemaPath === undefined || implementing) {
+      throw new AgyError(
+        'AGY_INVALID_INPUT',
+        'the first turn is a read-only plan turn with the plan schema'
+      );
+    }
+  }
   if (options.prompt.trim() === '') {
     throw new AgyError('AGY_INVALID_INPUT', 'the prompt is empty');
   }
@@ -283,6 +394,7 @@ export function turnArgs(options: TurnArgsOptions): string[] {
 
 /** The argv for the quota probe: same profile as the turn it guards, no model cost. */
 export function usageArgs(profile: TurnProfile): string[] {
+  assertSafeProfile(profile);
   return [
     '-p',
     '/usage',
