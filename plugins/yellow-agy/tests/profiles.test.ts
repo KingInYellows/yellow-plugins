@@ -113,7 +113,6 @@ describe('validateAllowCommand', () => {
     'cargo test --workspace',
     'make check',
     'vitest run',
-    'PNPM run lint',
   ])('accepts %s', (c) => {
     expect(validateAllowCommand(c)).toBe(c);
   });
@@ -297,6 +296,26 @@ describe('turnArgs', () => {
       )
     ).toBe('AGY_SETTINGS');
     expect(codeOf(() => assertSafeProfile(sb))).toBeUndefined();
+    // A structurally perfect copy still lacks the verified-sandbox mark.
+    expect(
+      codeOf(() =>
+        assertSafeProfile({ settings: sb.settings, flags: [...sb.flags] })
+      )
+    ).toBe('AGY_SETTINGS');
+    expect(Object.isFrozen(sb) && Object.isFrozen(sb.flags)).toBe(true);
+  });
+
+  it('refuses a grant whose tool or subcommand is not lower case', () => {
+    expect(codeOf(() => validateAllowCommand('NPM test'))).toBe(
+      'AGY_INVALID_INPUT'
+    );
+    expect(codeOf(() => validateAllowCommand('PNPM run lint'))).toBe(
+      'AGY_INVALID_INPUT'
+    );
+    expect(codeOf(() => validateAllowCommand('npm TEST'))).toBe(
+      'AGY_INVALID_INPUT'
+    );
+    expect(validateAllowCommand('npm run Build')).toBe('npm run Build');
   });
 
   it('accepts only the probed toolPermission values', () => {

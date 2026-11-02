@@ -15,6 +15,7 @@ import {
   scrubEnv,
   windowsCommandLineLength,
   WINDOWS_ARGV_LIMIT,
+  filterDriverNames,
 } from '../src/invocation';
 
 const dirtyEnv = {
@@ -58,6 +59,7 @@ describe('buildInvocation', () => {
     const inv = buildInvocation({ kind: 'posix' }, ['-p', 'hi'], {
       cwd: '/w',
       baseEnv: dirtyEnv,
+      filterDrivers: [],
     });
     expect(inv.file).toBe('agy');
     expect(inv.args).toEqual(['-p', 'hi']);
@@ -65,7 +67,7 @@ describe('buildInvocation', () => {
     expect(inv.env).toEqual({
       PATH: '/usr/bin',
       HOME: '/home/owner',
-      ...hookConfig('/dev/null'),
+      ...hookConfig('/dev/null', []),
     });
   });
 
@@ -73,6 +75,7 @@ describe('buildInvocation', () => {
     const inv = buildInvocation({ kind: 'windows-native' }, ['-p', 'hi'], {
       cwd: 'C:\\w',
       baseEnv: {},
+      filterDrivers: [],
     });
     expect(inv.file).toBe('agy.exe');
     expect(inv.env['GIT_CONFIG_VALUE_0']).toBe('NUL');
@@ -85,6 +88,7 @@ describe('buildInvocation', () => {
       {
         cwd: '/home/owner/.local/share/yellow-agy/worktrees/t1',
         baseEnv: dirtyEnv,
+        filterDrivers: [],
       }
     );
     expect(inv.file).toBe('wsl.exe');
@@ -98,7 +102,9 @@ describe('buildInvocation', () => {
       '-e',
       'env',
       ...unsets,
-      ...Object.entries(hookConfig('/dev/null')).map(([k, v]) => `${k}=${v}`),
+      ...Object.entries(hookConfig('/dev/null', [])).map(
+        ([k, v]) => `${k}=${v}`
+      ),
       'agy',
       '-p',
       'do "this"; rm -rf /',
@@ -112,6 +118,7 @@ describe('buildInvocation', () => {
     const inv = buildInvocation({ kind: 'wsl-bridge' }, ['-p', 'x'], {
       cwd: '/home/o/w',
       baseEnv: {},
+      filterDrivers: [],
     });
     expect(inv.args.slice(0, 2)).toEqual(['--cd', '/home/o/w']);
   });
@@ -125,6 +132,7 @@ describe('buildInvocation', () => {
         git_index_file: '/i',
         KEEP: '1',
       },
+      filterDrivers: [],
     });
     expect(inv.env['GIT_DIR']).toBeUndefined();
     expect(inv.env['GIT_WORK_TREE']).toBeUndefined();
@@ -144,6 +152,7 @@ describe('buildInvocation', () => {
           buildInvocation({ kind: 'wsl-bridge' }, ['-p', 'x'], {
             cwd,
             baseEnv: {},
+            filterDrivers: [],
           })
         )
       ).toBe('AGY_BRIDGE');
@@ -162,6 +171,7 @@ describe('buildInvocation', () => {
         buildInvocation({ kind: 'wsl-bridge' }, ['-p', 'x'], {
           cwd: '/mnt/c/repo',
           baseEnv: {},
+          filterDrivers: [],
         })
       )
     ).toBe('AGY_BRIDGE');
@@ -170,6 +180,7 @@ describe('buildInvocation', () => {
         buildInvocation({ kind: 'wsl-bridge' }, ['-p', 'x'], {
           cwd: 'repo',
           baseEnv: {},
+          filterDrivers: [],
         })
       )
     ).toBe('AGY_BRIDGE');
@@ -178,6 +189,7 @@ describe('buildInvocation', () => {
         buildInvocation({ kind: 'wsl-bridge', distro: 'a b' }, ['-p', 'x'], {
           cwd: '/home/o',
           baseEnv: {},
+          filterDrivers: [],
         })
       )
     ).toBe('AGY_INVALID_INPUT');
@@ -186,6 +198,7 @@ describe('buildInvocation', () => {
         buildInvocation({ kind: 'wsl-bridge', distro: '-e' }, ['-p', 'x'], {
           cwd: '/home/o',
           baseEnv: {},
+          filterDrivers: [],
         })
       )
     ).toBe('AGY_INVALID_INPUT');
@@ -202,6 +215,7 @@ describe('buildInvocation', () => {
           buildInvocation(host, ['--dangerously-skip-permissions'], {
             cwd: '/home/o',
             baseEnv: {},
+            filterDrivers: [],
           })
         )
       ).toBe('AGY_INTERNAL');
@@ -210,6 +224,7 @@ describe('buildInvocation', () => {
           buildInvocation(host, ['--dangerously-skip-permissions=true'], {
             cwd: '/home/o',
             baseEnv: {},
+            filterDrivers: [],
           })
         )
       ).toBe('AGY_INTERNAL');
@@ -223,6 +238,7 @@ describe('buildInvocation', () => {
         buildInvocation({ kind: 'wsl-bridge' }, ['-p', long], {
           cwd: '/home/o',
           baseEnv: {},
+          filterDrivers: [],
         })
       )
     ).toBe('AGY_PROMPT_TOO_LONG');
@@ -231,6 +247,7 @@ describe('buildInvocation', () => {
         buildInvocation({ kind: 'windows-native' }, ['-p', long], {
           cwd: 'C:\\w',
           baseEnv: {},
+          filterDrivers: [],
         })
       )
     ).toBe('AGY_PROMPT_TOO_LONG');
@@ -240,6 +257,7 @@ describe('buildInvocation', () => {
         buildInvocation({ kind: 'posix' }, ['-p', long], {
           cwd: '/w',
           baseEnv: {},
+          filterDrivers: [],
         })
       )
     ).toBeUndefined();
@@ -267,6 +285,7 @@ describe('injected git config', () => {
       const inv = buildInvocation({ kind: 'posix' }, ['-p', 'x'], {
         cwd: dir,
         baseEnv: { PATH: process.env['PATH'], HOME: dir },
+        filterDrivers: [],
       });
       git(['status', '--porcelain'], { ...inv.env });
       expect(existsSync(marker)).toBe(false);
@@ -306,6 +325,59 @@ describe('injected git config', () => {
     }
   });
 
+  it('parses filter driver names from git config --name-only output', () => {
+    expect(
+      filterDriverNames(
+        'filter.lfs.clean\nfilter.lfs.smudge\r\nfilter.a.b.process\n\n'
+      )
+    ).toEqual(['a.b', 'lfs']);
+    expect(filterDriverNames('')).toEqual([]);
+    expect(() => filterDriverNames('lfs\n')).toThrow(AgyError);
+    expect(() => filterDriverNames('filter.lfs\n')).toThrow(AgyError);
+  });
+
+  it('the parsed names turn off a real filter driver', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agy-filter2-'));
+    try {
+      const git = (args: string[], env?: Record<string, string>) =>
+        execFileSync('git', args, { cwd: dir, env, stdio: 'pipe' });
+      git(['init', '-q']);
+      const marker = join(dir, 'ran');
+      writeFileSync(join(dir, 'f.sh'), `#!/bin/sh\ntouch '${marker}'\ncat\n`, {
+        mode: 0o755,
+      });
+      git(['config', 'filter.x.y.clean', 'sh ./f.sh']);
+      writeFileSync(join(dir, '.gitattributes'), 'd.txt filter=x.y\n');
+      writeFileSync(join(dir, 'd.txt'), 'hi\n');
+      const names = filterDriverNames(
+        git(['config', '--name-only', '--get-regexp', '^filter\\.']).toString()
+      );
+      expect(names).toContain('x.y');
+      const inv = buildInvocation({ kind: 'posix' }, ['-p', 'x'], {
+        cwd: dir,
+        baseEnv: { PATH: process.env['PATH'], HOME: dir },
+        filterDrivers: names,
+      });
+      git(['add', 'd.txt'], { ...inv.env });
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('unsets the program-running git variables on the bridge', () => {
+    for (const name of [
+      'GIT_EDITOR',
+      'GIT_EXTERNAL_DIFF',
+      'GIT_PAGER',
+      'GIT_ASKPASS',
+      'GIT_SEQUENCE_EDITOR',
+      'GIT_PROXY_COMMAND',
+    ]) {
+      expect(BRIDGE_UNSET_VARS).toContain(name);
+    }
+  });
+
   it('refuses a filter driver name that could inject config', () => {
     expect(() =>
       buildInvocation({ kind: 'posix' }, ['-p', 'x'], {
@@ -323,6 +395,7 @@ describe('injected git config', () => {
       const inv = buildInvocation({ kind: 'posix' }, ['-p', 'x'], {
         cwd: dir,
         baseEnv: { PATH: process.env['PATH'], HOME: dir },
+        filterDrivers: [],
       });
       const git = (args: string[]) =>
         execFileSync('git', args, {

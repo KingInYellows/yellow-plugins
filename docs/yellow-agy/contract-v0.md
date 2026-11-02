@@ -73,11 +73,11 @@ in WSL. The hard rules apply on every host. `--sandbox` is unverified on native
 Windows, so test and lint commands stay off there. `setup` resolves one
 invocation and records it in the data dir:
 
-| Host                       | Invocation                                                                                                                                                                                       | Worktree root                                                            |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                                                                                  | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
-| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u … GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null GIT_CONFIG_KEY_1=core.fsmonitor GIT_CONFIG_VALUE_1=false agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
-| Windows native agy         | `agy.exe`                                                                                                                                                                                        | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
+| Host                       | Invocation                                                                                                                         | Worktree root                                                            |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                    | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
+| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u <each BRIDGE_UNSET_VARS name> <the GIT_CONFIG_COUNT/KEY_n/VALUE_n set below> agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
+| Windows native agy         | `agy.exe`                                                                                                                          | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
 
 The worktree is created where agy runs. On the WSL bridge that means a WSL clone
 of the repo, never `/mnt/c`. The bridge always uses `wsl.exe --exec` (`-e`),
@@ -185,13 +185,16 @@ defense in depth.
   every grant has to be safe with any trailing arguments. The repo's own test
   and lint commands named in the grant (`--allow-command`, which `authorize`
   validates: plain words, a first word from a fixed list of test, lint and build
-  tools with no path or `.exe`-style suffix, so no wrappers such as `env` or
-  `timeout`; a package or build tool only with a test, lint or build subcommand,
-  or `run <script>` for npm, pnpm, yarn and bun) are added only on a host where
-  `--sandbox` is verified (hard rules). Such a profile sets
+  tools, written lower-case, with no path or `.exe`-style suffix, so no wrappers
+  such as `env` or `timeout`; a package or build tool only with a test, lint or
+  build subcommand, or `run <script>` for npm, pnpm, yarn and bun) are added
+  only on a host where `--sandbox` is verified (hard rules). Such a profile sets
   `enableTerminalSandbox: true` and every turn that uses it also passes
   `--sandbox`; without granted commands it keeps `enableTerminalSandbox: false`
-  and no `--sandbox`. The adapter refuses any profile where the two disagree.
+  and no `--sandbox`. The adapter refuses any profile where the two disagree,
+  and any profile with granted commands that `implementProfile` did not build
+  itself after the sandbox check (it keeps a private record of those, so a
+  hand-built copy is refused at the argv boundary).
 - **Unverified:** whether agy runs a matched command through a shell, so that
   `$(…)`, backticks or `>` in the trailing arguments of an allowed rule (such as
   `pnpm test $(…)`) would execute or write. The 2026-11 probe covered only `&&`
@@ -204,9 +207,16 @@ defense in depth.
   `diff.ignoreSubmodules=all`, `status.submoduleSummary=false`, and, for each
   filter driver the repo's effective config defines (the caller passes the
   names), `filter.<name>.clean`, `.smudge` and `.process` set to empty and
-  `filter.<name>.required=false`. So a granted test command that calls git, and
-  the adapter's own host git calls (`collect`, snapshots), run no hook,
-  fsmonitor, editor, signer, submodule or filter command.
+  `filter.<name>.required=false`. The names are required input: the caller runs
+  `git config --name-only --get-regexp '^filter\.'` and passes
+  `filterDriverNames` of its output, which throws on any unexpected line. So a
+  granted test command that calls git runs no hook, fsmonitor, editor, signer,
+  submodule or filter command. On the bridge, `env -u` also unsets every
+  program-running or rerouting `GIT_*` variable git(1) documents (`GIT_EDITOR`,
+  `GIT_EXTERNAL_DIFF`, `GIT_PAGER`, `GIT_ASKPASS`, …), since the distro's own
+  environment is out of the Windows-side scrub's reach. The adapter's own host
+  git calls (`collect`, snapshots, in the lifecycle PR) use the same override
+  set and scrubbed environment.
 
 ## Result classification
 

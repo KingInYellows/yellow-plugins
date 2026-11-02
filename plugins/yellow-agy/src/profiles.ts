@@ -148,10 +148,19 @@ export function validateAllowCommand(command: string): string {
       `--allow-command must be plain words without shell syntax: ${JSON.stringify(command)}`
     );
   }
-  // Windows resolves executables case-insensitively, so compare lower-cased.
+  // Windows resolves executables case-insensitively, so compare lower-cased,
+  // and require the tool (and subcommand) to be written lower-case, so the
+  // emitted rule is the string that was checked.
   const lower = command.toLowerCase();
   const words = lower.split(' ');
   const tool = words[0] ?? '';
+  const original = command.split(' ');
+  if (
+    original[0] !== tool ||
+    (SUBCOMMAND_TOOLS.has(tool) && original[1] !== words[1])
+  ) {
+    refuse(command, 'must write the tool and subcommand in lower case');
+  }
   // No profile allows git; a grant can't add it (git -C . push).
   if (tool === 'git') refuse(command, 'may not grant git');
   if (SUBCOMMAND_TOOLS.has(tool)) {
@@ -238,6 +247,13 @@ export function readOnlyProfile(options: ProfileOptions = {}): TurnProfile {
   };
 }
 
+/**
+ * Profiles implementProfile built after checking sandboxVerified. A profile
+ * with command grants must be one of these, so a hand-built (or spread) copy
+ * can't claim a sandbox the host was never checked for.
+ */
+const sandboxedProfiles = new WeakSet<TurnProfile>();
+
 export function implementProfile(options: ImplementOptions): TurnProfile {
   const toolPermission = options.toolPermission ?? DEFAULT_TOOL_PERMISSION;
   checkToolPermission(toolPermission);
@@ -252,15 +268,17 @@ export function implementProfile(options: ImplementOptions): TurnProfile {
   const sandbox = extra.length > 0;
   const flags = ['--mode', 'accept-edits'];
   if (sandbox) flags.push('--sandbox');
-  return {
+  const profile: TurnProfile = Object.freeze({
     settings: settingsJson({
       toolPermission,
       commands,
       agentMode: 'accept-edits',
       sandbox,
     }),
-    flags,
-  };
+    flags: Object.freeze(flags),
+  });
+  if (sandbox) sandboxedProfiles.add(profile);
+  return profile;
 }
 
 const SETTINGS_KEYS = [
@@ -335,6 +353,11 @@ export function assertSafeProfile(profile: TurnProfile): void {
   }
   if (extra > 0 && mode !== 'accept-edits') {
     badProfile('extra commands need the implement profile');
+  }
+  if (extra > 0 && !sandboxedProfiles.has(profile)) {
+    badProfile(
+      'command grants must come from implementProfile on a host with a verified sandbox'
+    );
   }
 }
 
