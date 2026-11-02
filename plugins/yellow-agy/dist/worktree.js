@@ -206,20 +206,29 @@ async function dropSnapshotRefs(exec, worktree, localId) {
         await git(exec, worktree, ['update-ref', '-d', ref]);
     }
 }
+/** Patch options that ignore user config which would break `git apply`. */
+const PATCH_FORMAT = [
+    '--binary',
+    '--no-ext-diff',
+    '--no-textconv',
+    '--no-color',
+    '--src-prefix=a/',
+    '--dst-prefix=b/',
+];
 /** Reads the delegate's work without touching the real index. */
 async function collectWorktree(exec, worktree, localId, base) {
     checkLocalId(localId);
     sha(base);
     const count = Number.parseInt((await git(exec, worktree, ['rev-list', '--count', `${base}..HEAD`])).trim(), 10);
     // The repo's external diff and textconv helpers would run outside agy's
-    // sandbox and replace the patch with their output, so both are off.
+    // sandbox and replace the patch with their output, so both are off. Color
+    // and custom prefixes from the user's config would make the patch unusable
+    // by `git apply`, so the plain format is forced.
     const commits = count > 0
         ? await gitBytes(exec, worktree, [
             'format-patch',
             '--stdout',
-            '--binary',
-            '--no-ext-diff',
-            '--no-textconv',
+            ...PATCH_FORMAT,
             `${base}..HEAD`,
         ])
         : Buffer.alloc(0);
@@ -229,7 +238,7 @@ async function collectWorktree(exec, worktree, localId, base) {
     try {
         await git(exec, worktree, ['read-tree', sha(realIndex)], env);
         await git(exec, worktree, ['add', '--intent-to-add', '--all'], env);
-        const uncommitted = await gitBytes(exec, worktree, ['diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD'], env);
+        const uncommitted = await gitBytes(exec, worktree, ['diff', ...PATCH_FORMAT, 'HEAD'], env);
         return { commits, uncommitted, commitCount: count };
     }
     finally {

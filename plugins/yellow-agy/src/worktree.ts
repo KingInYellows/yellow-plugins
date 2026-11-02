@@ -304,6 +304,16 @@ export async function dropSnapshotRefs(
   }
 }
 
+/** Patch options that ignore user config which would break `git apply`. */
+const PATCH_FORMAT = [
+  '--binary',
+  '--no-ext-diff',
+  '--no-textconv',
+  '--no-color',
+  '--src-prefix=a/',
+  '--dst-prefix=b/',
+] as const;
+
 export interface Collected {
   /** format-patch output for commits since the base; empty when none. */
   readonly commits: Buffer;
@@ -328,15 +338,15 @@ export async function collectWorktree(
     10
   );
   // The repo's external diff and textconv helpers would run outside agy's
-  // sandbox and replace the patch with their output, so both are off.
+  // sandbox and replace the patch with their output, so both are off. Color
+  // and custom prefixes from the user's config would make the patch unusable
+  // by `git apply`, so the plain format is forced.
   const commits =
     count > 0
       ? await gitBytes(exec, worktree, [
           'format-patch',
           '--stdout',
-          '--binary',
-          '--no-ext-diff',
-          '--no-textconv',
+          ...PATCH_FORMAT,
           `${base}..HEAD`,
         ])
       : Buffer.alloc(0);
@@ -349,7 +359,7 @@ export async function collectWorktree(
     const uncommitted = await gitBytes(
       exec,
       worktree,
-      ['diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD'],
+      ['diff', ...PATCH_FORMAT, 'HEAD'],
       env
     );
     return { commits, uncommitted, commitCount: count };

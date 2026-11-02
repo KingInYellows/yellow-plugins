@@ -161,6 +161,22 @@ describe('worktree', () => {
     expect(got.uncommitted.toString()).not.toContain('HIJACK');
   });
 
+  it('collect writes plain patches whatever the color and prefix config', async () => {
+    const { wt, base } = await setup();
+    git(wt, 'config', 'color.ui', 'always');
+    git(wt, 'config', 'color.diff', 'always');
+    git(wt, 'config', 'diff.noprefix', 'true');
+    fs.writeFileSync(path.join(wt, 'a.txt'), 'committed\n');
+    git(wt, 'add', '-A');
+    git(wt, 'commit', '-q', '-m', 'change a');
+    fs.writeFileSync(path.join(wt, 'a.txt'), 'dirty\n');
+    const got = await collectWorktree(exec, wt, 't1', base);
+    for (const patch of [got.commits, got.uncommitted]) {
+      expect(patch.includes(0x1b)).toBe(false);
+      expect(patch.toString()).toContain('--- a/a.txt');
+    }
+  });
+
   it('collect keeps non-UTF-8 bytes in patches', async () => {
     const { wt, base } = await setup();
     fs.writeFileSync(
