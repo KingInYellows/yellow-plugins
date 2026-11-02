@@ -509,8 +509,12 @@ jq -n -c \
       missing: (if $mode == "off" then [] else ["tier_unknown"] end)}' >"$WORK/approval"
 }
 
+wait "$THREADS_PID" || THREADS_RC=$?
+wait "$BLOCKERS_PID" || BLOCKERS_RC=$?
+
 # The head must not have moved while the evidence was read: re-read it last,
-# and any change or failed read leaves the approval unknown.
+# after the background lookups finish, and any change or failed read leaves
+# the approval unknown.
 if [ -n "$A_HEAD" ]; then
     H_RC=0
     rg_gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
@@ -526,9 +530,6 @@ if [ -n "$A_HEAD" ]; then
             "$WORK/approval" >"$WORK/approval.new" && mv "$WORK/approval.new" "$WORK/approval"
     fi
 fi
-
-wait "$THREADS_PID" || THREADS_RC=$?
-wait "$BLOCKERS_PID" || BLOCKERS_RC=$?
 
 # --- Threads: any non-zero exit (3 = truncated list) leaves them unknown ---
 THREADS_OK=false
