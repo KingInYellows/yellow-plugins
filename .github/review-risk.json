@@ -49,7 +49,14 @@
     {
       "tier": "high",
       "why": "release, generator and dependency code",
-      "paths": ["scripts/*", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".npmrc"]
+      "paths": [
+        "scripts/*",
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        ".npmrc",
+        ".changeset/config.json"
+      ]
     },
     {
       "tier": "high",
@@ -63,8 +70,19 @@
         "plugins/yellow-review/skills/pr-review-workflow/scripts/*",
         "plugins/yellow-review/lib/*",
         "plugins/yellow-core/lib/compound-staging.sh",
+        "plugins/*/lib/run-github-stack-runtime.js",
         "plugins/github-workflow/lib/*",
         "plugins/gt-workflow/lib/*"
+      ]
+    },
+    {
+      "tier": "high",
+      "why": "path validation and provider routing that other plugins trust",
+      "paths": [
+        "plugins/yellow-core/lib/validate-fs.sh",
+        "plugins/yellow-core/lib/stack-operation-registry.js",
+        "plugins/yellow-core/lib/stack-provider-state.js",
+        "plugins/yellow-core/lib/remote-agent-provider-state.js"
       ]
     },
     {
