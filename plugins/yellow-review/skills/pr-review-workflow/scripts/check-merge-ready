@@ -372,14 +372,15 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
             # the 100 events read may hide a force push, so it leaves the
             # time unknown too.
             # committedDate is a GitTimestamp that keeps the committer's
-            # offset, so every time is normalised to UTC before comparing.
+            # offset, so every time becomes UTC epoch seconds, fraction kept,
+            # before comparing.
             jq -c --arg h "$A_HEAD" --arg label "$APPROVAL_LABEL" '
-              def utc: (capture("\\A(?<d>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})(\\.[0-9]+)?(?<z>Z|(?<s>[+-])(?<oh>[0-9]{2}):(?<om>[0-9]{2}))\\z") // null) as $m
+              def utc: (capture("\\A(?<d>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})(?<f>\\.[0-9]+)?(?<z>Z|(?<s>[+-])(?<oh>[0-9]{2}):(?<om>[0-9]{2}))\\z") // null) as $m
                 | if $m == null then null
                   else (($m.d + "Z") | fromdateiso8601)
                        - (if $m.z == "Z" then 0
                           else (($m.oh | tonumber) * 3600 + ($m.om | tonumber) * 60) * (if $m.s == "+" then 1 else -1 end) end)
-                       | todateiso8601 end;
+                       + (if $m.f == null then 0 else ("0" + $m.f | tonumber) end) end;
               .data.repository.pullRequest as $p
               | ([($p.commits.nodes // [])[] | .commit | select(.oid == $h)] | first) as $c
               | ([($c.checkSuites.nodes // [])[]?
@@ -396,7 +397,7 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
                                  | if any(. == null) then null else max end end),
                  events: (if ($p.timelineItems.nodes | type) == "array"
                           then [$p.timelineItems.nodes[] | select(type == "object" and (.createdAt | type) == "string" and .label != null)
-                                | .createdAt |= utc | select(.createdAt != null)]
+                                | .t = (.createdAt | utc) | select(.t != null)]
                           else null end)}' "$WORK/approval.raw" >"$WORK/labels" 2>/dev/null \
               || printf '{"headTime":null,"events":null}' >"$WORK/labels"
         fi
@@ -473,9 +474,9 @@ jq -n -c \
           and ((.actor.login // "") | ascii_downcase | IN($humans[])))] as $lbl
     # Only the latest addition of the label can approve: an earlier listed
     # human addition does not survive a removal and re-addition by anyone.
-    | ([($lab[0].events // [])[] | select(.label.name == $label)] | sort_by(.createdAt) | last) as $lastadd
+    | ([($lab[0].events // [])[] | select(.label.name == $label)] | sort_by(.t) | last) as $lastadd
     | (if $ht == null or $lastadd == null or $lab[0].present != true then null
-       elif ($lbl | any(. == $lastadd)) and $lastadd.createdAt >= $ht then $lastadd
+       elif ($lbl | any(. == $lastadd)) and $lastadd.t >= $ht then $lastadd
        else null end) as $lblhead
     | (if $r == null then null
        elif any($r[]; .author.__typename == "Bot" and ((.author.login // "") | norm | IN($bots[]))

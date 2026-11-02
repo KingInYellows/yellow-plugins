@@ -423,6 +423,15 @@ state_body() {
   [ "$(jq -c .blockers <<<"$output")" = '["approval_stale"]' ]
 }
 
+@test "CLAUDE-234: fractional seconds order a label and a push in the same second" {
+  config 'review_approval_gate: enforce'
+  HEAD_AT=2026-11-02T10:00:00Z SUITE_AT=2026-11-02T10:05:00.700Z \
+    LABELS="[$(lb Test User 2026-11-02T10:05:00.200Z)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_stale"]' ]
+}
+
 @test "CLAUDE-234: a label added before the head's push is stale, whatever the commit date" {
   config 'review_approval_gate: enforce'
   # Committed long before, pushed (first check suite) after the label.
@@ -587,10 +596,12 @@ state_body() {
 
 @test "CLAUDE-234: an unindented block list with blank and comment lines keeps every approver" {
   config 'review_approval_gate: enforce' 'review_approval_humans:' '- alice' '' '# second approver' '  - bob' 'review_cross_lineage_bots: [x]'
-  REVIEWS="[$(rv APPROVED bob User "$HEAD_SHA")]" with_files src/a.js
-  run --separate-stderr "$SCRIPT" test/repo 7
-  [ "$status" -eq 0 ]
-  [ "$(jq -r .approval.humanApproval.login <<<"$output")" = bob ]
+  for who in alice bob; do
+    REVIEWS="[$(rv APPROVED "$who" User "$HEAD_SHA")]" with_files src/a.js
+    run --separate-stderr "$SCRIPT" test/repo 7
+    [ "$status" -eq 0 ]
+    [ "$(jq -r .approval.humanApproval.login <<<"$output")" = "$who" ]
+  done
   REVIEWS="[$(rv APPROVED test User "$HEAD_SHA")]" with_files src/a.js
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 1 ]
