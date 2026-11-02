@@ -464,6 +464,8 @@ class GradeMathTest(unittest.TestCase):
         self.assertIsNone(rg.ungradable(ok))
         for wf, why in (({**ok, "coverage": {}}, "coverage.failed is missing"),
                         ({**ok, "coverage": {"failed": []}}, "coverage.ran is missing"),
+                        ({**ok, "coverage": {"ran": [], "failed": [], "empty": True}},
+                         "coverage.empty is true"),
                         ({**ok, "coverage": {"ran": None, "failed": []}}, "coverage.ran is missing"),
                         ({**ok, "coverage": {"ran": [1], "failed": []}}, "coverage.ran is missing"),
                         ({**ok, "coverage": {"ran": [], "failed": [None]}}, "coverage.failed is missing"),
@@ -516,6 +518,10 @@ class GradeMathTest(unittest.TestCase):
         a = {"x": {"kind": "case", "golden": [{"file": "f", "line": 1, "match": ["a"]}]}}
         b = {"x": {"kind": "case", "golden": [{"file": "f", "line": 1, "match": ["b"]}]}}
         self.assertNotEqual(rg.grading_set(a), rg.grading_set(b))
+        moved = {"x": {**a["x"], "head": "c" * 40}}
+        self.assertNotEqual(rg.grading_set(a), rg.grading_set(moved))
+        prose = {"x": {**a["x"], "notes": "edited", "source": "s", "tier": "high"}}
+        self.assertEqual(rg.grading_set(a), rg.grading_set(prose))
         self.assertEqual(rg.grading_set(a), rg.grading_set(json.loads(json.dumps(a))))
 
     def test_cost_usd_never_decides(self):

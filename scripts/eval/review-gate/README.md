@@ -26,8 +26,10 @@ the mean number of agents the workflow reports; the CLI's `total_cost_usd` is
 shown next to it but never decides (see the cost note below).
 `grade --baseline <old summary.json>` applies this rule and refuses a verdict
 while any run is missing or incomplete, or when the two runs graded different
-sets: different ids, or the same ids with different golden entries (each
-`summary.json` carries a `grading_set` hash of every id, kind and golden list).
+sets: different ids, or the same ids with different definitions (each
+`summary.json` carries a `grading_set` hash of every item's id, kind, repo,
+base, head, include/exclude and golden list; a synthetic control's head is the
+one `prepare` built, so an edited patch changes it).
 
 ## Cases and controls
 
@@ -80,8 +82,9 @@ control is graded exactly like a control and counts in the FP rate;
 `results-<date>.md` also shows how many of the false positives were synthetic.
 Three ship, all on `main` at `098fa5f`: a docs sentence, a test-only change and
 a behavior-preserving refactor. Write a new one by editing a detached worktree
-at `base` and saving `git diff` as the patch; a patch that no longer applies
-stops `prepare` with the row's id.
+at `base`, then `git add -A && git diff --cached > <id>.patch` (plain `git diff`
+leaves out new files); a patch that no longer applies stops `prepare` with the
+row's id.
 
 `cases/examples/` holds two files marked `"example": true` that only show the
 format. Their SHAs are made up; `prepare` loads them only with `--examples` and
@@ -153,13 +156,14 @@ python3 scripts/eval/review-gate/eval.py grade "$W" --baseline <old>/summary.jso
 ### Incomplete runs
 
 In `claude -p` a usage limit fails the agent instead of pausing, so a run whose
-`coverage.failed` is non-empty, or whose result is not a version-1 workflow
-result with `coverage.ran` and `coverage.failed` name lists, an integer `agents`
-count, and every finding carrying `display`, `severity`, `file`, a positive
-integer `line`, `title` and `suggested_fix` (a string or null), is
-**incomplete**: it is left out of recall and FP rate and listed separately,
-never graded as a miss. `run --retry-incomplete` reruns exactly the rows `grade`
-calls incomplete (both use one check).
+`coverage.failed` is non-empty, whose `coverage.empty` is true (no reviewer
+returned), or whose result is not a version-1 workflow result with
+`coverage.ran` and `coverage.failed` name lists, an integer `agents` count, and
+every finding carrying `display`, `severity`, `file`, a positive integer `line`,
+`title` and `suggested_fix` (a string or null), is **incomplete**: it is left
+out of recall and FP rate and listed separately, never graded as a miss.
+`run --retry-incomplete` reruns exactly the rows `grade` calls incomplete (both
+use one check).
 
 ### The headless command
 

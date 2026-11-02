@@ -437,6 +437,9 @@ def shape_problems(wf):
             names = cov.get(key)
             if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
                 problems.append("coverage.%s is missing or not a list of names" % key)
+        if cov.get("empty") is True:
+            # No hunter returned: a clean result here means nobody looked.
+            problems.append("coverage.empty is true (no reviewer returned a result)")
     if not is_count(wf.get("agents")):
         problems.append("agents is missing or not a non-negative integer")
     return problems
@@ -609,11 +612,18 @@ def tokens_in(cli):
                for v in mu.values() if isinstance(v, dict))
 
 
+GRADING_KEYS = ("kind", "repo", "base", "head", "golden", "include", "exclude")
+
+
 def grading_set(items):
-    """Hash of what grading reads from each item: its id, kind and golden
-    entries. Two summaries compare only when it matches, since an edited
-    golden regex changes recall without changing any id."""
-    graded = sorted([i, d.get("kind"), d.get("golden")] for i, d in items.items())
+    """Hash of each item's definition: id, kind, the commits it runs on (for a
+    synthetic control, the head prepare built, so an edited patch counts),
+    persona filters and golden entries. Two summaries compare only when it
+    matches, since an edited golden regex or a moved head changes recall or
+    FP rate without changing any id. Prose fields (notes, source,
+    confirmed_*) and the file's tier (prepare uses classify-risk's) are left
+    out."""
+    graded = sorted([i, *[d.get(k) for k in GRADING_KEYS]] for i, d in items.items())
     return hashlib.sha256(json.dumps(graded, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 
 
