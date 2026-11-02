@@ -184,9 +184,11 @@ jq -n -c --rawfile text "$WORK/config" --arg file "$CFG_FILE" '
         elif ($e | length) > 1 then {state: "twice"}
         else ($fm[$e[0]] | .[($k | length) + 1:] | strip) as $v
           | if $v != "" then {state: "set", v: $v}
-            else ($fm[$e[0] + 1:] | (map(test("\\A[ \\t]+-") | not) | index(true)) as $stop
-                  | if $stop == null then . else .[0:$stop] end) as $items
-              | {state: "set", list: [$items[] | sub("\\A[ \\t]+-[ \\t]*"; "") | strip | unq]}
+            else ($fm[$e[0] + 1:]
+                  | (map((test("\\A[ \\t]*-") or test("\\A[ \\t]*(#.*)?\\z")) | not) | index(true)) as $stop
+                  | if $stop == null then . else .[0:$stop] end
+                  | map(select(test("\\A[ \\t]*-")))) as $items
+              | {state: "set", list: [$items[] | sub("\\A[ \\t]*-[ \\t]*"; "") | strip | unq]}
             end
         end;
     def logins($k; $re):
@@ -369,7 +371,15 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
             # (removing it revokes the approval), and a timeline longer than
             # the 100 events read may hide a force push, so it leaves the
             # time unknown too.
+            # committedDate is a GitTimestamp that keeps the committer's
+            # offset, so every time is normalised to UTC before comparing.
             jq -c --arg h "$A_HEAD" --arg label "$APPROVAL_LABEL" '
+              def utc: (capture("\\A(?<d>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})(\\.[0-9]+)?(?<z>Z|(?<s>[+-])(?<oh>[0-9]{2}):(?<om>[0-9]{2}))\\z") // null) as $m
+                | if $m == null then null
+                  else (($m.d + "Z") | fromdateiso8601)
+                       - (if $m.z == "Z" then 0
+                          else (($m.oh | tonumber) * 3600 + ($m.om | tonumber) * 60) * (if $m.s == "+" then 1 else -1 end) end)
+                       | todateiso8601 end;
               .data.repository.pullRequest as $p
               | ([($p.commits.nodes // [])[] | .commit | select(.oid == $h)] | first) as $c
               | ([($c.checkSuites.nodes // [])[]?
@@ -382,9 +392,11 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
               | {present: $present,
                  headTime: (if $c == null or ($c.committedDate | type) != "string" or $suite == null
                                or $present == null or $p.timelineItems.pageInfo.hasPreviousPage != false then null
-                            else [$c.committedDate, $suite] + $forced | max end),
+                            else [$c.committedDate, $suite] + $forced | map(utc)
+                                 | if any(. == null) then null else max end end),
                  events: (if ($p.timelineItems.nodes | type) == "array"
-                          then [$p.timelineItems.nodes[] | select(type == "object" and (.createdAt | type) == "string" and .label != null)]
+                          then [$p.timelineItems.nodes[] | select(type == "object" and (.createdAt | type) == "string" and .label != null)
+                                | .createdAt |= utc | select(.createdAt != null)]
                           else null end)}' "$WORK/approval.raw" >"$WORK/labels" 2>/dev/null \
               || printf '{"headTime":null,"events":null}' >"$WORK/labels"
         fi

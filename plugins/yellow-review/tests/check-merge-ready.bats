@@ -396,6 +396,21 @@ state_body() {
   [ "$(jq -c .approval.missing <<<"$output")" = '[]' ]
 }
 
+@test "CLAUDE-234: a commit date with a timezone offset is compared in UTC" {
+  config 'review_approval_gate: enforce'
+  # 19:00+09:00 is 10:00Z, before the 10:05Z label.
+  HEAD_AT=2026-11-02T19:00:00+09:00 LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.humanApproval.via <<<"$output")" = label ]
+  # 03:10-08:00 is 11:10Z, after the label.
+  HEAD_AT=2026-11-02T03:10:00-08:00 SUITE_AT=2026-11-02T10:00:00Z \
+    LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_stale"]' ]
+}
+
 @test "CLAUDE-234: a label added before the head's push is stale, whatever the commit date" {
   config 'review_approval_gate: enforce'
   # Committed long before, pushed (first check suite) after the label.
@@ -549,6 +564,17 @@ state_body() {
 
 @test "CLAUDE-234: review_approval_humans replaces the owner default" {
   config 'review_approval_gate: enforce' 'review_approval_humans: [alice, "bob"]'
+  REVIEWS="[$(rv APPROVED bob User "$HEAD_SHA")]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.humanApproval.login <<<"$output")" = bob ]
+  REVIEWS="[$(rv APPROVED test User "$HEAD_SHA")]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+}
+
+@test "CLAUDE-234: an unindented block list with blank and comment lines keeps every approver" {
+  config 'review_approval_gate: enforce' 'review_approval_humans:' '- alice' '' '# second approver' '  - bob' 'review_cross_lineage_bots: [x]'
   REVIEWS="[$(rv APPROVED bob User "$HEAD_SHA")]" with_files src/a.js
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 0 ]
