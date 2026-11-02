@@ -474,15 +474,18 @@ def run(work, jobs, dry_run, retry_incomplete=False, timeout=3600):
         return 0
     for row in skipped:
         print("skip %s" % row["id"], flush=True)
-    failed = 0
+    failed = incomplete = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
         for rid, ok, note in pool.map(lambda r: run_one(r, work, claude, timeout), todo):
             failed += not ok
+            incomplete += ok and note.startswith("incomplete")
             print("%s %s%s" % ("ok  " if ok else "FAIL", rid, " (%s)" % note if note else ""), flush=True)
     if failed:
         print("run: %d of %d runs failed; rerun to retry only those" % (failed, len(todo)), file=sys.stderr)
-        return 1
-    return 0
+    if incomplete:
+        print("run: %d of %d runs are incomplete; rerun with --retry-incomplete to retry them"
+              % (incomplete, len(todo)), file=sys.stderr)
+    return 1 if failed or incomplete else 0
 
 
 # --- grade ------------------------------------------------------------------
@@ -698,12 +701,19 @@ def main(argv=None):
         if not re.fullmatch(ms.SAFE_NAME, a.model):
             sys.exit("prepare: --model must match %s" % ms.SAFE_NAME)
         items = load_items(os.path.abspath(a.cases), os.path.abspath(a.controls), a.examples)
+        if a.examples:  # format check only: the examples' commits do not exist
+            print("prepare: %d example items are valid" % len(items))
+            return 0
         prepare(work, items, repo_dirs(a.repo_dir), a.model, set(a.only.split(",")) if a.only else None)
         return 0
     if a.cmd == "run":
         return run(work, a.jobs, a.dry_run, a.retry_incomplete, a.timeout)
     date = a.date or datetime.date.today().isoformat()
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+    try:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+            raise ValueError(date)
+        datetime.date.fromisoformat(date)
+    except ValueError:
         sys.exit("grade: --date takes YYYY-MM-DD")
     return grade(work, date, os.path.abspath(a.results_dir), a.baseline)
 

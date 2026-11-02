@@ -205,7 +205,7 @@ class PipelineTest(Tmp):
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertEqual({r["id"]: r["fingerprint"] for r in rg.read_matrix(self.work)}, before)
         self.prepare("--model", "haiku")
-        self.assertNotEqual(rg.read_matrix(self.work)[0]["fingerprint"], before[rg.read_matrix(self.work)[0]["id"]])
+        self.assertTrue(all(r["fingerprint"] != before[r["id"]] for r in rg.read_matrix(self.work)))
 
     def test_reviewer_hash_covers_every_loaded_plugin(self):
         root = os.path.join(self.tmp, "fake-repo")
@@ -263,7 +263,9 @@ class PipelineTest(Tmp):
     def test_run_skips_rows_with_current_fingerprint(self):
         self.prepare()
         res = self.cli("run", self.work, "-j", "3")
-        self.assertEqual(res.returncode, 0, res.stderr)
+        # One stub row returns an ungradable workflow: the run says so and exits 1.
+        self.assertEqual(res.returncode, 1, res.stderr)
+        self.assertIn("1 of 5 runs are incomplete; rerun with --retry-incomplete", res.stderr)
         self.assertEqual(len(self.logged()), 5)
         with open(os.path.join(self.log, "case-hit.json"), encoding="utf-8") as handle:
             argv = json.load(handle)
@@ -526,7 +528,7 @@ class HarvestBotsTest(Tmp):
         self.assertEqual(bugbot["line"], 17)
         self.assertFalse(bugbot["merged"])
 
-    def test_fetch_pages_and_pull_lookups_are_get_only(self):
+    def test_fetch_pages_and_pull_lookups_use_injected_get(self):
         calls = []
         comments = self.fixture("comments.json")
         pulls = self.fixture("pulls.json")

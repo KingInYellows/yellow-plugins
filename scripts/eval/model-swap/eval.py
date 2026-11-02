@@ -57,10 +57,16 @@ def fresh_worktree(path, commit, cwd=REPO):
     if os.path.isdir(path):
         # Remove it through the repository that owns it, which may not be cwd
         # when the same work directory is reused with another clone.
+        # A failed remove (a locked worktree) propagates; only a directory no
+        # repository owns any more is deleted outright.
         try:
             owner = git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=path).strip()
-            git("--git-dir", owner, "worktree", "remove", "--force", path, cwd=os.path.dirname(path))
         except subprocess.CalledProcessError:
+            owner = None
+        if owner:
+            git("--git-dir", owner, "worktree", "remove", "--force", path, cwd=os.path.dirname(path))
+            git("--git-dir", owner, "worktree", "prune", cwd=os.path.dirname(path))
+        else:
             shutil.rmtree(path)
         git("worktree", "prune", cwd=cwd)
     worktree(path, commit, cwd)
