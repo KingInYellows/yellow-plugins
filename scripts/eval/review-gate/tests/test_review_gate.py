@@ -575,12 +575,189 @@ class HarvestBotsTest(Tmp):
         os.makedirs(bin_dir)
         os.symlink(shutil.which("git"), os.path.join(bin_dir, "git"))
         res = subprocess.run([sys.executable, HARVEST, "--repo-dir", repo, "--repo", "test/demo",
-                              "--ref", "main", "--bots"], capture_output=True, text=True, check=False,
+                              "--ref", "main", "--bots", "--ci"], capture_output=True, text=True, check=False,
                              env={**os.environ, **GIT_ENV, "PATH": bin_dir})
         self.assertEqual(res.returncode, 0, res.stderr)
         out = json.loads(res.stdout)
-        self.assertEqual(out["sources"], {"git": "ok", "bots": "skipped: gh not found"})
+        self.assertEqual(out["sources"], {"git": "ok", "bots": "skipped: gh not found",
+                                          "ci": "skipped: gh not found"})
         self.assertEqual(out["candidates"], [])
+
+
+class HarvestHeadMappingTest(Tmp):
+    def test_fix_hunks_map_onto_each_target_head(self):
+        repo = self.tmp
+        git(repo, "init", "-q", "-b", "main")
+        commit(repo, "chore: init", {"README.md": "x\n"})
+        head = commit(repo, "feat: add helpers (#10)", {"lib/h.sh": lines(10), "lib/k.sh": lines(10)})
+        # Between #10 and the fix: three lines land at the top of h.sh, line 5
+        # of k.sh is rewritten, and k.sh is renamed.
+        commit(repo, "feat: header (#11)", {"lib/h.sh": "a\nb\nc\n" + lines(10)})
+        commit(repo, "feat: tweak k (#12)", {"lib/k.sh": lines(10, {5: "five"})})
+        git(repo, "mv", "lib/k.sh", "lib/m.sh")
+        git(repo, "commit", "-q", "-m", "refactor: rename k (#13)")
+        parent = git(repo, "rev-parse", "HEAD")
+        fix = commit(repo, "fix: follow-up to #10 (#14)", {
+            "lib/h.sh": "a\nb\nc\n" + lines(10, {6: "six"}),
+            "lib/m.sh": lines(10, {5: "FIVE", 8: "eight"}),
+        })
+        found = {c["commit"]: c for c in hv.harvest_git(repo, "main", "test/demo")}
+        cand = found[fix]
+        self.assertEqual(cand["hunks_relative_to"], parent)
+        self.assertEqual(sorted((h["file"], h["line"]) for h in cand["hunks"]),
+                         [("lib/h.sh", 9), ("lib/m.sh", 5), ("lib/m.sh", 8)])
+        target = cand["targets"][0]
+        self.assertEqual(target["head"], head)
+        at_head = sorted(target["hunks_at_head"], key=lambda h: (h["file"], h["line"] or 0))
+        self.assertEqual(at_head, [
+            {"file": "lib/h.sh", "line": 6},
+            {"file": "lib/k.sh", "line": None, "note": "line changed between target head and fix parent"},
+            {"file": "lib/k.sh", "line": 8},
+        ])
+
+    def test_map_back_shifts_and_new_files(self):
+        diff = ("diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -2,0 +3,2 @@\n+x\n+y\n@@ -10 +11,0 @@\n-z\n"
+                "diff --git a/n b/n\nnew file mode 100644\n--- /dev/null\n+++ b/n\n@@ -0,0 +1 @@\n+q\n")
+        entries = hv.parse_diff(diff)
+        self.assertEqual(hv.map_back(entries, "f", 2), ("f", 2, None))
+        self.assertEqual(hv.map_back(entries, "f", 3)[1], None)  # inserted after head
+        self.assertEqual(hv.map_back(entries, "f", 5), ("f", 3, None))
+        self.assertEqual(hv.map_back(entries, "f", 11), ("f", 9, None))
+        self.assertEqual(hv.map_back(entries, "f", 12), ("f", 11, None))  # past head's deleted line 10
+        self.assertEqual(hv.map_back(entries, "n", 1), (None, None, "file not at target head"))
+        self.assertEqual(hv.map_back(entries, "other", 7), ("other", 7, None))
+        self.assertEqual(hv.new_side_hunks(diff), [{"file": "f", "line": 3}, {"file": "f", "line": 12},
+                                                   {"file": "n", "line": 1}])
+
+
+    def test_quoted_paths_from_real_git(self):
+        repo = self.tmp
+        git(repo, "init", "-q", "-b", "main")
+        commit(repo, "chore: init", {"caf\u00e9.py": lines(3), 'say "hi".sh': lines(3), "a b.sh": lines(3)})
+        sha = commit(repo, "fix: edit", {"caf\u00e9.py": lines(3, {2: "x"}), 'say "hi".sh': lines(3, {3: "y"}),
+                                         "a b.sh": lines(3, {1: "z"})})
+        git(repo, "mv", "caf\u00e9.py", "th\u00e9.py")
+        git(repo, "commit", "-q", "-m", "refactor: rename")
+        diff = git(repo, "show", "--format=", "-U0", sha)
+        self.assertIn('"', diff)  # git quoted both names
+        self.assertEqual(sorted((h["file"], h["line"]) for h in hv.new_side_hunks(diff)),
+                         [("a b.sh", 1), ("caf\u00e9.py", 2), ('say "hi".sh', 3)])
+        self.assertEqual(sorted((h["file"], h["line"]) for h in hv.old_side_hunks(diff)),
+                         [("a b.sh", 1), ("caf\u00e9.py", 2), ('say "hi".sh', 3)])
+        renamed = hv.parse_diff(git(repo, "diff", "-M", "-U0", sha, "HEAD"))
+        self.assertEqual([(e["old"], e["new"]) for e in renamed], [("caf\u00e9.py", "th\u00e9.py")])
+
+
+class HarvestReviewedTest(Tmp):
+    H = "a" * 40
+
+    def bot(self, pr, head, created):
+        return {"kind": "bot-p1", "pr": pr, "head": head, "created_at": created}
+
+    def test_tag_reviewed_compares_heads_and_utc_times(self):
+        reviews = [hv.review_record(7, self.H, "2026-10-05T10:00:00Z"),
+                   hv.review_record(7, self.H, "2026-10-06T10:00:00+02:00")]
+        cands = [self.bot(7, self.H, "2026-10-05T10:00:00Z"),        # same second: reviewed first
+                 self.bot(7, self.H.upper(), "2026-10-05T09:00:00Z"),  # before every review
+                 self.bot(7, "b" * 40, "2026-10-07T00:00:00Z"),       # head never reviewed
+                 self.bot(8, self.H, "2026-10-07T00:00:00Z"),         # other PR
+                 {"kind": "fix"}]
+        hv.tag_reviewed(cands, reviews)
+        self.assertEqual([c.get("review") for c in cands],
+                         ["missed", "reviewed-later", "no-record", "no-record", None])
+        self.assertEqual(cands[0]["reviewed_at"], "2026-10-05T10:00:00Z")
+
+    def test_load_reviewed_from_ledger_dir_and_json(self):
+        ledger = os.path.join(self.tmp, "findings")
+        write(os.path.join(ledger, "7.jsonl"), "\n".join([
+            json.dumps({"v": 1, "type": "observation", "pr": 7, "head_sha": self.H, "at": "2026-10-05T10:00:00Z"}),
+            json.dumps({"v": 1, "type": "transition", "head_sha": self.H, "at": "2026-10-05T11:00:00Z"}),
+            json.dumps({"v": 1, "type": "observation", "pr": 7, "head_sha": "short", "at": "2026-10-05T10:00:00Z"}),
+            "not json",
+        ]) + "\n")
+        write(os.path.join(ledger, "7.state"), "x\n")
+        self.assertEqual([(r["pr"], r["head"]) for r in hv.load_reviewed(ledger)], [(7, self.H)])
+        runs = os.path.join(self.tmp, "runs.json")
+        write(runs, json.dumps([{"pr": "9", "head": self.H, "at": "2026-10-05T10:00:00"},
+                                {"pr": 9, "head": self.H, "at": "yesterday"}]))
+        self.assertEqual([(r["pr"], r["at"]) for r in hv.load_reviewed(runs)],
+                         [(9, hv.epoch("2026-10-05T10:00:00Z"))])
+
+    def test_cli_misses_only_needs_reviewed(self):
+        res = subprocess.run([sys.executable, HARVEST, "--repo-dir", ROOT, "--repo", "test/demo",
+                              "--bots", "--misses-only"], capture_output=True, text=True, check=False)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("--misses-only needs", res.stderr)
+
+
+class HarvestCiTest(Tmp):
+    def run_(self, rid, wf, num, conclusion, sha, day, branch="main", event="push"):
+        return {"id": rid, "workflow_id": wf, "name": "CI %d" % wf, "run_number": num, "status": "completed",
+                "conclusion": conclusion, "head_sha": sha, "head_branch": branch, "event": event,
+                "created_at": day + "T12:00:00Z", "html_url": "https://github.com/t/d/actions/runs/%d" % rid}
+
+    def history(self):
+        repo = self.tmp
+        git(repo, "init", "-q", "-b", "main")
+        commit(repo, "chore: init", {"README.md": "x\n"})
+        good = commit(repo, "feat: a (#20)", {"lib/a.sh": lines(5)})
+        bad = commit(repo, "feat: b (#21)", {"lib/a.sh": lines(5, {4: "broken"})})
+        later = commit(repo, "docs: c (#22)", {"README.md": "y\n"})
+        return hv.read_history(repo, "main"), good, bad, later
+
+    def test_red_after_green_is_tied_to_the_pr_and_its_lines(self):
+        (commits, show, _), good, bad, later = self.history()
+        runs = [self.run_(1, 1, 1, "success", good, "2026-10-02"),
+                self.run_(2, 1, 2, "failure", bad, "2026-10-03"),
+                self.run_(3, 1, 3, "failure", later, "2026-10-04"),     # still red: not a new break
+                self.run_(4, 2, 1, "timed_out", good, "2026-10-02"),    # nothing earlier: unknown
+                self.run_(5, 2, 2, "cancelled", bad, "2026-10-03"),     # undecided, skipped
+                self.run_(6, 2, 3, "success", later, "2026-10-04"),
+                self.run_(7, 3, 1, "failure", bad, "2026-10-03", branch="feature"),
+                self.run_(8, 3, 2, "failure", bad, "2026-10-03", event="pull_request"),
+                self.run_(9, 4, 1, "failure", "f" * 40, "2026-10-03")]  # not on this ref
+        found = hv.ci_candidates(runs, commits, "t/d", show, "main", "2026-10-01", "2026-10-31",
+                                 jobs={2: [{"job": "test", "steps": ["bats"]}]})
+        by_id = {c["run_id"]: c for c in found}
+        self.assertEqual(sorted(by_id), [2, 4, 9])
+        hit = by_id[2]
+        self.assertEqual((hit["pr"], hit["head"], hit["previous"]), (21, bad, "success"))
+        self.assertEqual(hit["base"], good)
+        self.assertEqual(hit["hunks"], [{"file": "lib/a.sh", "line": 4}])
+        self.assertEqual(hit["failed_jobs"], [{"job": "test", "steps": ["bats"]}])
+        self.assertEqual(by_id[4]["previous"], "unknown")
+        self.assertEqual((by_id[9]["pr"], by_id[9]["hunks"]), (None, []))
+        self.assertIn("not on this ref", by_id[9]["note"])
+        # The lookback run before --since gives `previous`; it is not a candidate itself.
+        found = hv.ci_candidates(runs, commits, "t/d", show, "main", "2026-10-03", "2026-10-03")
+        self.assertEqual([c["run_id"] for c in found], [2, 9])
+
+    def test_harvest_ci_queries_with_lookback_and_fetches_failed_jobs(self):
+        (commits, show, _), good, bad, _ = self.history()
+        calls = []
+        runs = [self.run_(2, 1, 2, "failure", bad, "2026-10-03"), self.run_(1, 1, 1, "success", good, "2026-09-28")]
+        jobs = {"jobs": [{"name": "lint", "conclusion": "success", "steps": []},
+                         {"name": "test", "conclusion": "failure",
+                          "steps": [{"name": "setup", "conclusion": "success"},
+                                    {"name": "bats", "conclusion": "failure"}]}]}
+
+        filler = [{"name": "matrix %d" % i, "conclusion": "success", "steps": []} for i in range(100)]
+
+        def get(path, params=None):
+            calls.append((path, params))
+            if path.endswith("/actions/runs"):
+                return {"workflow_runs": runs}
+            return {"jobs": filler} if params["page"] == 1 else jobs  # the failure is on page 2
+
+        found, truncated = hv.harvest_ci("t/d", "main", "2026-10-01", "2026-10-31", commits, show, get=get)
+        self.assertFalse(truncated)
+        self.assertEqual(calls[0][1]["created"], "2026-09-24..2026-10-31")
+        self.assertEqual((calls[0][1]["branch"], calls[0][1]["event"]), ("main", "push"))
+        self.assertEqual([(c[0], c[1]["page"]) for c in calls[1:]],
+                         [("repos/t/d/actions/runs/2/jobs", 1), ("repos/t/d/actions/runs/2/jobs", 2)])
+        self.assertEqual([c["run_id"] for c in found], [2])
+        self.assertEqual(found[0]["previous"], "success")
+        self.assertEqual(found[0]["failed_jobs"], [{"job": "test", "steps": ["bats"]}])
 
 
 if __name__ == "__main__":
