@@ -6,6 +6,7 @@
  * are checked in the contract's order and the first match wins.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.NEEDS_INPUT_INSTRUCTION = void 0;
 exports.parseResult = parseResult;
 exports.classifyTurn = classifyTurn;
 exports.needsInput = needsInput;
@@ -123,6 +124,9 @@ function classifyTurn(outcome) {
             `agy exited with ${outcome.exitCode ?? outcome.signal ?? 'unknown'}`,
     };
 }
+/** Appended to every implement-turn prompt so a blocked turn can say so. */
+exports.NEEDS_INPUT_INSTRUCTION = 'If you are blocked on a decision only the owner can make, stop and end ' +
+    'your reply with one final line of the form `NEEDS_INPUT: <question>`.';
 /**
  * The `NEEDS_INPUT: <question>` marker an implement turn's prompt asks for.
  * Only this line marks a run as needing a reply; supervise never guesses.

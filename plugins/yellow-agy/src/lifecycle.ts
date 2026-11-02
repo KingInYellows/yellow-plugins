@@ -12,7 +12,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import type { AgyResult, TurnClass, TurnOutcome } from './classify';
-import { classifyTurn, needsInput, structuredOutput } from './classify';
+import {
+  classifyTurn,
+  NEEDS_INPUT_INSTRUCTION,
+  needsInput,
+  structuredOutput,
+} from './classify';
 import type { AgyErrorCode } from './errors';
 import { AgyError } from './errors';
 import type { HostExec } from './host-exec';
@@ -803,7 +808,7 @@ export class Lifecycle {
       cls = await this.turn(
         requestId,
         task.worktree,
-        prompt,
+        `${prompt}\n\n${NEEDS_INPUT_INSTRUCTION}`,
         profile,
         task.conversationId,
         false

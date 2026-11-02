@@ -268,6 +268,8 @@ describe('Lifecycle', () => {
       requiresAttention: true,
       question: 'which file?',
     });
+    // The implement prompt asks for the marker.
+    expect(h.calls[1]?.args.some((a) => a.includes('NEEDS_INPUT:'))).toBe(true);
   });
 
   it('a failed delegate turn leaves a FAILED task with its worktree', async () => {

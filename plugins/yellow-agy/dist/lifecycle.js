@@ -599,7 +599,7 @@ class Lifecycle {
         }
         let cls;
         try {
-            cls = await this.turn(requestId, task.worktree, prompt, profile, task.conversationId, false);
+            cls = await this.turn(requestId, task.worktree, `${prompt}\n\n${classify_1.NEEDS_INPUT_INSTRUCTION}`, profile, task.conversationId, false);
         }
         catch (err) {
             const code = err instanceof errors_1.AgyError ? err.code : 'AGY_INTERNAL';

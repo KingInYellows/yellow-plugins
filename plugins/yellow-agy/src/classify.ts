@@ -184,6 +184,11 @@ export function classifyTurn(outcome: TurnOutcome): TurnClass {
   };
 }
 
+/** Appended to every implement-turn prompt so a blocked turn can say so. */
+export const NEEDS_INPUT_INSTRUCTION =
+  'If you are blocked on a decision only the owner can make, stop and end ' +
+  'your reply with one final line of the form `NEEDS_INPUT: <question>`.';
+
 /**
  * The `NEEDS_INPUT: <question>` marker an implement turn's prompt asks for.
  * Only this line marks a run as needing a reply; supervise never guesses.
