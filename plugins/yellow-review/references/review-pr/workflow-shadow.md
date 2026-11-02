@@ -59,19 +59,20 @@ esac
 
 Build `args` as a JSON object, not a JSON-encoded string:
 
-| Key             | Value                                                                                                                       |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `repo`          | `owner/name` from `gh repo view`                                                                                            |
-| `pr`            | the PR number                                                                                                               |
-| `base`, `head`  | the merge-base and head SHAs printed above                                                                                  |
-| `tier`          | the Step 3a2 tier; `high` when it is `unknown`                                                                              |
-| `diff_path`     | the `diff_path` printed above                                                                                               |
-| `repo_root`     | the `repo_root` printed above                                                                                               |
-| `changed_files` | the PR's changed paths, repo-relative (`git diff --name-only "<DIFF_BASE>"...HEAD`)                                         |
-| `review_md`     | the `REVIEW.md` text, or `null`                                                                                             |
-| `include`       | the final Step 4 reviewer set by bare agent name (`correctness-reviewer`), without `code-simplifier` and the learnings pass |
-| `exclude`       | `reviewer_set.exclude`, or `[]`                                                                                             |
-| `dismissed`     | one `{file, line, rule}` per `<finding>` in the Step 3e dismissed-findings block (see below), or `[]`                       |
+| Key                | Value                                                                                                                       |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `repo`             | `owner/name` from `gh repo view`                                                                                            |
+| `pr`               | the PR number                                                                                                               |
+| `base`, `head`     | the merge-base and head SHAs printed above                                                                                  |
+| `tier`             | the Step 3a2 tier; `high` when it is `unknown`                                                                              |
+| `diff_path`        | the `diff_path` printed above                                                                                               |
+| `repo_root`        | the `repo_root` printed above                                                                                               |
+| `changed_files`    | the PR's changed paths, repo-relative (`git diff --name-only "<DIFF_BASE>"...HEAD`)                                         |
+| `review_md`        | the `REVIEW.md` text, or `null`                                                                                             |
+| `include`          | the final Step 4 reviewer set by bare agent name (`correctness-reviewer`), without `code-simplifier` and the learnings pass |
+| `exclude`          | `reviewer_set.exclude`, or `[]`                                                                                             |
+| `dismissed`        | one `{file, line, rule}` per `<finding>` in the Step 3e dismissed-findings block (see below), or `[]`                       |
+| `file_line_counts` | only when `include` has `thermonuclear-reviewer`: see below                                                                 |
 
 The Step 3e block (`review-ledger.sh dismissed-context`) prints each entry as
 `<finding><where>FILE:LINE</where><rule>CATEGORY/RULE</rule><scope>…</scope><reason>…</reason></finding>`,
@@ -84,6 +85,13 @@ XML-escaped. For each entry:
 - Unescape `file` and `rule`: `&lt;` to `<`, `&gt;` to `>`, then `&amp;` to `&`.
 - Leave out `<scope>` and `<reason>`: they are free text from the ledger, and
   the workflow matches on file, line within 3 and `rule`.
+
+When `include` has `thermonuclear-reviewer`, run the Step 5 item 6
+`file-line-counts` block now and check its output as item 6 says. Pass the
+header line and the rows after it, up to but not including the footer, as the
+`file_line_counts` string, without the fence, the tags or any escaping: the
+workflow adds those. Leave the key out whenever item 6 would omit the block.
+Without it the workflow's thermonuclear hunter reports no size findings.
 
 ## Launch
 

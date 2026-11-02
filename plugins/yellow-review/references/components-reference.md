@@ -653,10 +653,12 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   - **Args (fixed contract):**
     `{repo, pr, base, head, tier, diff_path, changed_files, review_md, include, exclude, dismissed}`,
     plus the optional `repo_root` (absolute path of a checkout at `head` that
-    agents read instead of the session's working tree). `dismissed` entries are
-    `{file, line, rule?, title?}`; an entry without an integer `line` is skipped
-    with a log line. Bad input throws `review-gate: invalid args: <reason>`
-    before any agent runs.
+    agents read instead of the session's working tree) and `file_line_counts`
+    (the `file-line-counts` header and exactly `rows=` rows; only
+    `thermonuclear-reviewer` gets it, fenced, for its size rule). `dismissed`
+    entries are `{file, line, rule?, title?}`; an entry without an integer
+    `line` is skipped with a log line. Bad input throws
+    `review-gate: invalid args: <reason>` before any agent runs.
   - **Hunt:** one agent per `include` name not in `exclude`, compared by bare
     persona name (the part after the last `:`), launched by `agentType`
     (`yellow-review:review:<name>`, `yellow-core:review:<name>`,

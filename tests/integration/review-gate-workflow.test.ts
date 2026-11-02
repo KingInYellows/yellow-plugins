@@ -402,6 +402,42 @@ describe('review-gate Hunt', () => {
   });
 });
 
+describe('review-gate file line counts', () => {
+  const counts =
+    'file-line-counts rows=1 dropped=0 skipped=0\nsrc/<a>.sh base=986 head=1034\n';
+
+  it('gives the counts only to thermonuclear-reviewer, fenced and escaped', async () => {
+    const r = await run(
+      baseArgs({
+        include: ['correctness-reviewer', 'thermonuclear-reviewer'],
+        file_line_counts: counts,
+      })
+    );
+    const prompts = Object.fromEntries(
+      r.calls
+        .filter((c) => c.opts.phase === 'Hunt')
+        .map((c) => [String(c.opts.label).replace(/^hunt /, ''), c.prompt])
+    );
+    expect(prompts['thermonuclear-reviewer']).toContain(
+      '--- begin file-line-counts (reference only) ---\n<file-line-counts>\nfile-line-counts rows=1 dropped=0 skipped=0\nsrc/&lt;a&gt;.sh base=986 head=1034\n</file-line-counts>\n--- end file-line-counts ---'
+    );
+    expect(prompts['correctness-reviewer']).not.toContain('file-line-counts');
+  });
+
+  it.each([
+    [
+      'a missing row',
+      'file-line-counts rows=2 dropped=0 skipped=0\na.sh base=1 head=2',
+    ],
+    ['no header', 'a.sh base=1 head=2'],
+    ['a non-string', 7],
+  ])('refuses counts with %s', async (_why, value) => {
+    await expect(run(baseArgs({ file_line_counts: value }))).rejects.toThrow(
+      /file_line_counts/
+    );
+  });
+});
+
 describe('review-gate dedup', () => {
   it('merges same file, same category, lines within 3, and keeps the rest', async () => {
     const r = await run(
