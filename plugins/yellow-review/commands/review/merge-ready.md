@@ -87,24 +87,28 @@ MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens
   ledger has unreadable records, any of which may be a pending finding): add the
   `skipped` count to the row. Name `/review:triage <PR#>` when the ledger
   blocks.
-- `Approval` comes from the `approval` object. The tier is `classify-risk`
-  over the PR's files with `.github/review-risk.json` read at the default
-  branch's tip, so neither the PR nor a parent PR in its stack can lower it.
-  `yellow-plugins.local.md` key `review_approval_gate` sets the mode: `off`
-  (row reads `off`, no lookups), `advisory` (default: list `missing`, the
-  verdict ignores it) or `enforce` (`approval_required`, `approval_stale` and
+- `Approval` comes from the `approval` object. The tier is `classify-risk` over
+  the PR's files with `.github/review-risk.json` read at the default branch's
+  tip, so neither the PR nor a parent PR in its stack can lower it.
+  `yellow-plugins.local.md` key `review_approval_gate` sets the mode: `off` (row
+  reads `off`, no lookups), `advisory` (default: list `missing`, the verdict
+  ignores it) or `enforce` (`approval_required`, `approval_stale` and
   `cross_lineage_missing` block; `tier_unknown`, `reviews_unknown` and
-  `fresh_review_unknown` make the verdict `unknown`). Low needs no human;
-  medium and high need one approving review on the head SHA from a login in
-  `review_approval_humans` (default: the repository owner); a bot's approval
-  or one on an older commit never counts. High also needs a review on the head
-  by a login in `review_cross_lineage_bots`; `freshReview` is always unknown
-  until the ledger records the head of each review run.
+  `fresh_review_unknown` make the verdict `unknown`). Low needs no human; medium
+  and high need approval of the head SHA by a login in `review_approval_humans`
+  (default: the repository owner): an approving review on that commit, or that
+  login adding the `graphite-queue` label after the head arrived (GitHub will
+  not let the owner approve their own PR, so the owner approves by queueing).
+  `humanApproval.via` says which. A bot's approval or label, or one from before
+  the head, never counts (`approval_stale`); a label whose timing cannot be
+  checked is `head_time_unknown`. High also needs a review on the head by a
+  login in `review_cross_lineage_bots`; `freshReview` is always unknown until
+  the ledger records the head of each review run.
 - For `blocked`, end with the next step for each blocker: `/review:resolve` for
   threads, the reviewer for changes requested, the failing check names for CI, a
-  rebase for conflicts, an approving review on the head commit for
-  `approval_required` or `approval_stale`, a Codex review of the head for
-  `cross_lineage_missing`.
+  rebase for conflicts, the user adding `graphite-queue` again (or approving the
+  head commit) for `approval_required` or `approval_stale`, a Codex review of
+  the head for `cross_lineage_missing`.
 - For `unknown`, say what could not be read and suggest re-running; an unknown
   is never reported as ready. `merge_state` means GitHub reports the merge as
   `BLOCKED` for a reason none of the rows show, often a required check that

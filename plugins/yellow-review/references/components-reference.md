@@ -180,14 +180,16 @@ flags, exit codes, trust-boundary rules and library behavior.
   one GraphQL read of the PR state and head-commit status-check rollup, then
   `review-ledger.sh summary`; prints one JSON report (verdict, `blockers`,
   `unknowns`, per-source detail) and exits 0 ready, 1 blocked, 3 unknown, 2
-  usage. Worst case about 370 s (the callers' Bash timeout is 420000 ms).
-  Unless `review_approval_gate` is `off`, it also reads the PR's reviews, its
-  files (files API, old paths of renames included) and
-  `.github/review-risk.json` at the default branch tip (contents API), pipes
-  the paths into `classify-risk --policy-file <tmp> --stdin`, and reports an
-  `approval` object: tier, required humans (0 or 1), a listed human's
-  approval on the head SHA, the high-tier cross-lineage review on the head,
-  and `missing` tokens, which block only under `enforce`
+  usage. Worst case about 370 s (the callers' Bash timeout is 420000 ms). Unless
+  `review_approval_gate` is `off`, it also reads the PR's reviews, its files
+  (files API, old paths of renames included) and `.github/review-risk.json` at
+  the default branch tip (contents API), pipes the paths into
+  `classify-risk --policy-file <tmp> --stdin`, and reports an `approval` object:
+  tier, required humans (0 or 1), a listed human's approval of the head SHA (an
+  approving review on it, or adding `graphite-queue` after the head arrived: the
+  later of its committer date and its first check suite), the high-tier
+  cross-lineage review on the head, and `missing` tokens, which block only under
+  `enforce`
 - `classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>`
   (or `--stdin [--numstat] [<base-ref>]` with paths, or
   `<added>\t<deleted>\t<path>` numstat rows, one per line on stdin) — Review

@@ -55,14 +55,19 @@
 # repository's default branch, never the PR head or its base branch (in a
 # stack the base is the parent PR's unmerged branch, which could weaken the
 # policy for the child). No policy there is default medium (policy none).
-# low needs no human; medium needs one APPROVED review on the head SHA by a
-# listed human (a User account, never a Bot; an approval on an older commit
-# only is approval_stale); high needs the same plus a review on the head SHA
+# low needs no human; medium needs a listed human's approval of the head SHA
+# (a User account, never a Bot): an APPROVED review on it, or adding the
+# graphite-queue label at or after the time the head arrived, which is the
+# later of its committer date and its first check suite (GitHub blocks
+# self-approval, so the owner approves by queueing; humanApproval.via is
+# review or label). An approval or label from before the head only is
+# approval_stale; a label with no readable head time is head_time_unknown.
+# high needs the same plus a review on the head SHA
 # by a listed cross-lineage bot. freshReview is always null: the review
 # ledger records a head SHA per finding, not per run, and a clean run writes
 # no record, so nothing proves a fresh review of the head (missing token
 # fresh_review_unknown). Other missing tokens: approval_required,
-# approval_stale, cross_lineage_missing, tier_unknown (the file list, the
+# approval_stale, cross_lineage_missing, head_time_unknown, tier_unknown (the file list, the
 # policy or the classification failed, or the head moved during the run;
 # required is then null and no other token is listed), reviews_unknown.
 # Config: yellow-plugins.local.md at the root of a checkout of <owner/repo>,
@@ -211,6 +216,10 @@ jq -n -c --rawfile text "$WORK/config" --arg file "$CFG_FILE" '
 }
 jq -r '.warnings[]' "$WORK/acfg" | while IFS= read -r w; do note "Warning: $w"; done
 APPROVAL_MODE=$(jq -r '.mode' "$WORK/acfg")
+# The label whose addition by a listed human counts as approval: GitHub will
+# not let a repository owner approve their own PR, so the owner approves by
+# queueing it. Claude adds this label only to low-tier PRs.
+APPROVAL_LABEL=graphite-queue
 
 # --- Threads and reviews run in the background (each can take minutes) ---
 THREADS_RC=0
@@ -291,6 +300,12 @@ query MergeReadyApproval($owner: String!, $name: String!, $number: Int!) {
       reviews(last: 100) {
         nodes { state author { __typename login } commit { oid } }
       }
+      commits(last: 1) {
+        nodes { commit { oid committedDate checkSuites(first: 100) { nodes { createdAt } } } }
+      }
+      timelineItems(last: 100, itemTypes: [LABELED_EVENT]) {
+        nodes { ... on LabeledEvent { createdAt label { name } actor { __typename login } } }
+      }
     }
   }
 }'
@@ -298,6 +313,7 @@ TIER=unknown
 POLICY=null
 A_HEAD=""
 printf 'null' >"$WORK/reviews"
+printf '{"headTime":null,"events":null}' >"$WORK/labels"
 if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
     A_RC=0
     rg_gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
@@ -329,6 +345,21 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
             A_HEAD=""
         else
             jq '.data.repository.pullRequest.reviews.nodes' "$WORK/approval.raw" >"$WORK/reviews"
+            # Label approval: who added the label and when, against the time
+            # the head arrived. That time is the later of the head commit's
+            # committer date and its first check suite (set by GitHub at
+            # push), so an old committer date cannot predate a fresh push.
+            jq -c --arg h "$A_HEAD" '
+              .data.repository.pullRequest as $p
+              | ([($p.commits.nodes // [])[] | .commit | select(.oid == $h)] | first) as $c
+              | {headTime: (if $c == null or ($c.committedDate | type) != "string" then null
+                            else ([$c.committedDate]
+                                  + ([($c.checkSuites.nodes // [])[] | .createdAt | strings] | sort | .[:1]))
+                                 | max end),
+                 events: (if ($p.timelineItems.nodes | type) == "array"
+                          then [$p.timelineItems.nodes[] | select(type == "object" and (.createdAt | type) == "string")]
+                          else null end)}' "$WORK/approval.raw" >"$WORK/labels" 2>/dev/null \
+              || printf '{"headTime":null,"events":null}' >"$WORK/labels"
         fi
     fi
     if [ -n "$A_HEAD" ]; then
@@ -376,7 +407,8 @@ fi
 
 jq -n -c \
     --arg mode "$APPROVAL_MODE" --arg tier "$TIER" --arg policy "$POLICY" --arg head "$A_HEAD" \
-    --arg owner "$OWNER" --slurpfile cfg "$WORK/acfg" --slurpfile rev "$WORK/reviews" '
+    --arg owner "$OWNER" --slurpfile cfg "$WORK/acfg" --slurpfile rev "$WORK/reviews" \
+    --arg label "$APPROVAL_LABEL" --slurpfile lab "$WORK/labels" '
   def norm: ascii_downcase | sub("\\[bot\\]\\z"; "");
   if $mode == "off" then
     {mode: "off", tier: null, policy: null, required: null, humanApproval: null,
@@ -389,18 +421,26 @@ jq -n -c \
           and ((.author.login // "") | test("\\[bot\\]\\z") | not)
           and ((.author.login // "") | ascii_downcase | IN($humans[])))] as $appr
     | ([$appr[] | select(.commit.oid == $head)] | last) as $onhead
+    | $lab[0].headTime as $ht
+    | [($lab[0].events // [])[] | select(.label.name == $label and .actor.__typename == "User"
+          and ((.actor.login // "") | test("\\[bot\\]\\z") | not)
+          and ((.actor.login // "") | ascii_downcase | IN($humans[])))] as $lbl
+    | (if $ht == null then null else ([$lbl[] | select(.createdAt >= $ht)] | last) end) as $lblhead
     | (if $r == null then null
        else any($r[]; ((.author.login // "") | norm | IN($bots[])) and .commit.oid == $head) end) as $xl
     | {mode: $mode, tier: $tier, policy: (if $policy == "null" then null else $policy end),
        required: ({low: 0, medium: 1, high: 1}[$tier]),
-       humanApproval: (if $onhead == null then null else {login: $onhead.author.login, commit: $onhead.commit.oid} end),
+       humanApproval: (if $onhead != null then {login: $onhead.author.login, commit: $onhead.commit.oid, via: "review"}
+                       elif $lblhead != null then {login: $lblhead.actor.login, commit: $head, via: "label", at: $lblhead.createdAt}
+                       else null end),
        extras: {crossLineage: (if $tier == "high" then $xl else null end), freshReview: null},
        missing: (
          if $tier == "unknown" then ["tier_unknown"]
          elif $tier == "low" then []
-         else (if $r == null then ["reviews_unknown"]
-               elif $onhead != null then []
-               elif ($appr | length) > 0 then ["approval_stale"]
+         else (if $onhead != null or $lblhead != null then []
+               elif $r == null then ["reviews_unknown"]
+               elif ($lbl | length) > 0 and $ht == null then ["head_time_unknown"]
+               elif ($appr | length) > 0 or ($lbl | length) > 0 then ["approval_stale"]
                else ["approval_required"] end)
               + (if $tier == "high" then
                    (if $xl == false then ["cross_lineage_missing"] else [] end) + ["fresh_review_unknown"]

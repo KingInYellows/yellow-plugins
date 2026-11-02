@@ -71,11 +71,23 @@ with_files() {
   MOCK_GH_MRA_BODY=$(approval_body "${REVIEWS:-[]}" "$#")
 }
 
-# approval_body <reviews-json> <changedFiles> [head]
+# approval_body <reviews-json> <changedFiles> [head]: the head commit was
+# committed at HEAD_AT and its first check suite created at SUITE_AT; label
+# events come from LABELS (default none).
 approval_body() {
   jq -nc --arg h "${3:-$HEAD_SHA}" --arg d "$DEFAULT_OID" --argjson r "$1" --argjson n "$2" \
+    --arg ca "${HEAD_AT:-2026-11-02T10:00:00Z}" --arg sa "${SUITE_AT:-2026-11-02T10:01:00Z}" \
+    --argjson l "${LABELS:-[]}" \
     '{data:{repository:{defaultBranchRef:{target:{oid:$d}},
-      pullRequest:{headRefOid:$h, changedFiles:$n, reviews:{nodes:$r}}}}}'
+      pullRequest:{headRefOid:$h, changedFiles:$n, reviews:{nodes:$r},
+        commits:{nodes:[{commit:{oid:$h, committedDate:$ca, checkSuites:{nodes:[{createdAt:$sa}]}}}]},
+        timelineItems:{nodes:$l}}}}}'
+}
+
+# lb <login> <User|Bot> <createdAt> [label]: one LabeledEvent node.
+lb() {
+  jq -nc --arg l "$1" --arg t "$2" --arg c "$3" --arg n "${4:-graphite-queue}" \
+    '{createdAt:$c, label:{name:$n}, actor:{__typename:$t, login:$l}}'
 }
 
 # config <frontmatter lines>: an untracked yellow-plugins.local.md.
@@ -368,8 +380,46 @@ state_body() {
   REVIEWS="[$(rv APPROVED Test User "$HEAD_SHA")]" with_files src/a.js
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 0 ]
-  [ "$(jq -c .approval.humanApproval <<<"$output")" = "{\"login\":\"Test\",\"commit\":\"$HEAD_SHA\"}" ]
+  [ "$(jq -c .approval.humanApproval <<<"$output")" = "{\"login\":\"Test\",\"commit\":\"$HEAD_SHA\",\"via\":\"review\"}" ]
   [ "$(jq -c .approval.missing <<<"$output")" = '[]' ]
+}
+
+@test "CLAUDE-234: the owner adding graphite-queue after the head arrived approves" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -c .approval.humanApproval <<<"$output")" = "{\"login\":\"Test\",\"commit\":\"$HEAD_SHA\",\"via\":\"label\",\"at\":\"2026-11-02T10:05:00Z\"}" ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '[]' ]
+}
+
+@test "CLAUDE-234: a label added before the head's push is stale, whatever the commit date" {
+  config 'review_approval_gate: enforce'
+  # Committed long before, pushed (first check suite) after the label.
+  HEAD_AT=2026-11-01T00:00:00Z SUITE_AT=2026-11-02T11:00:00Z \
+    LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_stale"]' ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+}
+
+@test "CLAUDE-234: other labels, bots and unlisted accounts never approve by label" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z other),$(lb Test Bot 2026-11-02T10:05:00Z),$(lb 'test[bot]' User 2026-11-02T10:05:00Z),$(lb mallory User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_required"]' ]
+}
+
+@test "CLAUDE-234: a label with no readable head time is unknown, not approval" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  MOCK_GH_MRA_BODY=$(jq -c 'del(.data.repository.pullRequest.commits)' <<<"$MOCK_GH_MRA_BODY")
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["head_time_unknown"]' ]
+  [ "$(jq -c .unknowns <<<"$output")" = '["approval"]' ]
 }
 
 @test "CLAUDE-234: an approval on an older commit is stale" {

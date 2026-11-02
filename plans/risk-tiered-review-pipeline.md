@@ -260,22 +260,25 @@ number of humans.
 | Tier   | Requirement before `graphite-queue`                                                                                                                                                                                      |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Low    | All Important findings answered, CI green, `check-merge-ready` ready. Claude may add the label itself (the existing standing approval).                                                                                  |
-| Medium | The above, plus an approving GitHub review from KingInYellow18 **on the head SHA**.                                                                                                                                      |
-| High   | Same single approval from KingInYellow18 on the head SHA, plus automated extras before it: a cross-lineage pass (Codex or council) with no unanswered Important, and a fresh `review-gate` run on the final head commit. |
+| Medium | The above, plus KingInYellow18's approval **of the head SHA**: adding `graphite-queue` after the head arrived (chosen 2026-11-02), or an approving review on it.                                                         |
+| High   | Same single approval from KingInYellow18 of the head SHA, plus automated extras before it: a cross-lineage pass (Codex or council) with no unanswered Important, and a fresh `review-gate` run on the final head commit. |
 
 Rules from the infographic kept literally:
 
 - **An agent's approval never counts.** `check-merge-ready` accepts only a
   review by a listed human login; bot and Claude approvals are ignored.
 - **An approval covers one commit.** Compare the approving review's `commit_id`
-  with the head SHA; any later push invalidates it. A repo ruleset with "dismiss
-  stale approvals" enforces the same on GitHub's side.
+  with the head SHA, or the label event's time with the time the head arrived
+  (the later of its committer date and its first check suite); any later push
+  invalidates it. GitHub will not let the owner approve their own PR, so on
+  2026-11-02 the user chose the label as their approval. Claude acts through the
+  same account, so it must never add the label to a medium or high PR. A repo
+  ruleset with "dismiss stale approvals" enforces the same on GitHub's side.
 - **The change sets the tier.** The tier is recomputed on every push and posted
   in the sticky comment `sync-blocking-comment` already maintains.
 
-This changes the standing approval in [[graphite]]: Claude would add
-`graphite-queue` only for low-tier PRs. That is the user's call (open question
-1).
+This changes the standing approval in [[graphite]]: Claude adds `graphite-queue`
+only for low-tier PRs.
 
 ## 6. Stage-by-stage map: existing vs new
 
