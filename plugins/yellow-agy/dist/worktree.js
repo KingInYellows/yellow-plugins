@@ -98,21 +98,27 @@ async function createWorktree(exec, options) {
             '--verify',
             `${fetched}^{commit}`,
         ]));
+        // Create the branch atomically (`create` fails if the ref exists), so a
+        // failed `worktree add` below only ever rolls back a branch this call made.
+        const created = await exec.git(['update-ref', '--stdin'], {
+            cwd: options.repo,
+            stdin: `create refs/heads/${options.branch} ${base}\n`,
+        });
+        if (created.code !== 0) {
+            throw new errors_1.AgyError('AGY_WORKTREE', `branch ${options.branch} already exists; delegate needs a new branch`);
+        }
         try {
             await git(exec, options.repo, [
                 'worktree',
                 'add',
-                '-b',
-                options.branch,
                 '--',
                 options.worktree,
-                base,
+                options.branch,
             ]);
         }
         catch (err) {
-            // `worktree add -b` creates the branch before it checks the path, and
-            // a failure does not roll that back; the branch would then block every
-            // retry with no task left to abandon.
+            // Without the rollback, the branch would block every retry with no
+            // task left to abandon.
             await dropUnusedBranch(exec, options.repo, options.branch, base);
             throw err;
         }
@@ -128,8 +134,9 @@ async function createWorktree(exec, options) {
 }
 const FETCH_REF_PREFIX = 'refs/yellow-agy/fetch/';
 /**
- * Deletes `branch` after a failed `worktree add`, best effort, but only while
- * no worktree has it checked out and it still points at `base`.
+ * Deletes `branch`, which this run just created, after a failed
+ * `worktree add`; best effort, and only while no worktree has it checked out
+ * and it still points at `base`.
  */
 async function dropUnusedBranch(exec, repo, branch, base) {
     const ref = `refs/heads/${branch}`;

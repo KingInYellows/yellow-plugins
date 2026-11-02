@@ -87,6 +87,33 @@ describe('worktree', () => {
     expect(git(wt, 'branch', '--show-current').trim()).toBe('agy/busy');
   });
 
+  it('leaves alone a branch another creator made after the existence check', async () => {
+    const { repo, root } = makeRepo();
+    const racing = {
+      ...exec,
+      git: async (
+        args: readonly string[],
+        o: Parameters<typeof exec.git>[1]
+      ) => {
+        if (args[0] === 'update-ref' && args[1] === '--stdin') {
+          git(repo, 'branch', 'agy/race', 'main');
+        }
+        return exec.git(args, o);
+      },
+    };
+    const sha = git(repo, 'rev-parse', 'main').trim();
+    await expect(
+      createWorktree(racing, {
+        repo,
+        worktree: path.join(root, 'wt', 'race'),
+        branch: 'agy/race',
+        remote: 'origin',
+        baseBranch: 'main',
+      })
+    ).rejects.toMatchObject({ code: 'AGY_WORKTREE' });
+    expect(git(repo, 'rev-parse', 'agy/race').trim()).toBe(sha);
+  });
+
   it('rejects a .lock component anywhere in a branch name', () => {
     expect(() => validateBranchName('agy/x.lock/y')).toThrow(AgyError);
     expect(validateBranchName('agy/x.locked/y')).toBe('agy/x.locked/y');
