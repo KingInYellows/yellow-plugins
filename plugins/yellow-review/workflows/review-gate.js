@@ -245,18 +245,23 @@ function titleWords(t) {
     .filter((w) => w.length >= 3 && !STOPWORDS.includes(w));
 }
 
-// Two titles describe the same bug when one contains the other or their word
-// sets overlap by at least a fifth (Jaccard).
+// Two titles describe the same bug when they are equal, when one contains the
+// other and has at least two significant words, or when they share at least
+// two significant words and at least half of all their words (Jaccard). A single shared word is never enough: a loose match would merge
+// distinct defects and let one dismissed nit hide a new finding nearby.
 function similarTitles(a, b) {
   const x = normTitle(a);
   const y = normTitle(b);
   if (!x || !y) return false;
-  if (x.includes(y) || y.includes(x)) return true;
-  const wx = titleWords(a);
-  const wy = titleWords(b);
+  if (x === y) return true;
+  const wx = Array.from(new Set(titleWords(a)));
+  const wy = Array.from(new Set(titleWords(b)));
+  if (wx.length === 0 || wy.length === 0) return false;
+  const shorter = wx.length <= wy.length ? wx : wy;
+  if (shorter.length >= 2 && (x.includes(y) || y.includes(x))) return true;
   const inter = wx.filter((w) => wy.includes(w)).length;
   const union = new Set(wx.concat(wy)).size;
-  return union > 0 && inter / union >= 0.2;
+  return inter >= 2 && inter / union >= 0.5;
 }
 
 function cmp(a, b) {

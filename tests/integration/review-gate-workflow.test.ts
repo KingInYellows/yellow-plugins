@@ -422,7 +422,7 @@ describe('review-gate dedup', () => {
                   finding({
                     line: 13,
                     severity: 'P1',
-                    title: 'Path injection',
+                    title: 'Unquoted path breaks when spaces appear',
                     confidence: 100,
                     suggested_fix: 'Quote it',
                   }),
@@ -433,7 +433,9 @@ describe('review-gate dedup', () => {
     );
     const f = r.result.findings;
     expect(f).toHaveLength(3);
-    const mergedOne = f.find((x: Finding) => x.title === 'Path injection');
+    const mergedOne = f.find(
+      (x: Finding) => x.title === 'Unquoted path breaks when spaces appear'
+    );
     expect(mergedOne).toMatchObject({
       severity: 'P1',
       line: 13,
@@ -492,6 +494,28 @@ describe('review-gate dedup', () => {
       line: 13,
       reason: expect.stringMatching(/^merged into F\d+$/),
     });
+  });
+
+  it('needs two shared words and half the words to merge titles', async () => {
+    const r = await run(
+      baseArgs({
+        dismissed: [{ file: 'src/a.sh', line: 30, title: 'Path' }],
+      }),
+      {
+        hunter: (name) => ({
+          reviewer: name,
+          findings: [
+            finding({ line: 10 }),
+            finding({ line: 12, title: 'Path injection' }),
+            finding({ line: 30, severity: 'P1', title: 'Path traversal' }),
+          ],
+        }),
+      }
+    );
+    expect(r.result.findings.map((f: Finding) => f.line).sort()).toEqual([
+      10, 12, 30,
+    ]);
+    expect(r.result.dropped).toEqual([]);
   });
 
   it('keeps nearby findings with different known rules apart', async () => {

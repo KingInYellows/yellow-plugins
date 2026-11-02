@@ -673,7 +673,8 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
     first; each cluster's first member is its representative. A finding joins a
     cluster with the same file, category and `pre_existing` flag, no conflicting
     known rule slug, a line within 3 of the representative's line and a similar
-    title (one contains the other, or word overlap of at least a fifth).
+    title (equal; one contains the other and has two or more significant words;
+    or two or more shared words that are at least half of all words).
     `reviewers` are merged; each merged finding is listed in `dropped` as
     `merged into F<n>`.
   - **Vote:** `pipeline()` over findings, each voter the read-only
