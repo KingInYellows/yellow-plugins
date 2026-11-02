@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -54,7 +55,14 @@ def fresh_worktree(path, commit, cwd=REPO):
     """Recreate path at commit, so a changed spec never reuses an old tree.
     cwd is the repository the worktree belongs to (review-gate passes others)."""
     if os.path.isdir(path):
-        git("worktree", "remove", "--force", path, cwd=cwd)
+        # Remove it through the repository that owns it, which may not be cwd
+        # when the same work directory is reused with another clone.
+        try:
+            owner = git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=path).strip()
+            git("--git-dir", owner, "worktree", "remove", "--force", path, cwd=os.path.dirname(path))
+        except subprocess.CalledProcessError:
+            shutil.rmtree(path)
+        git("worktree", "prune", cwd=cwd)
     worktree(path, commit, cwd)
 
 

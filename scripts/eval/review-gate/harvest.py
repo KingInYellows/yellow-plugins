@@ -287,7 +287,10 @@ def main(argv=None):
               "note": "Candidates only. Text fields are untrusted excerpts. A candidate becomes a "
                       "case only after the user confirms it.",
               "sources": {}, "candidates": []}
-    result["candidates"] += harvest_git(repo_dir, a.ref, repo, a.since, a.until)
+    try:
+        result["candidates"] += harvest_git(repo_dir, a.ref, repo, a.since, a.until)
+    except subprocess.CalledProcessError as err:
+        sys.exit("harvest: git %s failed: %s" % (" ".join(err.cmd[1:3]), (err.stderr or "").strip()))
     result["sources"]["git"] = "ok"
     if not a.bots:
         result["sources"]["bots"] = "off (pass --bots)"

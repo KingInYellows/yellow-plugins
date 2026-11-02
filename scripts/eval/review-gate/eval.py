@@ -403,6 +403,8 @@ def run_one(row, work, claude, timeout):
     except subprocess.TimeoutExpired as err:
         rc, stdout, stderr = 124, err.stdout or "", "timeout after %ss" % timeout
         stdout = stdout.decode("utf-8", "replace") if isinstance(stdout, bytes) else stdout
+    except OSError as err:  # missing binary, or an argv over the kernel limit
+        rc, stdout, stderr = 127, "", "could not start %s: %s" % (claude, err)
     wall = round(time.monotonic() - start, 1)
     with open(os.path.join(out_dir, rid + ".err"), "w", encoding="utf-8") as handle:
         handle.write(stderr or "")
