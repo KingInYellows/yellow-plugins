@@ -583,12 +583,12 @@ describe('review-gate dedup', () => {
         findings: [
           finding({
             line: 10,
-            rule: 'invalid-json',
+            rule: 'null-handling',
             title: 'Validate input before parsing',
           }),
           finding({
             line: 12,
-            rule: 'out-of-bounds',
+            rule: 'off-by-one',
             title: 'Validate input before indexing',
           }),
         ],
@@ -665,6 +665,34 @@ describe('review-gate dedup', () => {
     }
   });
 
+  it('folds categories and rules the way the ledger does', async () => {
+    const r = await run(
+      baseArgs({
+        dismissed: [
+          { file: 'src/a.sh', line: 10, rule: 'maintainability/dead-code' },
+        ],
+      }),
+      {
+        hunter: (name) => ({
+          reviewer: name,
+          findings: [
+            finding({ category: 'security-lens', rule: 'dead-code' }),
+            finding({
+              line: 30,
+              category: 'Error_Handling',
+              rule: 'not-a-slug',
+              title: 'Swallowed failure',
+            }),
+          ],
+        }),
+      }
+    );
+    expect(r.result.dropped.map((d: Finding) => d.line)).toEqual([10]);
+    expect(r.result.findings.map((f: Finding) => [f.category, f.rule])).toEqual(
+      [['reliability', 'unclassified']]
+    );
+  });
+
   it('keeps its category aliases in step with review-ledger-vocab.json', () => {
     const vocab = JSON.parse(
       readFileSync(
@@ -691,7 +719,7 @@ describe('review-gate dedup', () => {
     const r = await run(
       baseArgs({
         dismissed: [
-          { file: 'src/a.sh', line: 41, rule: 'security/token-leak' },
+          { file: 'src/a.sh', line: 41, rule: 'security/credential-exposure' },
           { file: 'src/a.sh', line: 50, rule: 'correctness/unclassified' },
           { file: 'src/a.sh', line: 60, rule: 'correctness/style' },
           { file: 'src/a.sh', line: null, rule: 'correctness/unclassified' },
@@ -705,7 +733,7 @@ describe('review-gate dedup', () => {
             finding({
               line: 40,
               category: 'security',
-              rule: 'token-leak',
+              rule: 'credential-exposure',
               title: 'Token leak',
             }),
             finding({ line: 41, title: 'Off by one in loop' }),

@@ -415,14 +415,27 @@ const CATEGORY_ALIASES = {
   style: 'maintainability',
 };
 
+const own = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+
+// Mirrors rl_vocab_lookup in lib/review-ledger.sh, which wrote the dismissed
+// rules: fold case, "_" and spaces to "-", trim "-", map aliases, and file any
+// other category under maintainability.
 function normCategory(c) {
   const k = String(c || '')
     .toLowerCase()
-    .trim();
-  if (!k) return 'unclassified';
-  return Object.prototype.hasOwnProperty.call(CATEGORY_ALIASES, k)
-    ? CATEGORY_ALIASES[k]
-    : k;
+    .replace(/[_ ]/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
+  if (own(CATEGORY_RULES, k)) return k;
+  if (own(CATEGORY_ALIASES, k)) return CATEGORY_ALIASES[k];
+  return 'maintainability';
+}
+
+// A rule outside its category's slug list is "unclassified", as in the ledger.
+function normRule(category, rule) {
+  return typeof rule === 'string' && CATEGORY_RULES[category].includes(rule)
+    ? rule
+    : 'unclassified';
 }
 
 function cmp(a, b) {
@@ -870,7 +883,7 @@ hunters.forEach((name, i) => {
       title: String(f.title),
       severity: SEVERITIES.includes(f.severity) ? f.severity : 'P3',
       category: normCategory(f.category),
-      rule: typeof f.rule === 'string' && f.rule ? f.rule : 'unclassified',
+      rule: normRule(normCategory(f.category), f.rule),
       file: cleanPath(f.file),
       line: f.line,
       confidence: typeof f.confidence === 'number' ? f.confidence : 0,
