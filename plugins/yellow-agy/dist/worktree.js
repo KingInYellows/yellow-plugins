@@ -218,7 +218,11 @@ function nulList(out) {
 }
 /** Ignored untracked paths that a reset to the snapshot could delete. */
 async function ignoredCollisions(exec, worktree, snapshot) {
-    const ignored = nulList(await git(exec, worktree, [
+    return collisionsWith(exec, worktree, snapshot, await ignoredPaths(exec, worktree));
+}
+/** Untracked ignored paths under the worktree's current rules; dirs end in `/`. */
+async function ignoredPaths(exec, worktree) {
+    return nulList(await git(exec, worktree, [
         'ls-files',
         '--others',
         '--ignored',
@@ -226,6 +230,8 @@ async function ignoredCollisions(exec, worktree, snapshot) {
         '--directory',
         '-z',
     ]));
+}
+async function collisionsWith(exec, worktree, snapshot, ignored) {
     if (ignored.length === 0)
         return [];
     const tracked = new Set();
@@ -250,15 +256,29 @@ async function ignoredCollisions(exec, worktree, snapshot) {
 }
 /** Puts the worktree back to the snapshot, staged and unstaged parts as they were. */
 async function resetToSnapshot(exec, worktree, localId, snapshot) {
-    const collisions = await ignoredCollisions(exec, worktree, snapshot);
+    // Read once, under the rules in force now: the reset below swaps in other
+    // .gitignore files, which could make these paths look like delegate files.
+    const ignored = await ignoredPaths(exec, worktree);
+    const collisions = await collisionsWith(exec, worktree, snapshot, ignored);
     if (collisions.length > 0) {
         throw new errors_1.AgyError('AGY_WORKTREE', `ignored files would be overwritten by the reset: ${collisions.slice(0, 10).join(', ')}`, 'Move the named ignored files out of the worktree, then retry --reset-partial.');
     }
     await git(exec, worktree, ['reset', '--hard', snapshot.head]);
-    await git(exec, worktree, ['clean', '-fd']);
     await git(exec, worktree, ['read-tree', '--reset', '-u', snapshot.commit]);
+    // Clean against the snapshot's own tree and ignore rules, and keep every
+    // path that was ignored before the reset as well.
+    await git(exec, worktree, [
+        'clean',
+        '-fd',
+        ...ignored.flatMap((p) => ['-e', literalPattern(p)]),
+    ]);
     await git(exec, worktree, ['read-tree', snapshot.indexTree]);
     await dropSnapshotRefs(exec, worktree, localId);
+}
+/** An exclude pattern, anchored at the top, that matches only `path`. */
+function literalPattern(path) {
+    const escaped = path.replace(/[\\*?[\]]/g, '\\$&').replace(/ $/, '\\ ');
+    return `/${escaped}`;
 }
 async function dropSnapshotRefs(exec, worktree, localId) {
     const refs = snapshotRefs(localId);

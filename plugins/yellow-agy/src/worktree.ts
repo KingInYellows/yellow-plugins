@@ -303,7 +303,20 @@ export async function ignoredCollisions(
   worktree: string,
   snapshot: Pick<Snapshot, 'head' | 'commit'>
 ): Promise<string[]> {
-  const ignored = nulList(
+  return collisionsWith(
+    exec,
+    worktree,
+    snapshot,
+    await ignoredPaths(exec, worktree)
+  );
+}
+
+/** Untracked ignored paths under the worktree's current rules; dirs end in `/`. */
+async function ignoredPaths(
+  exec: HostExec,
+  worktree: string
+): Promise<string[]> {
+  return nulList(
     await git(exec, worktree, [
       'ls-files',
       '--others',
@@ -313,6 +326,14 @@ export async function ignoredCollisions(
       '-z',
     ])
   );
+}
+
+async function collisionsWith(
+  exec: HostExec,
+  worktree: string,
+  snapshot: Pick<Snapshot, 'head' | 'commit'>,
+  ignored: readonly string[]
+): Promise<string[]> {
   if (ignored.length === 0) return [];
   const tracked = new Set<string>();
   for (const rev of [snapshot.head, snapshot.commit]) {
@@ -344,7 +365,10 @@ export async function resetToSnapshot(
   localId: string,
   snapshot: Pick<Snapshot, 'head' | 'commit' | 'indexTree'>
 ): Promise<void> {
-  const collisions = await ignoredCollisions(exec, worktree, snapshot);
+  // Read once, under the rules in force now: the reset below swaps in other
+  // .gitignore files, which could make these paths look like delegate files.
+  const ignored = await ignoredPaths(exec, worktree);
+  const collisions = await collisionsWith(exec, worktree, snapshot, ignored);
   if (collisions.length > 0) {
     throw new AgyError(
       'AGY_WORKTREE',
@@ -353,10 +377,22 @@ export async function resetToSnapshot(
     );
   }
   await git(exec, worktree, ['reset', '--hard', snapshot.head]);
-  await git(exec, worktree, ['clean', '-fd']);
   await git(exec, worktree, ['read-tree', '--reset', '-u', snapshot.commit]);
+  // Clean against the snapshot's own tree and ignore rules, and keep every
+  // path that was ignored before the reset as well.
+  await git(exec, worktree, [
+    'clean',
+    '-fd',
+    ...ignored.flatMap((p) => ['-e', literalPattern(p)]),
+  ]);
   await git(exec, worktree, ['read-tree', snapshot.indexTree]);
   await dropSnapshotRefs(exec, worktree, localId);
+}
+
+/** An exclude pattern, anchored at the top, that matches only `path`. */
+function literalPattern(path: string): string {
+  const escaped = path.replace(/[\\*?[\]]/g, '\\$&').replace(/ $/, '\\ ');
+  return `/${escaped}`;
 }
 
 export async function dropSnapshotRefs(

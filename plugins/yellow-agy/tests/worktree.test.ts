@@ -160,6 +160,29 @@ describe('worktree', () => {
     expect(git(wt, 'for-each-ref', 'refs/yellow-agy/')).toBe('');
   });
 
+  it('reset keeps files ignored only by an uncommitted ignore rule', async () => {
+    const { wt } = await setup();
+    // Pre-turn: an uncommitted rule and the ignored file it protects, plus a
+    // special-character name to exercise pattern escaping.
+    fs.appendFileSync(path.join(wt, '.gitignore'), 'private.local\n[x]*.env\n');
+    fs.writeFileSync(path.join(wt, 'private.local'), 'secret\n');
+    fs.writeFileSync(path.join(wt, '[x]*.env'), 'k=v\n');
+    fs.writeFileSync(path.join(wt, 'untracked.txt'), 'pre\n');
+    const snap = await snapshotWorktree(exec, wt, 't1');
+    // The turn rewrites an untracked file and adds junk.
+    fs.writeFileSync(path.join(wt, 'untracked.txt'), 'agy\n');
+    fs.writeFileSync(path.join(wt, 'junk.txt'), 'junk\n');
+    await resetToSnapshot(exec, wt, 't1', snap);
+    expect(fs.readFileSync(path.join(wt, 'private.local'), 'utf8')).toBe(
+      'secret\n'
+    );
+    expect(fs.existsSync(path.join(wt, '[x]*.env'))).toBe(true);
+    expect(fs.readFileSync(path.join(wt, 'untracked.txt'), 'utf8')).toBe(
+      'pre\n'
+    );
+    expect(fs.existsSync(path.join(wt, 'junk.txt'))).toBe(false);
+  });
+
   it('refuses a reset that would delete an ignored file in the way', async () => {
     const { wt } = await setup();
     fs.mkdirSync(path.join(wt, 'build'));
