@@ -145,15 +145,23 @@ export async function createWorktree(
         `${fetched}^{commit}`,
       ])
     );
-    await git(exec, options.repo, [
-      'worktree',
-      'add',
-      '-b',
-      options.branch,
-      '--',
-      options.worktree,
-      base,
-    ]);
+    try {
+      await git(exec, options.repo, [
+        'worktree',
+        'add',
+        '-b',
+        options.branch,
+        '--',
+        options.worktree,
+        base,
+      ]);
+    } catch (err) {
+      // `worktree add -b` creates the branch before it checks the path, and
+      // a failure does not roll that back; the branch would then block every
+      // retry with no task left to abandon.
+      await dropUnusedBranch(exec, options.repo, options.branch, base);
+      throw err;
+    }
   } finally {
     // A failure here only pins objects until the next creation sweeps it;
     // it must not fail a worktree that now exists.
@@ -165,6 +173,27 @@ export async function createWorktree(
 }
 
 const FETCH_REF_PREFIX = 'refs/yellow-agy/fetch/';
+
+/**
+ * Deletes `branch` after a failed `worktree add`, best effort, but only while
+ * no worktree has it checked out and it still points at `base`.
+ */
+async function dropUnusedBranch(
+  exec: HostExec,
+  repo: string,
+  branch: string,
+  base: string
+): Promise<void> {
+  const ref = `refs/heads/${branch}`;
+  const list = await exec
+    .git(['worktree', 'list', '--porcelain'], { cwd: repo })
+    .catch(() => undefined);
+  if (list === undefined || list.code !== 0) return;
+  if (list.stdout.split('\n').some((l) => l === `branch ${ref}`)) return;
+  await exec
+    .git(['update-ref', '-d', ref, base], { cwd: repo })
+    .catch(() => undefined);
+}
 
 /** Deletes every leftover private fetch ref in `repo`, best effort. */
 async function dropFetchRefs(exec: HostExec, repo: string): Promise<void> {

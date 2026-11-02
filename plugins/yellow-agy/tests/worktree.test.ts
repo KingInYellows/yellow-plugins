@@ -67,6 +67,26 @@ describe('worktree', () => {
     expect(git(repo, 'for-each-ref', 'refs/yellow-agy/fetch')).toBe('');
   });
 
+  it('drops the new branch when worktree add fails on an occupied path', async () => {
+    const { repo, root } = makeRepo();
+    const wt = path.join(root, 'wt', 'busy');
+    fs.mkdirSync(wt, { recursive: true });
+    fs.writeFileSync(path.join(wt, 'f'), 'x');
+    const opts = {
+      repo,
+      worktree: wt,
+      branch: 'agy/busy',
+      remote: 'origin',
+      baseBranch: 'main',
+    };
+    await expect(createWorktree(exec, opts)).rejects.toBeInstanceOf(AgyError);
+    expect(git(repo, 'branch', '--list', 'agy/busy')).toBe('');
+    // Once the obstruction is gone, a retry succeeds.
+    fs.rmSync(wt, { recursive: true });
+    await createWorktree(exec, opts);
+    expect(git(wt, 'branch', '--show-current').trim()).toBe('agy/busy');
+  });
+
   it('rejects a .lock component anywhere in a branch name', () => {
     expect(() => validateBranchName('agy/x.lock/y')).toThrow(AgyError);
     expect(validateBranchName('agy/x.locked/y')).toBe('agy/x.locked/y');
