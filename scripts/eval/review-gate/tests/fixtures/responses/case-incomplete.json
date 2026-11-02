@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "tier": "medium",
+  "findings": [],
+  "dropped": [],
+  "coverage": {
+    "ran": ["project-compliance-reviewer"],
+    "failed": ["correctness-reviewer"],
+    "skipped": []
+  },
+  "agents": 2
+}
