@@ -16,7 +16,10 @@ export const meta = {
 
 // Contract: args and the return shape are fixed by
 // plans/risk-tiered-review-pipeline.md (Phase 1, CLAUDE-233). The eval runner
-// builds against them, so change them only with a version bump.
+// builds against them, so change them only with a version bump. Additive,
+// optional fields: args.repo_root (absolute path of a checkout at head that
+// agents read from), dismissed[].rule ("category/rule"; title is optional),
+// and coverage.empty (true when no hunter returned a result).
 
 const NIT_CAP = 5;
 const LINE_WINDOW = 3;
@@ -138,6 +141,8 @@ function isStringArray(value) {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
 
+const ABSOLUTE = /^(\/|[A-Za-z]:[\\/])/;
+
 function validateArgs(raw) {
   let a = raw;
   if (typeof a === 'string') {
@@ -162,11 +167,15 @@ function validateArgs(raw) {
     }
   }
   if (!TIERS.includes(a.tier)) fail('tier must be low, medium or high');
-  if (
-    typeof a.diff_path !== 'string' ||
-    !/^(\/|[A-Za-z]:[\\/])/.test(a.diff_path)
-  ) {
+  if (typeof a.diff_path !== 'string' || !ABSOLUTE.test(a.diff_path)) {
     fail('diff_path must be an absolute path');
+  }
+  if (
+    a.repo_root !== undefined &&
+    a.repo_root !== null &&
+    (typeof a.repo_root !== 'string' || !ABSOLUTE.test(a.repo_root))
+  ) {
+    fail('repo_root, when given, must be an absolute path');
   }
   if (!isStringArray(a.changed_files)) {
     fail('changed_files must be an array of paths');
@@ -175,8 +184,9 @@ function validateArgs(raw) {
     fail('review_md must be a string or null');
   }
   for (const key of ['include', 'exclude']) {
-    if (!isStringArray(a[key]))
+    if (!isStringArray(a[key])) {
       fail(`${key} must be an array of persona names`);
+    }
     for (const name of a[key]) {
       if (!/^[a-z0-9][a-z0-9:-]*$/.test(name)) {
         fail(`${key} has an invalid persona name: ${JSON.stringify(name)}`);
@@ -186,14 +196,17 @@ function validateArgs(raw) {
   if (a.include.length === 0) fail('include must name at least one persona');
   if (!Array.isArray(a.dismissed)) fail('dismissed must be an array');
   a.dismissed.forEach((d, i) => {
-    if (
-      d === null ||
-      typeof d !== 'object' ||
-      typeof d.title !== 'string' ||
-      typeof d.file !== 'string' ||
-      !Number.isInteger(d.line)
-    ) {
-      fail(`dismissed[${i}] must be {title: string, file: string, line: int}`);
+    if (d === null || typeof d !== 'object' || typeof d.file !== 'string') {
+      fail(`dismissed[${i}] must be an object with a file string`);
+    }
+    for (const key of ['title', 'rule']) {
+      if (
+        d[key] !== undefined &&
+        d[key] !== null &&
+        typeof d[key] !== 'string'
+      ) {
+        fail(`dismissed[${i}].${key} must be a string when given`);
+      }
     }
   });
   return a;
@@ -201,8 +214,9 @@ function validateArgs(raw) {
 
 // ---------- helpers ----------
 
-function cleanPath(p) {
-  return String(p).replace(/^\.\//, '');
+function bareName(name) {
+  const parts = name.split(':');
+  return parts[parts.length - 1];
 }
 
 function normTitle(t) {
@@ -210,6 +224,28 @@ function normTitle(t) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+const STOPWORDS = ['the', 'and', 'for', 'not', 'with', 'from', 'this', 'that'];
+
+function titleWords(t) {
+  return normTitle(t)
+    .split(' ')
+    .filter((w) => w.length >= 3 && !STOPWORDS.includes(w));
+}
+
+// Two titles describe the same bug when one contains the other or their word
+// sets overlap by at least a fifth (Jaccard).
+function similarTitles(a, b) {
+  const x = normTitle(a);
+  const y = normTitle(b);
+  if (!x || !y) return false;
+  if (x.includes(y) || y.includes(x)) return true;
+  const wx = titleWords(a);
+  const wy = titleWords(b);
+  const inter = wx.filter((w) => wy.includes(w)).length;
+  const union = new Set(wx.concat(wy)).size;
+  return union > 0 && inter / union >= 0.2;
 }
 
 function cmp(a, b) {
@@ -233,11 +269,13 @@ function fence(label, text) {
 
 function agentTypeFor(name) {
   if (name.includes(':')) return name;
-  if (YELLOW_REVIEW_PERSONAS.includes(name))
+  if (YELLOW_REVIEW_PERSONAS.includes(name)) {
     return `yellow-review:review:${name}`;
+  }
   if (YELLOW_CORE_PERSONAS.includes(name)) return `yellow-core:review:${name}`;
-  if (YELLOW_CODEX_PERSONAS.includes(name))
+  if (YELLOW_CODEX_PERSONAS.includes(name)) {
     return `yellow-codex:review:${name}`;
+  }
   return null;
 }
 
@@ -249,9 +287,13 @@ function contextBlock(a) {
   const files = a.changed_files.length
     ? a.changed_files.map((f) => `- ${f}`).join('\n')
     : '- (none listed)';
+  const where = a.repo_root
+    ? `The head commit is checked out at ${a.repo_root}: read every file from there, because the session's own working tree may change while you work.`
+    : 'The repository is checked out at the head commit, so read any file you need for context.';
   const lines = [
     `Base commit: ${a.base}. Head commit: ${a.head}. Risk tier: ${a.tier}.`,
-    `The unified diff is at ${a.diff_path}; read it with the Read tool. The repository is checked out at the head commit, so read any file you need for context.`,
+    `The unified diff is at ${a.diff_path}; read it with the Read tool. ${where}`,
+    'Give every file path in your answer relative to the repository root, as the changed-files list below spells them.',
     '',
     'Changed files:',
     fence('changed-files', files),
@@ -268,10 +310,12 @@ function contextBlock(a) {
   return lines.join('\n');
 }
 
-function dismissedBlock(a) {
-  if (!a.dismissed.length) return '';
-  const rows = a.dismissed
-    .map((d) => `- ${cleanPath(d.file)}:${d.line} ${d.title}`)
+function dismissedBlock(dismissed) {
+  if (!dismissed.length) return '';
+  const rows = dismissed
+    .map((d) =>
+      [`- ${d.file}:${d.line}`, d.rule, d.title].filter(Boolean).join(' ')
+    )
     .join('\n');
   return [
     '',
@@ -280,15 +324,12 @@ function dismissedBlock(a) {
   ].join('\n');
 }
 
-function hunterPrompt(a, name, hasAgentType) {
-  const who = hasAgentType
-    ? `as the ${name} reviewer`
-    : `through the lens of the "${name}" reviewer persona`;
+function hunterPrompt(a, name, dismissed) {
   return [
-    `Review ${prLabel(a)} ${who}.`,
+    `Review ${prLabel(a)} as the ${name} reviewer.`,
     '',
     contextBlock(a),
-    dismissedBlock(a),
+    dismissedBlock(dismissed),
     '',
     'Report every issue you find in the changed code, each with your honest confidence from 0 to 100. Include low-confidence and minor findings: a separate verification pass filters them, so here a missed issue costs more than a false one.',
     'Set pre_existing to true for an issue in code the diff did not change. Use line numbers from the head version of the file. Set rule to "unclassified" when no rule slug fits.',
@@ -306,11 +347,17 @@ function voterPlan(finding, tier) {
   return ['general'];
 }
 
+// Voters run as the read-only review-gate-verifier agent (Read, Grep, Glob):
+// they read untrusted PR content, so they get no edit or shell tools. P0/P1
+// voters keep the agent's own model (opus) at medium effort.
+const VERIFIER_AGENT = 'yellow-review:workflow:review-gate-verifier';
+
 function voterOpts(finding, lens) {
   const opts = {
     label: `vote ${finding.id} ${lens}`,
     phase: 'Vote',
     schema: VERDICT_SCHEMA,
+    agentType: VERIFIER_AGENT,
   };
   if (finding.severity === 'P0' || finding.severity === 'P1') {
     opts.effort = 'medium';
@@ -347,45 +394,52 @@ function verifierPrompt(a, f, lens) {
   ].join('\n');
 }
 
-// Plain-code dedup: same file, same category, lines within LINE_WINDOW of the
-// cluster. Keeps the most severe, then most confident, finding as the
-// representative and merges reviewer lists.
+// A dismissal matches a finding on file, line within LINE_WINDOW, and at
+// least one of rule ("category/rule", as the ledger's dismissed-context block
+// prints it) or title.
+function dismissalMatches(d, f) {
+  if (d.file !== f.file || Math.abs(d.line - f.line) > LINE_WINDOW) {
+    return false;
+  }
+  if (d.rule) {
+    const [cat, slug] = d.rule.split('/');
+    if (cat === f.category) return true;
+    if (slug && slug !== 'unclassified' && slug === f.rule) return true;
+  }
+  if (d.title && similarTitles(d.title, f.title)) return true;
+  return false;
+}
+
+// Plain-code dedup. Findings arrive sorted most severe, then most confident,
+// first, so each cluster's first member is its representative. A finding joins
+// a cluster when it has the same file, category and pre_existing flag, a line
+// within LINE_WINDOW of the representative's line, and a similar title. The
+// other members are returned so the caller can list them in dropped.
 function dedup(raw) {
+  const sorted = raw
+    .slice()
+    .sort(
+      (x, y) =>
+        sevRank(x.severity) - sevRank(y.severity) ||
+        y.confidence - x.confidence ||
+        x.order - y.order
+    );
   const clusters = [];
-  for (const f of raw) {
+  for (const f of sorted) {
     const hit = clusters.find(
       (c) =>
-        c.file === f.file &&
-        c.category === f.category &&
-        f.line >= c.minLine - LINE_WINDOW &&
-        f.line <= c.maxLine + LINE_WINDOW
+        c.rep.file === f.file &&
+        c.rep.category === f.category &&
+        c.rep.pre_existing === f.pre_existing &&
+        Math.abs(c.rep.line - f.line) <= LINE_WINDOW &&
+        similarTitles(c.rep.title, f.title)
     );
-    if (!hit) {
-      clusters.push({
-        file: f.file,
-        category: f.category,
-        minLine: f.line,
-        maxLine: f.line,
-        members: [f],
-      });
-      continue;
-    }
-    hit.minLine = Math.min(hit.minLine, f.line);
-    hit.maxLine = Math.max(hit.maxLine, f.line);
-    hit.members.push(f);
+    if (hit) hit.members.push(f);
+    else clusters.push({ rep: f, members: [f] });
   }
-  return clusters.map((c) => {
-    const members = c.members
-      .slice()
-      .sort(
-        (x, y) =>
-          sevRank(x.severity) - sevRank(y.severity) ||
-          y.confidence - x.confidence ||
-          x.order - y.order
-      );
-    const rep = members[0];
+  return clusters.map(({ rep, members }) => {
     const reviewers = [];
-    for (const m of c.members) {
+    for (const m of members) {
       if (!reviewers.includes(m.reviewer)) reviewers.push(m.reviewer);
     }
     const fix = members.find((m) => m.suggested_fix);
@@ -396,11 +450,11 @@ function dedup(raw) {
       title: rep.title,
       category: rep.category,
       rule: rep.rule,
-      confidence: Math.max(...c.members.map((m) => m.confidence)),
+      confidence: Math.max(...members.map((m) => m.confidence)),
       reviewers,
-      pre_existing: c.members.every((m) => m.pre_existing),
+      pre_existing: rep.pre_existing,
       suggested_fix: fix ? fix.suggested_fix : null,
-      merged: c.members.length,
+      others: members.slice(1),
     };
   });
 }
@@ -426,16 +480,6 @@ function decide(verdicts) {
   return { keep: false, unverified: false, votes };
 }
 
-function evidenceFrom(verdicts) {
-  const v = verdicts.find(
-    (x) =>
-      x.verdict === 'confirmed' &&
-      typeof x.evidence_file === 'string' &&
-      Number.isInteger(x.evidence_line)
-  );
-  return v ? { file: cleanPath(v.evidence_file), line: v.evidence_line } : null;
-}
-
 function displayFor(f, changed) {
   if (f.pre_existing || !changed.has(f.file)) return 'Pre-existing';
   return f.severity === 'P0' || f.severity === 'P1' ? 'Important' : 'Nit';
@@ -458,29 +502,91 @@ function rankSort(x, y) {
 // ---------- body ----------
 
 const input = validateArgs(args);
+const changedList = input.changed_files.map((p) =>
+  String(p).replace(/^\.\//, '')
+);
+const changed = new Set(changedList);
+const rootPrefix = input.repo_root
+  ? String(input.repo_root).replace(/[\\/]+$/, '') + '/'
+  : null;
+
+// Repo-relative path: strip "./" and repo_root; map any other absolute path
+// that ends in "/<changed file>" to that changed file (longest match).
+function cleanPath(p) {
+  let s = String(p).replace(/\\/g, '/').replace(/^\.\//, '');
+  if (rootPrefix && s.startsWith(rootPrefix.replace(/\\/g, '/'))) {
+    return s.slice(rootPrefix.length);
+  }
+  if (ABSOLUTE.test(s)) {
+    let best = null;
+    for (const c of changedList) {
+      if (s.endsWith(`/${c}`) && (!best || c.length > best.length)) best = c;
+    }
+    if (best) s = best;
+  }
+  return s;
+}
+
+function evidenceFrom(verdicts) {
+  const v = verdicts.find(
+    (x) =>
+      x.verdict === 'confirmed' &&
+      typeof x.evidence_file === 'string' &&
+      Number.isInteger(x.evidence_line)
+  );
+  return v ? { file: cleanPath(v.evidence_file), line: v.evidence_line } : null;
+}
+
 let agentCount = 0;
 const dropped = [];
-const coverage = { ran: [], failed: [], skipped: [] };
+const coverage = { ran: [], failed: [], skipped: [], empty: false };
 
 async function counted(prompt, opts) {
   agentCount += 1;
   return agent(prompt, opts);
 }
 
-// Hunter selection: include minus exclude, trimmed to the tier budget.
+// Dismissed entries without a usable line cannot be matched; skip them.
+const dismissed = [];
+for (const d of input.dismissed) {
+  if (!Number.isInteger(d.line) || d.line < 1) {
+    log(`Hunt: ignored a dismissed entry for ${d.file} with no line`);
+    continue;
+  }
+  dismissed.push({
+    file: cleanPath(d.file),
+    line: d.line,
+    title: d.title || null,
+    rule: d.rule || null,
+  });
+}
+
+// Hunter selection on bare persona names: include minus exclude, trimmed to
+// the tier budget.
+const excludeBare = input.exclude.map(bareName);
 const hunters = [];
+const seen = [];
 for (const name of input.include) {
-  if (hunters.includes(name) || coverage.skipped.includes(name)) continue;
-  if (input.exclude.includes(name)) {
+  const bare = bareName(name);
+  if (seen.includes(bare)) continue;
+  seen.push(bare);
+  if (excludeBare.includes(bare)) {
     coverage.skipped.push(name);
     log(`Hunt: skipped ${name} (in exclude)`);
     continue;
   }
-  if (input.tier === 'low' && !LOW_TIER_HUNTERS.includes(name)) {
+  if (input.tier === 'low' && !LOW_TIER_HUNTERS.includes(bare)) {
     coverage.skipped.push(name);
     log(
       `Hunt: skipped ${name} (low tier runs only ${LOW_TIER_HUNTERS.join(', ')})`
     );
+    continue;
+  }
+  if (!agentTypeFor(name)) {
+    // A bare name with no known plugin would run as a default subagent with
+    // edit and shell tools over PR content; refuse it instead.
+    coverage.failed.push(name);
+    log(`Hunt: ${name} is not a known persona; not run`);
     continue;
   }
   hunters.push(name);
@@ -489,18 +595,14 @@ for (const name of input.include) {
 phase('Hunt');
 const hunterResults = await parallel(
   hunters.map((name) => async () => {
-    const agentType = agentTypeFor(name);
-    if (!agentType) {
-      log(`Hunt: ${name} is not a known persona; running it as a plain prompt`);
-    }
     const opts = {
       label: `hunt ${name}`,
       phase: 'Hunt',
       schema: HUNTER_SCHEMA,
+      agentType: agentTypeFor(name),
     };
-    if (agentType) opts.agentType = agentType;
     try {
-      return await counted(hunterPrompt(input, name, Boolean(agentType)), opts);
+      return await counted(hunterPrompt(input, name, dismissed), opts);
     } catch (e) {
       log(`Hunt: ${name} failed: ${e && e.message ? e.message : e}`);
       return null;
@@ -547,22 +649,16 @@ hunters.forEach((name, i) => {
   }
 });
 
-// Dedup barrier: voting must not run twice on one bug.
-const merged = dedup(rawFindings);
-if (merged.length < rawFindings.length) {
-  log(`Dedup: ${rawFindings.length} findings merged into ${merged.length}`);
+if (coverage.ran.length === 0) {
+  coverage.empty = true;
+  log('Hunt: no hunter returned a result; this run reviewed nothing');
 }
 
-// Findings the maintainer already dismissed are dropped before any vote.
-const candidates = [];
-for (const f of merged) {
-  const dismissed = input.dismissed.find(
-    (d) =>
-      cleanPath(d.file) === f.file &&
-      Math.abs(d.line - f.line) <= LINE_WINDOW &&
-      normTitle(d.title) === normTitle(f.title)
-  );
-  if (dismissed) {
+// Findings the maintainer already dismissed are dropped one by one, before
+// dedup and before any vote.
+const live = [];
+for (const f of rawFindings) {
+  if (dismissed.some((d) => dismissalMatches(d, f))) {
     dropped.push({
       title: f.title,
       file: f.file,
@@ -571,8 +667,13 @@ for (const f of merged) {
     });
     continue;
   }
-  candidates.push(f);
+  live.push(f);
 }
+const dismissedCount = rawFindings.length - live.length;
+if (dismissedCount) log(`Hunt: ${dismissedCount} dismissed findings dropped`);
+
+// Dedup barrier: voting must not run twice on one bug.
+const candidates = dedup(live);
 candidates.sort(
   (x, y) =>
     sevRank(x.severity) - sevRank(y.severity) ||
@@ -582,7 +683,18 @@ candidates.sort(
 );
 candidates.forEach((f, i) => {
   f.id = `F${i + 1}`;
+  for (const m of f.others) {
+    dropped.push({
+      title: m.title,
+      file: m.file,
+      line: m.line,
+      reason: `merged into ${f.id}`,
+    });
+  }
 });
+if (candidates.length < live.length) {
+  log(`Dedup: ${live.length} findings merged into ${candidates.length}`);
+}
 
 phase('Vote');
 const judged = candidates.length
@@ -607,7 +719,6 @@ const judged = candidates.length
   : [];
 
 phase('Rank');
-const changed = new Set(input.changed_files.map(cleanPath));
 const kept = [];
 candidates.forEach((f, i) => {
   const j = judged[i] || { finding: f, verdicts: [] };
@@ -660,10 +771,11 @@ for (const f of kept) {
   }
   findings.push(f);
 }
-if (nits > NIT_CAP)
+if (nits > NIT_CAP) {
   log(
     `Rank: ${nits - NIT_CAP} Nits over the cap of ${NIT_CAP} moved to dropped`
   );
+}
 const refutedCount = dropped.filter((d) =>
   d.reason.startsWith('refuted')
 ).length;

@@ -14,17 +14,30 @@ it once per review.
 
 ## Inputs
 
-Write the diff to a fixed file under the git common dir. `>|` overwrites even
-under zsh `noclobber`. Use the `DIFF_BASE` value from Step 3a:
+The workflow's agents read a separate detached checkout of the head commit, not
+the working tree: Steps 7 to 9 edit and commit in the working tree while the run
+is still going. The checkout and the diff live under the git common dir, keyed
+by PR number. The block first removes anything a stopped earlier run left
+behind. `>|` overwrites even under zsh `noclobber`. Use the `DIFF_BASE` value
+from Step 3a:
 
 ```bash
 gate_dir="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/review-gate"
+gate_root="$gate_dir/pr-<PR#>"
 mkdir -p "$gate_dir" || exit 1
-git diff "<DIFF_BASE>"...HEAD >| "$gate_dir/pr-<PR#>.diff" || exit 1
-printf 'diff_path=%s\n' "$gate_dir/pr-<PR#>.diff"
-printf 'base=%s head=%s\n' "$(git merge-base "<DIFF_BASE>" HEAD)" "$(git rev-parse HEAD)"
+git worktree remove --force "$gate_root" 2>/dev/null
+rm -rf "$gate_root"
+git worktree prune
+head_sha=$(git rev-parse HEAD) || exit 1
+git worktree add --quiet --detach "$gate_root" "$head_sha" || exit 1
+git diff "<DIFF_BASE>"...HEAD >| "$gate_root.diff" || exit 1
+printf 'repo_root=%s\ndiff_path=%s\n' "$gate_root" "$gate_root.diff"
+printf 'base=%s head=%s\n' "$(git merge-base "<DIFF_BASE>" HEAD)" "$head_sha"
 gh repo view --json nameWithOwner -q .nameWithOwner
 ```
+
+If this block fails, run Cleanup below, record `not run (checkout failed)` for
+Step 10 and skip the rest of this file.
 
 Read `REVIEW.md` from the default branch, never from the PR head, so a PR cannot
 weaken its own review. Step 3a2 already fetched that branch:
@@ -39,18 +52,31 @@ esac
 
 Build `args` as a JSON object, not a JSON-encoded string:
 
-| Key             | Value                                                                                                                  |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `repo`          | `owner/name` from `gh repo view`                                                                                       |
-| `pr`            | the PR number                                                                                                          |
-| `base`, `head`  | the merge-base and head SHAs printed above                                                                             |
-| `tier`          | the Step 3a2 tier; `high` when it is `unknown`                                                                         |
-| `diff_path`     | the absolute path printed above                                                                                        |
-| `changed_files` | the PR's changed paths (`git diff --name-only "<DIFF_BASE>"...HEAD`)                                                   |
-| `review_md`     | the `REVIEW.md` text, or `null`                                                                                        |
-| `include`       | the final Step 4 reviewer set by agent name (`correctness-reviewer`), without `code-simplifier` and the learnings pass |
-| `exclude`       | `reviewer_set.exclude`, or `[]`                                                                                        |
-| `dismissed`     | `{title, file, line}` for each entry in the Step 3e dismissed-findings block, or `[]`                                  |
+| Key             | Value                                                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `repo`          | `owner/name` from `gh repo view`                                                                                            |
+| `pr`            | the PR number                                                                                                               |
+| `base`, `head`  | the merge-base and head SHAs printed above                                                                                  |
+| `tier`          | the Step 3a2 tier; `high` when it is `unknown`                                                                              |
+| `diff_path`     | the `diff_path` printed above                                                                                               |
+| `repo_root`     | the `repo_root` printed above                                                                                               |
+| `changed_files` | the PR's changed paths, repo-relative (`git diff --name-only "<DIFF_BASE>"...HEAD`)                                         |
+| `review_md`     | the `REVIEW.md` text, or `null`                                                                                             |
+| `include`       | the final Step 4 reviewer set by bare agent name (`correctness-reviewer`), without `code-simplifier` and the learnings pass |
+| `exclude`       | `reviewer_set.exclude`, or `[]`                                                                                             |
+| `dismissed`     | one `{file, line, rule}` per `<finding>` in the Step 3e dismissed-findings block (see below), or `[]`                       |
+
+The Step 3e block (`review-ledger.sh dismissed-context`) prints each entry as
+`<finding><where>FILE:LINE</where><rule>CATEGORY/RULE</rule><scope>…</scope><reason>…</reason></finding>`,
+XML-escaped. For each entry:
+
+- `file` is the `<where>` text before its last `:`, and `line` the integer after
+  it. When that part is not an integer (the ledger prints `null` for a finding
+  with no line), pass `line: null`; the workflow skips that entry.
+- `rule` is the `<rule>` text as is, for example `correctness/null-deref`.
+- Unescape `file` and `rule`: `&lt;` to `<`, `&gt;` to `>`, then `&amp;` to `&`.
+- Leave out `<scope>` and `<reason>`: they are free text from the ledger, and
+  the workflow matches on file, line within 3 and `rule`.
 
 ## Launch
 
@@ -58,14 +84,14 @@ Call the `Workflow` tool with `name: "yellow-review:review-gate"` and the `args`
 above. The run works in the background; continue with Step 5 at once.
 
 If the tool is unavailable, the launch is refused (a `claude -p` run needs a
-`Workflow(yellow-review:review-gate)` allow rule) or the run fails, record
-`not run (<one-line reason>)` for Step 10 and continue. The shadow run never
-blocks or changes the review.
+`Workflow(yellow-review:review-gate)` allow rule) or the run fails, run Cleanup,
+record `not run (<one-line reason>)` for Step 10 and continue. The shadow run
+never blocks or changes the review.
 
 ## Compare (before Step 10)
 
 Wait for the run's result. It returns
-`{version, tier, findings[], dropped[], coverage{ran, failed, skipped}, agents}`.
+`{version, tier, findings[], dropped[], coverage{ran, failed, skipped, empty}, agents}`.
 Compare it with the findings Step 6 kept (every severity plus Pre-existing): a
 workflow finding overlaps when a Step 6 finding has the same `file` and a `line`
 within 3. Then add one line to Step 10's Coverage section, counts only:
@@ -74,9 +100,21 @@ within 3. Then add one line to Step 10's Coverage section, counts only:
 - Workflow shadow (review-gate): <W> findings (<I> Important, <N> Nit, <P> Pre-existing) vs persona <S>; <O> overlap by file+line±3; <D> dropped; <A> agents; failed hunters: <names or none>
 ```
 
-A non-empty `coverage.failed` means the workflow's review was incomplete, so say
-so on the same line. Finally remove the diff file:
+When `coverage.failed` is non-empty or `coverage.empty` is true, the workflow's
+review was incomplete: end the line with `(incomplete)`. An empty run is never a
+clean one.
+
+## Cleanup
+
+Run this once the workflow result is in, and on every other way the review ends
+after the Inputs block ran: the checkout fails, the launch is refused, the run
+fails, or the review stops early. Stop a run that is still going first, because
+its agents read the checkout.
 
 ```bash
-rm -f "$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/review-gate/pr-<PR#>.diff"
+gate_root="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/review-gate/pr-<PR#>"
+git worktree remove --force "$gate_root" 2>/dev/null
+rm -rf "$gate_root"
+rm -f "$gate_root.diff"
+git worktree prune
 ```

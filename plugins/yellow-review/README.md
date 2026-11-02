@@ -170,11 +170,12 @@ version packages" PRs) does not select the plugin-surface personas
 `pattern-recognition-specialist`) in `/review:pr` or `/review:all`; any other
 manifest change or plugin-authoring path still does.
 
-### Workflow (1)
+### Workflow (2)
 
-| Agent                 | Description                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------ |
-| `pr-comment-resolver` | Implements one fix per cluster of review comments and proposes a disposition for each thread (no Bash) |
+| Agent                  | Description                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| `pr-comment-resolver`  | Implements one fix per cluster of review comments and proposes a disposition for each thread (no Bash) |
+| `review-gate-verifier` | Read-only voter for the `review-gate` workflow: one verdict with a `file:line` citation per finding    |
 
 ## Skills
 

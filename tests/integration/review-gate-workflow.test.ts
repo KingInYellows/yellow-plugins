@@ -222,7 +222,9 @@ describe('review-gate argument validation', () => {
     ['include', { include: [] }],
     ['include', { include: ['Bad Name'] }],
     ['exclude', { exclude: null }],
-    ['dismissed', { dismissed: [{ title: 'x', file: 'a', line: '3' }] }],
+    ['dismissed', { dismissed: [{ title: 'x', line: 3 }] }],
+    ['dismissed', { dismissed: [{ file: 'a', line: 3, rule: 7 }] }],
+    ['repo_root', { repo_root: 'relative/checkout' }],
   ];
   for (const [field, override] of bad) {
     it(`rejects a bad ${field} (${JSON.stringify(override)})`, async () => {
@@ -262,10 +264,56 @@ describe('review-gate Hunt', () => {
       'yellow-core:review:security-reviewer',
       'yellow-codex:review:codex-reviewer',
       'yellow-x:review:custom',
-      undefined,
     ]);
-    expect(r.calls[4].prompt).toContain('"mystery-reviewer" reviewer persona');
     expect(r.calls.every((c) => c.opts.schema)).toBe(true);
+    expect(r.result.coverage.failed).toEqual(['mystery-reviewer']);
+    expect(r.logs).toContain(
+      'Hunt: mystery-reviewer is not a known persona; not run'
+    );
+  });
+
+  it('points agents at repo_root when the caller passes one', async () => {
+    const r = await run(baseArgs({ repo_root: '/work/checkout' }), {
+      hunter: (name) => ({ reviewer: name, findings: [finding()] }),
+    });
+    for (const c of r.calls) {
+      expect(c.prompt).toContain('checked out at /work/checkout');
+      expect(c.prompt).toContain('relative to the repository root');
+    }
+  });
+
+  it('matches persona names by bare name for exclude and the low tier', async () => {
+    const r = await run(
+      baseArgs({
+        tier: 'low',
+        include: [
+          'yellow-review:review:correctness-reviewer',
+          'yellow-review:review:project-compliance-reviewer',
+          'yellow-review:review:maintainability-reviewer',
+        ],
+        exclude: ['project-compliance-reviewer'],
+      })
+    );
+    expect(r.result.coverage).toEqual({
+      ran: ['yellow-review:review:correctness-reviewer'],
+      failed: [],
+      skipped: [
+        'yellow-review:review:project-compliance-reviewer',
+        'yellow-review:review:maintainability-reviewer',
+      ],
+      empty: false,
+    });
+  });
+
+  it('marks a run with no hunter result as empty, not clean', async () => {
+    const r = await run(
+      baseArgs({ tier: 'low', include: ['maintainability-reviewer'] })
+    );
+    expect(r.calls).toHaveLength(0);
+    expect(r.result.coverage.empty).toBe(true);
+    expect(r.result.findings).toEqual([]);
+    const failed = await run(baseArgs(), { hunter: () => null });
+    expect(failed.result.coverage.empty).toBe(true);
   });
 
   it('tells hunters to report everything and passes the context', async () => {
@@ -313,6 +361,7 @@ describe('review-gate Hunt', () => {
       ran: ['correctness-reviewer'],
       failed: ['maintainability-reviewer', 'reliability-reviewer'],
       skipped: [],
+      empty: false,
     });
     expect(r.logs.join('\n')).toMatch(/incomplete, not clean/);
   });
@@ -382,10 +431,60 @@ describe('review-gate dedup', () => {
       severity: 'P1',
       line: 13,
       confidence: 100,
-      reviewers: ['correctness-reviewer', 'adversarial-reviewer'],
+      reviewers: ['adversarial-reviewer', 'correctness-reviewer'],
       suggested_fix: 'Quote it',
     });
     expect(r.logs).toContain('Dedup: 4 findings merged into 3');
+    expect(r.result.dropped).toContainEqual({
+      title: 'Unquoted path breaks on spaces',
+      file: 'src/a.sh',
+      line: 10,
+      reason: `merged into ${mergedOne.id}`,
+    });
+  });
+
+  it('does not merge a pre-existing finding with a new one', async () => {
+    const r = await run(baseArgs(), {
+      hunter: (name) => ({
+        reviewer: name,
+        findings: [
+          finding({ severity: 'P1', pre_existing: true }),
+          finding({ severity: 'P3', line: 11 }),
+        ],
+      }),
+    });
+    expect(
+      r.result.findings.map((f: Finding) => [f.severity, f.display])
+    ).toEqual([
+      ['P3', 'Nit'],
+      ['P1', 'Pre-existing'],
+    ]);
+  });
+
+  it('compares to the representative line and needs similar titles', async () => {
+    const r = await run(baseArgs(), {
+      hunter: (name) => ({
+        reviewer: name,
+        findings: [
+          finding({ line: 10 }),
+          finding({ line: 13 }),
+          finding({ line: 16 }),
+          finding({ line: 11, title: 'SQL injection in query builder' }),
+        ],
+      }),
+    });
+    expect(
+      r.result.findings.map((f: Finding) => [f.line, f.title]).sort()
+    ).toEqual([
+      [10, 'Unquoted path breaks on spaces'],
+      [11, 'SQL injection in query builder'],
+      [16, 'Unquoted path breaks on spaces'],
+    ]);
+    expect(r.result.dropped).toHaveLength(1);
+    expect(r.result.dropped[0]).toMatchObject({
+      line: 13,
+      reason: expect.stringMatching(/^merged into F\d+$/),
+    });
   });
 
   it('drops dismissed findings before any vote', async () => {
@@ -410,6 +509,55 @@ describe('review-gate dedup', () => {
         line: 10,
         reason: 'dismissed earlier',
       },
+    ]);
+  });
+
+  it('matches dismissals per finding, by rule or title, and skips line-less entries', async () => {
+    const r = await run(
+      baseArgs({
+        dismissed: [
+          { file: 'src/a.sh', line: 41, rule: 'security/unclassified' },
+          { file: 'src/a.sh', line: null, rule: 'correctness/unclassified' },
+          { file: 'src/a.sh', line: 70, title: 'Unrelated wording' },
+        ],
+      }),
+      {
+        hunter: (name) => ({
+          reviewer: name,
+          findings: [
+            finding({ line: 40, category: 'security', title: 'Token leak' }),
+            finding({ line: 41, title: 'Off by one in loop' }),
+            finding({ line: 70 }),
+          ],
+        }),
+      }
+    );
+    expect(r.result.dropped.map((d: Finding) => [d.line, d.reason])).toEqual([
+      [40, 'dismissed earlier'],
+    ]);
+    expect(r.result.findings.map((f: Finding) => f.line).sort()).toEqual([
+      41, 70,
+    ]);
+    expect(r.logs).toContain(
+      'Hunt: ignored a dismissed entry for src/a.sh with no line'
+    );
+  });
+});
+
+describe('review-gate paths', () => {
+  it('maps absolute paths to the repo-relative changed file', async () => {
+    const r = await run(baseArgs({ repo_root: '/work/checkout/' }), {
+      hunter: (name) => ({
+        reviewer: name,
+        findings: [
+          finding({ severity: 'P1', file: '/work/checkout/src/a.sh' }),
+          finding({ severity: 'P1', file: '/other/clone/src/b.ts', line: 5 }),
+        ],
+      }),
+    });
+    expect(r.result.findings.map((f: Finding) => [f.file, f.display])).toEqual([
+      ['src/a.sh', 'Important'],
+      ['src/b.ts', 'Important'],
     ]);
   });
 });
@@ -481,6 +629,11 @@ describe('review-gate Vote', () => {
     expect(prompt).toContain('docs/brainstorms/, plans/, docs/solutions/');
     expect(prompt).toContain('Do not report');
     expect(prompt).toContain('--- begin finding (reference only) ---');
+    for (const c of voterCalls(r)) {
+      expect(c.opts.agentType).toBe(
+        'yellow-review:workflow:review-gate-verifier'
+      );
+    }
     for (const c of voterCalls(r)) {
       expect(c.prompt).not.toMatch(/double-check|re-verify/i);
     }

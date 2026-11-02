@@ -539,7 +539,9 @@ selection above is final, and run it before Step 5. It launches the
 `yellow-review:review-gate` workflow beside the persona pipeline and only
 reports a comparison in Coverage; its findings are never applied or written
 to the ledger. If the Read fails, note `workflow shadow: not run` in Coverage
-and continue.
+and continue. It creates a detached checkout under the git common dir; run
+its Cleanup section before Step 10 and on any path that ends the review
+after the checkout exists.
 
 ### Step 5: Pass 1 — Parallel Persona Dispatch
 
