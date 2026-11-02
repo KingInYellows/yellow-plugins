@@ -518,6 +518,28 @@ describe('review-gate dedup', () => {
     expect(r.result.dropped).toEqual([]);
   });
 
+  it('matches contained titles only on whole words', async () => {
+    const r = await run(
+      baseArgs({
+        dismissed: [
+          { file: 'src/a.sh', line: 20, title: 'Path escapes repo' },
+          { file: 'src/a.sh', line: 40, title: 'Unquoted path' },
+        ],
+      }),
+      {
+        hunter: (name) => ({
+          reviewer: name,
+          findings: [
+            finding({ line: 20, title: 'Xpath escapes repository root' }),
+            finding({ line: 40, title: 'Unquoted path in loop' }),
+          ],
+        }),
+      }
+    );
+    expect(r.result.findings.map((f: Finding) => f.line)).toEqual([20]);
+    expect(r.result.dropped.map((d: Finding) => d.line)).toEqual([40]);
+  });
+
   it('keeps nearby findings with different known rules apart', async () => {
     const r = await run(baseArgs(), {
       hunter: (name) => ({
@@ -565,6 +587,51 @@ describe('review-gate dedup', () => {
         reason: 'dismissed earlier',
       },
     ]);
+  });
+
+  it('normalizes hunter category aliases before matching a dismissed rule', async () => {
+    const r = await run(
+      baseArgs({
+        dismissed: [
+          { file: 'src/a.sh', line: 10, rule: 'maintainability/file-size' },
+        ],
+      }),
+      {
+        hunter: (name) => ({
+          reviewer: name,
+          findings: [
+            finding({
+              category: 'Project-Compliance',
+              rule: 'file-size',
+              title: 'Command is over the line ceiling',
+            }),
+            finding({ line: 30, category: 'tests', title: 'Missing test' }),
+          ],
+        }),
+      }
+    );
+    expect(r.result.dropped.map((d: Finding) => d.line)).toEqual([10]);
+    expect(r.result.findings.map((f: Finding) => f.category)).toEqual([
+      'testing',
+    ]);
+  });
+
+  it('keeps its category aliases in step with review-ledger-vocab.json', () => {
+    const vocab = JSON.parse(
+      readFileSync(
+        resolve(
+          __dirname,
+          '..',
+          '..',
+          'plugins/yellow-review/lib/review-ledger-vocab.json'
+        ),
+        'utf8'
+      )
+    );
+    const m = SOURCE.match(/const CATEGORY_ALIASES = (\{[\s\S]*?\n\});/);
+    expect(m).not.toBeNull();
+    const aliases = vm.runInNewContext(`(${m![1]})`);
+    expect(JSON.parse(JSON.stringify(aliases))).toEqual(vocab.category_aliases);
   });
 
   it('matches dismissals per finding, by full category/rule or title, and skips line-less entries', async () => {

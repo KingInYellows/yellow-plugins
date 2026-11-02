@@ -246,8 +246,9 @@ function titleWords(t) {
 }
 
 // Two titles describe the same bug when they are equal, when one contains the
-// other and has at least two significant words, or when they share at least
-// two significant words and at least half of all their words (Jaccard). A single shared word is never enough: a loose match would merge
+// other as whole words and has at least two significant words, or when they
+// share at least two significant words and at least half of all their words
+// (Jaccard). A single shared word is never enough: a loose match would merge
 // distinct defects and let one dismissed nit hide a new finding nearby.
 function similarTitles(a, b) {
   const x = normTitle(a);
@@ -258,10 +259,52 @@ function similarTitles(a, b) {
   const wy = Array.from(new Set(titleWords(b)));
   if (wx.length === 0 || wy.length === 0) return false;
   const shorter = wx.length <= wy.length ? wx : wy;
-  if (shorter.length >= 2 && (x.includes(y) || y.includes(x))) return true;
+  // Containment is on whole words: "path" must not match inside "xpath".
+  const bx = ` ${x} `;
+  const by = ` ${y} `;
+  if (shorter.length >= 2 && (bx.includes(by) || by.includes(bx))) return true;
   const inter = wx.filter((w) => wy.includes(w)).length;
   const union = new Set(wx.concat(wy)).size;
   return inter >= 2 && inter / union >= 0.5;
+}
+
+// Hunter category aliases, copied from lib/review-ledger-vocab.json
+// (category_aliases). A workflow script cannot read plugin files, so the
+// review-gate test checks this map against the JSON.
+const CATEGORY_ALIASES = {
+  adversarial: 'correctness',
+  logic: 'correctness',
+  bug: 'correctness',
+  'error-handling': 'reliability',
+  perf: 'performance',
+  documentation: 'docs',
+  doc: 'docs',
+  comments: 'docs',
+  test: 'testing',
+  tests: 'testing',
+  'test-coverage': 'testing',
+  'plugin-contract': 'contract',
+  api: 'contract',
+  'breaking-change': 'contract',
+  'project-compliance': 'maintainability',
+  'project-standards': 'maintainability',
+  'cli-readiness': 'maintainability',
+  'agent-cli-readiness': 'maintainability',
+  'agent-native': 'maintainability',
+  simplicity: 'maintainability',
+  complexity: 'maintainability',
+  readability: 'maintainability',
+  style: 'maintainability',
+};
+
+function normCategory(c) {
+  const k = String(c || '')
+    .toLowerCase()
+    .trim();
+  if (!k) return 'unclassified';
+  return Object.prototype.hasOwnProperty.call(CATEGORY_ALIASES, k)
+    ? CATEGORY_ALIASES[k]
+    : k;
 }
 
 function cmp(a, b) {
@@ -429,7 +472,7 @@ function dismissalMatches(d, f) {
     if (
       slug &&
       slug !== 'unclassified' &&
-      cat === f.category &&
+      normCategory(cat) === f.category &&
       slug === f.rule
     ) {
       return true;
@@ -681,7 +724,7 @@ hunters.forEach((name, i) => {
       reviewer: name,
       title: String(f.title),
       severity: SEVERITIES.includes(f.severity) ? f.severity : 'P3',
-      category: String(f.category || 'unclassified'),
+      category: normCategory(f.category),
       rule: typeof f.rule === 'string' && f.rule ? f.rule : 'unclassified',
       file: cleanPath(f.file),
       line: f.line,
