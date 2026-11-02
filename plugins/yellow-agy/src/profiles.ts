@@ -7,11 +7,12 @@
 
 import { AgyError } from './errors';
 
-export const READ_ONLY_COMMANDS = [
-  'git status',
-  'git diff',
-  'git log',
-] as const;
+/**
+ * `git diff` and `git log` are left out on purpose: a command rule matches any
+ * trailing arguments, and their `--output=<file>` writes anywhere, even with
+ * edits off. The model reads files with its own tools instead.
+ */
+export const READ_ONLY_COMMANDS = ['git status'] as const;
 export const IMPLEMENT_EXTRA_COMMANDS = ['git add', 'git commit'] as const;
 
 /**
@@ -68,6 +69,53 @@ export interface TurnProfile {
   readonly flags: readonly string[];
 }
 
+/**
+ * Package and build tools whose subcommands can publish or run arbitrary code.
+ * A grant for one must name a safe subcommand, because a rule matches every
+ * argument after its words: `pnpm` alone would allow `pnpm publish`, and
+ * `pnpm --filter x` would allow `pnpm --filter x publish`.
+ */
+const SUBCOMMAND_TOOLS = new Set([
+  'npm',
+  'pnpm',
+  'yarn',
+  'bun',
+  'npx',
+  'pnpx',
+  'bunx',
+  'cargo',
+  'go',
+  'pip',
+  'pip3',
+  'uv',
+  'poetry',
+  'twine',
+  'gem',
+  'bundle',
+  'dotnet',
+  'mvn',
+  'gradle',
+  'make',
+]);
+const SAFE_SUBCOMMANDS = new Set([
+  'test',
+  'lint',
+  'check',
+  'build',
+  'typecheck',
+  'fmt',
+  'format',
+  'clippy',
+  'vet',
+]);
+
+function refuse(command: string, why: string): never {
+  throw new AgyError(
+    'AGY_INVALID_INPUT',
+    `--allow-command ${JSON.stringify(command)} ${why}`
+  );
+}
+
 /** Throws unless `command` is a plain command a grant may allow. */
 export function validateAllowCommand(command: string): string {
   if (!COMMAND_RE.test(command) || command.length > 200) {
@@ -75,6 +123,25 @@ export function validateAllowCommand(command: string): string {
       'AGY_INVALID_INPUT',
       `--allow-command must be plain words without shell syntax: ${JSON.stringify(command)}`
     );
+  }
+  const words = command.split(' ');
+  const tool = words[0] ?? '';
+  // The profile fixes the git commands; a grant can't add any (git -C . push).
+  if (tool === 'git')
+    refuse(command, 'may not grant git; the profile fixes it');
+  if (SUBCOMMAND_TOOLS.has(tool)) {
+    const sub = words[1] ?? '';
+    const script = words[2] ?? '';
+    const runsScript =
+      (sub === 'run' || sub === 'run-script') &&
+      script !== '' &&
+      !script.startsWith('-');
+    if (!SAFE_SUBCOMMANDS.has(sub) && !runsScript) {
+      refuse(
+        command,
+        `must name a test, lint or build subcommand of ${tool} (or run <script>)`
+      );
+    }
   }
   for (const prefix of DENIED_COMMAND_PREFIXES) {
     if (command === prefix || command.startsWith(`${prefix} `)) {

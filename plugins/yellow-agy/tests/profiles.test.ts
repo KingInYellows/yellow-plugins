@@ -30,7 +30,7 @@ describe('profiles', () => {
       agentMode: '',
       enableTerminalSandbox: false,
       permissions: {
-        allow: ['command(git status)', 'command(git diff)', 'command(git log)'],
+        allow: ['command(git status)'],
       },
     });
     expect(p.flags).toEqual([]);
@@ -44,8 +44,6 @@ describe('profiles', () => {
     });
     expect(JSON.parse(p.settings).permissions.allow).toEqual([
       'command(git status)',
-      'command(git diff)',
-      'command(git log)',
       'command(git add)',
       'command(git commit)',
     ]);
@@ -102,12 +100,15 @@ describe('profiles', () => {
 });
 
 describe('validateAllowCommand', () => {
-  it.each(['pnpm test', 'npm run lint', 'pytest -q', 'cargo test --workspace'])(
-    'accepts %s',
-    (c) => {
-      expect(validateAllowCommand(c)).toBe(c);
-    }
-  );
+  it.each([
+    'pnpm test',
+    'npm run lint',
+    'pytest -q',
+    'cargo test --workspace',
+    'make check',
+  ])('accepts %s', (c) => {
+    expect(validateAllowCommand(c)).toBe(c);
+  });
   it.each([
     'git push',
     'git push origin main',
@@ -124,6 +125,16 @@ describe('validateAllowCommand', () => {
     'pnpm test|sh',
     'agy -p x',
     'git config core.hooksPath x',
+    'git',
+    'git -C . push',
+    'git status',
+    'pnpm',
+    'pnpm --filter x',
+    'npm run',
+    'npm run --silent',
+    'npx some-package',
+    'cargo publish',
+    'make',
   ])('refuses %s', (c) => {
     expect(codeOf(() => validateAllowCommand(c))).toBe('AGY_INVALID_INPUT');
   });

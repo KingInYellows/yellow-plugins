@@ -169,18 +169,21 @@ overrides a global `accept-edits`, and `--mode` beats both, so the profile alone
 keeps a plan turn from editing. `setup` still refuses a loose global `agentMode`
 as defense in depth.
 
-- **read-only:**
-  `permissions.allow: ["command(git status)", "command(git diff)", "command(git log)"]`,
-  `agentMode: ""`, `enableTerminalSandbox: false`. No `--mode accept-edits`.
+- **read-only:** `permissions.allow: ["command(git status)"]`, `agentMode: ""`,
+  `enableTerminalSandbox: false`. No `--mode accept-edits`. `git diff` and
+  `git log` are left out: a rule matches any trailing arguments, and their
+  `--output=<file>` writes a file anywhere even with edits off.
 - **implement:** read-only, plus `command(git add)` and `command(git commit)`,
   with `agentMode: "accept-edits"` and `--mode accept-edits`. A `command(...)`
-  rule matches any arguments after its words, so `command(git diff)` covers
-  `git diff -- <path>` and no `regex:` rules are needed. The repo's own test and
-  lint commands named in the grant (`--allow-command`, which `authorize`
-  validates against an allowlist pattern) are added only on a host where
-  `--sandbox` is verified (hard rules). Every turn that runs with those commands
-  also passes `--sandbox`; the adapter refuses to build an implement invocation
-  that grants them without the flag.
+  rule matches any arguments after its words, so no `regex:` rules are needed,
+  and for the same reason a grant can't be broad. The repo's own test and lint
+  commands named in the grant (`--allow-command`, which `authorize` validates:
+  plain words, no `git`, nothing that reaches the network or publishes, and a
+  package or build tool only with a test, lint or build subcommand or
+  `run <script>`) are added only on a host where `--sandbox` is verified (hard
+  rules). Every turn that runs with those commands also passes `--sandbox`; the
+  adapter refuses to build an implement invocation that grants them without the
+  flag.
 
 ## Result classification
 
