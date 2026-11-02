@@ -54,6 +54,19 @@ describe('worktree', () => {
     ).rejects.toMatchObject({ code: 'AGY_WORKTREE' });
   });
 
+  it('sweeps a leftover private fetch ref before creating', async () => {
+    const { repo, wt, base } = await setup();
+    git(repo, 'update-ref', 'refs/yellow-agy/fetch/stale', base);
+    await createWorktree(exec, {
+      repo,
+      worktree: `${wt}-2`,
+      branch: 'agy/t2',
+      remote: 'origin',
+      baseBranch: 'main',
+    });
+    expect(git(repo, 'for-each-ref', 'refs/yellow-agy/fetch')).toBe('');
+  });
+
   it('rejects a .lock component anywhere in a branch name', () => {
     expect(() => validateBranchName('agy/x.lock/y')).toThrow(AgyError);
     expect(validateBranchName('agy/x.locked/y')).toBe('agy/x.locked/y');

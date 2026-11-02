@@ -78,8 +78,12 @@ async function createWorktree(exec, options) {
         throw new errors_1.AgyError('AGY_WORKTREE', `branch ${options.branch} already exists; delegate needs a new branch`);
     }
     // A private ref, not the shared FETCH_HEAD, which another fetch in the
-    // same repo could overwrite between the fetch and the rev-parse.
-    const fetched = `refs/yellow-agy/fetch/${(0, node_crypto_1.randomBytes)(8).toString('hex')}`;
+    // same repo could overwrite between the fetch and the rev-parse. It is kept
+    // until `worktree add` has made the commit reachable, so a concurrent gc
+    // can't prune it. Only one run holds the claim, so any older fetch ref is a
+    // leftover from a failed cleanup and is swept first.
+    await dropFetchRefs(exec, options.repo);
+    const fetched = `${FETCH_REF_PREFIX}${(0, node_crypto_1.randomBytes)(8).toString('hex')}`;
     let base;
     try {
         await git(exec, options.repo, [
@@ -94,20 +98,34 @@ async function createWorktree(exec, options) {
             '--verify',
             `${fetched}^{commit}`,
         ]));
+        await git(exec, options.repo, [
+            'worktree',
+            'add',
+            '-b',
+            options.branch,
+            '--',
+            options.worktree,
+            base,
+        ]);
     }
     finally {
-        await exec.git(['update-ref', '-d', fetched], { cwd: options.repo });
+        // A failure here only pins objects until the next creation sweeps it;
+        // it must not fail a worktree that now exists.
+        await exec
+            .git(['update-ref', '-d', fetched], { cwd: options.repo })
+            .catch(() => undefined);
     }
-    await git(exec, options.repo, [
-        'worktree',
-        'add',
-        '-b',
-        options.branch,
-        '--',
-        options.worktree,
-        base,
-    ]);
     return base;
+}
+const FETCH_REF_PREFIX = 'refs/yellow-agy/fetch/';
+/** Deletes every leftover private fetch ref in `repo`, best effort. */
+async function dropFetchRefs(exec, repo) {
+    const res = await exec.git(['for-each-ref', '--format=%(refname)', FETCH_REF_PREFIX], { cwd: repo });
+    if (res.code !== 0)
+        return;
+    for (const ref of res.stdout.split('\n').filter((r) => r !== '')) {
+        await exec.git(['update-ref', '-d', ref], { cwd: repo });
+    }
 }
 /** The temporary index path for `localId`, inside the worktree's git dir. */
 async function tempIndexPath(exec, worktree, localId, purpose) {
