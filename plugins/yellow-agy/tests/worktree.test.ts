@@ -41,6 +41,8 @@ describe('worktree', () => {
     const { repo, wt, base } = await setup();
     expect(git(wt, 'rev-parse', 'HEAD').trim()).toBe(base);
     expect(git(wt, 'branch', '--show-current').trim()).toBe('agy/t1');
+    // The base came from a private ref, which is gone afterwards.
+    expect(git(repo, 'for-each-ref', 'refs/yellow-agy/fetch')).toBe('');
     await expect(
       createWorktree(exec, {
         repo,

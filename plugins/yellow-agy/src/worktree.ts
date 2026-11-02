@@ -5,6 +5,8 @@
  * HostExec, so on the WSL bridge it runs inside the distro with hooks off.
  */
 
+import { randomBytes } from 'node:crypto';
+
 import { AgyError } from './errors';
 import type { ExecResult, HostExec } from './host-exec';
 
@@ -120,20 +122,28 @@ export async function createWorktree(
       `branch ${options.branch} already exists; delegate needs a new branch`
     );
   }
-  await git(exec, options.repo, [
-    'fetch',
-    '--no-tags',
-    '--',
-    options.remote,
-    `refs/heads/${options.baseBranch}`,
-  ]);
-  const base = sha(
+  // A private ref, not the shared FETCH_HEAD, which another fetch in the
+  // same repo could overwrite between the fetch and the rev-parse.
+  const fetched = `refs/yellow-agy/fetch/${randomBytes(8).toString('hex')}`;
+  let base: string;
+  try {
     await git(exec, options.repo, [
-      'rev-parse',
-      '--verify',
-      'FETCH_HEAD^{commit}',
-    ])
-  );
+      'fetch',
+      '--no-tags',
+      '--',
+      options.remote,
+      `+refs/heads/${options.baseBranch}:${fetched}`,
+    ]);
+    base = sha(
+      await git(exec, options.repo, [
+        'rev-parse',
+        '--verify',
+        `${fetched}^{commit}`,
+      ])
+    );
+  } finally {
+    await exec.git(['update-ref', '-d', fetched], { cwd: options.repo });
+  }
   await git(exec, options.repo, [
     'worktree',
     'add',

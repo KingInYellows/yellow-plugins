@@ -16,6 +16,7 @@ exports.dropSnapshotRefs = dropSnapshotRefs;
 exports.collectWorktree = collectWorktree;
 exports.removeWorktree = removeWorktree;
 exports.deleteBranchIfEmpty = deleteBranchIfEmpty;
+const node_crypto_1 = require("node:crypto");
 const errors_1 = require("./errors");
 const BRANCH_RE = /^(?!.*\.\.)(?!.*\/\/)(?!.*@\{)[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/;
 const LOCAL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -76,18 +77,27 @@ async function createWorktree(exec, options) {
     if (exists.code === 0) {
         throw new errors_1.AgyError('AGY_WORKTREE', `branch ${options.branch} already exists; delegate needs a new branch`);
     }
-    await git(exec, options.repo, [
-        'fetch',
-        '--no-tags',
-        '--',
-        options.remote,
-        `refs/heads/${options.baseBranch}`,
-    ]);
-    const base = sha(await git(exec, options.repo, [
-        'rev-parse',
-        '--verify',
-        'FETCH_HEAD^{commit}',
-    ]));
+    // A private ref, not the shared FETCH_HEAD, which another fetch in the
+    // same repo could overwrite between the fetch and the rev-parse.
+    const fetched = `refs/yellow-agy/fetch/${(0, node_crypto_1.randomBytes)(8).toString('hex')}`;
+    let base;
+    try {
+        await git(exec, options.repo, [
+            'fetch',
+            '--no-tags',
+            '--',
+            options.remote,
+            `+refs/heads/${options.baseBranch}:${fetched}`,
+        ]);
+        base = sha(await git(exec, options.repo, [
+            'rev-parse',
+            '--verify',
+            `${fetched}^{commit}`,
+        ]));
+    }
+    finally {
+        await exec.git(['update-ref', '-d', fetched], { cwd: options.repo });
+    }
     await git(exec, options.repo, [
         'worktree',
         'add',
