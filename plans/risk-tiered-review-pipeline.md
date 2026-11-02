@@ -112,7 +112,7 @@ with no context cost to the parent.
 
 ### Inputs (`args`)
 
-`{ repo, pr, base_sha, head_sha, tier, diff_path, changed_files, ledger_dismissed, review_md, include, exclude }`,
+`{ repo, pr, base, head, tier, diff_path, changed_files, review_md, include, exclude, dismissed }`,
 all produced by the calling command before launch. The workflow never fetches
 from GitHub itself; the caller passes data so runs are reproducible and the eval
 harness can feed the same shape.
