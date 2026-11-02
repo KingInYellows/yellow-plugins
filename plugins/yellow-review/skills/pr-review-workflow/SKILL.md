@@ -476,9 +476,9 @@ walk several PRs use (`commit-resolve-fixes`, `run-verify-command`,
 `check-resolve-text`) are documented in `references/local-scripts.md`; Read it
 before calling them.
 
-## File Line Counts Script
+## Local Git Scripts
 
-Same directory. Not GraphQL; it reads only the local repository:
+Same directory. Not GraphQL; they read only the local repository:
 
 - **file-line-counts** `<diff-base-ref>` — Prints a
   `file-line-counts rows=N dropped=M skipped=K` header, N
@@ -488,6 +488,9 @@ Same directory. Not GraphQL; it reads only the local repository:
   more than 500 changed files. Consumed by `review-pr.md` Step 5 item 6 for the
   `thermonuclear-reviewer` size rule; `review-all.md` delegates to that item
   rather than calling the script itself.
+- **classify-risk** — Review risk tier of a change from its paths; flags, output
+  and policy rules are in the script header and
+  `../../references/components-reference.md`
 
 ## Verification Loop
 

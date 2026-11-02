@@ -165,6 +165,49 @@ else
 fi
 ```
 
+### Step 3a2: Risk tier (display only)
+
+Classify the change from its paths. The tier is reported in Step 10 and
+does not change which reviewers run yet. The policy comes from the default
+branch, not the PR's base: in a stack the base is the parent PR's unmerged
+branch. Only the tier, the policy source and the policy's own rule names are
+printed; the changed paths are PR-controlled text and stay out of context.
+The policy is read at the commit this fetch returned (`FETCH_HEAD`), never a
+remote-tracking ref that a failed fetch would leave stale, and each network
+call is bounded at 30 s (then killed 5 s later) when a `timeout` or `gtimeout`
+with `--kill-after` is installed.
+
+```bash
+rr_net() {
+  for rr_t in timeout gtimeout; do
+    if command -v "$rr_t" >/dev/null 2>&1 &&
+      "$rr_t" --kill-after=1 1 true >/dev/null 2>&1; then
+      "$rr_t" --kill-after=5 30 "$@"
+      return
+    fi
+  done
+  "$@"
+}
+DEFAULT_BRANCH=$(rr_net gh repo view --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
+case "$DEFAULT_BRANCH" in
+  '' | -* | *..* | *[!A-Za-z0-9._/-]*) printf '[review:pr] Warning: no usable default branch; risk tier unknown\n' >&2 ;;
+  *)
+    if ! rr_net git fetch --no-tags --quiet origin "refs/heads/$DEFAULT_BRANCH"; then
+      printf '[review:pr] Warning: default branch fetch failed; risk tier unknown\n' >&2
+    elif ! POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
+      printf '[review:pr] Warning: fetched default branch unreadable; risk tier unknown\n' >&2
+    else
+      "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
+        --policy-ref "$POLICY_SHA" "<DIFF_BASE>" HEAD |
+        jq -r '"tier=\(.tier) policy=\(.policy) rules=\([.reasons[].rule] | unique | join("; "))"'
+    fi
+    ;;
+esac
+```
+
+Substitute the `DIFF_BASE` value chosen above. When nothing is printed,
+record the tier as `unknown` and continue.
+
 ### Step 3b: Query institutional memory (optional)
 
 1. If `.ruvector/` does not exist in the project root: proceed to Step 3c.
@@ -1252,6 +1295,7 @@ reader can distinguish "no contract changes detected" from "contract
 findings were produced but extension classification was malformed."
 
 ### Coverage
+- Risk tier: <low | medium | high | unknown> (<policy>; <distinct reason rules>)
 - Reviewers run: <list>
 - Reviewers skipped (graceful degradation): <list with reasons>
 - Findings suppressed at confidence < 75: <count>

@@ -181,6 +181,24 @@ flags, exit codes, trust-boundary rules and library behavior.
   `review-ledger.sh summary`; prints one JSON report (verdict, `blockers`,
   `unknowns`, per-source detail) and exits 0 ready, 1 blocked, 3 unknown, 2
   usage. Worst case about 370 s (the callers' Bash timeout is 420000 ms)
+- `classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>`
+  (or `--stdin [--numstat] [<base-ref>]` with paths, or
+  `<added>\t<deleted>\t<path>` numstat rows, one per line on stdin) — Review
+  risk tier of a change. Each file takes the tier of the first rule in
+  `.github/review-risk.json` whose glob matches it (a `*` crosses `/`), else
+  `default_tier`; the change takes its highest file tier, and a low change over
+  `low_max_lines` becomes medium. Plain `--stdin` has no line counts, so the
+  size rule is off; `--numstat` turns it on, and a malformed row makes the size
+  unknown, which lifts a low change to medium. The policy is read at
+  `--policy-ref` (the default branch in `/review:pr`) or the base ref, all globs
+  are matched in one jq pass, the policy file and any `REVIEW.md` are always
+  high, a path with any character outside `A-Z a-z 0-9 . _ / @ + -` (spaces,
+  commas, quotes and every name git would quote) is high, and an invalid or
+  unreadable policy makes everything high. Stdin is newline-delimited, so a
+  caller reading names from the GitHub API replaces control characters first
+  (the script header has the jq filter). Paths are repository-root relative.
+  Needs `jq` and `git`; no network calls. Design:
+  `plans/risk-tiered-review-pipeline.md` at the repository root
 - `sync-blocking-comment [--reasons <file>] <owner/repo> <pr> <resolution>` —
   `/review:resolve` Step 9: where conversation resolution is not enforced, keep
   one sticky PR comment (marker line, edited in place) listing the unresolved
@@ -718,6 +736,10 @@ in the transcript (Ctrl-O) on a second `/review:pr` run within the hour.
   repository with a bare origin and stub `gt`/`node`/`gh`, built by
   `tests/helpers/resolve-repo.bash`
 - `resolve-paths.bats` — unit tests for `lib/resolve-paths.sh`
+- `classify-risk.bats` — a throwaway repository per test with the policy
+  committed on `main`; covers base-ref and `--policy-ref` policy reads,
+  first-match order, the size rule with binary files, literal glob dots and
+  fail-closed policies
 - `file-line-counts.bats` — pins the thermonuclear line-count invariant
   alongside `skills/pr-review-workflow/scripts/file-line-counts`
 - `review-ledger.bats` — throwaway repositories with a bare origin, built by
