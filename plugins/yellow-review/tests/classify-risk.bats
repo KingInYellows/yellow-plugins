@@ -254,6 +254,85 @@ commit_file() {
   [ "$status" -eq 0 ]
   [ "$(jq -r .tier <<<"$output")" = medium ]
   [ "$(jq -r .lines <<<"$output")" = 15 ]
-  run "$SCRIPT" --policy-file "$BATS_TEST_TMPDIR/p.json" --stdin --numstat <<<"docs/no-tabs.md"
+  [ "$(jq -r '[.reasons[].path] | join(",")' <<<"$output")" = "" ]
+  [ "$(jq -r '.reasons[0].rule' <<<"$output")" = size ]
+}
+
+@test "--stdin --numstat: a path-only or malformed row makes the size unknown, not low" {
+  printf '%s\n' "$POLICY" >"$BATS_TEST_TMPDIR/p.json"
+  run "$SCRIPT" --policy-file "$BATS_TEST_TMPDIR/p.json" --stdin --numstat <<<$'1\t0\tdocs/a.md\ndocs/no-tabs.md'
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .tier <<<"$output")" = medium ]
+  [ "$(jq -r .lines <<<"$output")" = null ]
+  [ "$(jq -r '.reasons[0].rule' <<<"$output")" = size-unknown ]
+  [ "$(jq -r .counts.low <<<"$output")" = 2 ]
+  run "$SCRIPT" --policy-file "$BATS_TEST_TMPDIR/p.json" --stdin --numstat <<<$'x\t0\tdocs/a.md'
+  [ "$(jq -r .tier <<<"$output")" = medium ]
+  [ "$(jq -r .lines <<<"$output")" = null ]
+  run "$SCRIPT" --policy-file "$BATS_TEST_TMPDIR/p.json" --stdin --numstat <<<$'-\t3\tdocs/a.md'
+  [ "$(jq -r .tier <<<"$output")" = medium ]
+  # Well-formed small rows, including a binary file, stay low.
+  run "$SCRIPT" --policy-file "$BATS_TEST_TMPDIR/p.json" --stdin --numstat <<<$'1\t1\tdocs/a.md\n-\t-\tdocs/img.png'
   [ "$(jq -r .tier <<<"$output")" = low ]
+  [ "$(jq -r .lines <<<"$output")" = 2 ]
+}
+
+@test "a present false, null or unknown key makes the policy invalid" {
+  for bad in '{"version":1,"default_tier":"low","low_max_lines":false,"rules":[]}' \
+             '{"version":1,"default_tier":"low","low_max_lines":null,"rules":[]}' \
+             '{"version":1,"default_tier":null,"rules":[]}' \
+             '{"version":1,"default_tier":false,"rules":[]}' \
+             '{"version":1,"rules":[],"extra":1}'; do
+    printf '%s\n' "$bad" >"$BATS_TEST_TMPDIR/p.json"
+    run "$SCRIPT" --policy-file "$BATS_TEST_TMPDIR/p.json" --stdin <<<"docs/a.md"
+    [ "$(jq -r .policy <<<"$output")" = invalid ]
+    [ "$(jq -r .tier <<<"$output")" = high ]
+  done
+}
+
+@test "several JSON documents in the policy make it invalid" {
+  printf '{"version":1,"default_tier":"low","rules":[]}\n{"version":1,"default_tier":"high","rules":[]}\n' >"$BATS_TEST_TMPDIR/p.json"
+  run "$SCRIPT" --policy-file "$BATS_TEST_TMPDIR/p.json" --stdin <<<"docs/a.md"
+  [ "$(jq -r .policy <<<"$output")" = invalid ]
+  [ "$(jq -r .tier <<<"$output")" = high ]
+}
+
+@test "a policy path that is not a regular file is invalid, not absent" {
+  git checkout -q main
+  git rm -q .github/review-risk.json
+  mkdir -p .github/review-risk.json
+  printf '{}\n' >.github/review-risk.json/x
+  git add -A
+  git commit -qm "policy is a directory"
+  run "$SCRIPT" --stdin main <<<"docs/a.md"
+  [ "$(jq -r .policy <<<"$output")" = invalid ]
+  [ "$(jq -r .tier <<<"$output")" = high ]
+  git checkout -q feature
+  git checkout -qb linked
+  git rm -q .github/review-risk.json
+  mkdir -p .github
+  ln -s ../README.md .github/review-risk.json
+  git add -A
+  git commit -qm "policy is a symlink"
+  run "$SCRIPT" --stdin linked <<<"docs/a.md"
+  [ "$(jq -r .policy <<<"$output")" = invalid ]
+}
+
+@test "--stdin with --policy-ref needs no base ref" {
+  run "$SCRIPT" --policy-ref main --stdin <<<"docs/a.md"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .policy <<<"$output")" = ref ]
+  [ "$(jq -r .tier <<<"$output")" = low ]
+}
+
+@test "diff.relative does not hide changes outside the current directory" {
+  commit_file docs/guide.md
+  commit_file plugins/a/hooks/session.sh
+  git config diff.relative true
+  cd docs
+  run "$SCRIPT" main feature
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .files <<<"$output")" = 2 ]
+  [ "$(jq -r .tier <<<"$output")" = high ]
+  [ "$(jq -r '.reasons[0].path' <<<"$output")" = plugins/a/hooks/session.sh ]
 }
