@@ -587,8 +587,19 @@ class Lifecycle {
         return rest;
     }
     async implementTurn(requestId, op, task, prompt, profile) {
+        const fullPrompt = `${prompt}\n\n${classify_1.NEEDS_INPUT_INSTRUCTION}`;
         let snapshot;
         try {
+            // Refuse a prompt whose argv is invalid or too long before the
+            // snapshot and claim change anything.
+            (0, invocation_1.buildInvocation)(this.deps.host, (0, profiles_1.turnArgs)({
+                prompt: fullPrompt,
+                profile,
+                printTimeoutSeconds: this.deps.printTimeoutSeconds,
+                ...(task.conversationId === undefined
+                    ? {}
+                    : { conversationId: task.conversationId }),
+            }), { cwd: task.worktree, baseEnv: this.deps.baseEnv, filterDrivers: [] });
             const s = await (0, worktree_1.snapshotWorktree)(this.deps.exec, task.worktree, task.localId);
             snapshot = { head: s.head, commit: s.commit, indexTree: s.indexTree };
             await this.patchClaim(requestId, { snapshot });
@@ -599,7 +610,7 @@ class Lifecycle {
         }
         let cls;
         try {
-            cls = await this.turn(requestId, task.worktree, `${prompt}\n\n${classify_1.NEEDS_INPUT_INSTRUCTION}`, profile, task.conversationId, false);
+            cls = await this.turn(requestId, task.worktree, fullPrompt, profile, task.conversationId, false);
         }
         catch (err) {
             const code = err instanceof errors_1.AgyError ? err.code : 'AGY_INTERNAL';

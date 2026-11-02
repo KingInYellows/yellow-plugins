@@ -630,6 +630,20 @@ describe('Lifecycle', () => {
     });
   });
 
+  it('refuses an invalid implement reply before snapshotting or claiming', async () => {
+    const h = harness([planTurn, editTurn('x\n')]);
+    await h.lc.delegate(delegateInput(h.repo));
+    await h.lc.approve({ requestId: 'r2', localId: 't1' });
+    await expect(
+      h.lc.reply({ requestId: 'r3', localId: 't1', message: '--settings=x' })
+    ).rejects.toMatchObject({ code: 'AGY_INVALID_INPUT' });
+    expect(h.calls).toHaveLength(2);
+    const j = readJournal(h.deps.dataDir);
+    expect(j.activeRun).toBeUndefined();
+    expect(j.requests['r3']).toBeUndefined();
+    expect(j.tasks['t1']?.state).toBe('IMPLEMENTED');
+  });
+
   it('approve needs a valid plan', async () => {
     const h = harness([
       () => ({

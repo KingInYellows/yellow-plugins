@@ -790,8 +790,23 @@ export class Lifecycle {
     prompt: string,
     profile: TurnProfile
   ): Promise<Outcome> {
+    const fullPrompt = `${prompt}\n\n${NEEDS_INPUT_INSTRUCTION}`;
     let snapshot: PartialSnapshot;
     try {
+      // Refuse a prompt whose argv is invalid or too long before the
+      // snapshot and claim change anything.
+      buildInvocation(
+        this.deps.host,
+        turnArgs({
+          prompt: fullPrompt,
+          profile,
+          printTimeoutSeconds: this.deps.printTimeoutSeconds,
+          ...(task.conversationId === undefined
+            ? {}
+            : { conversationId: task.conversationId }),
+        }),
+        { cwd: task.worktree, baseEnv: this.deps.baseEnv, filterDrivers: [] }
+      );
       const s = await snapshotWorktree(
         this.deps.exec,
         task.worktree,
@@ -808,7 +823,7 @@ export class Lifecycle {
       cls = await this.turn(
         requestId,
         task.worktree,
-        `${prompt}\n\n${NEEDS_INPUT_INSTRUCTION}`,
+        fullPrompt,
         profile,
         task.conversationId,
         false
