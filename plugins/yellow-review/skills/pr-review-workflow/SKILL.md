@@ -416,8 +416,8 @@ Located at `skills/pr-review-workflow/scripts/`:
   420000 ms
 - **sync-blocking-comment**
   `[--reasons <file>] [--risk <file>] <owner/repo> <pr> <resolution>` — Sticky
-  comment of open threads plus the `--risk` tier and policy source, unless
-  `enforced`; exits as `handback-pr-thread` (contract "Blocking-threads")
+  comment of open threads plus the `--risk` tier and source, unless `enforced`;
+  exits as `handback-pr-thread` (contract "Blocking-threads comment")
 - **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with an
   idempotency marker; skips when our latest recent comment carries a marker for
   this thread and only bot comments follow it, and reports that disposition. An
