@@ -187,10 +187,11 @@ flags, exit codes, trust-boundary rules and library behavior.
   into `classify-risk --policy-file <tmp> --stdin --numstat` (so the size rule
   applies), and reports an `approval` object: tier, required humans (0 or 1), a
   listed human's approval of the head SHA (an approving review on it, or adding
-  `graphite-queue` after the head arrived: the later of its committer date and
-  its first check suite; no check suite means `head_time_unknown`), the
-  high-tier cross-lineage review on the head, and `missing` tokens, which block
-  only under `enforce`
+  `graphite-queue` after the head arrived: the latest of its committer date, its
+  first check suite on the PR's head branch and any force push to it; no such
+  suite means `head_time_unknown`; a head that moved by the final re-read leaves
+  the approval unknown), the high-tier cross-lineage review on the head, and
+  `missing` tokens, which block only under `enforce`
 - `classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>`
   (or `--stdin [--numstat] [<base-ref>]` with paths, or
   `<added>\t<deleted>\t<path>` numstat rows, one per line on stdin) — Review

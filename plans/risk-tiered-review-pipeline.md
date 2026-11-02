@@ -257,23 +257,27 @@ infographic's "two people" tier does not exist here. Every tier needs at most
 the user's own approval. What rises with risk is the automated scrutiny, not the
 number of humans.
 
-| Tier   | Requirement before `graphite-queue`                                                                                                                                                                                      |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Low    | All Important findings answered, CI green, `check-merge-ready` ready. Claude may add the label itself (the existing standing approval).                                                                                  |
-| Medium | The above, plus KingInYellow18's approval **of the head SHA**: adding `graphite-queue` after the head arrived (chosen 2026-11-02), or an approving review on it.                                                         |
-| High   | Same single approval from KingInYellow18 of the head SHA, plus automated extras before it: a cross-lineage pass (Codex or council) with no unanswered Important, and a fresh `review-gate` run on the final head commit. |
+| Tier   | Requirement before `graphite-queue`                                                                                                                                                                                                                                                                                                                                                         |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Low    | All Important findings answered, CI green, `check-merge-ready` ready. Claude may add the label itself (the existing standing approval).                                                                                                                                                                                                                                                     |
+| Medium | The above, plus KingInYellow18's approval **of the head SHA**: adding `graphite-queue` after the head arrived (chosen 2026-11-02), or an approving review on it.                                                                                                                                                                                                                            |
+| High   | Same single approval from KingInYellow18 of the head SHA, plus automated extras before it: a cross-lineage pass (Codex or council) with no unanswered Important, and a fresh `review-gate` run on the final head commit. Until the ledger records each run's head (Phase 3), the fresh run is unverifiable, so `enforce` leaves high PRs `unknown`; `advisory`, the default, only lists it. |
 
 Rules from the infographic kept literally:
 
 - **An agent's approval never counts.** `check-merge-ready` accepts only a
-  review by a listed human login; bot and Claude approvals are ignored.
+  review by, or a `graphite-queue` label added by, a listed human login; bot and
+  Claude approvals and labels are ignored.
 - **An approval covers one commit.** Compare the approving review's `commit_id`
   with the head SHA, or the label event's time with the time the head arrived
-  (the later of its committer date and its first check suite); any later push
-  invalidates it. GitHub will not let the owner approve their own PR, so on
-  2026-11-02 the user chose the label as their approval. Claude acts through the
-  same account, so it must never add the label to a medium or high PR. A repo
-  ruleset with "dismiss stale approvals" enforces the same on GitHub's side.
+  (the latest of its committer date, its first check suite on the PR's head
+  branch, and any force push to it); any later push invalidates it. GitHub will
+  not let the owner approve their own PR, so on 2026-11-02 the user chose the
+  label as their approval. Claude acts through the same account, so it must
+  never add the label to a medium or high PR. A repo ruleset with "dismiss stale
+  approvals" enforces the same for reviews on GitHub's side; nothing on GitHub
+  invalidates a stale label, so `check-merge-ready` is the only check of label
+  freshness.
 - **The change sets the tier.** The tier is recomputed on every push and posted
   in the sticky comment `sync-blocking-comment` already maintains.
 

@@ -296,15 +296,19 @@ query MergeReadyApproval($owner: String!, $name: String!, $number: Int!) {
     defaultBranchRef { target { oid } }
     pullRequest(number: $number) {
       headRefOid
+      headRefName
       changedFiles
       reviews(last: 100) {
         nodes { state author { __typename login } commit { oid } }
       }
       commits(last: 1) {
-        nodes { commit { oid committedDate checkSuites(first: 100) { nodes { createdAt } } } }
+        nodes { commit { oid committedDate checkSuites(first: 100) { nodes { createdAt branch { name } } } } }
       }
-      timelineItems(last: 100, itemTypes: [LABELED_EVENT]) {
-        nodes { ... on LabeledEvent { createdAt label { name } actor { __typename login } } }
+      timelineItems(last: 100, itemTypes: [LABELED_EVENT, HEAD_REF_FORCE_PUSHED_EVENT]) {
+        nodes {
+          ... on LabeledEvent { createdAt label { name } actor { __typename login } }
+          ... on HeadRefForcePushedEvent { createdAt afterCommit { oid } }
+        }
       }
     }
   }
@@ -346,19 +350,25 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
         else
             jq '.data.repository.pullRequest.reviews.nodes' "$WORK/approval.raw" >"$WORK/reviews"
             # Label approval: who added the label and when, against the time
-            # the head arrived. That time is the later of the head commit's
-            # committer date and its first check suite (set by GitHub at
-            # push), so an old committer date cannot predate a fresh push.
-            # With no check suite there is no push-time evidence, so the
-            # time is unknown and the label cannot approve.
+            # the head arrived on this PR: the latest of the head commit's
+            # committer date, its first check suite on the PR's head branch
+            # (set by GitHub at push) and any force push to it. Suites from
+            # another branch do not count, since a commit checked elsewhere
+            # first can be pushed here later. With no suite on the head
+            # branch there is no push-time evidence, so the time is unknown
+            # and the label cannot approve.
             jq -c --arg h "$A_HEAD" '
               .data.repository.pullRequest as $p
               | ([($p.commits.nodes // [])[] | .commit | select(.oid == $h)] | first) as $c
-              | ([($c.checkSuites.nodes // [])[]? | .createdAt | strings] | sort | first) as $suite
+              | ([($c.checkSuites.nodes // [])[]?
+                  | select(($p.headRefName | type) == "string" and .branch.name == $p.headRefName)
+                  | .createdAt | strings] | sort | first) as $suite
+              | ([($p.timelineItems.nodes // [])[]? | select(type == "object" and .afterCommit.oid == $h)
+                  | .createdAt | strings]) as $forced
               | {headTime: (if $c == null or ($c.committedDate | type) != "string" or $suite == null then null
-                            else [$c.committedDate, $suite] | max end),
+                            else [$c.committedDate, $suite] + $forced | max end),
                  events: (if ($p.timelineItems.nodes | type) == "array"
-                          then [$p.timelineItems.nodes[] | select(type == "object" and (.createdAt | type) == "string")]
+                          then [$p.timelineItems.nodes[] | select(type == "object" and (.createdAt | type) == "string" and .label != null)]
                           else null end)}' "$WORK/approval.raw" >"$WORK/labels" 2>/dev/null \
               || printf '{"headTime":null,"events":null}' >"$WORK/labels"
         fi
@@ -431,7 +441,8 @@ jq -n -c \
           and ((.actor.login // "") | ascii_downcase | IN($humans[])))] as $lbl
     | (if $ht == null then null else ([$lbl[] | select(.createdAt >= $ht)] | last) end) as $lblhead
     | (if $r == null then null
-       else any($r[]; ((.author.login // "") | norm | IN($bots[])) and .commit.oid == $head) end) as $xl
+       else any($r[]; .author.__typename == "Bot" and ((.author.login // "") | norm | IN($bots[]))
+                and .commit.oid == $head) end) as $xl
     | {mode: $mode, tier: $tier, policy: (if $policy == "null" then null else $policy end),
        required: ({low: 0, medium: 1, high: 1}[$tier]),
        humanApproval: (if $onhead != null then {login: $onhead.author.login, commit: $onhead.commit.oid, via: "review"}
@@ -456,6 +467,24 @@ jq -n -c \
       policy: null, required: null, humanApproval: null, extras: {crossLineage: null, freshReview: null},
       missing: (if $mode == "off" then [] else ["tier_unknown"] end)}' >"$WORK/approval"
 }
+
+# The head must not have moved while the evidence was read: re-read it last,
+# and any change or failed read leaves the approval unknown.
+if [ -n "$A_HEAD" ]; then
+    H_RC=0
+    rg_gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
+        -f query='query MergeReadyHead($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) { pullRequest(number: $number) { headRefOid } } }' \
+        >"$WORK/head.raw" 2>"$WORK/head.err" || H_RC=$?
+    END_HEAD=""
+    [ "$H_RC" -ne 0 ] || END_HEAD=$(jq -r '.data.repository.pullRequest.headRefOid // empty' "$WORK/head.raw" 2>/dev/null) || END_HEAD=""
+    if [ "$END_HEAD" != "$A_HEAD" ]; then
+        note "the head moved or could not be re-read after the approval check; approval unknown"
+        jq -c '.tier = "unknown" | .required = null | .humanApproval = null
+               | .extras = {crossLineage: null, freshReview: null} | .missing = ["tier_unknown"]' \
+            "$WORK/approval" >"$WORK/approval.new" && mv "$WORK/approval.new" "$WORK/approval"
+    fi
+fi
 
 wait "$THREADS_PID" || THREADS_RC=$?
 wait "$BLOCKERS_PID" || BLOCKERS_RC=$?

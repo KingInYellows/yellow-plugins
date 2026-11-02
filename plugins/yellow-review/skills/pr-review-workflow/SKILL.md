@@ -408,12 +408,15 @@ Located at `skills/pr-review-workflow/scripts/`:
   `/review:merge-ready`. Prints one JSON object with `verdict`
   (`ready`/`blocked`/`unknown`), `blockers` (`not_open`, `draft`, `conflicts`,
   `unresolved_threads`, `changes_requested`, `review_required`, `ci_failing`,
-  `ci_pending`, `ledger_findings`), `unknowns` (`pr_state`, `threads`,
-  `reviews`, `ci`, `mergeable`, `merge_state` for a `BLOCKED` or `BEHIND` merge
-  state, `ledger` when the PR's ledger files cannot be summarized or the summary
-  skipped unreadable records) and the detail behind each. Exits 0 ready, 1
-  blocked, 3 unknown, 2 usage; give it a Bash `timeout` of 420000 ms. Its
-  risk-tier `approval` object blocks only under `review_approval_gate: enforce`
+  `ci_pending`, `ledger_findings`, and under `review_approval_gate: enforce`
+  `approval_required`, `approval_stale`, `cross_lineage_missing`), `unknowns`
+  (`approval` under enforce when the approval evidence is unreadable,
+  `pr_state`, `threads`, `reviews`, `ci`, `mergeable`, `merge_state` for a
+  `BLOCKED` or `BEHIND` merge state, `ledger` when the PR's ledger files cannot
+  be summarized or the summary skipped unreadable records) and the detail behind
+  each. Exits 0 ready, 1 blocked, 3 unknown, 2 usage; give it a Bash `timeout`
+  of 420000 ms. Its risk-tier `approval` object blocks only under
+  `review_approval_gate: enforce`
 - **sync-blocking-comment** `[--reasons <file>] <owner/repo> <pr> <resolution>`
   — Keeps one sticky PR comment (marker line, edited in place) listing every
   unresolved thread with a link and status, unless `<resolution>` is `enforced`;

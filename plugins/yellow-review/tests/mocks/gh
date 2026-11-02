@@ -134,6 +134,13 @@ case "$ALL_ARGS" in
     printf '%s\n' "${MOCK_GH_MR_BODY:-$_mr_default}"
     exit 0
     ;;
+  *"MergeReadyHead"*)
+    # check-merge-ready's final head re-read. MOCK_GH_MRH_OID overrides the
+    # head; by default it repeats the approval response's head.
+    _mrh=${MOCK_GH_MRH_OID:-$(printf '%s' "${MOCK_GH_MRA_BODY:-}" | jq -r '.data.repository.pullRequest.headRefOid // empty' 2>/dev/null)}
+    jq -nc --arg h "$_mrh" '{data:{repository:{pullRequest:{headRefOid:$h}}}}'
+    exit 0
+    ;;
   *"MergeReadyApproval"*)
     # check-merge-ready approval query. MOCK_GH_MRA_BODY is the whole
     # response; MOCK_GH_MRA_FAIL=1 simulates a failure.

@@ -81,7 +81,8 @@ approval_body() {
     --argjson l "${LABELS:-[]}" \
     '{data:{repository:{defaultBranchRef:{target:{oid:$d}},
       pullRequest:{headRefOid:$h, changedFiles:$n, reviews:{nodes:$r},
-        commits:{nodes:[{commit:{oid:$h, committedDate:$ca, checkSuites:{nodes:[{createdAt:$sa}]}}}]},
+        headRefName:"feature",
+        commits:{nodes:[{commit:{oid:$h, committedDate:$ca, checkSuites:{nodes:[{createdAt:$sa, branch:{name:"feature"}}]}}}]},
         timelineItems:{nodes:$l}}}}}'
 }
 
@@ -447,6 +448,40 @@ state_body() {
   MOCK_GH_MR_FILES='[{"filename":"docs/a.md"}]'
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$(jq -r .approval.tier <<<"$output")" = medium ]
+}
+
+@test "CLAUDE-234: a check suite from another branch is not evidence of this PR's push" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  MOCK_GH_MRA_BODY=$(jq -c '.data.repository.pullRequest.commits.nodes[0].commit.checkSuites.nodes[0].branch.name = "elsewhere"' <<<"$MOCK_GH_MRA_BODY")
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["head_time_unknown"]' ]
+}
+
+@test "CLAUDE-234: a force push to the head after the label makes the label stale" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z),{\"createdAt\":\"2026-11-02T10:30:00Z\",\"afterCommit\":{\"oid\":\"$HEAD_SHA\"}}]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_stale"]' ]
+}
+
+@test "CLAUDE-234: a head that moves before the check ends leaves the approval unknown" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  MOCK_GH_MRH_OID=$OLD_SHA run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -r .approval.tier <<<"$output")" = unknown ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+}
+
+@test "CLAUDE-234: a User account named like the cross-lineage bot does not count" {
+  config 'review_approval_gate: enforce'
+  REVIEWS="[$(rv APPROVED Test User "$HEAD_SHA"),$(rv COMMENTED chatgpt-codex-connector User "$HEAD_SHA")]" with_files plugins/x/hooks/h.sh
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$(jq -r .approval.tier <<<"$output")" = high ]
+  [ "$(jq -r .approval.extras.crossLineage <<<"$output")" = false ]
 }
 
 @test "CLAUDE-234: an approval on an older commit is stale" {

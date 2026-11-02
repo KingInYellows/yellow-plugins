@@ -93,17 +93,19 @@ MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens
   `yellow-plugins.local.md` key `review_approval_gate` sets the mode: `off` (row
   reads `off`, no lookups), `advisory` (default: list `missing`, the verdict
   ignores it) or `enforce` (`approval_required`, `approval_stale` and
-  `cross_lineage_missing` block; `tier_unknown`, `reviews_unknown` and
-  `fresh_review_unknown` make the verdict `unknown`). Low needs no human; medium
+  `cross_lineage_missing` block; `tier_unknown`, `reviews_unknown`,
+  `head_time_unknown` and `fresh_review_unknown` make the verdict `unknown`). Low needs no human; medium
   and high need approval of the head SHA by a login in `review_approval_humans`
   (default: the repository owner): an approving review on that commit, or that
   login adding the `graphite-queue` label after the head arrived (GitHub will
   not let the owner approve their own PR, so the owner approves by queueing).
-  `humanApproval.via` says which. A bot's approval or label, or one from before
-  the head, never counts (`approval_stale`); a label whose timing cannot be
-  checked is `head_time_unknown`. High also needs a review on the head by a
+  `humanApproval.via` says which. A bot's or unlisted account's approval or
+  label never counts (`approval_required`); a listed human's from before the
+  head is `approval_stale`; a label whose timing cannot be checked is
+  `head_time_unknown`. High also needs a review on the head by a
   login in `review_cross_lineage_bots`; `freshReview` is always unknown until
-  the ledger records the head of each review run.
+  the ledger records the head of each review run, so under `enforce` a high PR
+  is `unknown` until then (Phase 3), and the default `advisory` only lists it.
 - For `blocked`, end with the next step for each blocker: `/review:resolve` for
   threads, the reviewer for changes requested, the failing check names for CI, a
   rebase for conflicts, the user adding `graphite-queue` again (or approving the
