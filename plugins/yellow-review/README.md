@@ -170,11 +170,12 @@ version packages" PRs) does not select the plugin-surface personas
 `pattern-recognition-specialist`) in `/review:pr` or `/review:all`; any other
 manifest change or plugin-authoring path still does.
 
-### Workflow (1)
+### Workflow (2)
 
-| Agent                 | Description                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------ |
-| `pr-comment-resolver` | Implements one fix per cluster of review comments and proposes a disposition for each thread (no Bash) |
+| Agent                  | Description                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| `pr-comment-resolver`  | Implements one fix per cluster of review comments and proposes a disposition for each thread (no Bash) |
+| `review-gate-verifier` | Read-only voter for the `review-gate` workflow: one verdict with a `file:line` citation per finding    |
 
 ## Skills
 
@@ -183,6 +184,21 @@ manifest change or plugin-authoring path still does.
 | `pr-review-workflow`          | Internal reference for adaptive selection and output format                                                                                       |
 | `stack-traversal`             | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack`                                      |
 | `yellow-thermonuclear-review` | Portable structural-quality rubric preloaded by `thermonuclear-reviewer`; adapted from Cursor's MIT-licensed `thermo-nuclear-code-quality-review` |
+
+## Workflows
+
+| Workflow      | Description                                                                                                                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `review-gate` | Risk-tiered review core: persona hunters, 1 or 3 verifier votes per finding, Important / Nit / Pre-existing ranking. Runs as `/yellow-review:review-gate` with `args` from the caller. |
+
+`/review:pr` calls it only when `yellow-plugins.local.md` sets
+`review_pipeline: workflow`, and only in shadow mode: the normal persona review
+runs unchanged, and the Coverage section adds one line comparing the two
+reviews' findings. The workflow's findings are not applied or recorded. Each run
+spends usage on its own agents: one per hunter (two on a low-tier change, more
+on medium and high) plus one verifier per finding, three for a P0/P1 above low.
+A `claude -p` run needs a `Workflow(yellow-review:review-gate)` allow rule to
+launch it.
 
 ## Scripts
 

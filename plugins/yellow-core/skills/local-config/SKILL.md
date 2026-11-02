@@ -54,7 +54,7 @@ used only by humans (commands ignore the body).
 ```yaml
 ---
 # review:pr / review:all behavior overrides (Wave 2 keys)
-review_pipeline: persona | legacy        # default: persona (Wave 2 default)
+review_pipeline: persona | legacy | workflow  # default: persona (Wave 2 default)
 review_depth: small | medium | large     # default: auto-detect from diff size
 focus_areas: [security, correctness, ...]  # default: all areas
 reviewer_set:
@@ -100,7 +100,7 @@ means the file remains valid forward-and-backward.
 
 | Field | Type | Default | Effect |
 |-------|------|---------|--------|
-| `review_pipeline` | `persona` \| `legacy` | `persona` | `legacy` falls back to pre-Wave-2 adaptive selection (no learnings pre-pass, no confidence rubric, no new personas). Use as escape hatch only. |
+| `review_pipeline` | `persona` \| `legacy` \| `workflow` | `persona` | `legacy` falls back to pre-Wave-2 adaptive selection (no learnings pre-pass, no confidence rubric, no new personas). Use as escape hatch only. `workflow` (`/review:pr` only, shadow mode) runs the `persona` pipeline unchanged and also launches yellow-review's `review-gate` workflow on the same diff, reporting a findings comparison in Coverage without applying or recording the workflow's findings (yellow-review `references/review-pr/workflow-shadow.md`). Other commands treat `workflow` as `persona`. |
 | `review_depth` | `small` \| `medium` \| `large` | auto | Forces a depth tier regardless of computed diff size. `large` always invokes `adversarial-reviewer`; `small` skips it even on large diffs. |
 | `focus_areas` | array of strings | empty (= all) | Narrows reviewer set to those whose `category` matches one of the listed areas. Recognized areas: `security`, `correctness`, `reliability`, `performance`, `maintainability`, `project-compliance`, `project-standards`, `architecture`, `testing`, `documentation`, `types`, `adversarial`. Always-on personas (`project-compliance-reviewer`, `correctness-reviewer`, `maintainability-reviewer`, `project-standards-reviewer`) survive the filter regardless of `focus_areas` — filtering them out would defeat the always-on contract. |
 | `reviewer_set.include` | array of agent names | empty | Additive — agents are spawned even if their conditional triggers don't fire. This is also the only way to reach `thermonuclear-reviewer` (yellow-review): an opt-in structural-quality persona that appears in neither dispatch table, so it runs only when named here. Two silent drops apply to `include`, both visible in the precedence pseudo-code under "Reading the config from a command". First, `review_pipeline: legacy` branches before overrides are read at all, so `include` has no effect there. Second, `focus_areas` filters the merged set afterwards, and `thermonuclear-reviewer` is not always-on (its category is `maintainability`), so an included `thermonuclear-reviewer` survives only when `focus_areas` is unset or lists `maintainability`. Neither drop emits a diagnostic. A third drop does: included agents still respect the depth tier. `thermonuclear-reviewer`, `adversarial-reviewer`, `code-simplicity-reviewer` and `architecture-strategist`, when no dispatch rule already selected them, run only at `medium` depth or above (`review_depth`, else the diff's gross line count: below 100 is `small`). Each one dropped is logged to stderr and listed in the report's Coverage section; `reviewer_set.force_depth` lifts the gate. |
@@ -219,8 +219,8 @@ use_persona_dispatch(reviewer_set)
   → `exclude` wins; emit a warning naming the conflicting agent.
 - A `reviewer_set.force_depth` name that is not in `include` → ignore it and
   emit a warning naming it; `force_depth` never adds an agent.
-- `review_pipeline` values other than `persona` / `legacy` → fall back to
-  `persona` and emit a warning.
+- `review_pipeline` values other than `persona` / `legacy` / `workflow` →
+  fall back to `persona` and emit a warning.
 - `stack` entries other than `ts` / `py` / `rust` / `go` → drop the
   unknown entry, emit a warning naming it. An empty array after dropping
   unknowns falls back to auto-detection.

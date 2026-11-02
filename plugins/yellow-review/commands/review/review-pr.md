@@ -15,6 +15,7 @@ allowed-tools:
   - AskUserQuestion
   - ToolSearch
   - Skill
+  - Workflow
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
@@ -388,6 +389,9 @@ overrides documented in that schema:
 - `review_pipeline: legacy` → fall back to the pre-Wave-2 adaptive
   selection (see "Legacy fallback" at the bottom of this section). Skip
   the rest of this step.
+- `review_pipeline: workflow` → run this step and Step 5 exactly as for
+  `persona`, plus the `review-gate` shadow run (see "Workflow shadow" at
+  the bottom of this section).
 - `review_depth: small | medium | large` → forces a depth tier regardless
   of computed diff size. `large` invokes `adversarial-reviewer`
   unconditionally even on small diffs; `small` skips
@@ -543,8 +547,20 @@ an improvised set silently changes what the rollback escape hatch means.
 If the Read fails (file missing, path unresolved), stop and report the
 exact path — do not fall back to the default persona pipeline, which
 would silently ignore the user's `legacy` setting.
-When `review_pipeline` is unset or `persona` (the default), skip the load
-and continue with the dispatch table above.
+When `review_pipeline` is unset, `persona` (the default) or `workflow`, skip
+the load and continue with the dispatch table above.
+
+#### Workflow shadow (`review_pipeline: workflow`)
+
+When `yellow-plugins.local.md` sets `review_pipeline: workflow`, Read
+`${CLAUDE_PLUGIN_ROOT}/references/review-pr/workflow-shadow.md` once the
+selection above is final, and run it before Step 5. It launches the
+`yellow-review:review-gate` workflow beside the persona pipeline and only
+reports a comparison in Coverage; its findings are never applied or written
+to the ledger. If the Read fails, note `workflow shadow: not run` in Coverage
+and continue. It creates a detached checkout under the git common dir; run
+its Cleanup section before Step 10 and on any path that ends the review
+after the checkout exists.
 
 ### Step 5: Pass 1 — Parallel Persona Dispatch
 
@@ -1306,6 +1322,7 @@ findings were produced but extension classification was malformed."
 - Plugin-contract extension strips (malformed `breaking_change_class`): <count or omit when zero>
 - Past learnings: <"none found" | "N injected">
 - Persona shadow: <the persona-shadow line, or omit when `reviewer_selection` is unset or `off`>
+- Workflow shadow (review-gate): <the workflow-shadow.md line, or omit unless `review_pipeline: workflow`>
 - Ledger: <new> new, <merged> carried over, <reopened> reopened, <pending> pending, <attention> need attention (plus dismissed-context counts, rejected ordinals and write failures — ledger.md "Step 10")
 
 ### Verdict
