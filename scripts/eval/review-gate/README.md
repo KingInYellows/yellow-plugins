@@ -126,11 +126,11 @@ python3 scripts/eval/review-gate/eval.py grade "$W" --baseline <old>/summary.jso
   `--plugin-dir` plugins (yellow-core, yellow-linear, yellow-review).
   Grading-only fields (`golden`, `notes`, `source`, `confirmed_*`) are left out,
   so fixing a golden regex regrades without rerunning. `run` skips a row whose
-  output carries the current fingerprint, so a stopped run resumes. `run`
-  first recomputes every row's fingerprint and refuses to start when any input
-  changed since `prepare` (an edited plugin file, diff or args); run `prepare`
-  again, and then every changed row reruns. A failed run leaves `out/<id>.bad`
-  and reruns next time.
+  output carries the current fingerprint, so a stopped run resumes. `run` first
+  recomputes every row's fingerprint and refuses to start when any input changed
+  since `prepare` (an edited plugin file, diff or args); run `prepare` again,
+  and then every changed row reruns. A failed run leaves `out/<id>.bad` and
+  reruns next time.
 - `grade` writes `results-<date>.md` here (`--date`, default today;
   `--results-dir` elsewhere) and `summary.json` in the work directory, and exits
   non-zero while any run is missing or incomplete.
