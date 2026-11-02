@@ -269,6 +269,14 @@ def main(argv=None):
                             (repo, REPO_RE, "--repo"), (a.ref, REF_RE, "--ref")):
         if value is not None and not rx.match(value):
             sys.exit("harvest: bad %s value %r" % (name, value))
+    for value, name in ((a.since, "--since"), (a.until, "--until")):
+        if value is not None:
+            try:
+                datetime.date.fromisoformat(value)
+            except ValueError:
+                sys.exit("harvest: %s %r is not a real date" % (name, value))
+    if a.since and a.until and a.since > a.until:
+        sys.exit("harvest: --since %s is after --until %s" % (a.since, a.until))
     if a.output:
         out_path = os.path.realpath(a.output)
         for folder in ("cases", "controls"):

@@ -427,8 +427,31 @@ def run_one(row, work, claude, timeout):
     return rid, True, "incomplete: %s" % why if why else ""
 
 
+def stale_rows(rows):
+    """Rows whose inputs changed since prepare: the args or diff file, the
+    reviewer's files, or the argv headless_argv builds. Their stored
+    fingerprint no longer names what a run would consume, so an output
+    stamped with it would be graded against the wrong reviewer."""
+    reviewer = reviewer_hash()
+    stale = []
+    for row in rows:
+        try:
+            with open(row["args"], encoding="utf-8") as handle:
+                diff_path = json.load(handle)["diff_path"]
+            fp = row_fingerprint(row["args"], diff_path, row["model"], reviewer)
+        except (OSError, ValueError, KeyError, TypeError):
+            fp = None
+        if fp != row["fingerprint"]:
+            stale.append(row["id"])
+    return stale
+
+
 def run(work, jobs, dry_run, retry_incomplete=False, timeout=3600):
     rows = read_matrix(work)
+    stale = stale_rows(rows)
+    if stale:
+        sys.exit("run: inputs changed since prepare for %s; run prepare again"
+                 % ", ".join(stale))
     claude = os.environ.get("CLAUDE_BIN", "claude")
     todo, skipped = [], []
     for row in rows:

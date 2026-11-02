@@ -295,6 +295,25 @@ class PipelineTest(Tmp):
         self.assertTrue(os.path.exists(os.path.join(self.work, "out", "case-hit.bad")))
         self.assertIn("case-hit", rg.summarize(self.work)["missing"])
 
+    def test_run_refuses_rows_whose_inputs_changed_since_prepare(self):
+        self.prepare()
+        rows = rg.read_matrix(self.work)
+        self.assertEqual(rg.stale_rows(rows), [])
+        # Edited reviewer files make every row stale.
+        with mock.patch.object(rg, "reviewer_hash", lambda: "edited"):
+            self.assertEqual(rg.stale_rows(rows), [r["id"] for r in rows])
+        # So does an edited diff, for its row only; run spends nothing.
+        row = next(r for r in rows if r["id"] == "case-hit")
+        with open(row["args"], encoding="utf-8") as handle:
+            diff_path = json.load(handle)["diff_path"]
+        with open(diff_path, "a", encoding="utf-8") as handle:
+            handle.write("+edited\n")
+        for extra in ((), ("--dry-run",)):
+            res = self.cli("run", self.work, *extra)
+            self.assertNotEqual(res.returncode, 0)
+            self.assertIn("inputs changed since prepare for case-hit; run prepare again", res.stderr)
+        self.assertEqual(self.logged(), [])
+
     def test_grade_counts_recall_fp_and_incomplete(self):
         self.prepare()
         self.cli("run", self.work)
@@ -469,6 +488,15 @@ class HarvestGitTest(Tmp):
                 "diff --git a/new.sh b/new.sh\nnew file mode 100644\n--- /dev/null\n+++ b/new.sh\n"
                 "@@ -0,0 +1 @@\n+y\n")
         self.assertEqual(hv.old_side_hunks(diff), [{"file": "q.sql", "line": 3}, {"file": "q.sql", "line": 9}])
+
+    def test_cli_rejects_impossible_or_reversed_dates(self):
+        for extra, why in ((["--since", "2026-02-30"], "not a real date"),
+                           (["--until", "2026-13-01"], "not a real date"),
+                           (["--since", "2026-11-05", "--until", "2026-11-01"], "is after")):
+            res = subprocess.run([sys.executable, HARVEST, "--repo-dir", ROOT, "--repo", "test/demo",
+                                  *extra], capture_output=True, text=True, check=False)
+            self.assertNotEqual(res.returncode, 0, extra)
+            self.assertIn(why, res.stderr)
 
     def test_cli_refuses_to_write_into_cases(self):
         res = subprocess.run([sys.executable, HARVEST, "--repo-dir", ROOT, "--repo", "test/demo",
