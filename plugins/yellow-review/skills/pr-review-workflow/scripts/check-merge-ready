@@ -449,7 +449,12 @@ jq -n -c \
     | [($lab[0].events // [])[] | select($lab[0].present != false and .label.name == $label and .actor.__typename == "User"
           and ((.actor.login // "") | test("\\[bot\\]\\z") | not)
           and ((.actor.login // "") | ascii_downcase | IN($humans[])))] as $lbl
-    | (if $ht == null then null else ([$lbl[] | select(.createdAt >= $ht)] | last) end) as $lblhead
+    # Only the latest addition of the label can approve: an earlier listed
+    # human addition does not survive a removal and re-addition by anyone.
+    | ([($lab[0].events // [])[] | select(.label.name == $label)] | sort_by(.createdAt) | last) as $lastadd
+    | (if $ht == null or $lastadd == null or $lab[0].present != true then null
+       elif ($lbl | any(. == $lastadd)) and $lastadd.createdAt >= $ht then $lastadd
+       else null end) as $lblhead
     | (if $r == null then null
        else any($r[]; .author.__typename == "Bot" and ((.author.login // "") | norm | IN($bots[]))
                 and .commit.oid == $head) end) as $xl
