@@ -90,7 +90,7 @@ flags, exit codes, trust-boundary rules and library behavior.
   Writes nothing to GitHub and adds no ledger records; the ledger is read only
   from a checkout of the same repository whose PR has ledger files
 
-### Agents (17)
+### Agents (18)
 
 **Review** — parallel code analysis specialists (report findings, do NOT edit):
 
@@ -151,6 +151,10 @@ flags, exit codes, trust-boundary rules and library behavior.
 - `pr-comment-resolver` — Implements one fix per cluster of review comments
   (spawned in parallel) and proposes a per-thread disposition; it has no Bash
   tool, and the orchestrator validates and writes everything to GitHub
+- `review-gate-verifier` — One verdict (confirmed, refuted, unverifiable) on one
+  finding for the `review-gate` workflow's Vote phase, with a `file:line`
+  citation. Read, Grep and Glob only, because it reads untrusted PR content;
+  `model: opus`, which P2/P3 voters override to `sonnet`
 
 ### Skills (3)
 
@@ -649,6 +653,77 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   file that must be read before Write populates it. The compound-staging ledger
   (`~/.claude/projects/<slug>/compound-staging/`) and the review-findings ledger
   above are separate stores; this script never touches the latter.
+
+### Workflows (1)
+
+- `workflows/review-gate.js` — `/yellow-review:review-gate`, a Claude Code
+  dynamic workflow (plain JavaScript; `export const meta` first, then a body
+  using `agent`, `parallel`, `pipeline`, `phase`, `log` and `args`). Claude Code
+  discovers the plugin's `workflows/` directory by default; the optional
+  `workflows` manifest field would replace that scan, so the catalog does not
+  set it. Design: `plans/risk-tiered-review-pipeline.md` section 4.
+  - **Args (fixed contract):**
+    `{repo, pr, base, head, tier, diff_path, changed_files, review_md, include, exclude, dismissed}`,
+    plus the optional `repo_root` (absolute path of a checkout at `head` that
+    agents read instead of the session's working tree) and `file_line_counts`
+    (the `file-line-counts` header and exactly `rows=` rows; only
+    `thermonuclear-reviewer` gets it, fenced, for its size rule). `dismissed`
+    entries are `{file, line, rule?, title?}`; an entry without an integer
+    `line` is skipped with a log line. Bad input throws
+    `review-gate: invalid args: <reason>` before any agent runs.
+  - **Hunt:** one agent per `include` name not in `exclude`, compared by bare
+    persona name (the part after the last `:`), launched by `agentType`
+    (`yellow-review:review:<name>`, `yellow-core:review:<name>`,
+    `yellow-codex:review:codex-reviewer`; a name with `:` runs only when it is
+    exactly that mapped type) with the compact-return schema as JSON Schema and
+    the `<rule-vocabulary>` block (an inline copy of
+    `lib/review-ledger-vocab.json` that a test keeps in step). Hunter categories
+    are folded the way the ledger's `rl_vocab_lookup` folds them: lower case,
+    `_` and spaces to `-`, aliases mapped, any other category filed under
+    `maintainability`; a rule outside its category's slug list becomes
+    `unclassified`, which never matches a dismissed rule. An unknown or unmapped
+    name is not run: it goes to `coverage.failed`, because a default subagent
+    would have edit and shell tools over PR content. Hunters are told to report
+    every issue with its confidence and repo-relative paths; the persona bodies'
+    own confidence floors still apply until the eval-gated follow-up removes
+    them. The low tier runs only `correctness-reviewer` and
+    `project-compliance-reviewer`; the rest go to `coverage.skipped` with a log
+    line. A `null` or failed hunter goes to `coverage.failed`; `coverage.empty`
+    is true when no hunter returned a result, and callers treat that as
+    incomplete.
+  - **Paths:** a finding's path loses `./` and `repo_root`; any other absolute
+    path ending in `/<changed file>` becomes that changed file.
+  - **Dismissed:** each raw finding is matched on its own against `dismissed`
+    (same file, line within 3, and the full `rule` category and slug, never an
+    `unclassified` slug or the category alone, or a similar title) and dropped
+    before dedup and voting.
+  - **Dedup:** plain code. Findings are taken most severe, then most confident,
+    first; each cluster's first member is its representative. A finding joins a
+    cluster with the same file, category and `pre_existing` flag, no conflicting
+    known rule slug, a line within 3 of the representative's line and a similar
+    title (equal; one contains the other and has two or more significant words;
+    or two or more shared words that are at least half of all words).
+    `reviewers` are merged; each merged finding is listed in `dropped` as
+    `merged into F<n>`.
+  - **Vote:** `pipeline()` over findings, each voter the read-only
+    `yellow-review:workflow:review-gate-verifier` agent. Three voters with the
+    lenses reproduces / handled-elsewhere / reachable-from-entry-point for P0/P1
+    on medium and high; one voter otherwise, and for every pre-existing finding.
+    P0/P1 voters keep the agent's `opus` at `medium` effort; P2/P3 voters run
+    `sonnet` at `low`. A verdict without a file:line citation counts as
+    unverifiable. Kept on a confirmed majority of the verdicts returned; with no
+    majority and no refutation (all unverifiable, or no verdict came back) it is
+    kept with `unverified: true`; otherwise dropped as refuted. The verifier
+    prompt carries `/review:pr` Step 6's quality gates (line accuracy,
+    protected-artifact filter, skim-FP).
+  - **Rank:** plain code. P0/P1 → Important, P2/P3 → Nit, `pre_existing` or a
+    file outside `changed_files` → Pre-existing. At most five Nits are shown;
+    the overflow goes to `dropped` with reason `nit cap (5)`. Every drop is
+    logged.
+  - **Return:**
+    `{version: 1, tier, findings[], dropped[], coverage{ran, failed, skipped, empty}, agents}`.
+  - **Tests:** `tests/integration/review-gate-workflow.test.ts` (repo root) runs
+    the body in `node:vm` with stub agents; no model is called.
 
 ### Hooks (1)
 
