@@ -215,9 +215,10 @@ the PR's base, which in a stack is the parent PR's unmerged branch), so a PR
 cannot lower its own tier. Hook registrations in `catalog/plugins/*` and plugin
 manifests, and the root `CLAUDE.md`/`AGENTS.md` that reviewers follow, are high
 as well. The policy file itself and any `REVIEW.md` are always high whatever the
-policy says, and a policy that cannot be read or validated makes every file high
-(fail closed). A backtest of the seed policy on 300 merged yellow-plugins PRs
-gave 45% high, 49% medium and 6% low.
+policy says. A policy file that exists but cannot be read or validated makes
+every file high (fail closed); a repo with no policy file uses the built-in
+default, where every other file is medium. A backtest of the seed policy on 300
+merged yellow-plugins PRs gave 45% high, 49% medium and 6% low.
 
 Seed policy for yellow-plugins (to be confirmed by the user). The concrete globs
 are in `.github/review-risk.json`; this is the intent they encode:
@@ -225,9 +226,12 @@ are in `.github/review-risk.json`; this is the intent they encode:
 - **High (always high, whatever the diff size):** `plugins/*/hooks/**`,
   `plugins/*/lib/*.sh` that handle trust boundaries, `scripts/` release and
   generator code, `.github/workflows/**`, `schemas/**`, `catalog/**`,
-  `.claude-plugin/**`, anything that writes to GitHub unattended (`resolve-*`,
-  `apply-thread-actions`). `rp_runner` in `lib/resolve-paths.sh` already lists
-  paths that unattended resolve must never commit, which is a good starting set.
+  `.claude-plugin/**` (except the generated `.claude-plugin/marketplace.json`
+  and `.agents/plugins/*`, which are medium: `catalog/` is their source and CI
+  checks them for drift), anything that writes to GitHub unattended
+  (`resolve-*`, `apply-thread-actions`). `rp_runner` in `lib/resolve-paths.sh`
+  already lists paths that unattended resolve must never commit, which is a good
+  starting set.
 - **Medium:** agent, command and skill Markdown; tests; any code not listed.
 - **Low:** docs, READMEs, CHANGELOG, `docs/research/`, changesets alone.
   Additive changes behind a `yellow-plugins.local.md` flag defaulting off would

@@ -174,13 +174,19 @@ branch. Only the tier, the policy source and the policy's own rule names are
 printed; the changed paths are PR-controlled text and stay out of context.
 The policy is read at the commit this fetch returned (`FETCH_HEAD`), never a
 remote-tracking ref that a failed fetch would leave stale, and each network
-call is bounded at 30 s when `timeout` or `gtimeout` is installed.
+call is bounded at 30 s (then killed 5 s later) when a `timeout` or `gtimeout`
+with `--kill-after` is installed.
 
 ```bash
 rr_net() {
-  if command -v timeout >/dev/null 2>&1; then timeout 30 "$@"
-  elif command -v gtimeout >/dev/null 2>&1; then gtimeout 30 "$@"
-  else "$@"; fi
+  for rr_t in timeout gtimeout; do
+    if command -v "$rr_t" >/dev/null 2>&1 &&
+      "$rr_t" --kill-after=1 1 true >/dev/null 2>&1; then
+      "$rr_t" --kill-after=5 30 "$@"
+      return
+    fi
+  done
+  "$@"
 }
 DEFAULT_BRANCH=$(rr_net gh repo view --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
 case "$DEFAULT_BRANCH" in
