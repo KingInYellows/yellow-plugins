@@ -1,0 +1,21 @@
+{
+  "id": "example-unquoted-path",
+  "example": true,
+  "notes": "EXAMPLE ONLY, not a real case. The SHAs and the defect are made up to show the format; prepare refuses it without --allow-examples.",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1467,
+  "base": "1111111111111111111111111111111111111111",
+  "head": "2222222222222222222222222222222222222222",
+  "lane": "correctness",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "plugins/yellow-example/lib/paths.sh",
+      "line": 42,
+      "match": ["unquoted|word.?split", "\\bpath\\b"]
+    }
+  ],
+  "source": "EXAMPLE: a Codex P1 on #1467 that review-gate missed",
+  "confirmed_by": "EXAMPLE",
+  "confirmed_at": "2026-11-02"
+}
