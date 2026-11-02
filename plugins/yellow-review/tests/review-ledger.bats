@@ -711,6 +711,40 @@ dismiss_with_guard() {
   [ "$("$RL" dismissed-context "$LEDGER_PR" --head "$H1" | jq -r '.[0].depends_on[0]')" = lib/guard.sh ]
 }
 
+# --- CLAUDE-243: dismissed-context reports where the anchor sits at --head ---
+
+@test "CLAUDE-243: dismissed-context maps the dismissal to its line at the head" {
+  mkdir -p src
+  printf 'sink() {\n  eval "$1"\n}\n' >|src/sink.sh
+  H1=$(commit_all sink)
+  observe "$H1" "[$(finding src/sink.sh 2 '{"category":"security","rule":"injection"}')]" >/dev/null
+  transition "$(ids)" dismissed --head "$H1" --reason "input validated upstream" >/dev/null
+  # five lines above the anchor: beyond the consumers' 3-line match window
+  printf '# a\n# b\n# c\n# d\n# e\nsink() {\n  eval "$1"\n}\n' >|src/sink.sh
+  H2=$(commit_all shift)
+  out=$("$RL" dismissed-context "$LEDGER_PR" --head "$H2")
+  [ "$(printf '%s' "$out" | jq -c '.[0] | [.line, .head_line, .head_file]')" = '[2,7,"src/sink.sh"]' ]
+  run --separate-stderr "$RL" dismissed-context "$LEDGER_PR" --head "$H2" --fenced
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<where>src/sink.sh:7</where>"* ]]
+  # at the recording head the two locations agree
+  [ "$("$RL" dismissed-context "$LEDGER_PR" --head "$H1" | jq -c '.[0] | [.line, .head_line]')" = '[2,2]' ]
+}
+
+@test "CLAUDE-243: dismissed-context follows a rename to the head path" {
+  mkdir -p src
+  printf 'sink() {\n  eval "$1"\n}\n' >|src/sink.sh
+  H1=$(commit_all sink)
+  observe "$H1" "[$(finding src/sink.sh 2 '{"category":"security","rule":"injection"}')]" >/dev/null
+  transition "$(ids)" dismissed --head "$H1" --reason "input validated upstream" >/dev/null
+  git mv src/sink.sh src/run.sh
+  printf '# a\n# b\n# c\n# d\nsink() {\n  eval "$1"\n}\n' >|src/run.sh
+  H2=$(commit_all rename)
+  out=$("$RL" dismissed-context "$LEDGER_PR" --head "$H2")
+  [ "$(printf '%s' "$out" | jq 'length')" -eq 1 ]
+  [ "$(printf '%s' "$out" | jq -c '.[0] | [.file, .head_file, .head_line]')" = '["src/sink.sh","src/run.sh",6]' ]
+}
+
 # --- CWE-1427: dismissed-context must not inject model-authored free text ---
 
 @test "CWE-1427: dismissed-context drops the model-authored title but keeps the human-written reason" {
