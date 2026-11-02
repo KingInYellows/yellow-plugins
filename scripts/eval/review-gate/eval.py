@@ -117,7 +117,8 @@ def load_schema(kind):
 
 
 def validate_item(doc, kind):
-    """Schema errors plus the checks a schema cannot state: regexes compile."""
+    """Schema errors plus the checks a schema cannot state: regexes compile
+    and confirmed_at is a real calendar date."""
     errors = schema_errors(doc, load_schema(kind))
     if not errors and kind == "case":
         for g in doc["golden"]:
@@ -126,6 +127,10 @@ def validate_item(doc, kind):
                     re.compile(rx)
                 except re.error as err:
                     errors.append("$.golden: bad regex %r: %s" % (rx, err))
+        try:
+            datetime.date.fromisoformat(doc["confirmed_at"])
+        except ValueError:
+            errors.append("$.confirmed_at: %r is not a calendar date" % doc["confirmed_at"])
     return errors
 
 
@@ -201,13 +206,15 @@ def reviewer_hash():
 
 def row_fingerprint(args_path, diff_path, model, reviewer):
     """Hash of what one run consumes: the args and diff file contents, the
-    parent model, the prompt and flags, and the reviewer's files. Grading-only
-    case fields (golden, notes, source, confirmed_*) are not in it, so editing
-    a golden regex never reruns a row. Files are read by explicit path, so the
-    hash does not depend on the process's working directory."""
+    reviewer's files, and the whole `claude -p` argv that headless_argv builds
+    (model, prompt and every flag), with the machine-specific paths and the
+    args text (hashed as a file) as placeholders. Grading-only case fields
+    (golden, notes, source, confirmed_*) are not in it, so editing a golden
+    regex never reruns a row. Files are read by explicit path, so the hash
+    does not depend on the process's working directory."""
     h = hashlib.sha256()
-    parts = [("model", model), ("prompt", PROMPT), ("denied", DENIED_TOOLS), ("plugins", ",".join(PLUGINS)),
-             ("workflow", WORKFLOW), ("reviewer", reviewer)]
+    argv = headless_argv("<claude>", model, "<prompts>", "<repo>", "<args>")
+    parts = [("argv", "\0".join(argv)), ("reviewer", reviewer)]
     for label, path in (("args", args_path), ("diff", diff_path)):
         with open(path, "rb") as handle:
             parts.append((label, handle.read().decode("utf-8", "replace")))
@@ -288,15 +295,21 @@ def headless_cmd(row, work, claude="claude"):
     prompts = os.path.realpath(os.path.join(work, "prompts"))
     if re.search(r"[,()\s]", prompts):
         sys.exit("run: work dir %s has a comma, parenthesis or space" % prompts)
-    allowed = ",".join(["Workflow(%s)" % WORKFLOW, "Read(./**)", "Grep(./**)", "Glob(./**)",
-                        "Read(/%s/**)" % prompts])
     with open(row["args"], encoding="utf-8") as handle:
         args = handle.read()
-    plugins = [x for name in PLUGINS for x in ("--plugin-dir", os.path.join(REPO, "plugins", name))]
+    return headless_argv(claude, row["model"], prompts, REPO, args.strip())
+
+
+def headless_argv(claude, model, prompts, repo, args):
+    """The argv itself. row_fingerprint hashes it with placeholders, so any
+    flag added or changed here reruns every row."""
+    allowed = ",".join(["Workflow(%s)" % WORKFLOW, "Read(./**)", "Grep(./**)", "Glob(./**)",
+                        "Read(/%s/**)" % prompts])
+    plugins = [x for name in PLUGINS for x in ("--plugin-dir", os.path.join(repo, "plugins", name))]
     return [claude, "-p", "--setting-sources", "", "--strict-mcp-config", *plugins,
-            "--model", row["model"], "--permission-mode", "dontAsk",
+            "--model", model, "--permission-mode", "dontAsk",
             "--allowedTools", allowed, "--disallowedTools", DENIED_TOOLS,
-            "--output-format", "json", PROMPT.format(workflow=WORKFLOW, args=args.strip())]
+            "--output-format", "json", PROMPT.format(workflow=WORKFLOW, args=args)]
 
 
 def parse_workflow(text):
@@ -325,8 +338,14 @@ def shape_problems(wf):
     if not isinstance(wf.get("findings"), list) or not all(isinstance(f, dict) for f in wf["findings"]):
         problems.append("findings is not a list of objects")
     cov = wf.get("coverage")
-    if not isinstance(cov, dict) or not isinstance(cov.get("failed", []), list):
+    if not isinstance(cov, dict):
         problems.append("coverage is missing")
+    elif not isinstance(cov.get("failed"), list):
+        # Without coverage.failed nobody knows which agents ran.
+        problems.append("coverage.failed is missing or not a list")
+    agents = wf.get("agents")
+    if not isinstance(agents, int) or isinstance(agents, bool) or agents < 0:
+        problems.append("agents is missing or not a non-negative integer")
     return problems
 
 
@@ -469,6 +488,14 @@ def tokens_in(cli):
                for v in mu.values() if isinstance(v, dict))
 
 
+def grading_set(items):
+    """Hash of what grading reads from each item: its id, kind and golden
+    entries. Two summaries compare only when it matches, since an edited
+    golden regex changes recall without changing any id."""
+    graded = sorted([i, d.get("kind"), d.get("golden")] for i, d in items.items())
+    return hashlib.sha256(json.dumps(graded, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+
+
 def summarize(work):
     with open(os.path.join(work, "items.json"), encoding="utf-8") as handle:
         items = json.load(handle)
@@ -490,7 +517,7 @@ def summarize(work):
         important = [f for f in wf["findings"] if is_important(f)]
         cli = out.get("cli") or {}
         r = {"id": rid, "kind": row["kind"], "tier": row["tier"], "important": len(important),
-             "agents": wf.get("agents") if isinstance(wf.get("agents"), int) else 0,
+             "agents": wf["agents"],
              "cost_usd": cli.get("total_cost_usd") or 0, "wall_s": out.get("eval_wall_s") or 0,
              "tokens": tokens_in(cli), "unmatched": []}
         if row["kind"] == "case":
@@ -510,6 +537,7 @@ def summarize(work):
         for key in ("agents", "cost_usd", "wall_s", "tokens"):
             s[key] += r[key]
         s["rows"].append(r)
+    s["grading_set"] = grading_set(items)
     s["recall"] = s["golden_hit"] / s["golden_total"] if s["golden_total"] else None
     s["fp_rate"] = s["controls_with_fp"] / s["controls_complete"] if s["controls_complete"] else None
     n = s["complete"] or 1
@@ -524,6 +552,8 @@ def verdict(new, base):
         return "no verdict", "a run is missing or incomplete; rerun before comparing"
     if {r["id"] for r in new["rows"]} != {r["id"] for r in base["rows"]}:
         return "no verdict", "the two runs graded different cases or controls"
+    if new.get("grading_set") != base.get("grading_set"):
+        return "no verdict", "the two runs graded different golden entries; prepare and grade both from the same cases"
     if new["recall"] is None or new["fp_rate"] is None:
         return "no verdict", "needs at least one case and one control"
     if new["fp_rate"] > base["fp_rate"]:

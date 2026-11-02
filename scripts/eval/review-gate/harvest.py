@@ -2,8 +2,8 @@
 """List candidate review-gate eval cases. Read-only: never writes a case.
 
 Sources:
-- git (always): reverts and `fix:` commits on the main line whose subject or
-  body references an earlier PR (`#123`, a /pull/123 URL, or "This reverts
+- git (always): reverts and `fix:` commits on the main line, committed in
+  [--since, --until] (UTC days), whose subject or body references an earlier PR (`#123`, a /pull/123 URL, or "This reverts
   commit <sha>"). Each candidate names the referenced PR's squash-merge commit
   (head) and its first parent (base), and the lines the fix or revert touched
   on the old side, which are where the defect was.
@@ -20,6 +20,7 @@ to build a command. The user confirms each candidate before it becomes a case.
 """
 
 import argparse
+import datetime
 import json
 import os
 import re
@@ -57,15 +58,21 @@ def git(repo_dir, *args):
 
 # --- git source ---------------------------------------------------------------
 
+LOG_FORMAT = "%H%x1f%P%x1f%ct%x1f%s%x1f%b%x1e"
+
+
 def parse_log(text):
-    """Commits from `git log --format=%H%x1f%P%x1f%s%x1f%b%x1e`, newest first."""
+    """Commits from `git log --format=LOG_FORMAT`, newest first. `day` is the
+    committer date as a UTC YYYY-MM-DD."""
     commits = []
     for record in text.split("\x1e"):
         record = record.strip("\n")
         if not record:
             continue
-        sha, parents, subject, body = (record.split("\x1f") + ["", "", ""])[:4]
-        commits.append({"sha": sha.strip(), "parents": parents.split(), "subject": subject,
+        sha, parents, stamp, subject, body = (record.split("\x1f") + ["", "", "", ""])[:5]
+        day = (datetime.datetime.fromtimestamp(int(stamp), datetime.timezone.utc).date().isoformat()
+               if stamp.strip().isdigit() else "")
+        commits.append({"sha": sha.strip(), "parents": parents.split(), "day": day, "subject": subject,
                         "body": body.strip()})
     return commits
 
@@ -106,8 +113,10 @@ def old_side_hunks(diff):
     return hunks
 
 
-def git_candidates(commits, repo, show):
-    """Candidates from parsed commits. `show(sha)` returns a commit's -U0 diff."""
+def git_candidates(commits, repo, show, since=None, until=None):
+    """Candidates from parsed commits. `show(sha)` returns a commit's -U0 diff.
+    The PR and revert lookups use every commit; only the fix or revert itself
+    must fall in [since, until], so a recent fix to an old PR keeps its SHAs."""
     by_pr = {}
     by_sha = {}
     for c in commits:
@@ -117,6 +126,8 @@ def git_candidates(commits, repo, show):
             by_pr[n] = c
     out = []
     for c in commits:
+        if (since and c["day"] < since) or (until and c["day"] > until):
+            continue
         revert = bool(REVERT_RE.match(c["subject"]))
         if not revert and not FIX_RE.match(c["subject"]):
             continue
@@ -154,12 +165,11 @@ def git_candidates(commits, repo, show):
 
 
 def harvest_git(repo_dir, ref, repo, since=None, until=None):
-    args = ["log", "--first-parent", "--format=%H%x1f%P%x1f%s%x1f%b%x1e"]
-    args += ["--since=%s" % since] if since else []
-    args += ["--until=%s" % until] if until else []
-    commits = parse_log(git(repo_dir, *args, ref, "--"))
+    # The whole first-parent history: the dates filter candidates, not the
+    # merged PRs they point back to.
+    commits = parse_log(git(repo_dir, "log", "--first-parent", "--format=" + LOG_FORMAT, ref, "--"))
     show = lambda sha: git(repo_dir, "show", "--no-color", "--no-ext-diff", "--format=", "-U0", sha)
-    return git_candidates(commits, repo, show)
+    return git_candidates(commits, repo, show, since, until)
 
 
 # --- bot source -----------------------------------------------------------------

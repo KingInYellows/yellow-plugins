@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 TESTS = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(TESTS)
@@ -105,6 +106,8 @@ class SchemaTest(unittest.TestCase):
             ({**good, "golden": [{"file": "a", "line": 0, "match": ["x"]}]}, "below 1"),
             ({**good, "golden": [{"file": "a", "line": True, "match": ["x"]}]}, "expected integer"),
             ({**good, "golden": [{"file": "a", "line": 1, "match": ["(unclosed"]}]}, "bad regex"),
+            ({**good, "confirmed_at": "2026-13-40"}, "not a calendar date"),
+            ({**good, "confirmed_at": "2026-02-30"}, "not a calendar date"),
         ]
         for doc, why in bad:
             errors = rg.validate_item(doc, "case")
@@ -205,8 +208,42 @@ class PipelineTest(Tmp):
         self.assertNotEqual(rg.read_matrix(self.work)[0]["fingerprint"], before[rg.read_matrix(self.work)[0]["id"]])
 
     def test_reviewer_hash_covers_every_loaded_plugin(self):
-        self.assertEqual(rg.REVIEWER_PATHS, tuple("plugins/" + p for p in rg.PLUGINS))
-        self.assertEqual(rg.PLUGINS, ("yellow-core", "yellow-linear", "yellow-review"))
+        root = os.path.join(self.tmp, "fake-repo")
+        for name in rg.PLUGINS:
+            write(os.path.join(root, "plugins", name, "agents", "a.md"), "agent %s\n" % name)
+        with mock.patch.object(rg.ms, "REPO", root):
+            before = rg.reviewer_hash()
+            self.assertEqual(rg.reviewer_hash(), before)
+            for name in rg.PLUGINS:
+                path = os.path.join(root, "plugins", name, "agents", "a.md")
+                write(path, "edited\n")
+                after = rg.reviewer_hash()
+                self.assertNotEqual(after, before, name)
+                before = after
+            # A new file anywhere under a loaded plugin counts too.
+            write(os.path.join(root, "plugins", "yellow-review", "skills", "s", "SKILL.md"), "x\n")
+            self.assertNotEqual(rg.reviewer_hash(), before)
+            # A plugin the run does not load does not.
+            before = rg.reviewer_hash()
+            write(os.path.join(root, "plugins", "yellow-other", "a.md"), "x\n")
+            self.assertEqual(rg.reviewer_hash(), before)
+
+    def test_fingerprint_covers_every_headless_flag(self):
+        self.prepare()
+        row = rg.read_matrix(self.work)[0]
+        args = row["args"]
+        diff = args.replace(".args.json", ".diff")
+        before = rg.row_fingerprint(args, diff, row["model"], "r")
+        self.assertEqual(row["fingerprint"], rg.row_fingerprint(args, diff, row["model"],
+                                                                  rg.reviewer_hash()))
+        real = rg.headless_argv
+        with mock.patch.object(rg, "headless_argv", lambda *a: real(*a) + ["--new-flag"]):
+            self.assertNotEqual(rg.row_fingerprint(args, diff, row["model"], "r"), before)
+        with mock.patch.object(rg, "DENIED_TOOLS", "Bash"):
+            self.assertNotEqual(rg.row_fingerprint(args, diff, row["model"], "r"), before)
+        # The command that runs is the one fingerprinted.
+        cmd = rg.headless_cmd(row, self.work)
+        self.assertEqual(len(cmd), len(rg.headless_argv("<claude>", row["model"], "<p>", "<r>", "<a>")))
 
     def test_prepare_needs_a_checkout_for_the_repo(self):
         res = self.cli("prepare", self.work, "--cases", self.cases, "--controls", self.controls)
@@ -279,6 +316,15 @@ class PipelineTest(Tmp):
         with open(os.path.join(self.work, "summary.json"), encoding="utf-8") as handle:
             summary = json.load(handle)
         self.assertEqual(summary["date"], "2026-11-02")
+        # An edited golden entry keeps every id but changes the grading set.
+        items_path = os.path.join(self.work, "items.json")
+        with open(items_path, encoding="utf-8") as handle:
+            items = json.load(handle)
+        items["case-hit"]["golden"][0]["match"] = ["other"]
+        write(items_path, json.dumps(items))
+        edited = rg.summarize(self.work)
+        self.assertEqual({r["id"] for r in edited["rows"]}, {r["id"] for r in s["rows"]})
+        self.assertNotEqual(edited["grading_set"], s["grading_set"])
 
 
 class GradeMathTest(unittest.TestCase):
@@ -309,7 +355,21 @@ class GradeMathTest(unittest.TestCase):
         self.assertIsNone(rg.parse_workflow('{"error": "Workflow not found"}'))
         self.assertIsNone(rg.parse_workflow(None))
         self.assertEqual(rg.shape_problems({"version": 2, "findings": "x"}),
-                         ["version is 2, not 1", "findings is not a list of objects", "coverage is missing"])
+                         ["version is 2, not 1", "findings is not a list of objects", "coverage is missing",
+                          "agents is missing or not a non-negative integer"])
+
+    def test_missing_coverage_failed_or_agents_is_incomplete(self):
+        ok = {"version": 1, "findings": [], "coverage": {"failed": []}, "agents": 3}
+        self.assertIsNone(rg.ungradable(ok))
+        for wf, why in (({**ok, "coverage": {}}, "coverage.failed is missing"),
+                        ({**ok, "coverage": {"failed": None}}, "coverage.failed is missing"),
+                        ({**ok, "coverage": {"failed": "x"}}, "coverage.failed is missing"),
+                        ({k: v for k, v in ok.items() if k != "agents"}, "agents is missing"),
+                        ({**ok, "agents": "3"}, "agents is missing"),
+                        ({**ok, "agents": 2.5}, "agents is missing"),
+                        ({**ok, "agents": True}, "agents is missing"),
+                        ({**ok, "agents": -1}, "agents is missing")):
+            self.assertIn(why, rg.ungradable(wf) or "", wf)
 
     def summary(self, recall, fp, agents, cost=1.0, ids=("a", "b")):
         return {"recall": recall, "fp_rate": fp, "mean_cost_usd": cost, "mean_agents": agents,
@@ -325,6 +385,17 @@ class GradeMathTest(unittest.TestCase):
         self.assertEqual(v(self.summary(0.4, 0.0, 5), base), "drop")
         self.assertEqual(v(self.summary(0.9, 0.0, 5, ids=("a",)), base), "no verdict")
         self.assertEqual(v({**self.summary(0.9, 0.0, 5), "incomplete": [{"id": "a"}]}, base), "no verdict")
+
+    def test_different_golden_entries_give_no_verdict(self):
+        base = {**self.summary(0.5, 0.1, 10), "grading_set": "aaaa"}
+        decision, why = rg.verdict({**self.summary(0.9, 0.0, 5), "grading_set": "bbbb"}, base)
+        self.assertEqual(decision, "no verdict")
+        self.assertIn("golden", why)
+        self.assertEqual(rg.verdict({**self.summary(0.9, 0.0, 5), "grading_set": "aaaa"}, base)[0], "keep")
+        a = {"x": {"kind": "case", "golden": [{"file": "f", "line": 1, "match": ["a"]}]}}
+        b = {"x": {"kind": "case", "golden": [{"file": "f", "line": 1, "match": ["b"]}]}}
+        self.assertNotEqual(rg.grading_set(a), rg.grading_set(b))
+        self.assertEqual(rg.grading_set(a), rg.grading_set(json.loads(json.dumps(a))))
 
     def test_cost_usd_never_decides(self):
         base = self.summary(0.5, 0.1, 10, cost=1.0)
@@ -368,6 +439,29 @@ class HarvestGitTest(Tmp):
         self.assertEqual(revert["reverted_commit"], c2)
         self.assertEqual([t["pr"] for t in revert["targets"]], [11])
         self.assertEqual(revert["hunks"], [{"file": "lib/o.sh", "line": 1}])
+
+    def test_date_range_filters_candidates_not_the_pr_lookup(self):
+        repo = self.tmp
+        git(repo, "init", "-q", "-b", "main")
+
+        def dated(day, message, files):
+            env = {"GIT_AUTHOR_DATE": day + "T12:00:00Z", "GIT_COMMITTER_DATE": day + "T12:00:00Z"}
+            with mock.patch.dict(os.environ, env):
+                return commit(repo, message, files)
+
+        dated("2026-08-01", "chore: init", {"README.md": "x\n"})
+        old_pr = dated("2026-08-02", "feat: add helper (#10)", {"lib/h.sh": lines(5)})
+        early = dated("2026-09-15", "fix: first follow-up to #10 (#11)", {"lib/h.sh": lines(5, {1: "a"})})
+        recent = dated("2026-10-05", "fix: quote path from #10 (#12)", {"lib/h.sh": lines(5, {2: "b"})})
+        late = dated("2026-11-20", "fix: later follow-up to #10 (#13)", {"lib/h.sh": lines(5, {3: "c"})})
+        found = hv.harvest_git(repo, "main", "test/demo", since="2026-10-01", until="2026-10-31")
+        self.assertEqual([c["commit"] for c in found], [recent])
+        target = found[0]["targets"][0]
+        self.assertEqual((target["pr"], target["head"], target["note"]), (10, old_pr, None))
+        self.assertEqual(target["base"], git(repo, "rev-parse", old_pr + "^"))
+        # The range is inclusive, in UTC days.
+        found = hv.harvest_git(repo, "main", "test/demo", since="2026-09-15", until="2026-11-20")
+        self.assertEqual([c["commit"] for c in found], [late, recent, early])
 
     def test_removed_dash_dash_line_is_not_a_file_header(self):
         diff = ("diff --git a/q.sql b/q.sql\nindex 1..2 100644\n--- a/q.sql\n+++ b/q.sql\n"
