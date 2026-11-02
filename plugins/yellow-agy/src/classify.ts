@@ -59,14 +59,17 @@ export type TurnClass =
 export function parseResult(stdout: string): AgyResult | undefined {
   const trimmed = stdout.trim();
   if (trimmed === '') return undefined;
-  const candidates = [trimmed];
-  // agy may print notices before the JSON; fall back to the last line that parses.
-  const lines = trimmed.split(/\r?\n/);
-  for (let i = lines.length - 1; i >= 0; i -= 1) {
-    const line = lines[i]?.trim() ?? '';
-    if (line.startsWith('{')) candidates.push(lines.slice(i).join('\n'));
+  // agy may print notices before the JSON; fall back to the latest line that
+  // starts an object, built only when the whole text doesn't parse.
+  function* candidates(): Generator<string> {
+    yield trimmed;
+    const lines = trimmed.split(/\r?\n/);
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      const line = lines[i]?.trim() ?? '';
+      if (line.startsWith('{')) yield lines.slice(i).join('\n');
+    }
   }
-  for (const text of candidates) {
+  for (const text of candidates()) {
     try {
       const value: unknown = JSON.parse(text);
       if (

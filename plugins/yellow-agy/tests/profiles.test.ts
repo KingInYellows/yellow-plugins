@@ -164,6 +164,13 @@ describe('validateAllowCommand', () => {
     '/usr/bin/pytest',
     'cargo run x',
     'npx vitest',
+    'wget x',
+    'ssh host',
+    'scp a b',
+    'rsync a b',
+    'nc host 80',
+    'su root',
+    'docker run x',
   ])('refuses %s', (c) => {
     expect(codeOf(() => validateAllowCommand(c))).toBe('AGY_INVALID_INPUT');
   });

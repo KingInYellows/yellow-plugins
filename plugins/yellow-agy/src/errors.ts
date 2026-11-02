@@ -27,7 +27,10 @@ export type AgyErrorCode =
   | 'AGY_INVALID_INPUT'
   | 'AGY_INTERNAL';
 
-/** 1 = the operation ran and failed; 2 = refused before anything ran. */
+/**
+ * 0 = done, or stopped for the owner (AGY_DENIED); 1 = the operation ran and
+ * failed; 2 = refused before anything ran.
+ */
 export type ExitCode = 0 | 1 | 2;
 
 interface CatalogEntry {

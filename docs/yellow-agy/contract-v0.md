@@ -188,9 +188,10 @@ defense in depth.
   suffix, so no wrappers such as `env` or `timeout`; a package or build tool
   only with a test, lint or build subcommand, or `run <script>` for npm, pnpm,
   yarn and bun) are added only on a host where `--sandbox` is verified (hard
-  rules). Every turn that runs with those commands also passes `--sandbox`; the
-  adapter refuses to build an implement invocation that grants them without the
-  flag.
+  rules). Such a profile sets `enableTerminalSandbox: true` and every turn that
+  uses it also passes `--sandbox`; without granted commands it keeps
+  `enableTerminalSandbox: false` and no `--sandbox`. The adapter refuses any
+  profile where the two disagree.
 - **Unverified:** whether agy runs a matched command through a shell, so that
   `$(…)`, backticks or `>` in the trailing arguments of an allowed rule (such as
   `git status $(…)`) would execute or write. The 2026-11 probe covered only `&&`
