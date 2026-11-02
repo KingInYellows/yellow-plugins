@@ -11,6 +11,23 @@ exports.classifyTurn = classifyTurn;
 exports.needsInput = needsInput;
 exports.structuredOutput = structuredOutput;
 const profiles_1 = require("./profiles");
+/**
+ * Drops fields whose runtime type would break the lifecycle: a non-string
+ * `response` (read as text) and a `conversation_id` that fails the argv rule
+ * (a plan turn without one becomes a model error instead).
+ */
+function sanitize(r) {
+    const out = { ...r };
+    if (out['response'] !== undefined && typeof out['response'] !== 'string') {
+        delete out['response'];
+    }
+    const conv = out['conversation_id'];
+    if (conv !== undefined &&
+        (typeof conv !== 'string' || !profiles_1.CONVERSATION_RE.test(conv))) {
+        delete out['conversation_id'];
+    }
+    return out;
+}
 /** Parses agy's JSON output; undefined when stdout holds no JSON object. */
 function parseResult(stdout) {
     const trimmed = stdout.trim();
@@ -33,16 +50,7 @@ function parseResult(stdout) {
             if (value !== null &&
                 typeof value === 'object' &&
                 !Array.isArray(value)) {
-                // A malformed conversation id would break the next turn's argv;
-                // dropping it makes a plan turn a model error instead.
-                const r = value;
-                const conv = r['conversation_id'];
-                if (conv !== undefined &&
-                    (typeof conv !== 'string' || !profiles_1.CONVERSATION_RE.test(conv))) {
-                    const { conversation_id: _dropped, ...rest } = r;
-                    return rest;
-                }
-                return value;
+                return sanitize(value);
             }
         }
         catch {
@@ -120,7 +128,8 @@ function classifyTurn(outcome) {
  * Only this line marks a run as needing a reply; supervise never guesses.
  */
 function needsInput(response) {
-    if (response === undefined)
+    // agy's JSON is untrusted: a null or non-string response has no marker.
+    if (typeof response !== 'string')
         return undefined;
     const lines = response.trimEnd().split(/\r?\n/);
     const last = lines[lines.length - 1]?.trim() ?? '';

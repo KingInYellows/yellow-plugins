@@ -57,6 +57,26 @@ export type TurnClass =
       readonly detail: string;
     };
 
+/**
+ * Drops fields whose runtime type would break the lifecycle: a non-string
+ * `response` (read as text) and a `conversation_id` that fails the argv rule
+ * (a plan turn without one becomes a model error instead).
+ */
+function sanitize(r: Record<string, unknown>): AgyResult {
+  const out: Record<string, unknown> = { ...r };
+  if (out['response'] !== undefined && typeof out['response'] !== 'string') {
+    delete out['response'];
+  }
+  const conv = out['conversation_id'];
+  if (
+    conv !== undefined &&
+    (typeof conv !== 'string' || !CONVERSATION_RE.test(conv))
+  ) {
+    delete out['conversation_id'];
+  }
+  return out as AgyResult;
+}
+
 /** Parses agy's JSON output; undefined when stdout holds no JSON object. */
 export function parseResult(stdout: string): AgyResult | undefined {
   const trimmed = stdout.trim();
@@ -79,18 +99,7 @@ export function parseResult(stdout: string): AgyResult | undefined {
         typeof value === 'object' &&
         !Array.isArray(value)
       ) {
-        // A malformed conversation id would break the next turn's argv;
-        // dropping it makes a plan turn a model error instead.
-        const r = value as Record<string, unknown>;
-        const conv = r['conversation_id'];
-        if (
-          conv !== undefined &&
-          (typeof conv !== 'string' || !CONVERSATION_RE.test(conv))
-        ) {
-          const { conversation_id: _dropped, ...rest } = r;
-          return rest as AgyResult;
-        }
-        return value as AgyResult;
+        return sanitize(value as Record<string, unknown>);
       }
     } catch {
       // try the next candidate
@@ -179,8 +188,9 @@ export function classifyTurn(outcome: TurnOutcome): TurnClass {
  * The `NEEDS_INPUT: <question>` marker an implement turn's prompt asks for.
  * Only this line marks a run as needing a reply; supervise never guesses.
  */
-export function needsInput(response: string | undefined): string | undefined {
-  if (response === undefined) return undefined;
+export function needsInput(response: unknown): string | undefined {
+  // agy's JSON is untrusted: a null or non-string response has no marker.
+  if (typeof response !== 'string') return undefined;
   const lines = response.trimEnd().split(/\r?\n/);
   const last = lines[lines.length - 1]?.trim() ?? '';
   const match = /^NEEDS_INPUT:\s*(\S.*)$/.exec(last);

@@ -204,6 +204,14 @@ describe('parseResult', () => {
       ).toEqual({ status: 'SUCCESS' });
     }
   });
+
+  it('drops a non-string response; needsInput ignores non-strings', () => {
+    expect(parseResult('{"status":"SUCCESS","response":null}')).toEqual({
+      status: 'SUCCESS',
+    });
+    expect(needsInput(null)).toBeUndefined();
+    expect(needsInput(42)).toBeUndefined();
+  });
 });
 
 describe('needsInput and structuredOutput', () => {
