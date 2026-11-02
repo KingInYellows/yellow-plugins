@@ -26,6 +26,12 @@
 #                                        thread, rate limit, forbidden reply)
 #   latestOpinionatedReviews             MOCK_GH_BLOCKERS_{FAIL,FIXTURE}
 #   MergeReadyState                      MOCK_GH_MR_BODY, MOCK_GH_MR_FAIL
+#   MergeReadyApproval                   MOCK_GH_MRA_BODY, MOCK_GH_MRA_FAIL
+#   */contents/.github/review-risk.json  MOCK_GH_MR_POLICY (served only for
+#                                        ref=MOCK_GH_MR_DEFAULT_OID; any other
+#                                        ref gets an all-low policy),
+#                                        MOCK_GH_MR_POLICY_FAIL=404|1
+#   */pulls/<n>/files                    MOCK_GH_MR_FILES replaces the fixture
 #   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES;
 #                                        MOCK_GH_PROTECTION_MAIN and
 #                                        MOCK_GH_RULES_MAIN override them for
@@ -128,6 +134,39 @@ case "$ALL_ARGS" in
     printf '%s\n' "${MOCK_GH_MR_BODY:-$_mr_default}"
     exit 0
     ;;
+  *"MergeReadyHead"*)
+    # check-merge-ready's final head re-read. MOCK_GH_MRH_OID overrides the
+    # head; by default it repeats the approval response's head.
+    _mrh=${MOCK_GH_MRH_OID:-$(printf '%s' "${MOCK_GH_MRA_BODY:-}" | jq -r '.data.repository.pullRequest.headRefOid // empty' 2>/dev/null)}
+    jq -nc --arg h "$_mrh" '{data:{repository:{pullRequest:{headRefOid:$h}}}}'
+    exit 0
+    ;;
+  *"MergeReadyApproval"*)
+    # check-merge-ready approval query. MOCK_GH_MRA_BODY is the whole
+    # response; MOCK_GH_MRA_FAIL=1 simulates a failure.
+    : >"${PAGE_STATE_DIR}/mock_gh_approval_called"
+    if [ "${MOCK_GH_MRA_FAIL:-0}" = 1 ]; then
+      printf 'gh: Server Error (HTTP 500)\n' >&2
+      exit 1
+    fi
+    _mra_default='{"data":{"repository":null}}'
+    printf '%s\n' "${MOCK_GH_MRA_BODY:-$_mra_default}"
+    exit 0
+    ;;
+  *"/contents/.github/review-risk.json"*)
+    # Risk policy for check-merge-ready. Only the default-branch ref gets
+    # MOCK_GH_MR_POLICY, so a test can prove which ref was read.
+    printf '%s\n' "$ALL_ARGS" >>"${PAGE_STATE_DIR}/mock_gh_contents_args"
+    case "${MOCK_GH_MR_POLICY_FAIL:-0}" in
+      404) printf 'gh: Not Found (HTTP 404)\n' >&2; exit 1 ;;
+      1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+    esac
+    case "$ALL_ARGS" in
+      *"ref=${MOCK_GH_MR_DEFAULT_OID:-none}"*) printf '%s\n' "${MOCK_GH_MR_POLICY:-}" ;;
+      *) printf '%s\n' '{"version":1,"default_tier":"low","rules":[]}' ;;
+    esac
+    exit 0
+    ;;
   *"FollowupViewer"*)
     # file-followup-issue viewer lookup. MOCK_GH_VIEWER overrides the login;
     # MOCK_GH_VIEWER_FAIL=1|ratelimit simulates a failure.
@@ -169,6 +208,10 @@ case "$ALL_ARGS" in
     if [ "${MOCK_GH_FILES_FAIL:-0}" = 1 ]; then
       printf 'gh: Server Error (HTTP 500)\n' >&2
       exit 1
+    fi
+    if [ -n "${MOCK_GH_MR_FILES:-}" ]; then
+      printf '%s\n' "$MOCK_GH_MR_FILES"
+      exit 0
     fi
     cat "$FIXTURE_DIR/${MOCK_GH_FILES_FIXTURE:-pr-files-response.json}"
     exit 0
