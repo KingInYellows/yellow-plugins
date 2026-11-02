@@ -11,11 +11,13 @@ SRC="${PLUGIN_DIR}/skills/pr-review-workflow/scripts/check-merge-ready"
 # query goes through the gh mock.
 setup() {
   export PATH="${BATS_TEST_DIRNAME}/mocks:${PATH}"
-  unset MOCK_GH_MR_BODY MOCK_GH_MR_FAIL
+  unset MOCK_GH_MR_BODY MOCK_GH_MR_FAIL MOCK_GH_MRA_BODY MOCK_GH_MRA_FAIL \
+    MOCK_GH_MR_POLICY MOCK_GH_MR_POLICY_FAIL MOCK_GH_MR_FILES
   ROOT="${BATS_TEST_TMPDIR}/plugin"
   mkdir -p "$ROOT/skills/pr-review-workflow/scripts" "$ROOT/lib"
   cp "$SRC" "$ROOT/skills/pr-review-workflow/scripts/check-merge-ready"
   cp "${PLUGIN_DIR}/lib/resolve-gh.sh" "$ROOT/lib/resolve-gh.sh"
+  cp "${PLUGIN_DIR}/skills/pr-review-workflow/scripts/classify-risk" "$ROOT/skills/pr-review-workflow/scripts/classify-risk"
   SCRIPT="$ROOT/skills/pr-review-workflow/scripts/check-merge-ready"
   cat >"$ROOT/skills/pr-review-workflow/scripts/get-pr-comments" <<'STUB'
 #!/bin/sh
@@ -36,14 +38,49 @@ printf '%s\n' "${MR_LEDGER:-{\}}"
 STUB
   chmod +x "$ROOT"/skills/pr-review-workflow/scripts/* "$ROOT/lib/review-ledger.sh"
   unset MR_THREADS MR_THREADS_RC MR_BLOCKERS MR_LEDGER MR_LEDGER_FAIL
-  export MOCK_GH_MR_BODY
+  export MOCK_GH_MR_BODY MOCK_GH_MRA_BODY MOCK_GH_MR_FILES MOCK_GH_MR_POLICY MOCK_GH_MR_DEFAULT_OID
   MOCK_GH_MR_BODY=$(state_body)
+  # Approval evidence: a docs-only PR (low) with no reviews, and the risk
+  # policy served only for the default branch's tip.
+  MOCK_GH_MR_DEFAULT_OID=$DEFAULT_OID
+  MOCK_GH_MR_POLICY=$TEST_POLICY
+  with_files docs/a.md
   # A checkout of test/repo, so the ledger is read for it.
   CHECKOUT="${BATS_TEST_TMPDIR}/checkout"
   git init -q "$CHECKOUT"
   git -C "$CHECKOUT" remote add origin git@github.com:Test/repo.git
   LEDGER_DIR="$CHECKOUT/.git/yellow-review/findings"
   cd "$CHECKOUT"
+}
+
+HEAD_SHA=1111111111111111111111111111111111111111
+OLD_SHA=2222222222222222222222222222222222222222
+DEFAULT_OID=3333333333333333333333333333333333333333
+TEST_POLICY='{"version":1,"default_tier":"medium","rules":[{"tier":"high","why":"hooks","paths":["plugins/*/hooks/*"]},{"tier":"low","why":"docs","paths":["docs/*"]}]}'
+
+# rv <state> <login> <User|Bot> <commit>: one review node.
+rv() {
+  jq -nc --arg s "$1" --arg l "$2" --arg t "$3" --arg c "$4" \
+    '{state:$s, author:{__typename:$t, login:$l}, commit:{oid:$c}}'
+}
+
+# with_files <path>...: the PR's file list, and an approval response whose
+# changedFiles matches it (reviews from REVIEWS, default none).
+with_files() {
+  MOCK_GH_MR_FILES=$(printf '%s\n' "$@" | jq -R . | jq -sc 'map({filename: .})')
+  MOCK_GH_MRA_BODY=$(approval_body "${REVIEWS:-[]}" "$#")
+}
+
+# approval_body <reviews-json> <changedFiles> [head]
+approval_body() {
+  jq -nc --arg h "${3:-$HEAD_SHA}" --arg d "$DEFAULT_OID" --argjson r "$1" --argjson n "$2" \
+    '{data:{repository:{defaultBranchRef:{target:{oid:$d}},
+      pullRequest:{headRefOid:$h, changedFiles:$n, reviews:{nodes:$r}}}}}'
+}
+
+# config <frontmatter lines>: an untracked yellow-plugins.local.md.
+config() {
+  { printf -- '---\n'; printf '%s\n' "$@"; printf -- '---\n'; } >"$CHECKOUT/yellow-plugins.local.md"
 }
 
 # with_ledger_files: give PR 7 a ledger record so the summary is consulted.
@@ -55,13 +92,13 @@ with_ledger_files() {
 # state_body [key=json ...]: a green, open, mergeable PR with overrides
 # applied to its pullRequest object (rollup=<json> replaces the rollup).
 state_body() {
-  _pr='{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"abc123","labels":{"nodes":[]}}'
+  _pr='{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"1111111111111111111111111111111111111111","labels":{"nodes":[]}}'
   _roll='{"state":"SUCCESS","contexts":{"pageInfo":{"hasNextPage":false},"nodes":[{"__typename":"CheckRun","name":"lint","status":"COMPLETED","conclusion":"SUCCESS"},{"__typename":"CheckRun","name":"claude","status":"COMPLETED","conclusion":"SKIPPED"}]}}'
   for _kv in "$@"; do
     _k=${_kv%%=*}; _v=${_kv#*=}
     if [ "$_k" = rollup ]; then _roll=$_v; else _pr=$(printf '%s' "$_pr" | jq -c --arg k "$_k" --argjson v "$_v" '.[$k] = $v'); fi
   done
-  jq -nc --argjson p "$_pr" --argjson r "$_roll" '{data:{repository:{pullRequest:($p + {commits:{nodes:[{commit:{oid:"abc123",statusCheckRollup:$r}}]}})}}}'
+  jq -nc --argjson p "$_pr" --argjson r "$_roll" '{data:{repository:{pullRequest:($p + {commits:{nodes:[{commit:{oid:"1111111111111111111111111111111111111111",statusCheckRollup:$r}}]}})}}}'
 }
 
 @test "rejects bad arguments with exit 2" {
@@ -82,7 +119,7 @@ state_body() {
   [ "$status" -eq 0 ]
   [ "$(jq -r .verdict <<<"$output")" = ready ]
   [ "$(jq -c .blockers <<<"$output")" = '[]' ]
-  [ "$(jq -r .head <<<"$output")" = abc123 ]
+  [ "$(jq -r .head <<<"$output")" = "$HEAD_SHA" ]
   [ "$(jq -r .ci.state <<<"$output")" = SUCCESS ]
   [ "$(jq -c .threads <<<"$output")" = '{"unresolved":0,"outdated":0}' ]
 }
@@ -297,4 +334,198 @@ state_body() {
 @test "makes no write calls to GitHub" {
   run --separate-stderr "$SCRIPT" test/repo 7
   ! grep -qiE 'mutation|-X (POST|PATCH|PUT|DELETE)|--method' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
+}
+
+# --- CLAUDE-234: approval by risk ---
+
+@test "CLAUDE-234: a low-tier PR needs no human and stays ready under enforce" {
+  config 'review_approval_gate: enforce'
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '.approval | {mode, tier, policy, required, missing}' <<<"$output")" = '{"mode":"enforce","tier":"low","policy":"default_branch","required":0,"missing":[]}' ]
+  [ "$(jq -c .approval.extras <<<"$output")" = '{"crossLineage":null,"freshReview":null}' ]
+}
+
+@test "CLAUDE-234: advisory lists a missing approval without changing the verdict" {
+  with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .verdict <<<"$output")" = ready ]
+  [ "$(jq -c '.approval | {mode, tier, required, missing}' <<<"$output")" = '{"mode":"advisory","tier":"medium","required":1,"missing":["approval_required"]}' ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+}
+
+@test "CLAUDE-234: enforce blocks a medium PR with no human approval" {
+  config 'review_approval_gate: enforce'
+  with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_required"]' ]
+}
+
+@test "CLAUDE-234: a listed human's approval on the head SHA readies a medium PR" {
+  config 'review_approval_gate: enforce'
+  REVIEWS="[$(rv APPROVED Test User "$HEAD_SHA")]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -c .approval.humanApproval <<<"$output")" = "{\"login\":\"Test\",\"commit\":\"$HEAD_SHA\"}" ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '[]' ]
+}
+
+@test "CLAUDE-234: an approval on an older commit is stale" {
+  config 'review_approval_gate: enforce'
+  REVIEWS="[$(rv APPROVED test User "$OLD_SHA"),$(rv COMMENTED test User "$HEAD_SHA")]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_stale"]' ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+}
+
+@test "CLAUDE-234: a bot's or an unlisted account's approval never counts" {
+  config 'review_approval_gate: enforce'
+  REVIEWS="[$(rv APPROVED test Bot "$HEAD_SHA"),$(rv APPROVED 'test[bot]' User "$HEAD_SHA"),$(rv APPROVED mallory User "$HEAD_SHA")]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_required"]' ]
+}
+
+@test "CLAUDE-234: review_approval_humans replaces the owner default" {
+  config 'review_approval_gate: enforce' 'review_approval_humans: [alice, "bob"]'
+  REVIEWS="[$(rv APPROVED bob User "$HEAD_SHA")]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.humanApproval.login <<<"$output")" = bob ]
+  REVIEWS="[$(rv APPROVED test User "$HEAD_SHA")]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+}
+
+@test "CLAUDE-234: high with approval and a cross-lineage review on head: fresh review is unknown" {
+  REVIEWS="[$(rv APPROVED test User "$HEAD_SHA"),$(rv COMMENTED chatgpt-codex-connector Bot "$HEAD_SHA")]" with_files plugins/x/hooks/a.sh docs/a.md
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '.approval | {tier, required, extras, missing}' <<<"$output")" = '{"tier":"high","required":1,"extras":{"crossLineage":true,"freshReview":null},"missing":["fresh_review_unknown"]}' ]
+  config 'review_approval_gate: enforce'
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .unknowns <<<"$output")" = '["approval"]' ]
+  [ "$(jq -c .blockers <<<"$output")" = '[]' ]
+}
+
+@test "CLAUDE-234: high without a cross-lineage review on head blocks under enforce" {
+  config 'review_approval_gate: enforce'
+  REVIEWS="[$(rv APPROVED test User "$HEAD_SHA"),$(rv COMMENTED chatgpt-codex-connector Bot "$OLD_SHA")]" with_files plugins/x/hooks/a.sh
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["cross_lineage_missing"]' ]
+  [ "$(jq -r .approval.extras.crossLineage <<<"$output")" = false ]
+}
+
+@test "CLAUDE-234: high with neither approval nor extras lists every token" {
+  config 'review_approval_gate: enforce' 'review_cross_lineage_bots:' '  - "other-reviewer[bot]"'
+  REVIEWS="[$(rv COMMENTED chatgpt-codex-connector Bot "$HEAD_SHA")]" with_files plugins/x/hooks/a.sh
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["approval_required","cross_lineage_missing","fresh_review_unknown"]' ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_required","cross_lineage_missing"]' ]
+  [ "$(jq -c .unknowns <<<"$output")" = '["approval"]' ]
+}
+
+@test "CLAUDE-234: off makes no approval calls" {
+  config 'review_approval_gate: off'
+  with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -c .approval <<<"$output")" = '{"mode":"off","tier":null,"policy":null,"required":null,"humanApproval":null,"extras":{"crossLineage":null,"freshReview":null},"missing":[]}' ]
+  [ ! -e "${BATS_TEST_TMPDIR}/mock_gh_approval_called" ]
+  ! grep -q -- '/files\|/contents/' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
+}
+
+@test "CLAUDE-234: the policy is read at the default branch tip, never the PR head or base" {
+  with_files plugins/x/hooks/a.sh
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$(jq -r .approval.tier <<<"$output")" = high ]
+  grep -q -- "contents/.github/review-risk.json?ref=$DEFAULT_OID" "${BATS_TEST_TMPDIR}/mock_gh_contents_args"
+  ! grep -q -- "ref=$HEAD_SHA" "${BATS_TEST_TMPDIR}/mock_gh_contents_args"
+}
+
+@test "CLAUDE-234: no policy on the default branch is default medium" {
+  export MOCK_GH_MR_POLICY_FAIL=404
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$(jq -c '.approval | {tier, policy}' <<<"$output")" = '{"tier":"medium","policy":"none"}' ]
+}
+
+@test "CLAUDE-234: an invalid policy fails closed to high" {
+  MOCK_GH_MR_POLICY='{"version":2}'
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$(jq -c '.approval | {tier, policy}' <<<"$output")" = '{"tier":"high","policy":"invalid"}' ]
+}
+
+@test "CLAUDE-234: an unreadable policy leaves the tier unknown" {
+  export MOCK_GH_MR_POLICY_FAIL=1
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '.approval | {tier, required, missing}' <<<"$output")" = '{"tier":"unknown","required":null,"missing":["tier_unknown"]}' ]
+  config 'review_approval_gate: enforce'
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .unknowns <<<"$output")" = '["approval"]' ]
+}
+
+@test "CLAUDE-234: a failed approval lookup is unknown under enforce" {
+  config 'review_approval_gate: enforce'
+  export MOCK_GH_MRA_FAIL=1
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["tier_unknown"]' ]
+  [[ "$stderr" == *"approval lookup failed"* ]]
+}
+
+@test "CLAUDE-234: a head that moved during the check leaves the tier unknown" {
+  MOCK_GH_MRA_BODY=$(approval_body '[]' 1 "$OLD_SHA")
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$(jq -r .approval.tier <<<"$output")" = unknown ]
+  [[ "$stderr" == *"head moved"* ]]
+}
+
+@test "CLAUDE-234: a file list shorter than changedFiles leaves the tier unknown" {
+  MOCK_GH_MRA_BODY=$(approval_body '[]' 5)
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$(jq -r .approval.tier <<<"$output")" = unknown ]
+}
+
+@test "CLAUDE-234: a renamed file's old path and an unsafe name count toward the tier" {
+  MOCK_GH_MR_FILES='[{"filename":"docs/a.md","previous_filename":"plugins/x/hooks/a.sh"}]'
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$(jq -r .approval.tier <<<"$output")" = high ]
+  MOCK_GH_MR_FILES='[{"filename":"docs/a\nb.md"}]'
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$(jq -r .approval.tier <<<"$output")" = high ]
+}
+
+@test "CLAUDE-234: a tracked config file is ignored" {
+  config 'review_approval_gate: enforce'
+  git -C "$CHECKOUT" add yellow-plugins.local.md
+  with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.mode <<<"$output")" = advisory ]
+  [[ "$stderr" == *"tracked"* ]]
+}
+
+@test "CLAUDE-234: a checkout of another repository does not supply the config" {
+  config 'review_approval_gate: enforce'
+  with_files src/a.js
+  run --separate-stderr "$SCRIPT" other/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.mode <<<"$output")" = advisory ]
+}
+
+@test "CLAUDE-234: invalid config values warn and use the defaults" {
+  config 'review_approval_gate: strict' 'review_approval_humans: [bad login]'
+  with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$(jq -r .approval.mode <<<"$output")" = advisory ]
+  [[ "$stderr" == *"review_approval_gate is invalid"* ]]
+  [[ "$stderr" == *"review_approval_humans has an invalid login"* ]]
 }

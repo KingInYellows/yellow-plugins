@@ -16,9 +16,17 @@
 #    "ci":{"state":"SUCCESS|PENDING|EXPECTED|FAILURE|ERROR|NONE"|null,
 #          "failing":[names],"pending":[names],"truncated":bool},
 #    "ledger":{"status":"read|partial|none|other_repo|unavailable",
-#              "mergeBlocking":N|null,"skipped":N|null}}
+#              "mergeBlocking":N|null,"skipped":N|null},
+#    "approval":{"mode":"off|advisory|enforce",
+#                "tier":"low|medium|high|unknown"|null,
+#                "policy":"default_branch|none|invalid"|null,
+#                "required":0|1|null,
+#                "humanApproval":{"login":"...","commit":"<sha>"}|null,
+#                "extras":{"crossLineage":bool|null,"freshReview":null},
+#                "missing":[tokens]}}
 # blockers holds fixed tokens: not_open, draft, conflicts, unresolved_threads,
-# changes_requested, review_required, ci_failing, ci_pending, ledger_findings.
+# changes_requested, review_required, ci_failing, ci_pending, ledger_findings,
+# and in enforce mode approval_required, approval_stale, cross_lineage_missing.
 # unknowns names what could not be read: pr_state, threads, reviews, ci,
 # mergeable (GitHub reports UNKNOWN while it is still computing the merge),
 # ledger (the PR has ledger files but the summary failed, or status partial:
@@ -28,6 +36,8 @@
 # for a reason this gate may not see, such as a required check that never
 # reported on the head or a base branch that must be merged in first, so the
 # PR is not reported ready).
+# approval (enforce mode only: the tier or the approval evidence could not be
+# read).
 # A blocker is definite; an unknown is never read as "no blocker".
 # Unresolved threads count outdated ones too, whether or not the base branch
 # enforces conversation resolution (conversationResolution is reported only).
@@ -39,13 +49,42 @@
 # block: the queue rule needs CI, threads and reviews, and cloud sessions never
 # hold a local ledger. A checkout of another repository (other_repo) is not
 # read, since ledger files are keyed by PR number only.
+# Approval by risk (CLAUDE-234): the tier comes from classify-risk over the
+# PR's file list (files API, renamed files' old paths included) with
+# .github/review-risk.json fetched through the contents API at the tip of the
+# repository's default branch, never the PR head or its base branch (in a
+# stack the base is the parent PR's unmerged branch, which could weaken the
+# policy for the child). No policy there is default medium (policy none).
+# low needs no human; medium needs one APPROVED review on the head SHA by a
+# listed human (a User account, never a Bot; an approval on an older commit
+# only is approval_stale); high needs the same plus a review on the head SHA
+# by a listed cross-lineage bot. freshReview is always null: the review
+# ledger records a head SHA per finding, not per run, and a clean run writes
+# no record, so nothing proves a fresh review of the head (missing token
+# fresh_review_unknown). Other missing tokens: approval_required,
+# approval_stale, cross_lineage_missing, tier_unknown (the file list, the
+# policy or the classification failed, or the head moved during the run;
+# required is then null and no other token is listed), reviews_unknown.
+# Config: yellow-plugins.local.md at the root of a checkout of <owner/repo>,
+# only when git does not track it (a tracked file could be edited by a PR, so
+# its keys are ignored with a note): review_approval_gate off|advisory|enforce
+# (default advisory), review_approval_humans (default: the repository owner's
+# login) and review_cross_lineage_bots (default chatgpt-codex-connector[bot]),
+# each list a flow ([a, b]) or block (- a) sequence of logins. advisory lists
+# approval.missing only and leaves the verdict alone; enforce turns
+# approval_required, approval_stale and cross_lineage_missing into blockers
+# and any other token into the approval unknown; off makes no approval calls
+# and reports mode off with every other approval field null.
 # Exit: 0 ready, 1 blocked (any blocker, even with unknowns), 3 unknown (no
 # blocker but something unread), 2 usage. Every lookup failure exits 1 or 3
 # with a note on stderr, never with an empty stdout; with jq missing or no
 # temp directory the report keeps its shape with every field null.
-# Time bound: get-pr-comments (270 s deadline), get-pr-blockers (up to 360 s)
-# and the state query run in parallel, so the worst case is about 370 s,
-# inside the 420000 ms Bash tool timeout merge-ready.md gives the call.
+# Time bound: get-pr-comments (270 s deadline) and get-pr-blockers (up to
+# 360 s) run in the background while the foreground makes the state query
+# and, unless approval is off, three approval calls (reviews, the paginated
+# file list, the policy), each under one rg_gh timeout (30 s by default, 60 s
+# at most): 240 s at most. The worst case stays about 370 s, inside the
+# 420000 ms Bash tool timeout merge-ready.md gives the call.
 
 set -eu
 
@@ -74,7 +113,7 @@ esac
 
 # all_unknown: the full report shape with nothing read; built without jq.
 all_unknown() {
-    printf '{"pr":%s,"head":null,"state":null,"verdict":"unknown","blockers":[],"unknowns":["pr_state","threads","reviews","ci"],"isDraft":null,"mergeable":null,"mergeStateStatus":null,"queued":null,"threads":null,"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown","ci":{"state":null,"failing":[],"pending":[],"truncated":false},"ledger":{"status":"unavailable","mergeBlocking":null,"skipped":null}}\n' "$PR_NUMBER"
+    printf '{"pr":%s,"head":null,"state":null,"verdict":"unknown","blockers":[],"unknowns":["pr_state","threads","reviews","ci"],"isDraft":null,"mergeable":null,"mergeStateStatus":null,"queued":null,"threads":null,"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown","ci":{"state":null,"failing":[],"pending":[],"truncated":false},"ledger":{"status":"unavailable","mergeBlocking":null,"skipped":null},"approval":null}\n' "$PR_NUMBER"
 }
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -89,6 +128,89 @@ LEDGER_LIB="$HERE/../../../lib/review-ledger.sh"
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/check-merge-ready.XXXXXX") || { note 'mktemp failed; readiness unknown'; all_unknown; exit 3; }
 trap 'rm -rf "$WORK"' EXIT
+
+# --- Is the current directory a checkout of <owner/repo>? ---
+# The ledger and the approval config are read only from such a checkout.
+SAME_REPO=false
+TOP=""
+COMMON_DIR=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || COMMON_DIR=""
+if [ -n "$COMMON_DIR" ]; then
+    ORIGIN=$(git config --get remote.origin.url 2>/dev/null) || ORIGIN=""
+    ORIGIN=${ORIGIN%/}
+    ORIGIN=${ORIGIN%.git}
+    ORIGIN_REPO=$(printf '%s' "$ORIGIN" | awk -F'[/:]' 'NF >= 2 { print $(NF-1) "/" $NF }' | tr '[:upper:]' '[:lower:]')
+    WANT_REPO=$(printf '%s/%s' "$OWNER" "$NAME" | tr '[:upper:]' '[:lower:]')
+    [ "$ORIGIN_REPO" != "$WANT_REPO" ] || SAME_REPO=true
+    TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+fi
+
+# --- Approval config (yellow-plugins.local.md, untracked only) ---
+CFG_NAME=yellow-plugins.local.md
+CFG_FILE=absent
+: >"$WORK/config"
+if [ "$SAME_REPO" = true ] && [ -n "$TOP" ] && { [ -e "$TOP/$CFG_NAME" ] || [ -L "$TOP/$CFG_NAME" ]; }; then
+    CFG_RC=0
+    git -C "$TOP" ls-files --error-unmatch -- "$CFG_NAME" >/dev/null 2>&1 || CFG_RC=$?
+    if [ "$CFG_RC" -ne 1 ]; then
+        note "$CFG_NAME is tracked by git (or git could not tell); approval keys ignored"
+    elif [ -L "$TOP/$CFG_NAME" ] || [ ! -f "$TOP/$CFG_NAME" ]; then
+        note "$CFG_NAME is a symlink or not a regular file; approval keys ignored"
+    elif head -c 65537 -- "$TOP/$CFG_NAME" >"$WORK/config" 2>/dev/null \
+        && [ "$(wc -c <"$WORK/config")" -le 65536 ]; then
+        CFG_FILE=present
+    else
+        note "$CFG_NAME is unreadable or over 64 KiB; approval keys ignored"
+        : >"$WORK/config"
+    fi
+fi
+# Top-level keys of the frontmatter only. A key given twice, a value that is
+# not a list or a login outside GitHub's characters warns and is dropped.
+jq -n -c --rawfile text "$WORK/config" --arg file "$CFG_FILE" '
+  def strip: sub("[ \\t]+#.*\\z"; "") | sub("\\A[ \\t]+"; "") | sub("[ \\t]+\\z"; "");
+  def unq: if test("\\A\".*\"\\z") or test("\\A\u0027.*\u0027\\z") then .[1:-1] else . end;
+  ($text | split("\n") | map(sub("\r\\z"; ""))) as $lines
+  | (if $file != "present" or ($lines[0] // "") != "---" then []
+     else ([range(1; $lines | length) | select($lines[.] == "---")] | first) as $end
+       | if $end == null then [] else $lines[1:$end] end end) as $fm
+  | def value($k):
+      [range(0; $fm | length) | select($fm[.] | startswith($k + ":"))] as $e
+      | if ($e | length) == 0 then {state: "unset"}
+        elif ($e | length) > 1 then {state: "twice"}
+        else ($fm[$e[0]] | .[($k | length) + 1:] | strip) as $v
+          | if $v != "" then {state: "set", v: $v}
+            else ($fm[$e[0] + 1:] | (map(test("\\A[ \\t]+-") | not) | index(true)) as $stop
+                  | if $stop == null then . else .[0:$stop] end) as $items
+              | {state: "set", list: [$items[] | sub("\\A[ \\t]+-[ \\t]*"; "") | strip | unq]}
+            end
+        end;
+    def logins($k; $re):
+      value($k) as $x
+      | if $x.state == "unset" then {v: null, w: []}
+        elif $x.state == "twice" then {v: null, w: ["\($k) is given more than once; using the default"]}
+        else (if $x.list != null then $x.list
+              elif ($x.v | test("\\A\\[.*\\]\\z")) then ($x.v[1:-1] | split(",") | map(strip | unq) | map(select(. != "")))
+              else null end) as $l
+          | if $l == null then {v: null, w: ["\($k) is not a list; using the default"]}
+            else ($l | map(select(test($re)))) as $ok
+              | {v: (if ($ok | length) == 0 then null else $ok end),
+                 w: ((if ($l | map(select(test($re) | not)) | length) > 0 then ["\($k) has an invalid login; ignored"] else [] end)
+                     + (if ($ok | length) == 0 then ["\($k) lists no valid login; using the default"] else [] end))}
+            end
+        end;
+    value("review_approval_gate") as $g
+  | (if $g.state == "set" and ($g.v // "" | strip | unq | IN("off", "advisory", "enforce"))
+     then {v: ($g.v | strip | unq), w: []}
+     elif $g.state == "unset" then {v: "advisory", w: []}
+     else {v: "advisory", w: ["review_approval_gate is invalid; using advisory"]} end) as $mode
+  | logins("review_approval_humans"; "\\A[A-Za-z0-9][A-Za-z0-9-]{0,38}\\z") as $h
+  | logins("review_cross_lineage_bots"; "\\A[A-Za-z0-9][A-Za-z0-9-]{0,38}(?:\\[bot\\])?\\z") as $b
+  | {mode: $mode.v, humans: $h.v, bots: $b.v, warnings: ($mode.w + $h.w + $b.w)}
+' >"$WORK/acfg" 2>/dev/null || {
+    note "could not parse $CFG_NAME; approval keys take their defaults"
+    printf '{"mode":"advisory","humans":null,"bots":null,"warnings":[]}' >"$WORK/acfg"
+}
+jq -r '.warnings[]' "$WORK/acfg" | while IFS= read -r w; do note "Warning: $w"; done
+APPROVAL_MODE=$(jq -r '.mode' "$WORK/acfg")
 
 # --- Threads and reviews run in the background (each can take minutes) ---
 THREADS_RC=0
@@ -135,6 +257,7 @@ query MergeReadyState($owner: String!, $name: String!, $number: Int!) {
 }'
 
 STATE_OK=false
+GH_READY=false
 if ! command -v gh >/dev/null 2>&1; then
     note 'gh not found; PR state and CI unknown'
 elif [ ! -r "$RESOLVE_GH_LIB" ]; then
@@ -142,6 +265,7 @@ elif [ ! -r "$RESOLVE_GH_LIB" ]; then
 else
     # shellcheck source=../../../lib/resolve-gh.sh
     . "$RESOLVE_GH_LIB"
+    GH_READY=true
     STATE_RC=0
     rg_gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
         -f query="$QUERY" >"$WORK/state" 2>"$WORK/state.err" || STATE_RC=$?
@@ -154,6 +278,140 @@ else
     fi
 fi
 [ "$STATE_OK" = true ] || printf '{}' >"$WORK/state"
+
+# --- Approval evidence: reviews, tier (skipped entirely when off) ---
+# shellcheck disable=SC2016
+APPROVAL_QUERY='
+query MergeReadyApproval($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    defaultBranchRef { target { oid } }
+    pullRequest(number: $number) {
+      headRefOid
+      changedFiles
+      reviews(last: 100) {
+        nodes { state author { __typename login } commit { oid } }
+      }
+    }
+  }
+}'
+TIER=unknown
+POLICY=null
+A_HEAD=""
+printf 'null' >"$WORK/reviews"
+if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
+    A_RC=0
+    rg_gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
+        -f query="$APPROVAL_QUERY" >"$WORK/approval.raw" 2>"$WORK/approval.err" || A_RC=$?
+    # One space-separated line, every value checked before it reaches a URL.
+    A_ROW=""
+    if [ "$A_RC" -eq 0 ]; then
+        A_ROW=$(jq -r '
+          (.data.repository // {}) as $r | ($r.pullRequest // {}) as $p
+          | if ((.errors // []) | length) == 0
+               and ($p.headRefOid | type == "string" and test("\\A[0-9a-f]{40}\\z"))
+               and ($r.defaultBranchRef.target.oid | type == "string" and test("\\A[0-9a-f]{40}\\z"))
+               and ($p.changedFiles | type == "number")
+               and ($p.reviews.nodes | type == "array")
+            then "\($p.headRefOid) \($r.defaultBranchRef.target.oid) \($p.changedFiles)"
+            else error("bad approval lookup") end' "$WORK/approval.raw" 2>/dev/null) || A_ROW=""
+    fi
+    STATE_HEAD=$(jq -r '.data.repository.pullRequest.headRefOid // empty' "$WORK/state" 2>/dev/null) || STATE_HEAD=""
+    if [ -z "$A_ROW" ]; then
+        [ "$A_RC" -ne 124 ] || note "gh timed out after ${RG_GH_TIMEOUT}s on the approval lookup"
+        note "approval lookup failed; tier and reviews unknown: $(head -c 300 "$WORK/approval.err" | tr '\n' ' ')"
+    else
+        A_HEAD=${A_ROW%% *}
+        A_REST=${A_ROW#* }
+        POLICY_OID=${A_REST%% *}
+        CHANGED=${A_REST#* }
+        if [ -n "$STATE_HEAD" ] && [ "$STATE_HEAD" != "$A_HEAD" ]; then
+            note "the head moved during the check; tier and reviews unknown"
+            A_HEAD=""
+        else
+            jq '.data.repository.pullRequest.reviews.nodes' "$WORK/approval.raw" >"$WORK/reviews"
+        fi
+    fi
+    if [ -n "$A_HEAD" ]; then
+        TIER_OK=false
+        F_RC=0
+        rg_gh api --paginate "repos/$OWNER/$NAME/pulls/$PR_NUMBER/files?per_page=100" \
+            >"$WORK/files" 2>"$WORK/files.err" || F_RC=$?
+        # Old and new paths; a name outside the allowlist becomes a path that
+        # classify-risk rates high, so it can never lower the tier or forge a
+        # row. A list shorter than changedFiles (GitHub stops at 3000) fails.
+        if [ "$F_RC" -eq 0 ] && jq -s -r --argjson n "$CHANGED" '
+              (map(if type == "array" then . else error("not a list") end) | add // []) as $f
+              | if ($f | length) < $n then error("short list") else $f[] end
+              | (.filename, (.previous_filename // empty))
+              | if type == "string" and test("\\A[A-Za-z0-9._/@+-]+\\z") then . else "unsafe?path" end
+            ' "$WORK/files" >"$WORK/paths" 2>/dev/null; then
+            P_RC=0
+            rg_gh api -H 'Accept: application/vnd.github.raw+json' \
+                "repos/$OWNER/$NAME/contents/.github/review-risk.json?ref=$POLICY_OID" \
+                >"$WORK/policy.json" 2>"$WORK/policy.err" || P_RC=$?
+            if [ "$P_RC" -eq 0 ]; then
+                POLICY=default_branch
+            elif [ "$P_RC" -ne 124 ] && grep -q 'HTTP 404' "$WORK/policy.err"; then
+                POLICY=none
+                printf '{"version":1,"default_tier":"medium","rules":[]}\n' >"$WORK/policy.json"
+            else
+                note "policy lookup failed; tier unknown: $(head -c 300 "$WORK/policy.err" | tr '\n' ' ')"
+            fi
+            if [ "$POLICY" != null ] && "$HERE/classify-risk" --policy-file "$WORK/policy.json" --stdin \
+                <"$WORK/paths" >"$WORK/risk" 2>"$WORK/risk.err" \
+                && TIER=$(jq -er '.tier | select(IN("low", "medium", "high"))' "$WORK/risk" 2>/dev/null); then
+                TIER_OK=true
+                [ "$(jq -r '.policy' "$WORK/risk")" != invalid ] || POLICY=invalid
+            elif [ "$POLICY" != null ]; then
+                note "classify-risk failed; tier unknown: $(head -c 300 "$WORK/risk.err" | tr '\n' ' ')"
+            fi
+        else
+            note "file list lookup failed or was cut short; tier unknown: $(head -c 300 "$WORK/files.err" | tr '\n' ' ')"
+        fi
+        [ "$TIER_OK" = true ] || { TIER=unknown; POLICY=null; }
+    fi
+elif [ "$APPROVAL_MODE" != off ]; then
+    note "gh unavailable; tier and reviews unknown"
+fi
+
+jq -n -c \
+    --arg mode "$APPROVAL_MODE" --arg tier "$TIER" --arg policy "$POLICY" --arg head "$A_HEAD" \
+    --arg owner "$OWNER" --slurpfile cfg "$WORK/acfg" --slurpfile rev "$WORK/reviews" '
+  def norm: ascii_downcase | sub("\\[bot\\]\\z"; "");
+  if $mode == "off" then
+    {mode: "off", tier: null, policy: null, required: null, humanApproval: null,
+     extras: {crossLineage: null, freshReview: null}, missing: []}
+  else
+    ($cfg[0].humans // [$owner] | map(ascii_downcase)) as $humans
+    | ($cfg[0].bots // ["chatgpt-codex-connector[bot]"] | map(norm)) as $bots
+    | $rev[0] as $r
+    | [($r // [])[] | select(.state == "APPROVED" and .author.__typename == "User"
+          and ((.author.login // "") | test("\\[bot\\]\\z") | not)
+          and ((.author.login // "") | ascii_downcase | IN($humans[])))] as $appr
+    | ([$appr[] | select(.commit.oid == $head)] | last) as $onhead
+    | (if $r == null then null
+       else any($r[]; ((.author.login // "") | norm | IN($bots[])) and .commit.oid == $head) end) as $xl
+    | {mode: $mode, tier: $tier, policy: (if $policy == "null" then null else $policy end),
+       required: ({low: 0, medium: 1, high: 1}[$tier]),
+       humanApproval: (if $onhead == null then null else {login: $onhead.author.login, commit: $onhead.commit.oid} end),
+       extras: {crossLineage: (if $tier == "high" then $xl else null end), freshReview: null},
+       missing: (
+         if $tier == "unknown" then ["tier_unknown"]
+         elif $tier == "low" then []
+         else (if $r == null then ["reviews_unknown"]
+               elif $onhead != null then []
+               elif ($appr | length) > 0 then ["approval_stale"]
+               else ["approval_required"] end)
+              + (if $tier == "high" then
+                   (if $xl == false then ["cross_lineage_missing"] else [] end) + ["fresh_review_unknown"]
+                 else [] end)
+         end)}
+  end' >"$WORK/approval" 2>/dev/null || {
+    note 'could not assemble the approval section; approval unknown'
+    jq -n -c --arg mode "$APPROVAL_MODE" '{mode: $mode, tier: (if $mode == "off" then null else "unknown" end),
+      policy: null, required: null, humanApproval: null, extras: {crossLineage: null, freshReview: null},
+      missing: (if $mode == "off" then [] else ["tier_unknown"] end)}' >"$WORK/approval"
+}
 
 wait "$THREADS_PID" || THREADS_RC=$?
 wait "$BLOCKERS_PID" || BLOCKERS_RC=$?
@@ -182,15 +440,9 @@ fi
 LEDGER_STATUS=none
 LEDGER_BLOCKING=null
 LEDGER_SKIPPED=null
-COMMON_DIR=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || COMMON_DIR=""
 if [ -n "$COMMON_DIR" ]; then
-    ORIGIN=$(git config --get remote.origin.url 2>/dev/null) || ORIGIN=""
-    ORIGIN=${ORIGIN%/}
-    ORIGIN=${ORIGIN%.git}
-    ORIGIN_REPO=$(printf '%s' "$ORIGIN" | awk -F'[/:]' 'NF >= 2 { print $(NF-1) "/" $NF }' | tr '[:upper:]' '[:lower:]')
-    WANT_REPO=$(printf '%s/%s' "$OWNER" "$NAME" | tr '[:upper:]' '[:lower:]')
     LEDGER_DIR="$COMMON_DIR/yellow-review/findings"
-    if [ "$ORIGIN_REPO" != "$WANT_REPO" ]; then
+    if [ "$SAME_REPO" != true ]; then
         LEDGER_STATUS=other_repo
     elif [ -f "$LEDGER_DIR/$PR_NUMBER.jsonl" ] || [ -f "$LEDGER_DIR/$PR_NUMBER.pending" ]; then
         LEDGER_STATUS=unavailable
@@ -217,6 +469,7 @@ jq -n \
     --slurpfile s "$WORK/state" \
     --slurpfile t "$WORK/threads" \
     --slurpfile b "$WORK/blockers" \
+    --slurpfile a "$WORK/approval" \
     --arg lstatus "$LEDGER_STATUS" \
     --argjson lblocking "$LEDGER_BLOCKING" \
     --argjson lskipped "$LEDGER_SKIPPED" '
@@ -251,8 +504,10 @@ jq -n \
           | (.name // .context)],
         truncated: ($roll.contexts.pageInfo.hasNextPage // false)
       },
-      ledger: {status: $lstatus, mergeBlocking: $lblocking, skipped: $lskipped}
+      ledger: {status: $lstatus, mergeBlocking: $lblocking, skipped: $lskipped},
+      approval: $a[0]
     }
+  | (.approval.mode == "enforce") as $enforce
   | .blockers = [
       (if .state != null and .state != "OPEN" then "not_open" else empty end),
       (if .isDraft == true then "draft" else empty end),
@@ -262,7 +517,8 @@ jq -n \
       (if .reviewDecision == "REVIEW_REQUIRED" then "review_required" else empty end),
       (if .ci.state == "FAILURE" or .ci.state == "ERROR" then "ci_failing" else empty end),
       (if .ci.state == "PENDING" or .ci.state == "EXPECTED" then "ci_pending" else empty end),
-      (if (.ledger.mergeBlocking // 0) > 0 then "ledger_findings" else empty end)
+      (if (.ledger.mergeBlocking // 0) > 0 then "ledger_findings" else empty end),
+      (if $enforce then (.approval.missing[] | select(IN("approval_required", "approval_stale", "cross_lineage_missing"))) else empty end)
     ]
   | .unknowns = [
       (if $stateok then empty else "pr_state" end),
@@ -271,7 +527,9 @@ jq -n \
       (if $stateok and (.ci.state | IN("SUCCESS","NONE","PENDING","EXPECTED","FAILURE","ERROR")) then empty else "ci" end),
       (if $stateok and .mergeable == "UNKNOWN" then "mergeable" else empty end),
       (if $stateok and (.mergeStateStatus | IN("BLOCKED","BEHIND")) then "merge_state" else empty end),
-      (if .ledger.status | IN("unavailable", "partial") then "ledger" else empty end)
+      (if .ledger.status | IN("unavailable", "partial") then "ledger" else empty end),
+      (if $enforce and any(.approval.missing[]; IN("approval_required", "approval_stale", "cross_lineage_missing") | not)
+       then "approval" else empty end)
     ]
   | .verdict = (if (.blockers | length) > 0 then "blocked"
                 elif (.unknowns | length) > 0 then "unknown"
