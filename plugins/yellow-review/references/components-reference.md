@@ -663,16 +663,18 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
     persona name (the part after the last `:`), launched by `agentType`
     (`yellow-review:review:<name>`, `yellow-core:review:<name>`,
     `yellow-codex:review:codex-reviewer`; a name with `:` runs only when it is
-    exactly that mapped type) with the compact-return schema as JSON Schema. An
-    unknown or unmapped name is not run: it goes to `coverage.failed`, because a
-    default subagent would have edit and shell tools over PR content. Hunters
-    are told to report every issue with its confidence and repo-relative paths;
-    the persona bodies' own confidence floors still apply until the eval-gated
-    follow-up removes them. The low tier runs only `correctness-reviewer` and
-    `project-compliance-reviewer`; the rest go to `coverage.skipped` with a log
-    line. A `null` or failed hunter goes to `coverage.failed`; `coverage.empty`
-    is true when no hunter returned a result, and callers treat that as
-    incomplete.
+    exactly that mapped type) with the compact-return schema as JSON Schema and
+    the `<rule-vocabulary>` block (an inline copy of
+    `lib/review-ledger-vocab.json` that a test keeps in step; hunter categories
+    are normalized with its aliases). An unknown or unmapped name is not run: it
+    goes to `coverage.failed`, because a default subagent would have edit and
+    shell tools over PR content. Hunters are told to report every issue with its
+    confidence and repo-relative paths; the persona bodies' own confidence
+    floors still apply until the eval-gated follow-up removes them. The low tier
+    runs only `correctness-reviewer` and `project-compliance-reviewer`; the rest
+    go to `coverage.skipped` with a log line. A `null` or failed hunter goes to
+    `coverage.failed`; `coverage.empty` is true when no hunter returned a
+    result, and callers treat that as incomplete.
   - **Paths:** a finding's path loses `./` and `repo_root`; any other absolute
     path ending in `/<changed file>` becomes that changed file.
   - **Dismissed:** each raw finding is matched on its own against `dismissed`

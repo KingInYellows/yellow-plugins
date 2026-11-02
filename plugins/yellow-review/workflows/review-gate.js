@@ -315,9 +315,80 @@ function similarTitles(a, b) {
   return inter >= 2 && inter / union >= 0.5;
 }
 
-// Hunter category aliases, copied from lib/review-ledger-vocab.json
-// (category_aliases). A workflow script cannot read plugin files, so the
-// review-gate test checks this map against the JSON.
+// The rule vocabulary, copied from lib/review-ledger-vocab.json (categories
+// and category_aliases). A workflow script cannot read plugin files, so the
+// review-gate test checks both maps against the JSON.
+const CATEGORY_RULES = {
+  correctness: [
+    'logic-error',
+    'wrong-condition',
+    'off-by-one',
+    'null-handling',
+    'state-bug',
+    'wrong-error-path',
+    'race-condition',
+    'type-mismatch',
+    'unreachable-code',
+  ],
+  security: [
+    'missing-input-validation',
+    'injection',
+    'path-traversal',
+    'auth-bypass',
+    'credential-exposure',
+    'unfenced-untrusted-input',
+    'insecure-permissions',
+    'unsafe-deserialization',
+  ],
+  reliability: [
+    'missing-error-handling',
+    'swallowed-error',
+    'missing-timeout',
+    'unsafe-retry',
+    'resource-leak',
+    'non-atomic-write',
+    'missing-cleanup',
+  ],
+  performance: [
+    'n-plus-one',
+    'unbounded-work',
+    'redundant-io',
+    'inefficient-algorithm',
+    'blocking-call',
+  ],
+  maintainability: [
+    'dead-code',
+    'duplication',
+    'premature-abstraction',
+    'unclear-naming',
+    'excessive-complexity',
+    'tight-coupling',
+    'file-size',
+  ],
+  docs: [
+    'stale-doc',
+    'wrong-doc',
+    'missing-doc',
+    'broken-reference',
+    'count-drift',
+    'comment-rot',
+  ],
+  testing: [
+    'missing-test',
+    'weak-assertion',
+    'flaky-test',
+    'untested-edge-case',
+  ],
+  contract: [
+    'breaking-rename',
+    'signature-change',
+    'removal',
+    'semantics-change',
+    'frontmatter-violation',
+    'schema-drift',
+  ],
+};
+
 const CATEGORY_ALIASES = {
   adversarial: 'correctness',
   logic: 'correctness',
@@ -435,12 +506,38 @@ function dismissedBlock(dismissed) {
   ].join('\n');
 }
 
+// The <rule-vocabulary> block review-pr.md Step 5 item 7 gives every
+// reviewer. Without it hunters emit rule "unclassified", and a dismissed
+// category/rule can never match a repeated finding.
+function ruleVocabularyBlock() {
+  const rows = Object.entries(CATEGORY_RULES).map(
+    ([cat, slugs]) => `${cat}: ${slugs.join(', ')}`
+  );
+  for (const [alias, cat] of Object.entries(CATEGORY_ALIASES)) {
+    rows.push(`${alias} (alias of ${cat}): ${CATEGORY_RULES[cat].join(', ')}`);
+  }
+  return [
+    '',
+    "Pick each finding's category and rule from this vocabulary. If your own category is an alias, use its row:",
+    fence(
+      'rule-vocabulary',
+      [
+        '<rule-vocabulary>',
+        ...rows,
+        'Every category also accepts `unclassified`.',
+        '</rule-vocabulary>',
+      ].join('\n')
+    ),
+  ].join('\n');
+}
+
 function hunterPrompt(a, name, dismissed) {
   return [
     `Review ${prLabel(a)} as the ${name} reviewer.`,
     '',
     contextBlock(a),
     lineCountsBlock(a, name),
+    ruleVocabularyBlock(),
     dismissedBlock(dismissed),
     '',
     'Report every issue you find in the changed code, each with your honest confidence from 0 to 100. Include low-confidence and minor findings: a separate verification pass filters them, so here a missed issue costs more than a false one.',

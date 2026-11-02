@@ -652,6 +652,19 @@ describe('review-gate dedup', () => {
     ]);
   });
 
+  it('gives every hunter the rule vocabulary, aliases resolved', async () => {
+    const r = await run(baseArgs());
+    const hunts = r.calls.filter((c) => c.opts.phase === 'Hunt');
+    expect(hunts.length).toBeGreaterThan(0);
+    for (const c of hunts) {
+      expect(c.prompt).toContain('<rule-vocabulary>');
+      expect(c.prompt).toContain('correctness: logic-error, wrong-condition');
+      expect(c.prompt).toContain(
+        'project-compliance (alias of maintainability): dead-code, duplication'
+      );
+    }
+  });
+
   it('keeps its category aliases in step with review-ledger-vocab.json', () => {
     const vocab = JSON.parse(
       readFileSync(
@@ -668,6 +681,10 @@ describe('review-gate dedup', () => {
     expect(m).not.toBeNull();
     const aliases = vm.runInNewContext(`(${m![1]})`);
     expect(JSON.parse(JSON.stringify(aliases))).toEqual(vocab.category_aliases);
+    const c = SOURCE.match(/const CATEGORY_RULES = (\{[\s\S]*?\n\});/);
+    expect(c).not.toBeNull();
+    const rules = vm.runInNewContext(`(${c![1]})`);
+    expect(JSON.parse(JSON.stringify(rules))).toEqual(vocab.categories);
   });
 
   it('matches dismissals per finding, by full category/rule or title, and skips line-less entries', async () => {
