@@ -18,7 +18,7 @@ plugins/yellow-agy/
   src/
     invocation.ts   # the only place an agy argv/env is built: env scrub, hooks off, WSL bridge
     profiles.ts     # --settings profiles (read-only, implement) and per-turn argv
-    classify.ts     # result classification; NORMAL_FINISHED_REASONS stays empty until probed
+    classify.ts     # result classification; an absent finished_reason is a normal finish
     errors.ts       # AGY_* catalog with exit codes and recovery actions
   dist/             # committed compiled CJS; drift-checked in CI
   tests/            # vitest, no agy binary needed
