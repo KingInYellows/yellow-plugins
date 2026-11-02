@@ -42,17 +42,19 @@ adapter verifies, and they fail closed until it does:
   controller's active-run record under the journal lock (see "Reservations,
   retries and recovery"). A second `delegate`, `reply`, `approve`, `collect` or
   `abandon` while a run is live fails with `AGY_BUSY`.
-- **agy never pushes.** `git push`, `gh` and any network-reaching command stay
-  off every allowlist. Every agy child gets `GIT_CONFIG_COUNT=2`,
-  `core.hooksPath=<null device>` (`/dev/null` on POSIX hosts and inside WSL,
-  `NUL` for native `agy.exe`) and `core.fsmonitor=false` through
-  `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n`, so the `git status` and `git commit`
-  agy runs fire no repo or global hooks and no fsmonitor command. On the WSL
-  bridge they are set inside the distro as `env` arguments, not through
-  `WSLENV`. Every spawn drops all other `GIT_*` variables (config overrides and
-  repository routing such as `GIT_DIR`), and the bridge unsets them inside the
-  distro too. `collect` stages patches, and the owner's stack provider opens the
-  PR.
+- **agy never runs git.** No profile allows any `git` command: a rule matches
+  any trailing arguments, and git's options and config reach executables
+  (`--output`, `--ignore-submodules`, `--trailer`, editors, signers, filter
+  drivers). agy edits files with its own tools and leaves its changes
+  uncommitted; `collect` captures them as a patch. `gh` and any network-reaching
+  command stay off every allowlist too. As defense in depth for granted test
+  commands that call git, every agy child gets the git config overrides listed
+  under Permission profiles through
+  `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n`. On the WSL bridge
+  they are set inside the distro as `env` arguments, not through `WSLENV`. Every
+  spawn drops all other `GIT_*` variables (config overrides and repository
+  routing such as `GIT_DIR`), and the bridge unsets them inside the distro too.
+  `collect` stages patches, and the owner's stack provider opens the PR.
 - **No MCP servers in delegated runs.** agy starts every configured MCP server
   on every run, and the command allowlist doesn't govern their tools. A
   delegated run must start with none. agy 1.4.12 has no per-run way to turn them
@@ -61,8 +63,8 @@ adapter verifies, and they fail closed until it does:
 - **No branch code runs outside agy's sandbox.** Test and lint commands execute
   code the task wrote, with the owner's privileges. The implement profile allows
   them only when `--sandbox` is verified to confine files and network on that
-  host. Otherwise the profile carries edits plus `git add` / `git commit` only,
-  and the owner's CI runs the checks on the PR.
+  host. Otherwise the profile carries file edits only, and the owner's CI runs
+  the checks on the PR.
 
 ## Host bridge
 
@@ -174,27 +176,25 @@ global `accept-edits`, and `--mode` beats both, so the profile alone keeps a
 plan turn from editing. `setup` still refuses a loose global `agentMode` as
 defense in depth.
 
-- **read-only:** `permissions.allow: ["command(git status)"]`, `agentMode: ""`,
-  `enableTerminalSandbox: false`. No `--mode accept-edits`. `git diff` and
-  `git log` are left out: a rule matches any trailing arguments, and their
-  `--output=<file>` writes a file anywhere even with edits off.
-- **implement:** read-only, plus `command(git add)` and `command(git commit)`,
-  with `agentMode: "accept-edits"` and `--mode accept-edits`. A `command(...)`
-  rule is a prefix match: it matches any arguments after its words, so no
-  `regex:` rules are needed, and every grant has to be safe with any trailing
-  arguments. The repo's own test and lint commands named in the grant
-  (`--allow-command`, which `authorize` validates: plain words, a first word
-  from a fixed list of test, lint and build tools with no path or `.exe`-style
-  suffix, so no wrappers such as `env` or `timeout`; a package or build tool
-  only with a test, lint or build subcommand, or `run <script>` for npm, pnpm,
-  yarn and bun) are added only on a host where `--sandbox` is verified (hard
-  rules). Such a profile sets `enableTerminalSandbox: true` and every turn that
-  uses it also passes `--sandbox`; without granted commands it keeps
-  `enableTerminalSandbox: false` and no `--sandbox`. The adapter refuses any
-  profile where the two disagree.
+- **read-only:** `permissions.allow: []`, `agentMode: ""`,
+  `enableTerminalSandbox: false`. No `--mode accept-edits`. The model reads
+  files with its own tools.
+- **implement:** `agentMode: "accept-edits"` and `--mode accept-edits`, with no
+  commands unless the grant names some. A `command(...)` rule is a prefix match:
+  it matches any arguments after its words, so no `regex:` rules are needed, and
+  every grant has to be safe with any trailing arguments. The repo's own test
+  and lint commands named in the grant (`--allow-command`, which `authorize`
+  validates: plain words, a first word from a fixed list of test, lint and build
+  tools with no path or `.exe`-style suffix, so no wrappers such as `env` or
+  `timeout`; a package or build tool only with a test, lint or build subcommand,
+  or `run <script>` for npm, pnpm, yarn and bun) are added only on a host where
+  `--sandbox` is verified (hard rules). Such a profile sets
+  `enableTerminalSandbox: true` and every turn that uses it also passes
+  `--sandbox`; without granted commands it keeps `enableTerminalSandbox: false`
+  and no `--sandbox`. The adapter refuses any profile where the two disagree.
 - **Unverified:** whether agy runs a matched command through a shell, so that
   `$(…)`, backticks or `>` in the trailing arguments of an allowed rule (such as
-  `git status $(…)`) would execute or write. The 2026-11 probe covered only `&&`
+  `pnpm test $(…)`) would execute or write. The 2026-11 probe covered only `&&`
   chaining with every part granted, and not a chain with an ungranted part. Both
   are probed before the first real delegated run.
 - **Git config every agy child sees** (`GIT_CONFIG_COUNT`/`KEY_n`/`VALUE_n`):
@@ -204,9 +204,9 @@ defense in depth.
   `diff.ignoreSubmodules=all`, `status.submoduleSummary=false`, and, for each
   filter driver the repo's effective config defines (the caller passes the
   names), `filter.<name>.clean`, `.smudge` and `.process` set to empty and
-  `filter.<name>.required=false`. So no hook, fsmonitor, editor, signer,
-  submodule or filter command runs during the allowed `git status`, `git add`
-  and `git commit`, even with `--edit` or `-S`; agy's commits are unsigned.
+  `filter.<name>.required=false`. So a granted test command that calls git, and
+  the adapter's own host git calls (`collect`, snapshots), run no hook,
+  fsmonitor, editor, signer, submodule or filter command.
 
 ## Result classification
 

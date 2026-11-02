@@ -22,7 +22,7 @@ function codeOf(fn: () => unknown): string | undefined {
 const tp = { toolPermission: 'request-review' };
 
 describe('profiles', () => {
-  it('read-only: overages off, workspace only, git read commands, no flags', () => {
+  it('read-only: overages off, workspace only, no commands, no flags', () => {
     const p = readOnlyProfile(tp);
     expect(JSON.parse(p.settings)).toEqual({
       useG1Credits: false,
@@ -31,23 +31,19 @@ describe('profiles', () => {
       agentMode: '',
       enableTerminalSandbox: false,
       permissions: {
-        allow: ['command(git status)'],
+        allow: [],
       },
     });
     expect(p.flags).toEqual([]);
   });
 
-  it('implement: adds git add/commit and accept-edits, no sandbox without extra commands', () => {
+  it('implement: accept-edits and no commands or sandbox without a grant', () => {
     const p = implementProfile({
       ...tp,
       allowCommands: [],
       sandboxVerified: false,
     });
-    expect(JSON.parse(p.settings).permissions.allow).toEqual([
-      'command(git status)',
-      'command(git add)',
-      'command(git commit)',
-    ]);
+    expect(JSON.parse(p.settings).permissions.allow).toEqual([]);
     expect(p.flags).toEqual(['--mode', 'accept-edits']);
     expect(JSON.parse(p.settings).agentMode).toBe('accept-edits');
     expect(JSON.parse(p.settings).enableTerminalSandbox).toBe(false);
@@ -267,10 +263,20 @@ describe('turnArgs', () => {
     expect(forged({ ...base, extra: 1 })).toBe('AGY_SETTINGS');
     expect(
       forged({ ...base, permissions: { allow: ['command(git push)'] } })
-    ).toBe('AGY_INVALID_INPUT');
-    expect(
-      forged({ ...base, permissions: { allow: ['command(git commit)'] } })
     ).toBe('AGY_SETTINGS');
+    expect(
+      forged({ ...base, permissions: { allow: ['command(git status)'] } })
+    ).toBe('AGY_SETTINGS');
+    expect(
+      forged(
+        {
+          ...base,
+          agentMode: 'accept-edits',
+          permissions: { allow: ['command(git commit)'] },
+        },
+        ['--mode', 'accept-edits']
+      )
+    ).toBe('AGY_INVALID_INPUT');
     expect(forged(base, ['--mode', 'accept-edits'])).toBe('AGY_SETTINGS');
     expect(
       codeOf(() =>

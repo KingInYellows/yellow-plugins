@@ -6,7 +6,7 @@
  * permission could slip into a run, so they throw instead of degrading.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TOOL_PERMISSIONS = exports.DEFAULT_TOOL_PERMISSION = exports.IMPLEMENT_EXTRA_COMMANDS = exports.READ_ONLY_COMMANDS = void 0;
+exports.TOOL_PERMISSIONS = exports.DEFAULT_TOOL_PERMISSION = void 0;
 exports.validateAllowCommand = validateAllowCommand;
 exports.readOnlyProfile = readOnlyProfile;
 exports.implementProfile = implementProfile;
@@ -14,13 +14,12 @@ exports.assertSafeProfile = assertSafeProfile;
 exports.turnArgs = turnArgs;
 exports.usageArgs = usageArgs;
 const errors_1 = require("./errors");
-/**
- * `git diff` and `git log` are left out on purpose: a command rule matches any
- * trailing arguments, and their `--output=<file>` writes anywhere, even with
- * edits off. The model reads files with its own tools instead.
+/*
+ * No profile allows git. A command rule matches any trailing arguments, and
+ * git's options and config reach executables (`--output`, `--ignore-submodules`,
+ * `--trailer`, editors, signers, filters). The model reads and edits files with
+ * its own tools, and `collect` captures its uncommitted changes as a patch.
  */
-exports.READ_ONLY_COMMANDS = ['git status'];
-exports.IMPLEMENT_EXTRA_COMMANDS = ['git add', 'git commit'];
 /**
  * First words (or first two words) a grant can never allow: anything that
  * reaches the network, publishes, or changes git remotes. `agy never pushes`.
@@ -129,9 +128,9 @@ function validateAllowCommand(command) {
     const lower = command.toLowerCase();
     const words = lower.split(' ');
     const tool = words[0] ?? '';
-    // The profile fixes the git commands; a grant can't add any (git -C . push).
+    // No profile allows git; a grant can't add it (git -C . push).
     if (tool === 'git')
-        refuse(command, 'may not grant git; the profile fixes it');
+        refuse(command, 'may not grant git');
     if (SUBCOMMAND_TOOLS.has(tool)) {
         const sub = words[1] ?? '';
         const script = words[2] ?? '';
@@ -185,7 +184,7 @@ function readOnlyProfile(options = {}) {
     return {
         settings: settingsJson({
             toolPermission,
-            commands: exports.READ_ONLY_COMMANDS,
+            commands: [],
             agentMode: '',
             sandbox: false,
         }),
@@ -199,11 +198,7 @@ function implementProfile(options) {
     if (extra.length > 0 && !options.sandboxVerified) {
         throw new errors_1.AgyError('AGY_SETTINGS', 'test and lint commands need a host where --sandbox is verified; this host has none');
     }
-    const commands = [
-        ...exports.READ_ONLY_COMMANDS,
-        ...exports.IMPLEMENT_EXTRA_COMMANDS,
-        ...extra,
-    ];
+    const commands = extra;
     const sandbox = extra.length > 0;
     const flags = ['--mode', 'accept-edits'];
     if (sandbox)
@@ -226,10 +221,6 @@ const SETTINGS_KEYS = [
     'enableTerminalSandbox',
     'permissions',
 ].sort();
-const FIXED_COMMANDS = new Set([
-    ...exports.READ_ONLY_COMMANDS,
-    ...exports.IMPLEMENT_EXTRA_COMMANDS,
-]);
 function badProfile(why) {
     throw new errors_1.AgyError('AGY_SETTINGS', `refusing a turn profile: ${why}`);
 }
@@ -275,13 +266,8 @@ function assertSafeProfile(profile) {
         if (m === null)
             badProfile(`unexpected rule ${JSON.stringify(rule)}`);
         const cmd = m[1] ?? '';
-        if (FIXED_COMMANDS.has(cmd)) {
-            if (mode !== 'accept-edits' &&
-                !exports.READ_ONLY_COMMANDS.includes(cmd)) {
-                badProfile(`${cmd} needs the implement profile`);
-            }
-            continue;
-        }
+        if (mode !== 'accept-edits')
+            badProfile(`${cmd} needs the implement profile`);
         validateAllowCommand(cmd);
         extra += 1;
     }

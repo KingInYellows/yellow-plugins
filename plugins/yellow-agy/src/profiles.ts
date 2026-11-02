@@ -7,13 +7,12 @@
 
 import { AgyError } from './errors';
 
-/**
- * `git diff` and `git log` are left out on purpose: a command rule matches any
- * trailing arguments, and their `--output=<file>` writes anywhere, even with
- * edits off. The model reads files with its own tools instead.
+/*
+ * No profile allows git. A command rule matches any trailing arguments, and
+ * git's options and config reach executables (`--output`, `--ignore-submodules`,
+ * `--trailer`, editors, signers, filters). The model reads and edits files with
+ * its own tools, and `collect` captures its uncommitted changes as a patch.
  */
-export const READ_ONLY_COMMANDS = ['git status'] as const;
-export const IMPLEMENT_EXTRA_COMMANDS = ['git add', 'git commit'] as const;
 
 /**
  * First words (or first two words) a grant can never allow: anything that
@@ -153,9 +152,8 @@ export function validateAllowCommand(command: string): string {
   const lower = command.toLowerCase();
   const words = lower.split(' ');
   const tool = words[0] ?? '';
-  // The profile fixes the git commands; a grant can't add any (git -C . push).
-  if (tool === 'git')
-    refuse(command, 'may not grant git; the profile fixes it');
+  // No profile allows git; a grant can't add it (git -C . push).
+  if (tool === 'git') refuse(command, 'may not grant git');
   if (SUBCOMMAND_TOOLS.has(tool)) {
     const sub = words[1] ?? '';
     const script = words[2] ?? '';
@@ -232,7 +230,7 @@ export function readOnlyProfile(options: ProfileOptions = {}): TurnProfile {
   return {
     settings: settingsJson({
       toolPermission,
-      commands: READ_ONLY_COMMANDS,
+      commands: [],
       agentMode: '',
       sandbox: false,
     }),
@@ -250,11 +248,7 @@ export function implementProfile(options: ImplementOptions): TurnProfile {
       'test and lint commands need a host where --sandbox is verified; this host has none'
     );
   }
-  const commands = [
-    ...READ_ONLY_COMMANDS,
-    ...IMPLEMENT_EXTRA_COMMANDS,
-    ...extra,
-  ];
+  const commands = extra;
   const sandbox = extra.length > 0;
   const flags = ['--mode', 'accept-edits'];
   if (sandbox) flags.push('--sandbox');
@@ -277,10 +271,6 @@ const SETTINGS_KEYS = [
   'enableTerminalSandbox',
   'permissions',
 ].sort();
-const FIXED_COMMANDS = new Set<string>([
-  ...READ_ONLY_COMMANDS,
-  ...IMPLEMENT_EXTRA_COMMANDS,
-]);
 
 function badProfile(why: string): never {
   throw new AgyError('AGY_SETTINGS', `refusing a turn profile: ${why}`);
@@ -326,15 +316,8 @@ export function assertSafeProfile(profile: TurnProfile): void {
     const m = typeof rule === 'string' ? /^command\((.*)\)$/.exec(rule) : null;
     if (m === null) badProfile(`unexpected rule ${JSON.stringify(rule)}`);
     const cmd = m[1] ?? '';
-    if (FIXED_COMMANDS.has(cmd)) {
-      if (
-        mode !== 'accept-edits' &&
-        !READ_ONLY_COMMANDS.includes(cmd as never)
-      ) {
-        badProfile(`${cmd} needs the implement profile`);
-      }
-      continue;
-    }
+    if (mode !== 'accept-edits')
+      badProfile(`${cmd} needs the implement profile`);
     validateAllowCommand(cmd);
     extra += 1;
   }

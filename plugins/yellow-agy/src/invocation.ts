@@ -77,10 +77,11 @@ const DISTRO_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const FILTER_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 /**
- * Config every agy child's git sees, overriding every key that names a command
- * the allowed `git status`, `git add` and `git commit` could run: hooks,
- * fsmonitor, editors, signing programs, submodule recursion, and every named
- * filter driver (its clean/smudge/process commands run on status and add).
+ * Config every git child sees (defense in depth: no profile allows git, but a
+ * granted test command or the adapter's own host calls may run it): no hooks,
+ * fsmonitor, editors, signing programs or submodule recursion, and every named
+ * filter driver emptied (its clean/smudge/process commands run on status and
+ * add).
  */
 export function hookConfig(
   nullDevice: string,
@@ -92,7 +93,7 @@ export function hookConfig(
     // `git commit --edit` runs the editor; `true` exits 0 without editing.
     ['core.editor', 'true'],
     ['sequence.editor', 'true'],
-    // `git commit -S` runs the signer; agy's commits stay unsigned.
+    // `git commit -S` runs the signer.
     ['commit.gpgSign', 'false'],
     ['gpg.program', 'false'],
     ['gpg.ssh.program', 'false'],
