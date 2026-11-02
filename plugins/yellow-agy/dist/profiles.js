@@ -6,7 +6,7 @@
  * permission could slip into a run, so they throw instead of degrading.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.IMPLEMENT_EXTRA_COMMANDS = exports.READ_ONLY_COMMANDS = void 0;
+exports.DEFAULT_TOOL_PERMISSION = exports.IMPLEMENT_EXTRA_COMMANDS = exports.READ_ONLY_COMMANDS = void 0;
 exports.validateAllowCommand = validateAllowCommand;
 exports.readOnlyProfile = readOnlyProfile;
 exports.implementProfile = implementProfile;
@@ -49,6 +49,8 @@ const DENIED_COMMAND_PREFIXES = [
 ];
 /** A plain command: words of safe characters separated by single spaces. */
 const COMMAND_RE = /^[A-Za-z0-9][A-Za-z0-9._:/@+=-]*( [A-Za-z0-9._:/@+=-]+)*$/;
+/** Probed 2026-11: the default value; an unapproved call is soft-denied at once headless. */
+exports.DEFAULT_TOOL_PERMISSION = 'request-review';
 /** Throws unless `command` is a plain command a grant may allow. */
 function validateAllowCommand(command) {
     if (!COMMAND_RE.test(command) || command.length > 200) {
@@ -66,23 +68,37 @@ function checkToolPermission(value) {
         throw new errors_1.AgyError('AGY_SETTINGS', `refusing to build a profile with toolPermission ${JSON.stringify(value)}`);
     }
 }
-function settingsJson(toolPermission, commands) {
+/**
+ * agy overlays --settings on the global config per top-level key: a key given
+ * here replaces the global one, a key left out leaks through. So every key
+ * that can widen a run is pinned, even where the value matches agy's default.
+ */
+function settingsJson(input) {
     return JSON.stringify({
         useG1Credits: false,
         allowNonWorkspaceAccess: false,
-        toolPermission,
-        permissions: { allow: commands.map((c) => `command(${c})`) },
+        toolPermission: input.toolPermission,
+        agentMode: input.agentMode,
+        enableTerminalSandbox: input.sandbox,
+        permissions: { allow: input.commands.map((c) => `command(${c})`) },
     });
 }
-function readOnlyProfile(options) {
-    checkToolPermission(options.toolPermission);
+function readOnlyProfile(options = {}) {
+    const toolPermission = options.toolPermission ?? exports.DEFAULT_TOOL_PERMISSION;
+    checkToolPermission(toolPermission);
     return {
-        settings: settingsJson(options.toolPermission, exports.READ_ONLY_COMMANDS),
+        settings: settingsJson({
+            toolPermission,
+            commands: exports.READ_ONLY_COMMANDS,
+            agentMode: '',
+            sandbox: false,
+        }),
         flags: [],
     };
 }
 function implementProfile(options) {
-    checkToolPermission(options.toolPermission);
+    const toolPermission = options.toolPermission ?? exports.DEFAULT_TOOL_PERMISSION;
+    checkToolPermission(toolPermission);
     const extra = options.allowCommands.map(validateAllowCommand);
     if (extra.length > 0 && !options.sandboxVerified) {
         throw new errors_1.AgyError('AGY_SETTINGS', 'test and lint commands need a host where --sandbox is verified; this host has none');
@@ -92,10 +108,19 @@ function implementProfile(options) {
         ...exports.IMPLEMENT_EXTRA_COMMANDS,
         ...extra,
     ];
+    const sandbox = extra.length > 0;
     const flags = ['--mode', 'accept-edits'];
-    if (extra.length > 0)
+    if (sandbox)
         flags.push('--sandbox');
-    return { settings: settingsJson(options.toolPermission, commands), flags };
+    return {
+        settings: settingsJson({
+            toolPermission,
+            commands,
+            agentMode: 'accept-edits',
+            sandbox,
+        }),
+        flags,
+    };
 }
 const CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 /** The agy argv (without the binary) for one model turn. */

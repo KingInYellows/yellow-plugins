@@ -12,8 +12,9 @@ exports.classifyTurn = classifyTurn;
 exports.needsInput = needsInput;
 exports.structuredOutput = structuredOutput;
 /**
- * `finished_reason` values verified to mean a normal completion. Empty until
- * the adapter probe pins one (open question 3), so no turn classifies as OK.
+ * `finished_reason` values verified to mean a normal completion. The 2026-11
+ * probe showed agy 1.4.12 omits the key on a normal finish, so an absent
+ * reason is OK; any string not listed here stays UNVERIFIED (fail closed).
  */
 exports.NORMAL_FINISHED_REASONS = [];
 /** Parses agy's JSON output; undefined when stdout holds no JSON object. */
@@ -69,7 +70,7 @@ function classifyTurn(outcome, normalReasons = exports.NORMAL_FINISHED_REASONS) 
     if (result !== undefined &&
         result.status === 'SUCCESS' &&
         outcome.exitCode === 0) {
-        if (reason !== undefined && normalReasons.includes(reason)) {
+        if (reason === undefined || normalReasons.includes(reason)) {
             return { kind: 'OK', result };
         }
         return { kind: 'UNVERIFIED', result, finishedReason: reason };

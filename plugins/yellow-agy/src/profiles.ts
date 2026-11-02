@@ -46,9 +46,12 @@ const DENIED_COMMAND_PREFIXES = [
 /** A plain command: words of safe characters separated by single spaces. */
 const COMMAND_RE = /^[A-Za-z0-9][A-Za-z0-9._:/@+=-]*( [A-Za-z0-9._:/@+=-]+)*$/;
 
+/** Probed 2026-11: the default value; an unapproved call is soft-denied at once headless. */
+export const DEFAULT_TOOL_PERMISSION = 'request-review';
+
 export interface ProfileOptions {
-  /** The probed toolPermission value that runs headless; never always-proceed. */
-  readonly toolPermission: string;
+  /** A toolPermission value that runs headless; never always-proceed. */
+  readonly toolPermission?: string;
 }
 
 export interface ImplementOptions extends ProfileOptions {
@@ -93,28 +96,46 @@ function checkToolPermission(value: string): void {
   }
 }
 
-function settingsJson(
-  toolPermission: string,
-  commands: readonly string[]
-): string {
+interface SettingsInput {
+  readonly toolPermission: string;
+  readonly commands: readonly string[];
+  readonly agentMode: '' | 'accept-edits';
+  readonly sandbox: boolean;
+}
+
+/**
+ * agy overlays --settings on the global config per top-level key: a key given
+ * here replaces the global one, a key left out leaks through. So every key
+ * that can widen a run is pinned, even where the value matches agy's default.
+ */
+function settingsJson(input: SettingsInput): string {
   return JSON.stringify({
     useG1Credits: false,
     allowNonWorkspaceAccess: false,
-    toolPermission,
-    permissions: { allow: commands.map((c) => `command(${c})`) },
+    toolPermission: input.toolPermission,
+    agentMode: input.agentMode,
+    enableTerminalSandbox: input.sandbox,
+    permissions: { allow: input.commands.map((c) => `command(${c})`) },
   });
 }
 
-export function readOnlyProfile(options: ProfileOptions): TurnProfile {
-  checkToolPermission(options.toolPermission);
+export function readOnlyProfile(options: ProfileOptions = {}): TurnProfile {
+  const toolPermission = options.toolPermission ?? DEFAULT_TOOL_PERMISSION;
+  checkToolPermission(toolPermission);
   return {
-    settings: settingsJson(options.toolPermission, READ_ONLY_COMMANDS),
+    settings: settingsJson({
+      toolPermission,
+      commands: READ_ONLY_COMMANDS,
+      agentMode: '',
+      sandbox: false,
+    }),
     flags: [],
   };
 }
 
 export function implementProfile(options: ImplementOptions): TurnProfile {
-  checkToolPermission(options.toolPermission);
+  const toolPermission = options.toolPermission ?? DEFAULT_TOOL_PERMISSION;
+  checkToolPermission(toolPermission);
   const extra = options.allowCommands.map(validateAllowCommand);
   if (extra.length > 0 && !options.sandboxVerified) {
     throw new AgyError(
@@ -127,9 +148,18 @@ export function implementProfile(options: ImplementOptions): TurnProfile {
     ...IMPLEMENT_EXTRA_COMMANDS,
     ...extra,
   ];
+  const sandbox = extra.length > 0;
   const flags = ['--mode', 'accept-edits'];
-  if (extra.length > 0) flags.push('--sandbox');
-  return { settings: settingsJson(options.toolPermission, commands), flags };
+  if (sandbox) flags.push('--sandbox');
+  return {
+    settings: settingsJson({
+      toolPermission,
+      commands,
+      agentMode: 'accept-edits',
+      sandbox,
+    }),
+    flags,
+  };
 }
 
 export interface TurnArgsOptions {

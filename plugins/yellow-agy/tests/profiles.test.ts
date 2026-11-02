@@ -27,6 +27,8 @@ describe('profiles', () => {
       useG1Credits: false,
       allowNonWorkspaceAccess: false,
       toolPermission: 'request-review',
+      agentMode: '',
+      enableTerminalSandbox: false,
       permissions: {
         allow: ['command(git status)', 'command(git diff)', 'command(git log)'],
       },
@@ -48,6 +50,14 @@ describe('profiles', () => {
       'command(git commit)',
     ]);
     expect(p.flags).toEqual(['--mode', 'accept-edits']);
+    expect(JSON.parse(p.settings).agentMode).toBe('accept-edits');
+    expect(JSON.parse(p.settings).enableTerminalSandbox).toBe(false);
+  });
+
+  it('defaults toolPermission to request-review', () => {
+    expect(JSON.parse(readOnlyProfile().settings).toolPermission).toBe(
+      'request-review'
+    );
   });
 
   it('implement: test commands need a verified sandbox and always add --sandbox', () => {
@@ -66,6 +76,7 @@ describe('profiles', () => {
       sandboxVerified: true,
     });
     expect(p.flags).toEqual(['--mode', 'accept-edits', '--sandbox']);
+    expect(JSON.parse(p.settings).enableTerminalSandbox).toBe(true);
     expect(JSON.parse(p.settings).permissions.allow).toContain(
       'command(pnpm test)'
     );

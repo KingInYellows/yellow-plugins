@@ -74,13 +74,16 @@ describe('classifyTurn', () => {
     expect(c.kind === 'DENIED' && c.deniedActions).toHaveLength(1);
   });
 
-  it('SUCCESS is never OK until a normal finished_reason is pinned', () => {
+  it('SUCCESS with finished_reason absent is OK (agy 1.4.12 normal finish)', () => {
+    expect(classifyTurn(outcome({ json: ok })).kind).toBe('OK');
+  });
+
+  it('SUCCESS with an unrecognized finished_reason is UNVERIFIED', () => {
     const c = classifyTurn(
       outcome({ json: { ...ok, finished_reason: 'stop' } })
     );
     expect(c.kind).toBe('UNVERIFIED');
     expect(c.kind === 'UNVERIFIED' && c.finishedReason).toBe('stop');
-    expect(classifyTurn(outcome({ json: ok })).kind).toBe('UNVERIFIED');
   });
 
   it('SUCCESS with a pinned normal reason is OK', () => {

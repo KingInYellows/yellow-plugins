@@ -18,7 +18,7 @@ classifier gains `READY_AGY` and accepts `--provider agy`. `READY_JULES` and
 and an explicit `--provider` always wins over the classifier.
 
 Hard rules. The spike tested the auth, bridge, permission and containment
-behavior; the rules that depend on open questions (MCP, sandbox,
+behavior; the rules that depended on open questions (MCP, sandbox,
 `finished_reason`, settings merge, command matching) are requirements the
 adapter verifies, and they fail closed until it does:
 
@@ -51,8 +51,9 @@ adapter verifies, and they fail closed until it does:
   `collect` stages patches, and the owner's stack provider opens the PR.
 - **No MCP servers in delegated runs.** agy starts every configured MCP server
   on every run, and the command allowlist doesn't govern their tools. A
-  delegated run must start with none. If the adapter's probe finds no per-run
-  way to turn them off, `setup` refuses with `AGY_MCP` while any is configured.
+  delegated run must start with none. agy 1.4.12 has no per-run way to turn them
+  off, so `setup` refuses with `AGY_MCP` while any server is enabled; the owner
+  can run `agy mcp disable <name>`.
 - **No branch code runs outside agy's sandbox.** Test and lint commands execute
   code the task wrote, with the owner's privileges. The implement profile allows
   them only when `--sandbox` is verified to confine files and network on that
@@ -76,7 +77,7 @@ The worktree is created where agy runs. On the WSL bridge that means a WSL clone
 of the repo, never `/mnt/c`. The bridge always uses `wsl.exe --exec` (`-e`),
 never the `--` form, so no shell in the distro re-parses prompts or the
 `--settings` JSON. Argv is always an array, and stdin is closed except in
-`stream-json` mode (an open question). Windows caps a command line at 32,767
+`stream-json` mode, which v0 doesn't use. Windows caps a command line at 32,767
 characters, so on the bridge a prompt whose full argv would exceed 30,000
 characters fails with `AGY_PROMPT_TOO_LONG` before anything spawns.
 
@@ -156,26 +157,30 @@ local processes.
 
 ## Permission profiles (`--settings` JSON)
 
-Both profiles carry `{"useG1Credits": false}`, `allowNonWorkspaceAccess: false`
-and an explicit `toolPermission` that is never `always-proceed`, so an owner's
-global setting can't widen a run past its allowlist or out of the worktree. The
-adapter probe confirms which `toolPermission` value runs headless without
-blocking on prompts. Until it does, `setup` refuses with `AGY_SETTINGS` when the
-owner's global config sets either key more loosely. The same applies to
-`agentMode`: `setup` refuses with `AGY_SETTINGS` when the global config sets a
-mode that auto-approves edits, such as `accept-edits`, unless the adapter probe
-shows that a per-run `--settings` replaces the global mode. Otherwise a plan or
-read-only reply could edit the worktree before `approve`.
+Both profiles pin every top-level key that can widen a run, because agy overlays
+`--settings` on the global config per top-level key: a key the run gives
+replaces the global key wholesale, and a key it leaves out leaks through (probed
+2026-11 on agy 1.4.12). The pinned keys are `useG1Credits: false`,
+`allowNonWorkspaceAccess: false`, `toolPermission` (default `request-review`,
+never `always-proceed`), `agentMode`, `enableTerminalSandbox` and `permissions`.
+Every `toolPermission` value runs headless: a call the profile doesn't allow is
+soft-denied at once and shows up in `denied_actions`. A per-run `agentMode: ""`
+overrides a global `accept-edits`, and `--mode` beats both, so the profile alone
+keeps a plan turn from editing. `setup` still refuses a loose global `agentMode`
+as defense in depth.
 
 - **read-only:**
-  `permissions.allow: ["command(git status)", "command(git diff)", "command(git log)"]`.
-  No `--mode accept-edits`.
+  `permissions.allow: ["command(git status)", "command(git diff)", "command(git log)"]`,
+  `agentMode: ""`, `enableTerminalSandbox: false`. No `--mode accept-edits`.
 - **implement:** read-only, plus `command(git add)` and `command(git commit)`,
-  with `--mode accept-edits`. The repo's own test and lint commands named in the
-  grant (`--allow-command`, which `authorize` validates against an allowlist
-  pattern) are added only on a host where `--sandbox` is verified (hard rules).
-  Every turn that runs with those commands also passes `--sandbox`; the adapter
-  refuses to build an implement invocation that grants them without the flag.
+  with `agentMode: "accept-edits"` and `--mode accept-edits`. A `command(...)`
+  rule matches any arguments after its words, so `command(git diff)` covers
+  `git diff -- <path>` and no `regex:` rules are needed. The repo's own test and
+  lint commands named in the grant (`--allow-command`, which `authorize`
+  validates against an allowlist pattern) are added only on a host where
+  `--sandbox` is verified (hard rules). Every turn that runs with those commands
+  also passes `--sandbox`; the adapter refuses to build an implement invocation
+  that grants them without the flag.
 
 ## Result classification
 
@@ -186,19 +191,18 @@ agy's `status` alone isn't trustworthy. Classify in this order:
 | process killed by our deadline, or `finished_reason: "print_timeout"` (agy still says SUCCESS / exit 0) | `TIMED_OUT`                                                                       | 1, `AGY_TIMEOUT`, partial output kept |
 | owner cancel / SIGTERM, or `finished_reason: "interrupted"`                                             | `INTERRUPTED`                                                                     | 1, `AGY_INTERRUPTED`                  |
 | non-empty `denied_actions`                                                                              | `DENIED`. Report each denied action, and reply or re-authorize with a wider grant | 0 with `requiresAttention`            |
-| `status: "SUCCESS"`, empty `denied_actions`, verified normal `finished_reason`                          | `OK`                                                                              | 0                                     |
-| `status: "SUCCESS"`, empty `denied_actions`, `finished_reason` missing or unrecognized                  | Not `OK`. Report with partial output kept                                         | 0 with `requiresAttention`            |
+| `status: "SUCCESS"`, empty `denied_actions`, `finished_reason` absent (agy 1.4.12's normal finish)      | `OK`                                                                              | 0                                     |
+| `status: "SUCCESS"`, empty `denied_actions`, `finished_reason` present but unrecognized                 | Not `OK`. Report with partial output kept                                         | 0 with `requiresAttention`            |
 | `authentication required` on stderr                                                                     | `AGY_AUTH_REQUIRED`. The owner signs in interactively once                        | 1                                     |
 | exit 3 / `status: "ERROR"`, no auth message                                                             | `AGY_MODEL_ERROR` (quota exhaustion → `AGY_QUOTA`)                                | 1                                     |
 
-A Not `OK` turn (`SUCCESS` with a missing or unrecognized `finished_reason`) is
-still a settled turn. It settles its reservation as completed, journaling the
-usage and the observed `finished_reason`, and releases the active-run claim. The
-task keeps the stored `conversation_id` and advances as it would after `OK`: a
-plan turn moves to `PLAN_PENDING` and an implement turn to `IMPLEMENTED`. The
-result carries `requiresAttention`, so the owner reviews the output before
-approving or opening a PR. Until open question 3 pins the normal value, every
-successful turn takes this path.
+A Not `OK` turn (`SUCCESS` with an unrecognized `finished_reason`) is still a
+settled turn. It settles its reservation as completed, journaling the usage and
+the observed `finished_reason`, and releases the active-run claim. The task
+keeps the stored `conversation_id` and advances as it would after `OK`: a plan
+turn moves to `PLAN_PENDING` and an implement turn to `IMPLEMENTED`. The result
+carries `requiresAttention`, so the owner reviews the output before approving or
+opening a PR.
 
 A turn that ends in `AGY_AUTH_REQUIRED`, `AGY_MODEL_ERROR` or `AGY_QUOTA`
 settles its reservation as terminal, journaling the code and any usage, and
@@ -224,11 +228,12 @@ as needing a reply. Any other response is reported as is.
 ## Quota gate
 
 Before every model turn, run `agy -p "/usage" --output-format json` (no quota
-cost) with the same per-run `--settings` profile as the turn it guards, so its
-MCP servers stay off. `/usage` updates late, so the gate subtracts the journaled
-cost of turns from the last 15 minutes (or 2% per turn when a turn's cost is
-unknown) from the reported bucket. It refuses with `AGY_QUOTA_LOW` when the
-result is below the grant's `minQuotaPercent` (default 10), and with
+cost) with the same per-run `--settings` profile as the turn it guards. `/usage`
+runs in print mode without a model call and returns machine-readable remaining
+fractions per model bucket. `/usage` updates late, so the gate subtracts the
+journaled cost of turns from the last 15 minutes (or 2% per turn when a turn's
+cost is unknown) from the reported bucket. It refuses with `AGY_QUOTA_LOW` when
+the result is below the grant's `minQuotaPercent` (default 10), and with
 `AGY_QUOTA_UNKNOWN` when `/usage` fails or can't be parsed. Journal usage before
 and after each turn.
 
@@ -246,24 +251,27 @@ New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
 `AGY_MODEL_ERROR`, `AGY_WORKTREE`, `AGY_BRIDGE`, `AGY_MCP`,
 `AGY_PROMPT_TOO_LONG`, `AGY_QUOTA_UNKNOWN`, `AGY_SETTINGS`.
 
-## Open questions (probe in the adapter PR)
+## Probe answers (2026-11, agy 1.4.12 under WSL2)
 
-1. Can `--settings` turn off the owner's MCP servers for one run? Every run
-   currently starts them (10+ s, and an unpinned `npx` server). If it can't,
-   `setup` refuses with `AGY_MCP` (hard rules).
-2. Does `--sandbox` confine files and network under WSL2? Until it is shown to,
-   the implement profile allows no test or lint commands (hard rules).
-3. What `finished_reason` value marks a normal completion? Until it is pinned,
-   no run classifies as `OK` (fail closed).
-4. Is `--input-format stream-json` worth using for multi-turn runs? v0 uses one
-   process per turn.
-5. Does a per-run `--settings` merge with or replace the global config, and
-   which `toolPermission` value runs headless without prompting? Does it also
-   replace a global `agentMode`?
-6. How does agy's strict (non-regex) command matching treat arguments? Probe
-   `git diff -- <path>`, `git add <path>` and `git commit -m <message>` against
-   the profiles' `command(...)` rules, and use narrowly scoped `regex:` rules
-   only where a plain rule doesn't match.
+The adapter probe answered five of the six open questions; the run sheet is
+`docs/spikes/antigravity-cli-adapter-probe-2026-11.md`.
+
+1. **MCP:** `--settings` rejects the MCP keys as unknown and no flag turns MCP
+   off for one run. The only switch is the global `agy mcp disable <name>`, so
+   `setup` refuses with `AGY_MCP` while `agy mcp list` shows an enabled server.
+   Disabling is the owner's call; the adapter never changes it.
+2. **Sandbox: still open.** bwrap works under WSL2, but the probe was
+   inconclusive. Until it is shown to confine files and network, the implement
+   profile allows no test or lint commands (hard rules).
+3. **`finished_reason`:** absent on a normal finish. Present values seen are
+   `print_timeout` and `interrupted`; any other value stays Not `OK`.
+4. **`--input-format stream-json`:** exists (one message per stdin line, needs
+   `--output-format stream-json`). v0 keeps one process per turn.
+5. **Settings merge:** per top-level key (see Permission profiles). Every
+   `toolPermission` value runs headless; `agentMode` accepts `accept-edits`,
+   `plan`, `auto` and `""`.
+6. **Command matching:** `command(<words>)` matches extra arguments, and each
+   part of a chained command is matched on its own. No `regex:` rules.
 
 ## Non-goals for v0
 
