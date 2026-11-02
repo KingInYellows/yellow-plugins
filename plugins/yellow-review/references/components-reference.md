@@ -185,13 +185,14 @@ flags, exit codes, trust-boundary rules and library behavior.
   (files API, old paths of renames included) and `.github/review-risk.json` at
   the default branch tip (contents API), pipes the paths with their line counts
   into `classify-risk --policy-file <tmp> --stdin --numstat` (so the size rule
-  applies), and reports an `approval` object: tier, required humans (0 or 1), a
-  listed human's approval of the head SHA (an approving review on it, or adding
-  `graphite-queue` after the head arrived: the latest of its committer date, its
-  first check suite on the PR's head branch and any force push to it; no such
-  suite means `head_time_unknown`; a head that moved by the final re-read leaves
-  the approval unknown), the high-tier cross-lineage review on the head, and
-  `missing` tokens, which block only under `enforce`
+  applies), and reports an `approval` object: tier, required humans (0 or 1;
+  null when the tier is unknown), a listed human's approval of the head SHA (an
+  approving review on it, or adding `graphite-queue` after the head arrived: the
+  latest of its committer date, its first check suite on the PR's head branch
+  and any force push to it; no such suite means `head_time_unknown`; a head that
+  moved by the final re-read leaves the approval unknown), the high-tier
+  cross-lineage review on the head, and `missing` tokens, which block only under
+  `enforce`
 - `classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>`
   (or `--stdin [--numstat] [<base-ref>]` with paths, or
   `<added>\t<deleted>\t<path>` numstat rows, one per line on stdin) — Review
@@ -743,8 +744,8 @@ in the transcript (Ctrl-O) on a second `/review:pr` run within the hour.
 - `check-merge-ready.bats` — stub `get-pr-comments`, `get-pr-blockers` and
   ledger beside a copy of the script, with the state query served by
   `tests/mocks/gh` (`MOCK_GH_MR_BODY`) and the approval reads by
-  `MOCK_GH_MRA_BODY`, `MOCK_GH_MR_FILES` and `MOCK_GH_MR_POLICY` (served only
-  for the default branch's tip), with the real `classify-risk`
+  `MOCK_GH_MRA_BODY`, `MOCK_GH_MR_FILES` and `MOCK_GH_MR_POLICY` (only the
+  policy is keyed to the default branch's tip), with the real `classify-risk`
 - `commit-resolve-fixes.bats`, `run-verify-command.bats` — a throwaway
   repository with a bare origin and stub `gt`/`node`/`gh`, built by
   `tests/helpers/resolve-repo.bash`

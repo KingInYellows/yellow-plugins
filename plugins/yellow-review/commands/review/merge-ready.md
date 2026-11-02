@@ -109,8 +109,9 @@ MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens
 - For `blocked`, end with the next step for each blocker: `/review:resolve` for
   threads, the reviewer for changes requested, the failing check names for CI, a
   rebase for conflicts, the user adding `graphite-queue` again (or approving the
-  head commit) for `approval_required` or `approval_stale`, a Codex review of
-  the head for `cross_lineage_missing`.
+  head commit) for `approval_required` or `approval_stale`, a review of the head by a
+  `review_cross_lineage_bots` account (Codex by default) for
+  `cross_lineage_missing`.
 - For `unknown`, say what could not be read and suggest re-running; an unknown
   is never reported as ready. `merge_state` means GitHub reports the merge as
   `BLOCKED` for a reason none of the rows show, often a required check that
