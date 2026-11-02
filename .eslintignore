@@ -31,3 +31,8 @@ docs/api/
 # Config files
 *.config.js
 *.config.ts
+
+# Claude Code workflow scripts (plugins/*/workflows/*.js) use top-level
+# `return` beside `export const meta`, which no ESLint sourceType parses.
+# tests/integration/review-gate-workflow.test.ts executes them instead.
+plugins/*/workflows/
