@@ -873,11 +873,39 @@ A non-zero exit (an unreadable head is exit 2) adds the Notes line
 3's `conversationResolution` is `enforced`. Otherwise use the Write tool to put
 a JSON object at a `mktemp` path mapping each thread this run leaves blocking to
 its status (`disagree`, `unclear`, `human-held`, `needs-permission`,
-`not-found`, `verify-failed`, `not-attempted`), and run it as its own Bash call
-with a `timeout` of 420000 ms:
+`not-found`, `verify-failed`, `not-attempted`). Then classify the PR's risk tier
+the way `/review:pr` Step 3a2 does, with the policy read at the default branch's
+fetched tip so neither the PR nor a parent in its stack sets it:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/sync-blocking-comment" --reasons "<reasons-file>" "<owner/repo>" "<PR#>" "<conversationResolution>"
+RISK_FILE=""
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
+BASE_BRANCH=$(gh pr view "<PR#>" --json baseRefName -q .baseRefName) || BASE_BRANCH=""
+RISK_OK=1
+for rr_b in "$DEFAULT_BRANCH" "$BASE_BRANCH"; do
+  case "$rr_b" in '' | -* | *..* | *[!A-Za-z0-9._/-]*) RISK_OK=0 ;; esac
+done
+if [ "$RISK_OK" = 1 ] &&
+  git fetch --no-tags --quiet origin "+refs/heads/$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH" &&
+  git fetch --no-tags --quiet origin "refs/heads/$DEFAULT_BRANCH" &&
+  POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}') &&
+  RISK_FILE=$(mktemp "${TMPDIR:-/tmp}/resolve-risk.XXXXXX"); then
+  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
+    --policy-ref "$POLICY_SHA" "origin/$BASE_BRANCH" HEAD >|"$RISK_FILE" ||
+    { rm -f "$RISK_FILE"; RISK_FILE=""; }
+else
+  RISK_FILE=""
+fi
+printf 'risk_file=%s\n' "$RISK_FILE"
+```
+
+An empty `risk_file=` (a lookup, fetch or classification failed) drops `--risk`
+below and the comment has no tier line; it never stops the run. Run the sync as
+its own Bash call with a `timeout` of 420000 ms, with `--risk "<risk-file>"`
+only when the path printed above is not empty:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/sync-blocking-comment" --reasons "<reasons-file>" --risk "<risk-file>" "<owner/repo>" "<PR#>" "<conversationResolution>"
 ```
 
 It lists every unresolved thread GitHub reports, not only this run's. Exit 4

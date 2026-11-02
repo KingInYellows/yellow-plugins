@@ -3,7 +3,7 @@
 # repositories where GitHub does not enforce conversation resolution (there an
 # open thread blocks merge only by convention). The comment is found by its
 # marker line among the viewer's own PR comments and edited in place.
-# Usage: sync-blocking-comment [--reasons <file>] <owner/repo> <pr-number> <resolution>
+# Usage: sync-blocking-comment [--reasons <file>] [--risk <file>] <owner/repo> <pr-number> <resolution>
 #   <resolution>: conversationResolution from get-pr-blockers (enforced,
 #     not_enforced or unknown). enforced skips without a gh call: GitHub
 #     already stops the merge on open threads.
@@ -11,6 +11,12 @@
 #     /review:resolve gave them: disagree, unclear, human-held,
 #     needs-permission, not-found, verify-failed, not-attempted. Any other
 #     value, or a thread missing from the file, shows as "open".
+#   --risk <file>: optional classify-risk output for the PR. Only its tier
+#     (low, medium, high) and policy source (base, ref, file, none, invalid)
+#     are read; the comment shows them on a "Risk tier" line. Without it the
+#     line is left out. Policy ref reads "from the default branch": callers
+#     pass --policy-ref the default branch's tip (resolve-pr.md Step 9). A file that is unreadable, a symlink, not a JSON
+#     object, or holds another tier or policy is a usage error.
 # Every unresolved thread blocks, outdated ones included, as in
 # check-merge-ready; the list is read fresh from GitHub, so the comment holds
 # no local state. No blocking threads: an existing comment is edited to say
@@ -46,16 +52,27 @@ FETCH_DEADLINE=120
 note() { printf '[sync-blocking-comment] %s\n' "$1" >&2; }
 
 usage() {
-    printf 'Usage: sync-blocking-comment [--reasons <file>] <owner/repo> <pr-number> <enforced|not_enforced|unknown>\n' >&2
+    printf 'Usage: sync-blocking-comment [--reasons <file>] [--risk <file>] <owner/repo> <pr-number> <enforced|not_enforced|unknown>\n' >&2
     exit 2
 }
 
 REASONS_FILE=""
-if [ "${1:-}" = --reasons ]; then
-    [ $# -ge 2 ] || usage
-    REASONS_FILE="$2"
-    shift 2
-fi
+RISK_FILE=""
+while :; do
+    case "${1:-}" in
+        --reasons)
+            [ $# -ge 2 ] && [ -z "$REASONS_FILE" ] || usage
+            REASONS_FILE="$2"
+            shift 2
+            ;;
+        --risk)
+            [ $# -ge 2 ] && [ -z "$RISK_FILE" ] || usage
+            RISK_FILE="$2"
+            shift 2
+            ;;
+        *) break ;;
+    esac
+done
 [ $# -eq 3 ] || usage
 case "${1:-}" in --*) usage ;; esac
 
@@ -89,6 +106,20 @@ if [ -n "$REASONS_FILE" ]; then
     fi
     jq -e 'type == "object"' "$REASONS_FILE" >/dev/null 2>&1 || {
         printf 'Error: reasons file is not a JSON object: %s\n' "$REASONS_FILE" >&2
+        exit 2
+    }
+fi
+
+RISK_TIER=""
+RISK_POLICY=""
+if [ -n "$RISK_FILE" ]; then
+    if [ -L "$RISK_FILE" ] || [ ! -f "$RISK_FILE" ] || [ ! -r "$RISK_FILE" ]; then
+        printf 'Error: cannot read risk file: %s\n' "$RISK_FILE" >&2
+        exit 2
+    fi
+    RISK_TIER=$(jq -er 'select(type == "object") | .tier | select(IN("low", "medium", "high"))' "$RISK_FILE" 2>/dev/null) \
+        && RISK_POLICY=$(jq -er '.policy | select(IN("base", "ref", "file", "none", "invalid"))' "$RISK_FILE" 2>/dev/null) || {
+        printf 'Error: risk file is not classify-risk output: %s\n' "$RISK_FILE" >&2
         exit 2
     }
 fi
@@ -232,6 +263,7 @@ else
     printf '{}' >"$WORK/reasons"
 fi
 jq -r -j --arg m "$MARKER" --arg res "$RESOLUTION" --arg head "$HEAD" \
+    --arg tier "$RISK_TIER" --arg policy "$RISK_POLICY" \
     --argjson max "$MAX_ROWS" --slurpfile reasons "$WORK/reasons" '
   def cell: tostring | gsub("[\r\n\t]"; " ") | gsub("[`|<>\\\\]"; "");
   ["disagree","unclear","human-held","needs-permission","not-found","verify-failed","not-attempted"] as $vocab
@@ -248,7 +280,11 @@ jq -r -j --arg m "$MARKER" --arg res "$RESOLUTION" --arg head "$HEAD" \
           status: ((if ($vocab | index($why)) != null then $why else "open" end)
                    + (if $t.isOutdated == true then " (outdated)" else "" end))
         } ] as $rows
+  | {base: "policy from the base branch", ref: "policy from the default branch",
+     file: "policy from a local file", none: "no policy file, so the default tier",
+     invalid: "policy unreadable or invalid, so every file is high"} as $src
   | $m + "\n### Review threads blocking merge\n\n"
+  + (if $tier == "" then "" else "**Risk tier:** `" + $tier + "` (" + $src[$policy] + ")\n\n" end)
   + (if $n == 0 then
        "No open review threads block merge.\n"
      else
