@@ -630,6 +630,24 @@ class HarvestHeadMappingTest(Tmp):
                                                    {"file": "n", "line": 1}])
 
 
+    def test_quoted_paths_from_real_git(self):
+        repo = self.tmp
+        git(repo, "init", "-q", "-b", "main")
+        commit(repo, "chore: init", {"caf\u00e9.py": lines(3), 'say "hi".sh': lines(3), "a b.sh": lines(3)})
+        sha = commit(repo, "fix: edit", {"caf\u00e9.py": lines(3, {2: "x"}), 'say "hi".sh': lines(3, {3: "y"}),
+                                         "a b.sh": lines(3, {1: "z"})})
+        git(repo, "mv", "caf\u00e9.py", "th\u00e9.py")
+        git(repo, "commit", "-q", "-m", "refactor: rename")
+        diff = git(repo, "show", "--format=", "-U0", sha)
+        self.assertIn('"', diff)  # git quoted both names
+        self.assertEqual(sorted((h["file"], h["line"]) for h in hv.new_side_hunks(diff)),
+                         [("a b.sh", 1), ("caf\u00e9.py", 2), ('say "hi".sh', 3)])
+        self.assertEqual(sorted((h["file"], h["line"]) for h in hv.old_side_hunks(diff)),
+                         [("a b.sh", 1), ("caf\u00e9.py", 2), ('say "hi".sh', 3)])
+        renamed = hv.parse_diff(git(repo, "diff", "-M", "-U0", sha, "HEAD"))
+        self.assertEqual([(e["old"], e["new"]) for e in renamed], [("caf\u00e9.py", "th\u00e9.py")])
+
+
 class HarvestReviewedTest(Tmp):
     H = "a" * 40
 

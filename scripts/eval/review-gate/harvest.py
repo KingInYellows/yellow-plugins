@@ -108,6 +108,42 @@ def referenced_prs(commit):
     return found
 
 
+GIT_ESCAPES = {"a": 7, "b": 8, "t": 9, "n": 10, "v": 11, "f": 12, "r": 13, '"': 34, "\\": 92}
+
+
+def git_path(text):
+    """A path as git prints it in a diff header: plain, or double-quoted with
+    C escapes and octal-escaped UTF-8 when it holds tabs, quotes or non-ASCII
+    characters (core.quotePath)."""
+    if not (len(text) >= 2 and text[0] == '"' and text[-1] == '"'):
+        return text
+    body, out, i = text[1:-1], bytearray(), 0
+    while i < len(body):
+        ch = body[i]
+        if ch == "\\" and i + 1 < len(body):
+            nxt = body[i + 1]
+            if nxt in "01234567" and re.match(r"[0-7]{3}", body[i + 1:i + 4]):
+                out.append(int(body[i + 1:i + 4], 8) & 0xFF)
+                i += 4
+                continue
+            if nxt in GIT_ESCAPES:
+                out.append(GIT_ESCAPES[nxt])
+                i += 2
+                continue
+        out += ch.encode("utf-8")
+        i += 1
+    return out.decode("utf-8", "replace")
+
+
+def header_path(rest, prefix):
+    """`rest` of a `--- `/`+++ ` line without its a/ or b/ prefix, or None
+    for /dev/null. Git ends the line with a tab when the name has a space;
+    a name that itself holds a tab is quoted, so one trailing tab is never
+    part of it."""
+    path = git_path(rest[:-1] if rest.endswith("\t") else rest)
+    return path[len(prefix):] if path.startswith(prefix) else None
+
+
 def old_side_hunks(diff):
     """[{file, line}] for each hunk's first old-side line: where the defect was."""
     hunks, path, header = [], None, False
@@ -118,7 +154,7 @@ def old_side_hunks(diff):
             path, header = None, True
             continue
         if header and line.startswith("--- "):
-            path = line[6:] if line.startswith("--- a/") else None
+            path = header_path(line[4:], "a/")
             continue
         m = HUNK_RE.match(line)
         if m:
@@ -135,6 +171,8 @@ def parse_diff(diff):
     entries, cur, header = [], None, False
     for line in diff.splitlines():
         if line.startswith("diff --git "):
+            # The ---/+++ or rename lines below set the real names; these are
+            # only a fallback for a header with neither (a mode change).
             m = re.match(r"^diff --git a/(.+) b/(.+)$", line)
             cur = {"old": m.group(1) if m else None, "new": m.group(2) if m else None, "hunks": []}
             entries.append(cur)
@@ -146,16 +184,16 @@ def parse_diff(diff):
             # File names come from these lines only before the first @@: in a
             # hunk, `--- x` is a removed line such as `-- comment`.
             if line.startswith("--- "):
-                cur["old"] = line[6:] if line.startswith("--- a/") else None
+                cur["old"] = header_path(line[4:], "a/")
                 continue
             if line.startswith("+++ "):
-                cur["new"] = line[6:] if line.startswith("+++ b/") else None
+                cur["new"] = header_path(line[4:], "b/")
                 continue
             if line.startswith("rename from "):
-                cur["old"] = line[len("rename from "):]
+                cur["old"] = git_path(line[len("rename from "):])
                 continue
             if line.startswith("rename to "):
-                cur["new"] = line[len("rename to "):]
+                cur["new"] = git_path(line[len("rename to "):])
                 continue
         m = HUNK_RE.match(line)
         if m:
