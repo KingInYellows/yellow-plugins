@@ -1,6 +1,6 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace — 21 plugins for Git workflows, code
+Personal Claude Code plugin marketplace — 22 plugins for Git workflows, code
 review, CI, research, testing, documentation, code editing, security
 remediation, and cross-lineage code council.
 
@@ -24,6 +24,7 @@ Add the marketplace, then install individual plugins:
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                                           | 7 commands, 2 hooks, 1 MCP                     |
 | `github-workflow`     | GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)               | 9 commands, 9 skills, 2 hooks                  |
+| `yellow-agy`          | Local delegate on the Antigravity CLI (`agy`) under your Google AI Pro sign-in — yellow-jules successor (experimental scaffold)        | 1 command                                      |
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting                                    | 3 agents, 4 commands, 2 skills                 |
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners                            | 4 agents, 9 commands, 8 skills, 1 hook         |
 | `yellow-claudemod`    | Claude Code mod: records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit (experimental)       | 1 command, 1 hooks module                      |
@@ -311,6 +312,7 @@ yellow-plugins/
 ├── plugins/
 │   ├── gt-workflow/           # Graphite workflow (7 commands, 2 hooks, 1 MCP)
 │   ├── github-workflow/       # GitHub-native stacked-PR provider (9 commands, 9 skills, 2 hooks)
+│   ├── yellow-agy/            # Antigravity CLI local delegate, scaffold (1 command)
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
 │   ├── yellow-ci/             # CI toolkit (4 agents, 9 commands, 8 skills, 1 hook)
 │   ├── yellow-claudemod/      # Claude Code mod: spawn ledger + usage downshift (1 command, 1 hooks module)
@@ -323,7 +325,7 @@ yellow-plugins/
 │   ├── yellow-devin/          # Devin.AI, legacy (1 agent, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 2 skills)
 │   ├── yellow-goal/           # yellow-goal engine bridge (4 commands)
-│   ├── yellow-jules/          # Google Jules, experimental, grant-gated (10 commands, 2 skills)
+│   ├── yellow-jules/          # Google Jules, deprecated, grant-gated (10 commands, 2 skills)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)
 │   ├── yellow-research/       # Deep research (2 agents, 4 commands, 3 skills, 6 MCPs)

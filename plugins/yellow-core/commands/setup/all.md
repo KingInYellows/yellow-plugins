@@ -200,6 +200,8 @@ fi
 # yellow-council's Google slot is the Antigravity CLI; the legacy `gemini` CLI
 # stopped serving consumer requests on 2026-06-18 and does not count.
 command -v agy >/dev/null 2>&1 && printf 'agy:                OK (%s)\n' "$(agy --version 2>&1 | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)" || printf 'agy:                NOT FOUND\n'
+# yellow-agy reads the agy row too; on Windows agy may live only in WSL.
+command -v wsl.exe >/dev/null 2>&1 && printf 'wsl.exe:            OK\n' || printf 'wsl.exe:            NOT FOUND\n'
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
 command -v claude >/dev/null 2>&1 && printf 'claude:             OK (%s)\n' "$(claude --version 2>/dev/null | head -n1)" || printf 'claude:             NOT FOUND\n'
 # yellow-goal pins goal-gen engineVersion 0.4.0 (/goal:setup is authoritative).
@@ -438,7 +440,7 @@ for p in sys.argv[1:]:
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-jules yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-goal yellow-claudemod yellow-core; do
+    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-jules yellow-agy yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-goal yellow-claudemod yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -785,6 +787,21 @@ with consent.
   `JULES_API_KEY`, then run `/jules:setup` to verify or install the SDK"
 - NEEDS SETUP: neither the CLI nor the credential resolved
 
+**yellow-agy:**
+
+Scaffold successor to yellow-jules (setup checks only). Classify from Step 1's
+`agy:` row, the same row yellow-council reads. On Windows agy may live only
+inside WSL, which this dashboard does not probe; `/agy:setup` is authoritative
+and also checks auth variables and overages.
+
+Never READY: the version row alone cannot confirm subscription-only auth,
+overages off, or the permission settings, so `/agy:setup` must run.
+
+- PARTIAL: `agy` OK with any version, OR `agy` NOT FOUND on a host where Step
+  1's `wsl.exe` row is OK — detail: "run `/agy:setup` to check auth, overages,
+  permissions and the WSL bridge"
+- NEEDS SETUP: `agy` NOT FOUND and the `wsl.exe` row is NOT FOUND
+
 **yellow-semgrep:**
 
 Prefer the credential-status file from Step 1.6 over shell-env-only probes;
@@ -1000,6 +1017,7 @@ Marketplace Setup Dashboard
   yellow-cursor        READY           CLI resolved, credentials configured (alternative provider — not enabled)
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set
   yellow-jules         NEEDS SETUP     JULES_API_KEY not set (experimental provider — not enabled)
+  yellow-agy           PARTIAL         agy not on PATH; run /agy:setup to check the WSL bridge
   yellow-semgrep       PARTIAL         Token set, semgrep CLI missing
   yellow-research      PARTIAL         2/5 bundled sources available
   yellow-linear        READY           Linear MCP visible, Graphite available
@@ -1142,20 +1160,21 @@ tool in this fixed order:
 5. `cursor:setup`
 6. `devin:setup`
 7. `jules:setup`
-8. `semgrep:setup`
-9. `research:setup`
-10. `linear:setup`
-11. `debt:setup`
-12. `ci:setup`
-13. `review:setup`
-14. `browser-test:setup`
-15. `docs:setup`
-16. `composio:setup`
-17. `codex:setup`
-18. `council:setup`
-19. `goal:setup`
-20. `claudemod:setup`
-21. `statusline:setup`
+8. `agy:setup`
+9. `semgrep:setup`
+10. `research:setup`
+11. `linear:setup`
+12. `debt:setup`
+13. `ci:setup`
+14. `review:setup`
+15. `browser-test:setup`
+16. `docs:setup`
+17. `composio:setup`
+18. `codex:setup`
+19. `council:setup`
+20. `goal:setup`
+21. `claudemod:setup`
+22. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 This list is the fixed **order**, not a to-do list. Only invoke setups for
@@ -1170,6 +1189,7 @@ provider group in one run (see the section below). Use this mapping:
 - `yellow-cursor` → `cursor:setup`
 - `yellow-devin` → `devin:setup`
 - `yellow-jules` → `jules:setup`
+- `yellow-agy` → `agy:setup`
 - `yellow-semgrep` → `semgrep:setup`
 - `yellow-research` → `research:setup`
 - `yellow-linear` → `linear:setup`

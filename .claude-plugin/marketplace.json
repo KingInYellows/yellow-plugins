@@ -82,6 +82,16 @@
       "category": "development"
     },
     {
+      "name": "yellow-agy",
+      "description": "Local supervised delegate on the Antigravity CLI (agy) under the owner's Google AI Pro sign-in — successor to yellow-jules (scaffold: setup checks only)",
+      "version": "0.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-agy",
+      "category": "development"
+    },
+    {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
       "version": "3.13.0",
