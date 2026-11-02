@@ -55,6 +55,12 @@ async function gitBytes(exec, cwd, args, env) {
         throw gitError(args, res);
     return res.stdoutBytes;
 }
+async function runGit(exec, cwd, args, stdin, env) {
+    const res = await exec.git(args, env === undefined ? { cwd, stdin } : { cwd, env, stdin });
+    if (res.code !== 0)
+        throw gitError(args, res);
+    return res.stdout;
+}
 function gitError(args, res) {
     const detail = res.stderr.trim().split(/\r?\n/).slice(-3).join(' ');
     return new errors_1.AgyError('AGY_WORKTREE', `git ${args.slice(0, 2).join(' ')} failed: ${detail || `exit ${res.code}`}`);
@@ -220,14 +226,17 @@ function nulList(out) {
 async function ignoredCollisions(exec, worktree, snapshot) {
     return collisionsWith(exec, worktree, snapshot, await ignoredPaths(exec, worktree));
 }
-/** Untracked ignored paths under the worktree's current rules; dirs end in `/`. */
-async function ignoredPaths(exec, worktree) {
+/**
+ * Untracked ignored paths under the worktree's current rules. With `collapse`,
+ * a wholly ignored dir is one entry ending in `/`; without it, every file.
+ */
+async function ignoredPaths(exec, worktree, collapse = true) {
     const raw = await gitBytes(exec, worktree, [
         'ls-files',
         '--others',
         '--ignored',
         '--exclude-standard',
-        '--directory',
+        ...(collapse ? ['--directory'] : []),
         '-z',
     ]);
     const paths = [];
@@ -239,7 +248,7 @@ async function ignoredPaths(exec, worktree) {
             const bytes = raw.subarray(start, i);
             const text = bytes.toString('utf8');
             // A name that is not valid UTF-8 would come back as a different path,
-            // and a pattern for that path would not protect the real file.
+            // and an entry for that path would not protect the real file.
             if (!Buffer.from(text, 'utf8').equals(bytes)) {
                 throw new errors_1.AgyError('AGY_WORKTREE', `an ignored path is not valid UTF-8: ${JSON.stringify(text)}`, 'Move or rename that file, then retry --reset-partial.');
             }
@@ -281,37 +290,28 @@ async function resetToSnapshot(exec, worktree, localId, snapshot) {
     if (collisions.length > 0) {
         throw new errors_1.AgyError('AGY_WORKTREE', `ignored files would be overwritten by the reset: ${collisions.slice(0, 10).join(', ')}`, 'Move the named ignored files out of the worktree, then retry --reset-partial.');
     }
-    const unlistable = ignored.find((p) => /[\r\n]/.test(p));
-    if (unlistable !== undefined) {
-        throw new errors_1.AgyError('AGY_WORKTREE', `an ignored path has a line break in its name: ${JSON.stringify(unlistable)}`, 'Move that file out of the worktree, then retry --reset-partial.');
-    }
-    // The pre-reset ignored set goes in an excludes file, not on the command
-    // line, so a large ignored tree can't overflow the argument limit. It
-    // replaces the global excludes file, whose matches are already in the set.
-    const excludes = await tempIndexPath(exec, worktree, localId, 'excludes');
-    await exec.writeFile(excludes, ignored.map((p) => `${literalPattern(p)}\n`).join(''));
+    // Every ignored file, listed now, is protected through the clean below by
+    // putting it in a scratch index: clean never touches an indexed path,
+    // whatever the restored .gitignore files say (negations included).
+    const keep = await ignoredPaths(exec, worktree, false);
+    await git(exec, worktree, ['reset', '--hard', snapshot.head]);
+    await git(exec, worktree, ['read-tree', '--reset', '-u', snapshot.commit]);
+    const scratch = await tempIndexPath(exec, worktree, localId, 'clean');
+    const env = { GIT_INDEX_FILE: scratch };
     try {
-        await git(exec, worktree, ['reset', '--hard', snapshot.head]);
-        await git(exec, worktree, ['read-tree', '--reset', '-u', snapshot.commit]);
-        // Clean against the snapshot's own tree and ignore rules, keeping every
-        // path that was ignored before the reset as well.
-        await git(exec, worktree, [
-            '-c',
-            `core.excludesFile=${excludes}`,
-            'clean',
-            '-fd',
-        ]);
+        await git(exec, worktree, ['read-tree', snapshot.commit], env);
+        if (keep.length > 0) {
+            const empty = sha(await runGit(exec, worktree, ['hash-object', '-w', '--stdin'], ''));
+            await runGit(exec, worktree, ['update-index', '-z', '--index-info'], keep.map((p) => `100644 ${empty}\t${p}\0`).join(''), env);
+        }
+        // Clean against the snapshot's tree and ignore rules.
+        await git(exec, worktree, ['clean', '-fd'], env);
     }
     finally {
-        await exec.removeFile(excludes);
+        await exec.removeFile(scratch);
     }
     await git(exec, worktree, ['read-tree', snapshot.indexTree]);
     await dropSnapshotRefs(exec, worktree, localId);
-}
-/** An exclude pattern, anchored at the top, that matches only `path`. */
-function literalPattern(path) {
-    const escaped = path.replace(/[\\*?[\]]/g, '\\$&').replace(/ $/, '\\ ');
-    return `/${escaped}`;
 }
 async function dropSnapshotRefs(exec, worktree, localId) {
     const refs = snapshotRefs(localId);

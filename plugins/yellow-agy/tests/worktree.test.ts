@@ -181,14 +181,14 @@ describe('worktree', () => {
       'pre\n'
     );
     expect(fs.existsSync(path.join(wt, 'junk.txt'))).toBe(false);
-    const excludes = git(
+    const scratch = git(
       wt,
       'rev-parse',
       '--path-format=absolute',
       '--git-path',
-      'yellow-agy-excludes-t1'
+      'yellow-agy-clean-t1'
     ).trim();
-    expect(fs.existsSync(excludes)).toBe(false);
+    expect(fs.existsSync(scratch)).toBe(false);
   });
 
   it.runIf(process.platform === 'linux')(
@@ -210,6 +210,27 @@ describe('worktree', () => {
       expect(fs.existsSync(path.join(wt, 'junk.txt'))).toBe(true);
     }
   );
+
+  it('reset keeps an ignored file that the snapshot rules un-ignore', async () => {
+    const { wt } = await setup();
+    // Committed: *.log is ignored but keep.log is negated, so tracked-able.
+    fs.appendFileSync(path.join(wt, '.gitignore'), '!keep.log\n');
+    git(wt, 'commit', '-q', '-am', 'negate keep.log');
+    const snap = await snapshotWorktree(exec, wt, 't1');
+    // The turn drops the negation and creates the file, now ignored, inside
+    // an ignored dir as well.
+    fs.writeFileSync(path.join(wt, '.gitignore'), 'build/\n*.log\n');
+    fs.writeFileSync(path.join(wt, 'keep.log'), 'mine\n');
+    fs.mkdirSync(path.join(wt, 'build'));
+    fs.writeFileSync(path.join(wt, 'build', 'keep.log'), 'mine too\n');
+    await resetToSnapshot(exec, wt, 't1', snap);
+    expect(fs.readFileSync(path.join(wt, 'keep.log'), 'utf8')).toBe('mine\n');
+    expect(fs.existsSync(path.join(wt, 'build', 'keep.log'))).toBe(true);
+    expect(fs.readFileSync(path.join(wt, '.gitignore'), 'utf8')).toContain(
+      '!keep.log'
+    );
+    expect(git(wt, 'status', '--porcelain')).toBe('?? keep.log\n');
+  });
 
   it('refuses a reset that would delete an ignored file in the way', async () => {
     const { wt } = await setup();

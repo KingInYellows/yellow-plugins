@@ -187,14 +187,15 @@ local processes.
 - After `INTERRUPTED` or `TIMED_OUT`, the worktree may hold partial edits. The
   next `approve` or `reply` refuses with `requiresAttention` until the owner
   passes `--keep-partial` (continue on top of them) or `--reset-partial`. Reset
-  first lists the ignored untracked paths under the rules in force, then runs
+  first lists every ignored untracked file under the rules in force, then runs
   `git reset --hard <pre-turn HEAD>` and `git read-tree --reset -u <snapshot>`,
-  then `git clean -fd` with a temporary `core.excludesFile` holding an anchored
-  pattern for each listed path, and finally the index-only
-  `git read-tree <pre-turn-index>`. Work from earlier turns, deletions included,
-  comes back with its staged and unstaged parts as they were, and a file
-  protected only by an uncommitted ignore rule survives the swap of `.gitignore`
-  files. Both refs are deleted once the reset or the next turn settles.
+  then `git clean -fd` against a scratch index holding the snapshot tree plus
+  those files, and finally the index-only `git read-tree <pre-turn-index>`.
+  Clean never touches an indexed path, so a file the turn's rules ignored
+  survives even when the restored `.gitignore` files un-ignore it. Work from
+  earlier turns, deletions included, comes back with its staged and unstaged
+  parts as they were. Both refs are deleted once the reset or the next turn
+  settles.
 
 ## Permission profiles (`--settings` JSON)
 
