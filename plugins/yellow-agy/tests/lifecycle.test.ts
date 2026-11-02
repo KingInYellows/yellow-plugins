@@ -378,6 +378,149 @@ describe('Lifecycle', () => {
     });
   });
 
+  it('a refused implement profile releases the claim', async () => {
+    const h = harness([planTurn], {
+      allowCommands: ['pnpm test'],
+      sandboxVerified: false,
+    });
+    await h.lc.delegate(delegateInput(h.repo));
+    await expect(
+      h.lc.approve({ requestId: 'r2', localId: 't1' })
+    ).rejects.toMatchObject({ code: 'AGY_SETTINGS' });
+    const j = readJournal(h.deps.dataDir);
+    expect(j.activeRun).toBeUndefined();
+    expect(j.requests['r2']).toBeUndefined();
+    await expect(
+      h.lc.abandon({ requestId: 'r3', localId: 't1' })
+    ).resolves.toMatchObject({ state: 'ABANDONED' });
+  });
+
+  it('a quota refusal leaves partial edits unresolved', async () => {
+    let refuse = false;
+    const h = harness(
+      [
+        planTurn,
+        () => ({ cancelled: true, signal: 'SIGTERM', exitCode: null }),
+      ],
+      {
+        quotaGate: async () => {
+          if (refuse) throw new AgyError('AGY_QUOTA', 'quota');
+        },
+      }
+    );
+    await h.lc.delegate(delegateInput(h.repo));
+    await h.lc.approve({ requestId: 'r2', localId: 't1' });
+    refuse = true;
+    await expect(
+      h.lc.reply({
+        requestId: 'r3',
+        localId: 't1',
+        message: 'retry',
+        resetPartial: true,
+      })
+    ).rejects.toMatchObject({ code: 'AGY_QUOTA' });
+    expect(readJournal(h.deps.dataDir).tasks['t1']?.partial).toBeDefined();
+  });
+
+  it('a timed-out plan turn fails with AGY_TIMEOUT', async () => {
+    const h = harness([
+      () => ({
+        killedByDeadline: true,
+        json: {
+          status: 'SUCCESS',
+          conversation_id: 'c1',
+          structured_output: PLAN,
+        },
+      }),
+    ]);
+    expect(await h.lc.delegate(delegateInput(h.repo))).toMatchObject({
+      ok: false,
+      code: 'AGY_TIMEOUT',
+      state: 'FAILED',
+    });
+  });
+
+  it('redacts secret-shaped text in the stored plan', async () => {
+    const secret = 'sk-' + 'a'.repeat(24);
+    const h = harness([
+      () => ({
+        json: {
+          status: 'SUCCESS',
+          conversation_id: 'c1',
+          structured_output: { ...PLAN, steps: [`use ${secret}`] },
+        },
+      }),
+    ]);
+    await h.lc.delegate(delegateInput(h.repo));
+    const text = fs.readFileSync(
+      path.join(h.deps.dataDir, 'journal.json'),
+      'utf8'
+    );
+    expect(text).not.toContain(secret);
+    expect(readJournal(h.deps.dataDir).tasks['t1']?.plan?.steps[0]).toContain(
+      'REDACTED'
+    );
+  });
+
+  it('collect refuses while any run is live', async () => {
+    const h = harness([planTurn], { isAlive: (pid) => pid === 4242 });
+    await h.lc.delegate(delegateInput(h.repo));
+    const j = readJournal(h.deps.dataDir);
+    writeJournal(h.deps.dataDir, {
+      ...j,
+      activeRun: {
+        requestId: 'x',
+        op: 'reply',
+        localId: 'other',
+        ownerPid: 4242,
+        startedAt: new Date().toISOString(),
+      },
+    });
+    await expect(h.lc.collect('t1')).rejects.toMatchObject({
+      code: 'AGY_BUSY',
+    });
+    writeJournal(h.deps.dataDir, j);
+    await expect(h.lc.collect('t1')).resolves.toMatchObject({
+      localId: 't1',
+    });
+    expect(readJournal(h.deps.dataDir).activeRun).toBeUndefined();
+  });
+
+  it('an abandon interrupted after removing the worktree settles as ABANDONED', async () => {
+    const h = harness([planTurn], { isAlive: () => false });
+    await h.lc.delegate(delegateInput(h.repo));
+    const wt = path.join(h.deps.worktreeRoot, 't1');
+    git(h.repo, 'worktree', 'remove', '--force', wt);
+    const j = readJournal(h.deps.dataDir);
+    const at = new Date().toISOString();
+    writeJournal(h.deps.dataDir, {
+      ...j,
+      requests: {
+        ...j.requests,
+        a1: {
+          requestId: 'a1',
+          op: 'abandon',
+          localId: 't1',
+          status: 'pending',
+          at,
+        },
+      },
+      activeRun: {
+        requestId: 'a1',
+        op: 'abandon',
+        localId: 't1',
+        ownerPid: 1111,
+        startedAt: at,
+      },
+    });
+    expect(h.lc.status('t1')[0]?.state).toBe('PLAN_PENDING');
+    await expect(h.lc.collect('t1')).rejects.toMatchObject({
+      code: 'AGY_INVALID_INPUT',
+    });
+    expect(readJournal(h.deps.dataDir).tasks['t1']?.state).toBe('ABANDONED');
+    expect(readJournal(h.deps.dataDir).requests['a1']?.status).toBe('done');
+  });
+
   it('abandon collects, removes the worktree and keeps the branch', async () => {
     const h = harness([planTurn, editTurn('x\n')]);
     await h.lc.delegate(delegateInput(h.repo));

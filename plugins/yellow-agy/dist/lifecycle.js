@@ -76,6 +76,29 @@ function outcomeOf(task, extra = {}) {
         ...extra,
     };
 }
+/** True while `worktree` is still a git work tree. */
+async function isWorktree(exec, worktree) {
+    try {
+        const res = await exec.git(['rev-parse', '--is-inside-work-tree'], {
+            cwd: worktree,
+        });
+        return res.code === 0 && res.stdout.trim() === 'true';
+    }
+    catch {
+        return false;
+    }
+}
+/** Every string inside `value` redacted, shape kept (agy-written data). */
+function redactDeep(value) {
+    if (typeof value === 'string')
+        return (0, redact_1.redact)(value);
+    if (Array.isArray(value))
+        return value.map((v) => redactDeep(v));
+    if (value !== null && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactDeep(v)]));
+    }
+    return value;
+}
 /** HEAD of `worktree` when it has `refs/heads/<branch>` checked out. */
 async function ownBranchHead(exec, worktree, branch) {
     try {
@@ -125,10 +148,32 @@ class Lifecycle {
         if (this.alive(claim.ownerPid) || this.alive(claim.childPid))
             return j;
         let next = (0, state_1.withoutClaim)(j);
-        const task = j.tasks[claim.localId];
+        const task = (0, state_1.own)(j.tasks, claim.localId);
         const at = (0, state_1.nowIso)();
+        if (claim.op === 'collect') {
+            // collect changes nothing but artifacts; a retry rewrites them.
+            return (0, state_1.dropRequest)(next, claim.requestId);
+        }
+        if (claim.op === 'abandon' && task !== undefined) {
+            if (await isWorktree(this.deps.exec, task.worktree)) {
+                // Removal never happened: the task is as it was; retry abandon.
+                return (0, state_1.dropRequest)(next, claim.requestId);
+            }
+            const { partial: _p, ...rest } = task;
+            void _p;
+            const done = { ...rest, state: 'ABANDONED', updatedAt: at };
+            next = (0, state_1.putTask)(next, done);
+            return (0, state_1.putRequest)(next, {
+                requestId: claim.requestId,
+                op: claim.op,
+                localId: claim.localId,
+                status: 'done',
+                outcome: outcomeOf(done),
+                at,
+            });
+        }
         if (claim.op === 'delegate' && task === undefined) {
-            const pending = j.requests[claim.requestId];
+            const pending = (0, state_1.own)(j.requests, claim.requestId);
             const meta = pending?.outcome;
             if (meta?.worktree !== undefined && meta.repo !== undefined) {
                 // A crash between createWorktree and the journal write leaves no
@@ -138,7 +183,12 @@ class Lifecycle {
                 if (base === undefined && meta.branch !== undefined) {
                     base = await ownBranchHead(this.deps.exec, meta.worktree, meta.branch);
                 }
-                await this.deps.exec.git(['worktree', 'remove', '--force', '--', meta.worktree], { cwd: meta.repo });
+                const removed = await this.deps.exec.git(['worktree', 'remove', '--force', '--', meta.worktree], { cwd: meta.repo });
+                // Fail closed: keep the claim while the orphan still exists.
+                if (removed.code !== 0 &&
+                    (await isWorktree(this.deps.exec, meta.worktree))) {
+                    throw new errors_1.AgyError('AGY_WORKTREE', `an interrupted delegate left ${meta.worktree}, and removing it failed: ${removed.stderr.trim()}`, `Run git worktree remove --force -- ${meta.worktree} in ${meta.repo}, then retry.`);
+                }
                 if (meta.branch !== undefined && base !== undefined) {
                     await (0, worktree_1.deleteBranchIfEmpty)(this.deps.exec, meta.repo, meta.branch, base).catch(() => false);
                 }
@@ -148,7 +198,14 @@ class Lifecycle {
                 op: claim.op,
                 localId: claim.localId,
                 status: 'done',
-                outcome: { ok: false, code: 'AGY_INTERRUPTED', localId: claim.localId },
+                outcome: {
+                    ok: false,
+                    code: 'AGY_INTERRUPTED',
+                    localId: claim.localId,
+                    state: 'FAILED',
+                    requiresAttention: true,
+                    attention: ['the delegate was interrupted before its first turn'],
+                },
                 at,
             });
             return next;
@@ -183,9 +240,15 @@ class Lifecycle {
      * outcome instead when the request already finished.
      */
     async reserve(requestId, op, localId, check, meta) {
+        // Settle a dead claim in its own write, so a refusal below can't discard
+        // the settlement.
+        await (0, state_1.updateJournal)(this.deps.dataDir, async (j) => ({
+            journal: await this.settleStale(j),
+            result: undefined,
+        }));
         return (0, state_1.updateJournal)(this.deps.dataDir, async (j0) => {
             const j = await this.settleStale(j0);
-            const prior = j.requests[requestId];
+            const prior = (0, state_1.own)(j.requests, requestId);
             if (prior !== undefined) {
                 if (prior.op !== op) {
                     throw new errors_1.AgyError('AGY_INVALID_INPUT', `request id ${requestId} was used for ${prior.op}`);
@@ -285,9 +348,15 @@ class Lifecycle {
             return { journal: next, result: outcome };
         });
     }
-    async gate(profile, requestId) {
+    /**
+     * Builds the turn's profile and passes the quota gate, releasing the
+     * reservation if either refuses. Runs before any worktree change.
+     */
+    async prepare(requestId, build) {
         try {
+            const profile = build();
             await this.deps.quotaGate(profile, (0, state_1.readJournal)(this.deps.dataDir));
+            return profile;
         }
         catch (err) {
             await this.release(requestId);
@@ -304,8 +373,7 @@ class Lifecycle {
         });
         if (res.replay !== undefined)
             return res.replay;
-        const profile = this.readOnly();
-        await this.gate(profile, input.requestId);
+        const profile = await this.prepare(input.requestId, () => this.readOnly());
         let base;
         try {
             base = await (0, worktree_1.createWorktree)(this.deps.exec, {
@@ -321,7 +389,7 @@ class Lifecycle {
             throw err;
         }
         await (0, state_1.updateJournal)(this.deps.dataDir, (j) => {
-            const rec = j.requests[input.requestId];
+            const rec = (0, state_1.own)(j.requests, input.requestId);
             if (rec === undefined)
                 return { journal: j, result: undefined };
             return {
@@ -361,9 +429,13 @@ class Lifecycle {
         const conversationId = result?.conversation_id ?? task.conversationId;
         const attention = [];
         const at = (0, state_1.nowIso)();
+        // A plan turn that timed out or was interrupted produced no plan to
+        // trust; it is a failure with its own code, not a PLAN_PENDING success.
         const failed = cls.kind === 'AUTH_REQUIRED' ||
             cls.kind === 'QUOTA' ||
-            cls.kind === 'MODEL_ERROR';
+            cls.kind === 'MODEL_ERROR' ||
+            cls.kind === 'TIMED_OUT' ||
+            cls.kind === 'INTERRUPTED';
         if (failed || conversationId === undefined) {
             const code = failed ? codeFor(cls) : 'AGY_MODEL_ERROR';
             // A failed reply keeps the task as it was; a failed delegate is FAILED.
@@ -377,7 +449,8 @@ class Lifecycle {
             const out = result === undefined ? undefined : (0, classify_1.structuredOutput)(result, true);
             // The conversation has moved past the old plan, so a turn that asked
             // for a plan and got none leaves nothing to approve.
-            plan = (0, plan_schema_1.isPlan)(out) ? out : undefined;
+            // Stored in the journal and shown to the owner: redact agy's text.
+            plan = (0, plan_schema_1.isPlan)(out) ? redactDeep(out) : undefined;
             if (plan === undefined)
                 attention.push('agy returned no valid plan; reply with --correction to ask for one');
         }
@@ -392,7 +465,7 @@ class Lifecycle {
             ...(plan === undefined ? {} : { plan }),
             requiresAttention: attention.length > 0,
             ...(cls.kind === 'UNVERIFIED' && cls.finishedReason !== undefined
-                ? { lastFinishedReason: cls.finishedReason }
+                ? { lastFinishedReason: (0, redact_1.redact)(cls.finishedReason) }
                 : {}),
             updatedAt: at,
         };
@@ -478,9 +551,7 @@ class Lifecycle {
         void _p;
         return rest;
     }
-    async implementTurn(requestId, op, task, prompt) {
-        const profile = this.implement();
-        await this.gate(profile, requestId);
+    async implementTurn(requestId, op, task, prompt, profile) {
         let snapshot;
         try {
             const s = await (0, worktree_1.snapshotWorktree)(this.deps.exec, task.worktree, task.localId);
@@ -519,6 +590,7 @@ class Lifecycle {
         });
         if (res.replay !== undefined)
             return res.replay;
+        const profile = await this.prepare(input.requestId, () => this.implement());
         let task;
         try {
             task = await this.resolvePartial((0, state_1.getTask)(res.journal, input.localId), input.keepPartial === true, input.resetPartial === true);
@@ -527,7 +599,7 @@ class Lifecycle {
             await this.release(input.requestId);
             throw err;
         }
-        return this.implementTurn(input.requestId, 'approve', task, 'Implement the approved plan.');
+        return this.implementTurn(input.requestId, 'approve', task, 'Implement the approved plan.', profile);
     }
     async reply(input) {
         const res = await this.reserve(input.requestId, 'reply', input.localId, (j) => {
@@ -540,6 +612,8 @@ class Lifecycle {
         });
         if (res.replay !== undefined)
             return res.replay;
+        const approved = (0, state_1.getTask)(res.journal, input.localId).approved;
+        const profile = await this.prepare(input.requestId, () => approved ? this.implement() : this.readOnly());
         let task;
         try {
             task = await this.resolvePartial((0, state_1.getTask)(res.journal, input.localId), input.keepPartial === true, input.resetPartial === true);
@@ -551,9 +625,7 @@ class Lifecycle {
         if (input.correction === true)
             task = { ...task, correctiveRounds: task.correctiveRounds + 1 };
         if (task.approved)
-            return this.implementTurn(input.requestId, 'reply', task, input.message);
-        const profile = this.readOnly();
-        await this.gate(profile, input.requestId);
+            return this.implementTurn(input.requestId, 'reply', task, input.message, profile);
         const withSchema = input.correction === true;
         let cls;
         try {
@@ -590,17 +662,26 @@ class Lifecycle {
     }
     /** Writes the task's patches under artifacts/<localId>/. Needs no live run. */
     async collect(localId) {
-        const j = (0, state_1.readJournal)(this.deps.dataDir);
-        const task = (0, state_1.getTask)(j, localId);
-        if (j.activeRun?.localId === localId &&
-            (this.alive(j.activeRun.ownerPid) || this.alive(j.activeRun.childPid))) {
-            throw new errors_1.AgyError('AGY_BUSY', `a run on ${localId} is live`);
+        // Holds the active-run claim until the artifacts are written, so no
+        // turn or abandon can change the worktree or the patches underneath.
+        const requestId = `collect-${(0, node_crypto_1.randomBytes)(8).toString('hex')}`;
+        const res = await this.reserve(requestId, 'collect', localId, (j) => {
+            const t = (0, state_1.getTask)(j, localId);
+            if (t.state === 'ABANDONED') {
+                throw new errors_1.AgyError('AGY_INVALID_INPUT', `task ${localId} was abandoned; its last collect is in artifacts/${localId}`);
+            }
+        });
+        const task = (0, state_1.getTask)(res.journal, localId);
+        let got;
+        let written;
+        try {
+            got = await (0, worktree_1.collectWorktree)(this.deps.exec, task.worktree, localId, task.base);
+            written = this.writePatches(localId, got);
         }
-        if (task.state === 'ABANDONED') {
-            throw new errors_1.AgyError('AGY_INVALID_INPUT', `task ${localId} was abandoned; its last collect is in artifacts/${localId}`);
+        finally {
+            await this.release(requestId);
         }
-        const got = await (0, worktree_1.collectWorktree)(this.deps.exec, task.worktree, localId, task.base);
-        const { commitsPatch, uncommittedPatch } = this.writePatches(localId, got);
+        const { commitsPatch, uncommittedPatch } = written;
         const secret = (0, redact_1.scanSecretShapes)(got.commits) || (0, redact_1.scanSecretShapes)(got.uncommitted);
         return {
             localId,
@@ -707,9 +788,11 @@ function extrasOf(cls, result, attention) {
         requiresAttention: attention.length > 0,
         ...(response === undefined ? {} : { response }),
         ...(question === undefined ? {} : { question: (0, redact_1.redact)(question) }),
-        ...(cls.kind === 'DENIED' ? { deniedActions: cls.deniedActions } : {}),
+        ...(cls.kind === 'DENIED'
+            ? { deniedActions: redactDeep(cls.deniedActions) }
+            : {}),
         ...(cls.kind === 'UNVERIFIED' && cls.finishedReason !== undefined
-            ? { finishedReason: cls.finishedReason }
+            ? { finishedReason: (0, redact_1.redact)(cls.finishedReason) }
             : {}),
     };
 }

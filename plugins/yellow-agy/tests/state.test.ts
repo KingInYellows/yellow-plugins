@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   dataDir,
+  getTask,
   readJournal,
   recentUsage,
   updateJournal,
@@ -63,6 +64,20 @@ describe('state', () => {
     expect(j.usage.map((u) => u.requestId)).toEqual(['2']);
     expect(recentUsage(j, 30_000)).toEqual([]);
     expect(recentUsage(j, 15 * 60_000)).toHaveLength(1);
+    // A future-dated entry (clock skew) does not count.
+    const future = {
+      ...j,
+      usage: [
+        {
+          at: new Date(Date.now() + 60_000).toISOString(),
+          localId: 'f',
+          requestId: 'f',
+        },
+      ],
+    };
+    expect(recentUsage(future, 15 * 60_000)).toEqual([]);
+    // Inherited properties are not tasks.
+    expect(() => getTask(j, 'toString')).toThrow(/no task/);
   });
 
   it('serializes lock holders and breaks a lock whose pid is dead', async () => {

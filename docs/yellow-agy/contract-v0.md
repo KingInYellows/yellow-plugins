@@ -116,18 +116,23 @@ host git call run in their own process group, and a timeout signals the group.
    `approve` can start implementation. After approval it uses the implement
    profile. A correction spends a corrective round (R31 counters, unchanged). A
    `PLAN_PENDING` correction passes `--json-schema <plan.schema.json>` and
-   replaces the stored plan, so `approve` implements the corrected plan; a
-   correction that returns no valid plan clears it, and `approve` refuses until
-   one arrives.
-4. `collect` (no live run): `git -C <worktree> format-patch <base>..HEAD` for
+   replaces the stored plan, so `approve` implements the corrected plan. A
+   correction turn that completes without a valid plan clears it, and `approve`
+   refuses until one arrives; a correction turn that fails (auth, quota, model
+   error, timeout, interrupt) keeps the old plan. A plan turn that times out or
+   is interrupted is a failure with `AGY_TIMEOUT` / `AGY_INTERRUPTED`, never a
+   `PLAN_PENDING` success. Plans, denied actions and finish reasons are redacted
+   before they reach the journal.
+4. `collect` (no live run on any task; it holds the active-run claim until its
+   artifacts are written): `git -C <worktree> format-patch <base>..HEAD` for
    commits, then, in a temporary `GIT_INDEX_FILE` seeded from the real index,
    `git add --intent-to-add --all` and `git diff --binary HEAD`, leaving the
    real index untouched, for staged, unstaged and untracked changes, into
    `artifacts/<localId>/`. Both pass `--no-ext-diff --no-textconv`, so no
    repository diff helper runs outside agy's sandbox, and patches are kept as
-   raw bytes (text files need not be UTF-8). A patch whose new content is empty
-   is removed. Every artifact is scanned with yellow-jules' secret-shape layers;
-   a hit sets `secretShapedContent: true` and `requiresAttention`, and the owner
+   raw bytes (text files need not be UTF-8). An empty generated patch is
+   removed. Every artifact is scanned with yellow-jules' secret-shape layers; a
+   hit sets `secretShapedContent: true` and `requiresAttention`, and the owner
    reviews it before the stack provider opens a PR.
 5. `abandon` (terminal-gated, no live run): run `collect` first so nothing is
    lost, settle the journal, `git worktree remove --force` the worktree, and
@@ -164,7 +169,12 @@ local processes.
   its worktree is removed, and its branch is deleted if it has no commits beyond
   the base. When the crash came before the base was journaled, no turn has run,
   so the base is the worktree's `HEAD`, read only while it still has that branch
-  checked out. A turn reservation is settled as `INTERRUPTED`.
+  checked out. If removing that worktree fails and it still exists, the claim
+  stays and the call fails with `AGY_WORKTREE` naming the command to run. A
+  stale `collect` claim is dropped. A stale `abandon` claim settles the task as
+  `ABANDONED` when its worktree is gone, and otherwise is dropped so `abandon`
+  can be retried. Other turn reservations are settled as `INTERRUPTED`. The
+  settlement is written before the new call's own checks run.
 - The agy child's pid is written to the claim before the turn can settle; if
   that write fails, the turn is stopped and the call fails with the write's
   error. Journal writes fsync the temp file and then the directory around the

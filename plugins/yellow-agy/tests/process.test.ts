@@ -4,7 +4,6 @@ import * as path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-
 import { AgyError } from '../src/errors';
 import {
   BRIDGE_GROUP_SCRIPT,
@@ -166,6 +165,19 @@ describe('bridge Linux process group', () => {
       expect(() => process.kill(-pgid, 0)).toThrow();
     }
   );
+
+  it('rejects deadlines and grace periods Node would clamp to 1 ms', async () => {
+    const f = script('process.exit(0);');
+    for (const opts of [
+      { deadlineMs: 2 ** 31 },
+      { deadlineMs: 1_000, graceMs: -5 },
+      { deadlineMs: 1_000, graceMs: Number.POSITIVE_INFINITY },
+    ]) {
+      await expect(runTurn(inv(f), opts), JSON.stringify(opts)).rejects.toThrow(
+        AgyError
+      );
+    }
+  });
 
   it('a failed onSpawn write stops the turn and rejects with that error', async () => {
     const f = script('setInterval(()=>{},1000);');

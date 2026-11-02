@@ -50,6 +50,8 @@ exports.nowIso = nowIso;
 exports.putTask = putTask;
 exports.putRequest = putRequest;
 exports.withoutClaim = withoutClaim;
+exports.own = own;
+exports.dropRequest = dropRequest;
 exports.getTask = getTask;
 exports.recentUsage = recentUsage;
 const fs = __importStar(require("node:fs"));
@@ -213,6 +215,9 @@ function badJournal(part) {
     return new errors_1.AgyError('AGY_INTERNAL', `the journal has an unknown format (${part})`, 'Move the damaged journal aside; yellow-agy starts a new one.');
 }
 function readJournal(dir) {
+    // The same owner-only check as the locked paths, so status and collect
+    // never read a directory another user can write.
+    ensureDataDir(dir);
     let text;
     try {
         text = fs.readFileSync(path.join(dir, JOURNAL), 'utf8');
@@ -311,8 +316,18 @@ function withoutClaim(j) {
     void _drop;
     return rest;
 }
+/** `rec[key]` only when it is an own property (`toString` is not a task). */
+function own(rec, key) {
+    return Object.prototype.hasOwnProperty.call(rec, key) ? rec[key] : undefined;
+}
+/** The journal without request `requestId`. */
+function dropRequest(j, requestId) {
+    const { [requestId]: _gone, ...requests } = j.requests;
+    void _gone;
+    return { ...j, requests };
+}
 function getTask(j, localId) {
-    const task = j.tasks[localId];
+    const task = own(j.tasks, localId);
     if (task === undefined) {
         throw new errors_1.AgyError('AGY_INVALID_INPUT', `no task ${JSON.stringify(localId)}`);
     }
@@ -320,5 +335,9 @@ function getTask(j, localId) {
 }
 /** Usage entries from the last `windowMs`. */
 function recentUsage(j, windowMs, now = Date.now()) {
-    return j.usage.filter((u) => now - Date.parse(u.at) <= windowMs);
+    // A future-dated entry (clock skew) is not recent usage.
+    return j.usage.filter((u) => {
+        const age = now - Date.parse(u.at);
+        return age >= 0 && age <= windowMs;
+    });
 }

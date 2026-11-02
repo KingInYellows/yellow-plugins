@@ -265,6 +265,9 @@ function badJournal(part: string): AgyError {
 }
 
 export function readJournal(dir: string): Journal {
+  // The same owner-only check as the locked paths, so status and collect
+  // never read a directory another user can write.
+  ensureDataDir(dir);
   let text: string;
   try {
     text = fs.readFileSync(path.join(dir, JOURNAL), 'utf8');
@@ -383,8 +386,23 @@ export function withoutClaim(j: Journal): Journal {
   return rest;
 }
 
+/** `rec[key]` only when it is an own property (`toString` is not a task). */
+export function own<T>(
+  rec: Readonly<Record<string, T>>,
+  key: string
+): T | undefined {
+  return Object.prototype.hasOwnProperty.call(rec, key) ? rec[key] : undefined;
+}
+
+/** The journal without request `requestId`. */
+export function dropRequest(j: Journal, requestId: string): Journal {
+  const { [requestId]: _gone, ...requests } = j.requests;
+  void _gone;
+  return { ...j, requests };
+}
+
 export function getTask(j: Journal, localId: string): Task {
-  const task = j.tasks[localId];
+  const task = own(j.tasks, localId);
   if (task === undefined) {
     throw new AgyError(
       'AGY_INVALID_INPUT',
@@ -400,5 +418,9 @@ export function recentUsage(
   windowMs: number,
   now: number = Date.now()
 ): UsageEntry[] {
-  return j.usage.filter((u) => now - Date.parse(u.at) <= windowMs);
+  // A future-dated entry (clock skew) is not recent usage.
+  return j.usage.filter((u) => {
+    const age = now - Date.parse(u.at);
+    return age >= 0 && age <= windowMs;
+  });
 }

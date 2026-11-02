@@ -15,6 +15,7 @@ import { BRIDGE_PGID_MARKER, bridgeKillCommand } from './invocation';
 
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
 const DEFAULT_GRACE_MS = 10_000;
+const MAX_TIMER_MS = 2_147_483_647;
 
 export interface RunOptions {
   /** Wall-clock limit for the whole process, in ms. */
@@ -61,12 +62,19 @@ export function runTurn(
   inv: Invocation,
   options: RunOptions
 ): Promise<TurnOutcome> {
-  if (!Number.isFinite(options.deadlineMs) || options.deadlineMs <= 0) {
+  const graceMs = options.graceMs ?? DEFAULT_GRACE_MS;
+  // Node clamps a delay outside 1..2^31-1 ms to 1 ms, which would kill the
+  // turn at once.
+  const validDelay = (ms: number): boolean =>
+    Number.isFinite(ms) && ms >= 1 && ms <= MAX_TIMER_MS;
+  if (!validDelay(options.deadlineMs) || !validDelay(graceMs)) {
     return Promise.reject(
-      new AgyError('AGY_INTERNAL', 'deadlineMs must be a positive number')
+      new AgyError(
+        'AGY_INTERNAL',
+        `deadlineMs and graceMs must be between 1 and ${MAX_TIMER_MS} ms`
+      )
     );
   }
-  const graceMs = options.graceMs ?? DEFAULT_GRACE_MS;
   const groupKill = process.platform !== 'win32';
   return new Promise((resolve, reject) => {
     const child = spawn(inv.file, [...inv.args], {
@@ -83,6 +91,7 @@ export function runTurn(
     const out: Buffer[] = [];
     const err: Buffer[] = [];
     let graceTimer: NodeJS.Timeout | undefined;
+    let drainTimer: NodeJS.Timeout | undefined;
     let closed = false;
     let spawnError: unknown;
     let spawnDone: Promise<void> = Promise.resolve();
@@ -113,7 +122,14 @@ export function runTurn(
       if (!groupKill && child.exitCode !== null) return;
       try {
         if (groupKill) process.kill(-child.pid, sig);
-        else child.kill(sig);
+        else {
+          // Windows has no groups: taskkill /T takes the tree while the
+          // leader still lives (the drain timer covers what outlives it).
+          if (bridge === undefined) {
+            spawnKill('taskkill', ['/PID', String(child.pid), '/T', '/F']);
+          }
+          child.kill(sig);
+        }
       } catch {
         // already gone
       }
@@ -160,6 +176,7 @@ export function runTurn(
     const cleanup = (): void => {
       clearTimeout(deadline);
       if (graceTimer !== undefined) clearTimeout(graceTimer);
+      if (drainTimer !== undefined) clearTimeout(drainTimer);
       options.signal?.removeEventListener('abort', onAbort);
     };
     child.on('error', (e: NodeJS.ErrnoException) => {
@@ -184,6 +201,12 @@ export function runTurn(
       // agy is done; a tool still in its group would keep 'close' from firing.
       if (groupKill) kill('SIGKILL');
       killLinux('SIGKILL');
+      // A descendant we could not kill (Windows) may still hold the pipes;
+      // stop waiting for it so the turn always settles.
+      drainTimer ??= setTimeout(() => {
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+      }, graceMs);
     });
     child.on('close', (code, signal) => {
       closed = true;
