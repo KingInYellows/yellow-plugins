@@ -393,6 +393,10 @@ state_body() {
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 1 ]
   [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+  REVIEWS="[$(rv APPROVED alice User "$HEAD_SHA"),$(rv DISMISSED alice User "$HEAD_SHA")]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
   REVIEWS="[$(rv CHANGES_REQUESTED alice User "$HEAD_SHA"),$(rv COMMENTED alice User "$HEAD_SHA"),$(rv APPROVED alice User "$HEAD_SHA")]" with_files src/a.js
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 0 ]

@@ -461,9 +461,10 @@ jq -n -c \
     | ($cfg[0].bots // ["chatgpt-codex-connector[bot]"] | map(norm)) as $bots
     | ($rev[0] | if type == "object" then .nodes else null end) as $r
     | ($rev[0] | type == "object" and .truncated == true) as $rt
-    # Each listed human counts by their latest approve or request-changes
-    # review (nodes are oldest first), so a later request withdraws approval.
-    | [($r // [])[] | select((.state == "APPROVED" or .state == "CHANGES_REQUESTED") and .author.__typename == "User"
+    # Each listed human counts by their latest approve, request-changes or
+    # dismissed review (nodes are oldest first), so a later request or a
+    # dismissal withdraws approval.
+    | [($r // [])[] | select((.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED") and .author.__typename == "User"
           and ((.author.login // "") | test("\\[bot\\]\\z") | not)
           and ((.author.login // "") | ascii_downcase | IN($humans[])))]
       | group_by(.author.login | ascii_downcase) | map(last | select(.state == "APPROVED")) as $appr
