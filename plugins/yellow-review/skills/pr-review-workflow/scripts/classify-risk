@@ -3,7 +3,8 @@
 # changed paths, using the repository's policy file from a trusted ref, so a
 # pull request cannot lower its own tier by editing the policy.
 # Usage: classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>
-#        classify-risk [--policy-ref <ref> | --policy-file <file>] --stdin [<base-ref>]
+#        classify-risk [--policy-ref <ref> | --policy-file <file>] --stdin [--numstat] [<base-ref>]
+#   Paths are repository-root relative whatever the current directory.
 #   <base-ref>...<head-ref> is the diff (merge-base semantics).
 #   --policy-ref: read the policy from this ref instead of <base-ref>. Pass
 #     the default branch (origin/main) for a stacked PR: its base is the
@@ -13,7 +14,16 @@
 #     commit themselves.
 #   --stdin: paths on stdin, one per line; line counts are not known. The
 #     base ref is needed only to read the policy, so it may be omitted with
-#     --policy-file.
+#     --policy-file or --policy-ref. Input is newline-delimited: a caller that
+#     reads names from JSON (the GitHub API) must replace control characters
+#     first, e.g. jq -r '.filename | gsub("[\\u0000-\\u001f\\u007f]"; "?")',
+#     so a name holding a newline stays one line and is classified high.
+#   --stdin --numstat: stdin rows are "<added>\t<deleted>\t<path>" (git's
+#     --numstat form, "-" for binary), so the size rule applies. For callers
+#     that read the file list from the GitHub API instead of a checkout. A row
+#     without two tabs, or with counts that are not both numbers or both "-",
+#     makes the size unknown (lines null), and a low change with an unknown
+#     size becomes medium, rule size-unknown.
 # Policy: .github/review-risk.json:
 #   {"version":1,"default_tier":"medium","low_max_lines":300,
 #    "rules":[{"tier":"high|medium|low","why":"...","paths":["glob",...]}]}
@@ -27,16 +37,16 @@
 #   becomes medium. The policy file and any REVIEW.md are always high.
 #   A path outside ^[A-Za-z0-9._/@+-]+$ (git quotes unusual names) is high.
 #   No policy at the policy ref: every file is default medium. A policy that
-#   is unreadable, not version 1, or holds a glob, reason or number outside
-#   the allowed forms makes every file high (fail closed), rule
-#   policy-invalid.
+#   is unreadable, not a regular file, not exactly one JSON object, not
+#   version 1, or holds a key, glob, reason or number outside the allowed
+#   forms makes every file high (fail closed), rule policy-invalid.
 # Output: one JSON object on stdout:
 #   {"tier":"low|medium|high","policy":"base|ref|file|none|invalid",
 #    "files":N,"lines":N|null,"counts":{"low":N,"medium":N,"high":N},
 #    "reasons":[{"path":"..."|null,"tier":"...","rule":"..."}],"truncated":bool}
 #   reasons lists the files at the final tier (at most 50; truncated says
-#   whether more were left out), after a {"path":null,"rule":"size"} entry
-#   when the size rule raised the tier. Paths come from the change and are
+#   whether more were left out), after a {"path":null,"rule":"size"} (or
+#   "size-unknown") entry when the size rule raised the tier. Paths come from the change and are
 #   untrusted text; `rule` values come from the policy or this script.
 # Exit codes: 0 ok, 1 git failure (a ref or the diff could not be read),
 #   2 usage.
@@ -48,7 +58,7 @@ POLICY_PATH=.github/review-risk.json
 MAX_REASONS=50
 
 usage() {
-    printf 'Usage: classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>\n       classify-risk [--policy-ref <ref> | --policy-file <file>] --stdin [<base-ref>]\n' >&2
+    printf 'Usage: classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>\n       classify-risk [--policy-ref <ref> | --policy-file <file>] --stdin [--numstat] [<base-ref>]\n' >&2
     exit 2
 }
 
@@ -84,11 +94,16 @@ esac
 MODE=git
 BASE=""
 HEAD=""
+NUMSTAT=0
 if [ "${1:-}" = --stdin ]; then
     MODE=stdin
     shift
+    if [ "${1:-}" = --numstat ]; then
+        NUMSTAT=1
+        shift
+    fi
     case $# in
-        0) [ -n "$POLICY_FILE" ] || usage ;;
+        0) [ -n "$POLICY_FILE" ] || [ -n "$POLICY_REF" ] || usage ;;
         1) BASE="$1"; check_ref "$BASE" ;;
         *) usage ;;
     esac
@@ -111,10 +126,22 @@ trap 'rm -rf "$WORK"' EXIT
 if [ "$MODE" = git ]; then
     resolve base "$BASE"
     resolve head "$HEAD"
-    git -c core.quotePath=true diff --numstat --no-renames "$BASE...$HEAD" >"$WORK/numstat" 2>"$WORK/err" || {
+    # diff.relative=false: a user's diff.relative setting would otherwise
+    # drop changes outside the current directory.
+    git -c core.quotePath=true -c diff.relative=false diff --numstat --no-renames "$BASE...$HEAD" >"$WORK/numstat" 2>"$WORK/err" || {
         printf 'Error: git diff failed: %s\n' "$(cat "$WORK/err")" >&2
         exit 1
     }
+elif [ "$NUMSTAT" -eq 1 ]; then
+    # A row without two tabs is a bare path whose counts are malformed ("?"),
+    # which makes the size unknown.
+    while IFS= read -r p || [ -n "$p" ]; do
+        [ -n "$p" ] || continue
+        case "$p" in
+            *"	"*"	"*) printf '%s\n' "$p" ;;
+            *) printf -- '?\t?\t%s\n' "$p" ;;
+        esac
+    done >"$WORK/numstat"
 else
     while IFS= read -r p || [ -n "$p" ]; do
         [ -n "$p" ] || continue
@@ -136,29 +163,42 @@ else
         POLICY_STATE=base
         resolve base "$SRC"
     fi
-    if git cat-file -e "$SRC:$POLICY_PATH" 2>/dev/null; then
-        git show "$SRC:$POLICY_PATH" >"$WORK/policy.json" 2>/dev/null || POLICY_STATE=invalid
-    else
+    # Absent only when ls-tree succeeds and lists nothing; a failed lookup, a
+    # symlink, a directory or a failed read is invalid (fail closed).
+    if ! git ls-tree --full-tree "$SRC" -- "$POLICY_PATH" >"$WORK/tree" 2>/dev/null; then
+        POLICY_STATE=invalid
+    elif [ ! -s "$WORK/tree" ]; then
         POLICY_STATE=none
         printf '{"version":1,"default_tier":"medium","rules":[]}\n' >"$WORK/policy.json"
+    else
+        case "$(cat "$WORK/tree")" in
+            "100644 blob "*|"100755 blob "*)
+                git cat-file blob "$SRC:$POLICY_PATH" >"$WORK/policy.json" 2>/dev/null || POLICY_STATE=invalid ;;
+            *) POLICY_STATE=invalid ;;
+        esac
     fi
 fi
 
-# Validate the policy. An empty file is valid input to jq but yields nothing.
+# Validate the policy. Slurping makes an empty file or several JSON documents
+# a length other than 1, so both are invalid. Optional keys are tested with
+# has(), not `//`, so a present false or null is invalid, not a default.
 if [ "$POLICY_STATE" != invalid ]; then
-    jq -c '
+    jq -s -c '
       def ok_glob: type == "string" and test("\\A[A-Za-z0-9._/@+*?-]+\\z");
       def ok_why: type == "string" and test("\\A[A-Za-z0-9 ._,:;()/@+-]{1,120}\\z");
       def ok_tier: . == "low" or . == "medium" or . == "high";
-      if type == "object" and .version == 1
-         and ((.default_tier // "medium") | ok_tier)
-         and ((.low_max_lines // 300) | type == "number" and . == floor and . >= 0 and . <= 1000000)
+      def opt(k; d): if has(k) then .[k] else d end;
+      if length == 1 and (.[0] | type == "object") then .[0] else error("invalid") end
+      | if .version == 1
+         and (keys - ["version", "default_tier", "low_max_lines", "rules"] | length == 0)
+         and (opt("default_tier"; "medium") | ok_tier)
+         and (opt("low_max_lines"; 300) | type == "number" and . == floor and . >= 0 and . <= 1000000)
          and (.rules | type == "array")
          and (.rules | all(
                type == "object" and (.tier | ok_tier) and (.why | ok_why)
                and (.paths | type == "array" and length > 0 and all(ok_glob))))
-      then {default_tier: (.default_tier // "medium"),
-            low_max_lines: (.low_max_lines // 300),
+      then {default_tier: opt("default_tier"; "medium"),
+            low_max_lines: opt("low_max_lines"; 300),
             rules: .rules}
       else error("invalid") end
     ' "$WORK/policy.json" >"$WORK/policy.valid" 2>/dev/null || POLICY_STATE=invalid
@@ -167,7 +207,7 @@ fi
 [ "$POLICY_STATE" != invalid ] || printf '{"default_tier":"high","low_max_lines":0,"rules":[]}\n' >"$WORK/policy.valid"
 
 LINES_MODE=known
-[ "$MODE" = git ] || LINES_MODE=unknown
+[ "$MODE" = git ] || [ "$NUMSTAT" -eq 1 ] || LINES_MODE=unknown
 
 # One jq pass classifies every path: globs become anchored regexes (every
 # regex metacharacter other than * and ? is escaped; the allowed glob
@@ -191,18 +231,24 @@ jq -R -s \
           | if $m then {tier: $m.tier, path: $path, rule: $m.why}
             else {tier: $p.default_tier, path: $path, rule: "default"} end
         end ] as $files
-  | ( [ $rows[] | select((.add | test("\\A[0-9]+\\z")) and (.del | test("\\A[0-9]+\\z")))
+  | def num: test("\\A[0-9]+\\z");
+    ( [ $rows[] | select((.add | num) and (.del | num))
         | (.add | tonumber) + (.del | tonumber) ] | add // 0 ) as $sum
+  | ($lines_mode == "known"
+     and all($rows[]; ((.add | num) and (.del | num)) or (.add == "-" and .del == "-"))) as $known
   | (if ($files | length) == 0 then $p.default_tier
      else [ $files[].tier ] | max_by(rank) end) as $top
-  | ($top == "low" and $lines_mode == "known" and $sum > $p.low_max_lines) as $size
-  | (if $size then "medium" else $top end) as $final
+  | ($top == "low" and $known and $sum > $p.low_max_lines) as $size
+  | ($top == "low" and $lines_mode == "known" and ($known | not)) as $unsized
+  | (if $size or $unsized then "medium" else $top end) as $final
   | [ $files[] | select(.tier == $final) ] as $hits
   | {tier: $final, policy: $state, files: ($files | length),
-     lines: (if $lines_mode == "known" then $sum else null end),
+     lines: (if $known then $sum else null end),
      counts: {low: ([ $files[] | select(.tier == "low") ] | length),
               medium: ([ $files[] | select(.tier == "medium") ] | length),
               high: ([ $files[] | select(.tier == "high") ] | length)},
-     reasons: ((if $size then [{path: null, tier: "medium", rule: "size"}] else [] end) + $hits[0:$max]),
+     reasons: ((if $size then [{path: null, tier: "medium", rule: "size"}]
+                elif $unsized then [{path: null, tier: "medium", rule: "size-unknown"}]
+                else [] end) + $hits[0:$max]),
      truncated: (($hits | length) > $max)}
 ' "$WORK/numstat"

@@ -112,7 +112,7 @@ with no context cost to the parent.
 
 ### Inputs (`args`)
 
-`{ repo, pr, base_sha, head_sha, tier, diff_path, changed_files, ledger_dismissed, review_md, include, exclude }`,
+`{ repo, pr, base, head, tier, diff_path, changed_files, review_md, include, exclude, dismissed }`,
 all produced by the calling command before launch. The workflow never fetches
 from GitHub itself; the caller passes data so runs are reproducible and the eval
 harness can feed the same shape.
@@ -135,8 +135,10 @@ harness can feed the same shape.
   Vote phase is the only filter.
 - Cross-lineage hunter: `codex-reviewer` for medium and above when Codex is
   available. This is the cheapest answer to the data in
-  [[pr-review-loop-automation]]: 94% of Codex P1s arrive after a push, meaning
-  our own pass missed them first.
+  [[pr-review-loop-automation]]: 94% of Codex P1s arrive after a push. Some of
+  those are regressions in the new commit, so this suggests, but does not show,
+  that our own pass missed them first; Phase 1's eval measures misses on the
+  same head.
 
 ### Phase 2 — Vote
 
@@ -191,9 +193,11 @@ shell-compat; generated `.claude-plugin/` and `.agents/` manifests;
 `docs/solutions/`, `plans/`), and an "Always check" list (untrusted input
 fenced, fenced shell blocks work in bash and zsh, no real-spend executor
 commands in yellow-goal). Hunters and verifiers receive it in the prompt; the
-CLAUDE.md files are already injected into workflow agents. Read it from the base
-branch, never from the PR, as the managed product does, so a PR cannot weaken
-its own review.
+CLAUDE.md files are already injected into workflow agents. Read it from the
+default branch, never from the PR or its base, so a PR cannot weaken its own
+review: in a stack the base is the parent PR's unmerged branch (the same reason
+§5 gives for the policy). The managed product reads the base branch, which is
+the same commit for an unstacked PR.
 
 ## 5. Approval by risk
 
@@ -202,27 +206,37 @@ its own review.
 A deterministic script,
 `plugins/yellow-review/skills/pr-review-workflow/scripts/classify-risk`, reads
 the changed paths and diff stats and a per-repo policy file
-`.github/review-risk.yml`. Output: `{ tier, reasons[] }`. Rules are path globs
-plus one size signal. Each file takes the tier of the first rule in file order
-whose glob matches it, so narrow exceptions sit above the broad rule they carve
-out of; the change takes the highest tier of its files. The policy is read from
-the default branch (not the PR's base, which in a stack is the parent PR's
-unmerged branch), so a PR cannot lower its own tier. Hook registrations in
-`catalog/plugins/*` and plugin manifests, and the root `CLAUDE.md`/`AGENTS.md`
-that reviewers follow, are high as well. A backtest of the seed policy on 300
+`.github/review-risk.json` (JSON so `jq` reads it with no YAML dependency).
+Output: `{ tier, reasons[] }`. Rules are path globs plus one size signal. Each
+file takes the tier of the first rule in file order whose glob matches it, so
+narrow exceptions sit above the broad rule they carve out of; the change takes
+the highest tier of its files. The policy is read from the default branch (not
+the PR's base, which in a stack is the parent PR's unmerged branch), so a PR
+cannot lower its own tier. Hook registrations in `catalog/plugins/*` and plugin
+manifests, and the root `CLAUDE.md`/`AGENTS.md` that reviewers follow, are high
+as well. The policy file itself and any `REVIEW.md` are always high whatever the
+policy says. A policy file that exists but cannot be read or validated makes
+every file high (fail closed); a repo with no policy file uses the built-in
+default, where every other file is medium. A backtest of the seed policy on 300
 merged yellow-plugins PRs gave 45% high, 49% medium and 6% low.
 
-Seed policy for yellow-plugins (to be confirmed by the user):
+Seed policy for yellow-plugins (to be confirmed by the user). The concrete globs
+are in `.github/review-risk.json`; this is the intent they encode:
 
 - **High (always high, whatever the diff size):** `plugins/*/hooks/**`,
   `plugins/*/lib/*.sh` that handle trust boundaries, `scripts/` release and
   generator code, `.github/workflows/**`, `schemas/**`, `catalog/**`,
-  `.claude-plugin/**`, anything that writes to GitHub unattended (`resolve-*`,
-  `apply-thread-actions`). `rp_runner` in `lib/resolve-paths.sh` already lists
-  paths that unattended resolve must never commit, which is a good starting set.
+  `.claude-plugin/**` (except the generated `.claude-plugin/marketplace.json`
+  and `.agents/plugins/*`, which are medium: `catalog/` is their source and CI
+  checks them for drift), anything that writes to GitHub unattended
+  (`resolve-*`, `apply-thread-actions`). `rp_runner` in `lib/resolve-paths.sh`
+  already lists paths that unattended resolve must never commit, which is a good
+  starting set.
 - **Medium:** agent, command and skill Markdown; tests; any code not listed.
-- **Low:** docs, READMEs, CHANGELOG, `docs/research/`, changesets alone,
-  additive changes behind a `yellow-plugins.local.md` flag defaulting off.
+- **Low:** docs, READMEs, CHANGELOG, `docs/research/`, changesets alone.
+  Additive changes behind a `yellow-plugins.local.md` flag defaulting off would
+  also qualify, but that depends on diff content the path classifier cannot see;
+  it is left to the optional model second opinion below.
 
 For yellow-goal: high for `backend/src/real-run/**`, `executors/**`, approval
 and spend-ledger code, `.claude/hooks/guard-live-executor.mjs`, `policies/**`,
@@ -265,20 +279,20 @@ This changes the standing approval in [[graphite]]: Claude would add
 
 ## 6. Stage-by-stage map: existing vs new
 
-| Stage             | Existing component                                                                                                                      | New work                                                                                     |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Precondition      | CI `ci-status`; yellow-goal `ci.yml`                                                                                                    | REVIEW.md "do not report" list                                                               |
-| Context           | CLAUDE.md files; `/review:pr` Step 3d learnings pre-pass; Step 3e ledger dismissed context                                              | Root `REVIEW.md` in both repos                                                               |
-| Hunt              | 16 yellow-review personas, 10 yellow-core review agents, `codex-reviewer`, `thermonuclear-reviewer` (opt-in), compact-return schema     | `review-gate.js` Hunt phase; drop persona-side confidence floors                             |
-| Vote              | Step 6 skim-FP check (single orchestrator pass)                                                                                         | Verifier prompt + verdict schema; per-severity voter counts                                  |
-| Rank              | P0–P3 + Pre-existing sections; ledger categories (`review-ledger-vocab.json`)                                                           | Important/Nit display mapping; Nit cap                                                       |
-| Findings answered | `/review:resolve` dispositions, `apply-thread-actions`, review ledger, `/review:triage`, `sync-blocking-comment`, `/review:merge-ready` | Merge gate reads workflow `coverage.failed` as unknown                                       |
-| Approval by risk  | `check-merge-ready` (threads, reviews, CI, ledger)                                                                                      | `classify-risk` + `.github/review-risk.yml`; human-on-head-SHA check; tier in sticky comment |
-| Merge queue       | Graphite MQ, `graphite-queue` label                                                                                                     | none                                                                                         |
-| Ship behind flag  | `review_pipeline` setting (already has `legacy`), changesets, version-packages PR                                                       | `review_pipeline: workflow` value; shadow → advisory → enforce                               |
-| CI reviewer       | `claude-code-review.yml` (upstream `code-review` plugin on Sonnet 5.5)                                                                  | Phase 3: second job running `review-gate` headless                                           |
-| Cross-lineage     | `/council` (advisory, Claude + Codex + Gemini + OpenCode)                                                                               | Called for high tier only                                                                    |
-| Eval              | `scripts/eval/model-swap` (replay + scan graders, fingerprints, resume), `scripts/eval/thermonuclear-fixtures`                          | `scripts/eval/review-gate/` case format, case intake, scheduled run                          |
+| Stage             | Existing component                                                                                                                      | New work                                                                                      |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Precondition      | CI `ci-status`; yellow-goal `ci.yml`                                                                                                    | REVIEW.md "do not report" list                                                                |
+| Context           | CLAUDE.md files; `/review:pr` Step 3d learnings pre-pass; Step 3e ledger dismissed context                                              | Root `REVIEW.md` in both repos                                                                |
+| Hunt              | 16 yellow-review personas, 10 yellow-core review agents, `codex-reviewer`, `thermonuclear-reviewer` (opt-in), compact-return schema     | `review-gate.js` Hunt phase; drop persona-side confidence floors                              |
+| Vote              | Step 6 skim-FP check (single orchestrator pass)                                                                                         | Verifier prompt + verdict schema; per-severity voter counts                                   |
+| Rank              | P0–P3 + Pre-existing sections; ledger categories (`review-ledger-vocab.json`)                                                           | Important/Nit display mapping; Nit cap                                                        |
+| Findings answered | `/review:resolve` dispositions, `apply-thread-actions`, review ledger, `/review:triage`, `sync-blocking-comment`, `/review:merge-ready` | Merge gate reads workflow `coverage.failed` as unknown                                        |
+| Approval by risk  | `check-merge-ready` (threads, reviews, CI, ledger)                                                                                      | `classify-risk` + `.github/review-risk.json`; human-on-head-SHA check; tier in sticky comment |
+| Merge queue       | Graphite MQ, `graphite-queue` label                                                                                                     | none                                                                                          |
+| Ship behind flag  | `review_pipeline` setting (already has `legacy`), changesets, version-packages PR                                                       | `review_pipeline: workflow` value; shadow → advisory → enforce                                |
+| CI reviewer       | `claude-code-review.yml` (upstream `code-review` plugin on Sonnet 5.5)                                                                  | Phase 3: second job running `review-gate` headless                                            |
+| Cross-lineage     | `/council` (advisory, Claude + Codex + Gemini + OpenCode)                                                                               | Called for high tier only                                                                     |
+| Eval              | `scripts/eval/model-swap` (replay + scan graders, fingerprints, resume), `scripts/eval/thermonuclear-fixtures`                          | `scripts/eval/review-gate/` case format, case intake, scheduled run                           |
 
 ## 7. The eval feedback loop
 
@@ -373,7 +387,7 @@ From Anthropic's current prompting guide and the repo's own
 
 | Phase | Scope                                                                                                                                                                          | Gate to the next phase                                     |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| 0     | `REVIEW.md` in both repos; seed `review-risk.yml`; `classify-risk` script with bats tests; tier shown in the sticky comment only.                                              | A week of tiers the user agrees with.                      |
+| 0     | `REVIEW.md` in both repos; seed `review-risk.json`; `classify-risk` script with bats tests; tier shown in `/review:pr` only (sticky comment later).                            | A week of tiers the user agrees with.                      |
 | 1     | `review-gate.js` behind `review_pipeline: workflow` in `/review:pr`, run in shadow next to the current pipeline; both outputs logged. Validator support for `workflows/`.      | Eval: new pipeline's recall ≥ current, controls not worse. |
 | 2     | `review_pipeline: workflow` becomes the default for `/review:pr` and `/review:sweep`; approval rules enforced in `check-merge-ready`.                                          | Two weeks without a merge-gate false block.                |
 | 3     | CI job runs `review-gate` headless on non-draft PRs (separate from the upstream `code-review` job, which stays as an independent lineage until the eval says it adds nothing). | Ongoing eval loop.                                         |

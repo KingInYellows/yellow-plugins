@@ -20,9 +20,9 @@ rollback. In this repository that includes:
   `--- begin/end ---` fencing and "(reference only)" note.
 - A script that writes to GitHub or git without its idempotency marker, input
   validation or exit-code contract.
-- A version that drifts between `package.json`, `plugin.json` and
-  `marketplace.json`, or a manifest edited by hand instead of generated from
-  `catalog/`.
+- A change to the version-sync, manifest-generator or validator code that would
+  let version drift or a hand-edited manifest pass CI. Drift itself is caught by
+  `validate:versions` and `validate:generated`, so do not report it.
 - A hook that can block or slow every session, or that fails open where its
   contract says fail closed.
 
@@ -52,8 +52,8 @@ Report at most five Nits per review. Pick the five that matter most.
   instructions are brief and plain, with no ALL-CAPS rule lists or "be thorough"
   lines; and the change does not break the documented interface another command
   calls.
-- A plugin change carries a changeset, and behaviour changes update the plugin's
-  `README.md` and `CLAUDE.md`.
+- Behaviour changes update the plugin's `README.md` and `CLAUDE.md` (CI already
+  requires the changeset).
 - Branch and PR operations go through the enabled stacked-PR provider, never a
   raw `git push` or `gh pr create`.
 

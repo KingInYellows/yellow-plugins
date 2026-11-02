@@ -172,16 +172,35 @@ does not change which reviewers run yet. The policy comes from the default
 branch, not the PR's base: in a stack the base is the parent PR's unmerged
 branch. Only the tier, the policy source and the policy's own rule names are
 printed; the changed paths are PR-controlled text and stay out of context.
+The policy is read at the commit this fetch returned (`FETCH_HEAD`), never a
+remote-tracking ref that a failed fetch would leave stale, and each network
+call is bounded at 30 s (then killed 5 s later) when a `timeout` or `gtimeout`
+with `--kill-after` is installed.
 
 ```bash
-DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+rr_net() {
+  for rr_t in timeout gtimeout; do
+    if command -v "$rr_t" >/dev/null 2>&1 &&
+      "$rr_t" --kill-after=1 1 true >/dev/null 2>&1; then
+      "$rr_t" --kill-after=5 30 "$@"
+      return
+    fi
+  done
+  "$@"
+}
+DEFAULT_BRANCH=$(rr_net gh repo view --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
 case "$DEFAULT_BRANCH" in
   '' | -* | *..* | *[!A-Za-z0-9._/-]*) printf '[review:pr] Warning: no usable default branch; risk tier unknown\n' >&2 ;;
   *)
-    git fetch origin "$DEFAULT_BRANCH" --no-tags --quiet || true
-    "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
-      --policy-ref "origin/$DEFAULT_BRANCH" "<DIFF_BASE>" HEAD |
-      jq -r '"tier=\(.tier) policy=\(.policy) rules=\([.reasons[].rule] | unique | join("; "))"'
+    if ! rr_net git fetch --no-tags --quiet origin "refs/heads/$DEFAULT_BRANCH"; then
+      printf '[review:pr] Warning: default branch fetch failed; risk tier unknown\n' >&2
+    elif ! POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
+      printf '[review:pr] Warning: fetched default branch unreadable; risk tier unknown\n' >&2
+    else
+      "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
+        --policy-ref "$POLICY_SHA" "<DIFF_BASE>" HEAD |
+        jq -r '"tier=\(.tier) policy=\(.policy) rules=\([.reasons[].rule] | unique | join("; "))"'
+    fi
     ;;
 esac
 ```
