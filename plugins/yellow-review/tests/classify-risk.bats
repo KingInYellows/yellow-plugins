@@ -247,3 +247,13 @@ commit_file() {
   [ "$(jq -r .files <<<"$output")" = 2000 ]
   [ "$SECONDS" -lt 10 ]
 }
+
+@test "--stdin --numstat applies the size rule from API line counts" {
+  printf '%s\n' "$POLICY" >"$BATS_TEST_TMPDIR/p.json"
+  run "$SCRIPT" --policy-file "$BATS_TEST_TMPDIR/p.json" --stdin --numstat <<<$'15\t0\tdocs/a.md\n-\t-\tdocs/img.png'
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .tier <<<"$output")" = medium ]
+  [ "$(jq -r .lines <<<"$output")" = 15 ]
+  run "$SCRIPT" --policy-file "$BATS_TEST_TMPDIR/p.json" --stdin --numstat <<<"docs/no-tabs.md"
+  [ "$(jq -r .tier <<<"$output")" = low ]
+}

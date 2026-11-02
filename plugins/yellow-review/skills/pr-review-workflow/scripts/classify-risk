@@ -3,7 +3,7 @@
 # changed paths, using the repository's policy file from a trusted ref, so a
 # pull request cannot lower its own tier by editing the policy.
 # Usage: classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>
-#        classify-risk [--policy-ref <ref> | --policy-file <file>] --stdin [<base-ref>]
+#        classify-risk [--policy-ref <ref> | --policy-file <file>] --stdin [--numstat] [<base-ref>]
 #   <base-ref>...<head-ref> is the diff (merge-base semantics).
 #   --policy-ref: read the policy from this ref instead of <base-ref>. Pass
 #     the default branch (origin/main) for a stacked PR: its base is the
@@ -14,6 +14,9 @@
 #   --stdin: paths on stdin, one per line; line counts are not known. The
 #     base ref is needed only to read the policy, so it may be omitted with
 #     --policy-file.
+#   --stdin --numstat: stdin rows are "<added>\t<deleted>\t<path>" (git's
+#     --numstat form, "-" for binary), so the size rule applies. For callers
+#     that read the file list from the GitHub API instead of a checkout.
 # Policy: .github/review-risk.json:
 #   {"version":1,"default_tier":"medium","low_max_lines":300,
 #    "rules":[{"tier":"high|medium|low","why":"...","paths":["glob",...]}]}
@@ -48,7 +51,7 @@ POLICY_PATH=.github/review-risk.json
 MAX_REASONS=50
 
 usage() {
-    printf 'Usage: classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>\n       classify-risk [--policy-ref <ref> | --policy-file <file>] --stdin [<base-ref>]\n' >&2
+    printf 'Usage: classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>\n       classify-risk [--policy-ref <ref> | --policy-file <file>] --stdin [--numstat] [<base-ref>]\n' >&2
     exit 2
 }
 
@@ -84,9 +87,14 @@ esac
 MODE=git
 BASE=""
 HEAD=""
+NUMSTAT=0
 if [ "${1:-}" = --stdin ]; then
     MODE=stdin
     shift
+    if [ "${1:-}" = --numstat ]; then
+        NUMSTAT=1
+        shift
+    fi
     case $# in
         0) [ -n "$POLICY_FILE" ] || usage ;;
         1) BASE="$1"; check_ref "$BASE" ;;
@@ -115,6 +123,15 @@ if [ "$MODE" = git ]; then
         printf 'Error: git diff failed: %s\n' "$(cat "$WORK/err")" >&2
         exit 1
     }
+elif [ "$NUMSTAT" -eq 1 ]; then
+    # A row without two tabs is taken as a bare path with unknown counts.
+    while IFS= read -r p || [ -n "$p" ]; do
+        [ -n "$p" ] || continue
+        case "$p" in
+            *"	"*"	"*) printf '%s\n' "$p" ;;
+            *) printf -- '-\t-\t%s\n' "$p" ;;
+        esac
+    done >"$WORK/numstat"
 else
     while IFS= read -r p || [ -n "$p" ]; do
         [ -n "$p" ] || continue
@@ -167,7 +184,7 @@ fi
 [ "$POLICY_STATE" != invalid ] || printf '{"default_tier":"high","low_max_lines":0,"rules":[]}\n' >"$WORK/policy.valid"
 
 LINES_MODE=known
-[ "$MODE" = git ] || LINES_MODE=unknown
+[ "$MODE" = git ] || [ "$NUMSTAT" -eq 1 ] || LINES_MODE=unknown
 
 # One jq pass classifies every path: globs become anchored regexes (every
 # regex metacharacter other than * and ? is escaped; the allowed glob
