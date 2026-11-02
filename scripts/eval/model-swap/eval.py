@@ -45,16 +45,17 @@ def git(*args, cwd=REPO):
                           text=True, check=True).stdout
 
 
-def worktree(path, commit):
+def worktree(path, commit, cwd=REPO):
     if not os.path.isdir(path):
-        git("worktree", "add", "--quiet", "--detach", path, commit)
+        git("worktree", "add", "--quiet", "--detach", path, commit, cwd=cwd)
 
 
-def fresh_worktree(path, commit):
-    """Recreate path at commit, so a changed spec never reuses an old tree."""
+def fresh_worktree(path, commit, cwd=REPO):
+    """Recreate path at commit, so a changed spec never reuses an old tree.
+    cwd is the repository the worktree belongs to (review-gate passes others)."""
     if os.path.isdir(path):
-        git("worktree", "remove", "--force", path)
-    worktree(path, commit)
+        git("worktree", "remove", "--force", path, cwd=cwd)
+    worktree(path, commit, cwd)
 
 
 def fingerprint(*parts):
