@@ -81,6 +81,7 @@ jobs:
           - cursor
           - yellow-goal
           - yellow-jules
+          - yellow-agy
           - generated
           - shell-compat
 
@@ -246,6 +247,12 @@ jobs:
               pnpm --filter yellow-jules run build
               test -z "$(git status --porcelain --untracked-files=all -- plugins/yellow-jules/dist)"
               pnpm --filter yellow-jules test
+              ;;
+            yellow-agy)
+              # Committed-dist drift (untracked-aware) plus the package suite.
+              pnpm --filter yellow-agy run build
+              test -z "$(git status --porcelain --untracked-files=all -- plugins/yellow-agy/dist)"
+              pnpm --filter yellow-agy test
               ;;
             generated)
               # Schema conformance gate (mirror of the main workflow's

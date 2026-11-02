@@ -6,11 +6,24 @@ Pro sign-in.
 
 ## Status
 
-Experimental scaffold. Only `commands/agy/setup.md` exists. The TypeScript CLI
-(adapter, worktree module, and the grant/authority core ported from
-yellow-jules) lands next, built to `docs/yellow-agy/contract-v0.md`. Evidence
-for every flag the contract uses is in
-`docs/spikes/antigravity-cli-delegate-2026-10.md`.
+Experimental. `commands/agy/setup.md` is the only command. The TypeScript
+adapter is landing in stages against `docs/yellow-agy/contract-v0.md`; the
+evidence for every flag it uses is in
+`docs/spikes/antigravity-cli-delegate-2026-10.md` and
+`docs/spikes/antigravity-cli-adapter-probe-2026-11.md`.
+
+## Architecture
+
+```text
+plugins/yellow-agy/
+  src/
+    invocation.ts   # the only place an agy spawn (file, argv, env) is built: env scrub, hooks off, WSL bridge
+    profiles.ts     # --settings profiles (read-only, implement) and per-turn argv
+    classify.ts     # result classification; an absent finished_reason is a normal finish
+    errors.ts       # AGY_* catalog with exit codes and recovery actions
+  dist/             # committed compiled CJS; drift-checked in CI
+  tests/            # vitest, no agy binary needed
+```
 
 ## Conventions
 
