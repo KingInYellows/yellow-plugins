@@ -512,11 +512,13 @@ describe('review-gate dedup', () => {
     ]);
   });
 
-  it('matches dismissals per finding, by rule or title, and skips line-less entries', async () => {
+  it('matches dismissals per finding, by full category/rule or title, and skips line-less entries', async () => {
     const r = await run(
       baseArgs({
         dismissed: [
-          { file: 'src/a.sh', line: 41, rule: 'security/unclassified' },
+          { file: 'src/a.sh', line: 41, rule: 'security/token-leak' },
+          { file: 'src/a.sh', line: 50, rule: 'correctness/unclassified' },
+          { file: 'src/a.sh', line: 60, rule: 'correctness/style' },
           { file: 'src/a.sh', line: null, rule: 'correctness/unclassified' },
           { file: 'src/a.sh', line: 70, title: 'Unrelated wording' },
         ],
@@ -525,8 +527,15 @@ describe('review-gate dedup', () => {
         hunter: (name) => ({
           reviewer: name,
           findings: [
-            finding({ line: 40, category: 'security', title: 'Token leak' }),
+            finding({
+              line: 40,
+              category: 'security',
+              rule: 'token-leak',
+              title: 'Token leak',
+            }),
             finding({ line: 41, title: 'Off by one in loop' }),
+            finding({ line: 50, title: 'Null deref on empty input' }),
+            finding({ line: 60, rule: 'logic', title: 'Wrong branch taken' }),
             finding({ line: 70 }),
           ],
         }),
@@ -536,7 +545,7 @@ describe('review-gate dedup', () => {
       [40, 'dismissed earlier'],
     ]);
     expect(r.result.findings.map((f: Finding) => f.line).sort()).toEqual([
-      41, 70,
+      41, 50, 60, 70,
     ]);
     expect(r.logs).toContain(
       'Hunt: ignored a dismissed entry for src/a.sh with no line'

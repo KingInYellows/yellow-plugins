@@ -665,8 +665,9 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   - **Paths:** a finding's path loses `./` and `repo_root`; any other absolute
     path ending in `/<changed file>` becomes that changed file.
   - **Dismissed:** each raw finding is matched on its own against `dismissed`
-    (same file, line within 3, and the `rule`'s category or slug, or a similar
-    title) and dropped before dedup and voting.
+    (same file, line within 3, and the full `rule` category and slug, never an
+    `unclassified` slug or the category alone, or a similar title) and dropped
+    before dedup and voting.
   - **Dedup:** plain code. Findings are taken most severe, then most confident,
     first; each cluster's first member is its representative. A finding joins a
     cluster with the same file, category and `pre_existing` flag, a line within

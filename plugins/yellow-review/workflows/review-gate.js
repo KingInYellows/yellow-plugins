@@ -395,16 +395,25 @@ function verifierPrompt(a, f, lens) {
 }
 
 // A dismissal matches a finding on file, line within LINE_WINDOW, and at
-// least one of rule ("category/rule", as the ledger's dismissed-context block
-// prints it) or title.
+// least one of the full rule ("category/rule", as the ledger's
+// dismissed-context block prints it; category and slug must both match) or
+// title.
 function dismissalMatches(d, f) {
   if (d.file !== f.file || Math.abs(d.line - f.line) > LINE_WINDOW) {
     return false;
   }
+  // Category alone is too broad: one dismissed nit must not suppress a new
+  // P0 in the same category nearby. Match the full category/slug, or the title.
   if (d.rule) {
     const [cat, slug] = d.rule.split('/');
-    if (cat === f.category) return true;
-    if (slug && slug !== 'unclassified' && slug === f.rule) return true;
+    if (
+      slug &&
+      slug !== 'unclassified' &&
+      cat === f.category &&
+      slug === f.rule
+    ) {
+      return true;
+    }
   }
   if (d.title && similarTitles(d.title, f.title)) return true;
   return false;
