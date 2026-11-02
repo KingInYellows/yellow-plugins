@@ -300,6 +300,7 @@ query MergeReadyApproval($owner: String!, $name: String!, $number: Int!) {
       headRefName
       changedFiles
       reviews(last: 100) {
+        pageInfo { hasPreviousPage }
         nodes { state author { __typename login } commit { oid } }
       }
       commits(last: 1) {
@@ -351,7 +352,12 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
             note "the head moved during the check; tier and reviews unknown"
             A_HEAD=""
         else
-            jq '.data.repository.pullRequest.reviews.nodes' "$WORK/approval.raw" >"$WORK/reviews"
+            # More than the 100 reviews read: an older on-head approval or
+            # bot review may be hidden, so only a found one counts and a
+            # missing one is unknown, never definite.
+            jq '.data.repository.pullRequest.reviews
+                | {nodes, truncated: (.pageInfo.hasPreviousPage != false)}' \
+                "$WORK/approval.raw" >"$WORK/reviews"
             # Label approval: who added the label and when, against the time
             # the head arrived on this PR: the latest of the head commit's
             # committer date, its first check suite on the PR's head branch
@@ -440,7 +446,8 @@ jq -n -c \
   else
     ($cfg[0].humans // [$owner] | map(ascii_downcase)) as $humans
     | ($cfg[0].bots // ["chatgpt-codex-connector[bot]"] | map(norm)) as $bots
-    | $rev[0] as $r
+    | ($rev[0] | if type == "object" then .nodes else null end) as $r
+    | ($rev[0] | type == "object" and .truncated == true) as $rt
     | [($r // [])[] | select(.state == "APPROVED" and .author.__typename == "User"
           and ((.author.login // "") | test("\\[bot\\]\\z") | not)
           and ((.author.login // "") | ascii_downcase | IN($humans[])))] as $appr
@@ -456,8 +463,9 @@ jq -n -c \
        elif ($lbl | any(. == $lastadd)) and $lastadd.createdAt >= $ht then $lastadd
        else null end) as $lblhead
     | (if $r == null then null
-       else any($r[]; .author.__typename == "Bot" and ((.author.login // "") | norm | IN($bots[]))
-                and .commit.oid == $head) end) as $xl
+       elif any($r[]; .author.__typename == "Bot" and ((.author.login // "") | norm | IN($bots[]))
+                and .commit.oid == $head) then true
+       elif $rt then null else false end) as $xl
     | {mode: $mode, tier: $tier, policy: (if $policy == "null" then null else $policy end),
        required: ({low: 0, medium: 1, high: 1}[$tier]),
        humanApproval: (if $onhead != null then {login: $onhead.author.login, commit: $onhead.commit.oid, via: "review"}
@@ -468,14 +476,15 @@ jq -n -c \
          if $tier == "unknown" then ["tier_unknown"]
          elif $tier == "low" then []
          else (if $onhead != null or $lblhead != null then []
-               elif $r == null then ["reviews_unknown"]
+               elif $r == null or $rt then ["reviews_unknown"]
                elif ($lbl | length) > 0 and $ht == null then ["head_time_unknown"]
                elif ($appr | length) > 0 or ($lbl | length) > 0 then ["approval_stale"]
                else ["approval_required"] end)
               + (if $tier == "high" then
-                   (if $xl == false then ["cross_lineage_missing"] else [] end) + ["fresh_review_unknown"]
+                   (if $xl == false then ["cross_lineage_missing"] elif $xl == null then ["reviews_unknown"] else [] end)
+                   + ["fresh_review_unknown"]
                  else [] end)
-         end)}
+         end | reduce .[] as $t ([]; if any(.[]; . == $t) then . else . + [$t] end))}
   end' >"$WORK/approval" 2>/dev/null || {
     note 'could not assemble the approval section; approval unknown'
     jq -n -c --arg mode "$APPROVAL_MODE" '{mode: $mode, tier: (if $mode == "off" then null else "unknown" end),

@@ -80,7 +80,7 @@ approval_body() {
     --arg ca "${HEAD_AT:-2026-11-02T10:00:00Z}" --arg sa "${SUITE_AT:-2026-11-02T10:01:00Z}" \
     --argjson l "${LABELS:-[]}" \
     '{data:{repository:{defaultBranchRef:{target:{oid:$d}},
-      pullRequest:{headRefOid:$h, changedFiles:$n, reviews:{nodes:$r},
+      pullRequest:{headRefOid:$h, changedFiles:$n, reviews:{pageInfo:{hasPreviousPage:false}, nodes:$r},
         headRefName:"feature",
         commits:{nodes:[{commit:{oid:$h, committedDate:$ca, checkSuites:{nodes:[{createdAt:$sa, branch:{name:"feature"}}]}}}]},
         labels:{nodes:[{name:"graphite-queue"}]},
@@ -493,6 +493,24 @@ state_body() {
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 3 ]
   [ "$(jq -c .approval.missing <<<"$output")" = '["head_time_unknown"]' ]
+}
+
+@test "CLAUDE-234: more than 100 reviews with no on-head approval read is unknown, not missing" {
+  config 'review_approval_gate: enforce'
+  with_files src/a.js
+  MOCK_GH_MRA_BODY=$(jq -c '.data.repository.pullRequest.reviews.pageInfo.hasPreviousPage = true' <<<"$MOCK_GH_MRA_BODY")
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["reviews_unknown"]' ]
+}
+
+@test "CLAUDE-234: an on-head approval within the last 100 reviews still counts when older ones exist" {
+  config 'review_approval_gate: enforce'
+  REVIEWS="[$(rv APPROVED Test User "$HEAD_SHA")]" with_files src/a.js
+  MOCK_GH_MRA_BODY=$(jq -c '.data.repository.pullRequest.reviews.pageInfo.hasPreviousPage = true' <<<"$MOCK_GH_MRA_BODY")
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '[]' ]
 }
 
 @test "CLAUDE-234: a head that moves before the check ends leaves the approval unknown" {
