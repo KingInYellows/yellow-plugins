@@ -316,16 +316,35 @@ async function ignoredPaths(
   exec: HostExec,
   worktree: string
 ): Promise<string[]> {
-  return nulList(
-    await git(exec, worktree, [
-      'ls-files',
-      '--others',
-      '--ignored',
-      '--exclude-standard',
-      '--directory',
-      '-z',
-    ])
-  );
+  const raw = await gitBytes(exec, worktree, [
+    'ls-files',
+    '--others',
+    '--ignored',
+    '--exclude-standard',
+    '--directory',
+    '-z',
+  ]);
+  const paths: string[] = [];
+  let start = 0;
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] !== 0) continue;
+    if (i > start) {
+      const bytes = raw.subarray(start, i);
+      const text = bytes.toString('utf8');
+      // A name that is not valid UTF-8 would come back as a different path,
+      // and a pattern for that path would not protect the real file.
+      if (!Buffer.from(text, 'utf8').equals(bytes)) {
+        throw new AgyError(
+          'AGY_WORKTREE',
+          `an ignored path is not valid UTF-8: ${JSON.stringify(text)}`,
+          'Move or rename that file, then retry --reset-partial.'
+        );
+      }
+      paths.push(text);
+    }
+    start = i + 1;
+  }
+  return paths;
 }
 
 async function collisionsWith(

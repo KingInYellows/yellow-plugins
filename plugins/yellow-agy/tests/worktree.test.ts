@@ -191,6 +191,26 @@ describe('worktree', () => {
     expect(fs.existsSync(excludes)).toBe(false);
   });
 
+  it.runIf(process.platform === 'linux')(
+    'refuses a reset before touching anything when an ignored name is not UTF-8',
+    async () => {
+      const { wt } = await setup();
+      const snap = await snapshotWorktree(exec, wt, 't1');
+      const name = Buffer.concat([
+        Buffer.from(path.join(wt, 'x')),
+        Buffer.from([0xe9]),
+        Buffer.from('.log'),
+      ]);
+      fs.writeFileSync(name, 'keep\n');
+      fs.writeFileSync(path.join(wt, 'junk.txt'), 'junk\n');
+      await expect(resetToSnapshot(exec, wt, 't1', snap)).rejects.toMatchObject(
+        { code: 'AGY_WORKTREE' }
+      );
+      expect(fs.existsSync(name)).toBe(true);
+      expect(fs.existsSync(path.join(wt, 'junk.txt'))).toBe(true);
+    }
+  );
+
   it('refuses a reset that would delete an ignored file in the way', async () => {
     const { wt } = await setup();
     fs.mkdirSync(path.join(wt, 'build'));
