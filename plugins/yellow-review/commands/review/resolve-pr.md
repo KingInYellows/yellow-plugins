@@ -878,31 +878,49 @@ the way `/review:pr` Step 3a2 does, with the policy read at the default branch's
 fetched tip so neither the PR nor a parent in its stack sets it:
 
 ```bash
+rr_net() {
+  for rr_t in timeout gtimeout; do
+    if command -v "$rr_t" >/dev/null 2>&1 &&
+      "$rr_t" --kill-after=1 1 true >/dev/null 2>&1; then
+      "$rr_t" --kill-after=5 30 "$@"
+      return
+    fi
+  done
+  "$@"
+}
+rr_warn() { printf '[review:resolve] Warning: risk tier unknown (%s)\n' "$1" >&2; }
 RISK_FILE=""
-DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
-BASE_BRANCH=$(gh pr view "<PR#>" --json baseRefName -q .baseRefName) || BASE_BRANCH=""
+DEFAULT_BRANCH=$(rr_net gh repo view --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
+BASE_BRANCH=$(rr_net gh pr view "<PR#>" --json baseRefName -q .baseRefName) || BASE_BRANCH=""
 RISK_OK=1
 for rr_b in "$DEFAULT_BRANCH" "$BASE_BRANCH"; do
   case "$rr_b" in '' | -* | *..* | *[!A-Za-z0-9._/-]*) RISK_OK=0 ;; esac
 done
-if [ "$RISK_OK" = 1 ] &&
-  git fetch --no-tags --quiet origin "+refs/heads/$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH" &&
-  git fetch --no-tags --quiet origin "refs/heads/$DEFAULT_BRANCH" &&
-  POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}') &&
-  RISK_FILE=$(mktemp "${TMPDIR:-/tmp}/resolve-risk.XXXXXX"); then
-  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
-    --policy-ref "$POLICY_SHA" "origin/$BASE_BRANCH" HEAD >|"$RISK_FILE" ||
-    { rm -f "$RISK_FILE"; RISK_FILE=""; }
-else
+if [ "$RISK_OK" != 1 ]; then
+  rr_warn 'no usable default or base branch'
+elif ! rr_net git fetch --no-tags --quiet origin "+refs/heads/$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"; then
+  rr_warn 'base branch fetch failed'
+elif ! rr_net git fetch --no-tags --quiet origin "refs/heads/$DEFAULT_BRANCH"; then
+  rr_warn 'default branch fetch failed'
+elif ! POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
+  rr_warn 'fetched default branch unreadable'
+elif ! RISK_FILE=$(mktemp "${TMPDIR:-/tmp}/resolve-risk.XXXXXX"); then
   RISK_FILE=""
+  rr_warn 'mktemp failed'
+elif ! "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
+  --policy-ref "$POLICY_SHA" "origin/$BASE_BRANCH" HEAD >|"$RISK_FILE"; then
+  rm -f "$RISK_FILE"
+  RISK_FILE=""
+  rr_warn 'classify-risk failed'
 fi
 printf 'risk_file=%s\n' "$RISK_FILE"
 ```
 
-An empty `risk_file=` (a lookup, fetch or classification failed) drops `--risk`
-below and the comment has no tier line; it never stops the run. Run the sync as
-its own Bash call with a `timeout` of 420000 ms, with `--risk "<risk-file>"`
-only when the path printed above is not empty:
+Each network call is bounded at 30 s as in `/review:pr` Step 3a2, and each
+failure prints a `risk tier unknown (<stage>)` warning. An empty `risk_file=`
+drops `--risk` below and the comment has no tier line; it never stops the run.
+Run the sync as its own Bash call with a `timeout` of 420000 ms, with
+`--risk "<risk-file>"` only when the path printed above is not empty:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/sync-blocking-comment" --reasons "<reasons-file>" --risk "<risk-file>" "<owner/repo>" "<PR#>" "<conversationResolution>"

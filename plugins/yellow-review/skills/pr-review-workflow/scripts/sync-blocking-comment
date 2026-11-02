@@ -14,7 +14,7 @@
 #   --risk <file>: optional classify-risk output for the PR. Only its tier
 #     (low, medium, high) and policy source (base, ref, file, none, invalid)
 #     are read; the comment shows them on a "Risk tier" line. Without it the
-#     line is left out. Policy ref reads "from the default branch": callers
+#     line is left out. The file must hold exactly one JSON object. Policy ref reads "from the default branch": callers
 #     pass --policy-ref the default branch's tip (resolve-pr.md Step 9). A file that is unreadable, a symlink, not a JSON
 #     object, or holds another tier or policy is a usage error.
 # Every unresolved thread blocks, outdated ones included, as in
@@ -117,11 +117,17 @@ if [ -n "$RISK_FILE" ]; then
         printf 'Error: cannot read risk file: %s\n' "$RISK_FILE" >&2
         exit 2
     fi
-    RISK_TIER=$(jq -er 'select(type == "object") | .tier | select(IN("low", "medium", "high"))' "$RISK_FILE" 2>/dev/null) \
-        && RISK_POLICY=$(jq -er '.policy | select(IN("base", "ref", "file", "none", "invalid"))' "$RISK_FILE" 2>/dev/null) || {
+    # Exactly one JSON object, so a second document cannot ride along.
+    RISK_PAIR=$(jq -ser '
+        if length == 1 and (.[0] | type) == "object"
+           and (.[0].tier | IN("low", "medium", "high"))
+           and (.[0].policy | IN("base", "ref", "file", "none", "invalid"))
+        then "\(.[0].tier) \(.[0].policy)" else error("invalid") end' "$RISK_FILE" 2>/dev/null) || {
         printf 'Error: risk file is not classify-risk output: %s\n' "$RISK_FILE" >&2
         exit 2
     }
+    RISK_TIER=${RISK_PAIR%% *}
+    RISK_POLICY=${RISK_PAIR#* }
 fi
 
 skip() {

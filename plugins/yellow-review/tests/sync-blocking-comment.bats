@@ -263,11 +263,14 @@ gh_calls() {
 }
 
 @test "a risk file that is not classify-risk output is a usage error" {
-  for bad in '[]' '{"tier":"unknown","policy":"ref"}' '{"tier":"high","policy":"default_branch"}' '{"tier":"high"}' 'nope'; do
+  for bad in '[]' '{"tier":"unknown","policy":"ref"}' '{"tier":"high","policy":"default_branch"}' '{"tier":"high"}' 'nope' \
+    '{"tier":"low","policy":"base"} {"tier":"high","policy":"ref"}'; do
     printf '%s' "$bad" >"${BATS_TEST_TMPDIR}/risk.json"
     run --separate-stderr "$SCRIPT" --risk "${BATS_TEST_TMPDIR}/risk.json" test/repo 7 unknown
     [ "$status" -eq 2 ]
   done
+  run --separate-stderr "$SCRIPT" --risk "${BATS_TEST_TMPDIR}/missing.json" test/repo 7 unknown
+  [ "$status" -eq 2 ]
   printf '{"tier":"low","policy":"base"}' >"${BATS_TEST_TMPDIR}/ok.json"
   ln -s "${BATS_TEST_TMPDIR}/ok.json" "${BATS_TEST_TMPDIR}/risk-link.json"
   run --separate-stderr "$SCRIPT" --risk "${BATS_TEST_TMPDIR}/risk-link.json" test/repo 7 unknown
