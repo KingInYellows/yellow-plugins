@@ -741,15 +741,20 @@ class HarvestCiTest(Tmp):
                           "steps": [{"name": "setup", "conclusion": "success"},
                                     {"name": "bats", "conclusion": "failure"}]}]}
 
+        filler = [{"name": "matrix %d" % i, "conclusion": "success", "steps": []} for i in range(100)]
+
         def get(path, params=None):
             calls.append((path, params))
-            return {"workflow_runs": runs} if path.endswith("/actions/runs") else jobs
+            if path.endswith("/actions/runs"):
+                return {"workflow_runs": runs}
+            return {"jobs": filler} if params["page"] == 1 else jobs  # the failure is on page 2
 
         found, truncated = hv.harvest_ci("t/d", "main", "2026-10-01", "2026-10-31", commits, show, get=get)
         self.assertFalse(truncated)
         self.assertEqual(calls[0][1]["created"], "2026-09-24..2026-10-31")
         self.assertEqual((calls[0][1]["branch"], calls[0][1]["event"]), ("main", "push"))
-        self.assertEqual(calls[1][0], "repos/t/d/actions/runs/2/jobs")
+        self.assertEqual([(c[0], c[1]["page"]) for c in calls[1:]],
+                         [("repos/t/d/actions/runs/2/jobs", 1), ("repos/t/d/actions/runs/2/jobs", 2)])
         self.assertEqual([c["run_id"] for c in found], [2])
         self.assertEqual(found[0]["previous"], "success")
         self.assertEqual(found[0]["failed_jobs"], [{"job": "test", "steps": ["bats"]}])

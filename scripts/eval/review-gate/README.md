@@ -104,10 +104,11 @@ a real case must never set `example`. No confirmed cases ship yet.
      bot P1 then gets `review`: `missed` when a review of the same PR at the
      same head came at or before the comment (a true reviewer miss),
      `reviewed-later` when reviews of that head came only after it, and
-     `no-record` otherwise. `--misses-only` keeps only `missed` bot P1s. The
-     ledger writes observations only for runs that found something, so
-     `no-record` does not prove the head went unreviewed; once Phase 3 records
-     review-gate runs, pass those records as the JSON list.
+     `no-record` otherwise. `--misses-only` drops every bot P1 that is not
+     `missed`; git and CI candidates are kept, since they are defects whatever
+     the review history. The ledger writes observations only for runs that found
+     something, so `no-record` does not prove the head went unreviewed; once
+     Phase 3 records review-gate runs, pass those records as the JSON list.
    - **ci** (`--ci`): GitHub Actions push runs on the default branch
      (`--branch`, default `--ref` without `origin/`) that failed or timed out in
      the range after the same workflow's previous decided run passed. A failure
@@ -115,7 +116,8 @@ a real case must never set `example`. No confirmed cases ship yet.
      with no earlier run in the 7-day lookback says `previous: "unknown"`. Each
      is tied to the commit it ran on, that commit's PR (`pr`, `head`, `base`),
      the lines the PR changed at `head` (`hunks`), and the names of its failed
-     jobs and steps.
+     jobs and steps. `sources.ci` says `truncated` when the page cap stopped it
+     early, so older in-range failures may be missing.
 
    `--bots` and `--ci` are skipped with a note when `gh` is missing or not
    signed in. Commit messages, comment bodies and workflow and job names are

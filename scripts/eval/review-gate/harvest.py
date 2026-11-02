@@ -13,8 +13,8 @@ Sources:
   carries a P1 badge, created in [--since, --until]. Fetched with read-only
   `gh api --method GET`; skipped with a note when gh is missing or fails.
   With --reviewed, each one says whether a recorded review of the same PR at
-  the same head came before it (`review: "missed"`), and --misses-only keeps
-  just those.
+  the same head came before it (`review: "missed"`), and --misses-only drops
+  the other bot P1s.
 - ci (--ci): GitHub Actions push runs on the default branch that failed in
   [--since, --until] after the same workflow's previous run passed. Each is
   tied to the commit it ran on, that commit's squash-merged PR, and the lines
@@ -564,12 +564,23 @@ def harvest_ci(repo, branch, since, until, commits, show, max_pages=20, get=gh_g
     else:
         truncated = True
     found = ci_candidates(runs, commits, repo, show, branch, since, until)
-    jobs = {}
     for c in found:
         if isinstance(c["run_id"], int):
-            jobs[c["run_id"]] = failed_jobs(get("repos/%s/actions/runs/%d/jobs" % (repo, c["run_id"]),
-                                                {"filter": "latest", "per_page": 100}))
-    return ci_candidates(runs, commits, repo, show, branch, since, until, jobs), truncated
+            c["failed_jobs"] = run_failed_jobs(repo, c["run_id"], get)
+    return found, truncated
+
+
+def run_failed_jobs(repo, run_id, get, max_pages=10):
+    """Failed jobs of one run, reading every page of its jobs (a matrix can
+    have more than 100) before failed_jobs caps the list."""
+    jobs = []
+    for page in range(1, max_pages + 1):
+        batch = (get("repos/%s/actions/runs/%d/jobs" % (repo, run_id),
+                     {"filter": "latest", "per_page": 100, "page": page}) or {}).get("jobs") or []
+        jobs += batch
+        if len(batch) < 100:
+            break
+    return failed_jobs({"jobs": jobs})
 
 
 # --- main -------------------------------------------------------------------------
@@ -596,7 +607,8 @@ def main(argv=None):
     ap.add_argument("--reviewed", action="append", default=[], metavar="PATH",
                     help="recorded reviews: a JSON list of {pr, head, at}, or a review-ledger findings dir")
     ap.add_argument("--misses-only", action="store_true",
-                    help="keep only bot P1s posted after a recorded review of the same head")
+                    help="drop bot P1s not posted after a recorded review of the same head "
+                         "(git and CI candidates stay)")
     ap.add_argument("-o", "--output", help="write here instead of stdout (never under cases/ or controls/)")
     a = ap.parse_args(argv)
     repo_dir = os.path.abspath(a.repo_dir)
