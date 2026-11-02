@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -45,16 +46,30 @@ def git(*args, cwd=REPO):
                           text=True, check=True).stdout
 
 
-def worktree(path, commit):
+def worktree(path, commit, cwd=REPO):
     if not os.path.isdir(path):
-        git("worktree", "add", "--quiet", "--detach", path, commit)
+        git("worktree", "add", "--quiet", "--detach", path, commit, cwd=cwd)
 
 
-def fresh_worktree(path, commit):
-    """Recreate path at commit, so a changed spec never reuses an old tree."""
+def fresh_worktree(path, commit, cwd=REPO):
+    """Recreate path at commit, so a changed spec never reuses an old tree.
+    cwd is the repository the worktree belongs to (review-gate passes others)."""
     if os.path.isdir(path):
-        git("worktree", "remove", "--force", path)
-    worktree(path, commit)
+        # Remove it through the repository that owns it, which may not be cwd
+        # when the same work directory is reused with another clone.
+        # A failed remove (a locked worktree) propagates; only a directory no
+        # repository owns any more is deleted outright.
+        try:
+            owner = git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=path).strip()
+        except subprocess.CalledProcessError:
+            owner = None
+        if owner:
+            git("--git-dir", owner, "worktree", "remove", "--force", path, cwd=os.path.dirname(path))
+            git("--git-dir", owner, "worktree", "prune", cwd=os.path.dirname(path))
+        else:
+            shutil.rmtree(path)
+        git("worktree", "prune", cwd=cwd)
+    worktree(path, commit, cwd)
 
 
 def fingerprint(*parts):

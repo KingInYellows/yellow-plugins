@@ -54,7 +54,7 @@ used only by humans (commands ignore the body).
 ```yaml
 ---
 # review:pr / review:all behavior overrides (Wave 2 keys)
-review_pipeline: persona | legacy        # default: persona (Wave 2 default)
+review_pipeline: persona | legacy | workflow  # default: persona (Wave 2 default)
 review_depth: small | medium | large     # default: auto-detect from diff size
 focus_areas: [security, correctness, ...]  # default: all areas
 reviewer_set:
@@ -63,6 +63,9 @@ reviewer_set:
   force_depth: [<agent-name>, ...]        # included agents that skip the depth gate
 reviewer_selection: off | shadow | jev     # default: off (review:pr only; jev = shadow for now)
 reviewer_selection_private_repos: [<owner/repo | owner/*>, ...]  # user-level file only; default: empty
+review_approval_gate: off | advisory | enforce   # default: advisory (review:merge-ready)
+review_approval_humans: [<login>, ...]           # default: the repository owner's login
+review_cross_lineage_bots: ["<login>[bot]", ...] # default: chatgpt-codex-connector[bot]
 
 # Wave 3 keys (documented; consumer adoption tracked per-key below)
 stack: [ts, py, rust, go]                 # default: auto-detect from repo
@@ -100,7 +103,7 @@ means the file remains valid forward-and-backward.
 
 | Field | Type | Default | Effect |
 |-------|------|---------|--------|
-| `review_pipeline` | `persona` \| `legacy` | `persona` | `legacy` falls back to pre-Wave-2 adaptive selection (no learnings pre-pass, no confidence rubric, no new personas). Use as escape hatch only. |
+| `review_pipeline` | `persona` \| `legacy` \| `workflow` | `persona` | `legacy` falls back to pre-Wave-2 adaptive selection (no learnings pre-pass, no confidence rubric, no new personas). Use as escape hatch only. `workflow` (`/review:pr` only, shadow mode) runs the `persona` pipeline unchanged and also launches yellow-review's `review-gate` workflow on the same diff, reporting a findings comparison in Coverage without applying or recording the workflow's findings (yellow-review `references/review-pr/workflow-shadow.md`). Other commands treat `workflow` as `persona`. |
 | `review_depth` | `small` \| `medium` \| `large` | auto | Forces a depth tier regardless of computed diff size. `large` always invokes `adversarial-reviewer`; `small` skips it even on large diffs. |
 | `focus_areas` | array of strings | empty (= all) | Narrows reviewer set to those whose `category` matches one of the listed areas. Recognized areas: `security`, `correctness`, `reliability`, `performance`, `maintainability`, `project-compliance`, `project-standards`, `architecture`, `testing`, `documentation`, `types`, `adversarial`. Always-on personas (`project-compliance-reviewer`, `correctness-reviewer`, `maintainability-reviewer`, `project-standards-reviewer`) survive the filter regardless of `focus_areas` — filtering them out would defeat the always-on contract. |
 | `reviewer_set.include` | array of agent names | empty | Additive — agents are spawned even if their conditional triggers don't fire. This is also the only way to reach `thermonuclear-reviewer` (yellow-review): an opt-in structural-quality persona that appears in neither dispatch table, so it runs only when named here. Two silent drops apply to `include`, both visible in the precedence pseudo-code under "Reading the config from a command". First, `review_pipeline: legacy` branches before overrides are read at all, so `include` has no effect there. Second, `focus_areas` filters the merged set afterwards, and `thermonuclear-reviewer` is not always-on (its category is `maintainability`), so an included `thermonuclear-reviewer` survives only when `focus_areas` is unset or lists `maintainability`. Neither drop emits a diagnostic. A third drop does: included agents still respect the depth tier. `thermonuclear-reviewer`, `adversarial-reviewer`, `code-simplicity-reviewer` and `architecture-strategist`, when no dispatch rule already selected them, run only at `medium` depth or above (`review_depth`, else the diff's gross line count: below 100 is `small`). Each one dropped is logged to stderr and listed in the report's Coverage section; `reviewer_set.force_depth` lifts the gate. |
@@ -108,6 +111,9 @@ means the file remains valid forward-and-backward.
 | `reviewer_set.force_depth` | array of agent names | empty | Agents from `include` that bypass the depth gate, so they run even on a `small` diff — paying full model and effort on a one-line change becomes a stated choice. It adds nothing by itself: a name not in `include` warns and is ignored. `exclude` still wins. |
 | `reviewer_selection` | `off` \| `shadow` \| `jev` | `off` | `/review:pr` only. `shadow` logs, per review, the conditional personas the table's exact rules pick, the set the orchestrator picked, and the set TypeSafe's Jev would pick from one request on the redacted diff, to `<git-common-dir>/yellow-review/jev-persona/` (yellow-review `references/review-pr/persona-shadow.md`). It never changes which reviewers run. `jev` behaves as `shadow` until per-persona switching ships. The Jev call needs `TYPESAFE_API_KEY` and sends diff text to a third party only for public repositories or those in `reviewer_selection_private_repos` (`docs/security.md` "Persona selection shadow log"). The only key with a user-level fallback: when the repo file leaves it unset, `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md` is read, so one line there enables it for every repository. |
 | `reviewer_selection_private_repos` | array of `owner/repo` or `owner/*` | empty | Private repositories that may send their redacted diff to Jev under `reviewer_selection: shadow`; `owner/*` covers every repository of that owner (case-insensitive). Read only from the user-level `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`; a value in a repository's file is ignored, because `/review:pr` reads config from the checked-out PR head, where a contributor could add an opt-in. A repository whose visibility cannot be read counts as private. |
+| `review_approval_gate` | `off` \| `advisory` \| `enforce` | `advisory` | yellow-review's `check-merge-ready` (`/review:merge-ready`): approval by risk tier. Low needs no human; medium and high need approval of the head SHA by a login in `review_approval_humans`: an approving review on it, or that login adding `graphite-queue` after the head arrived; high also needs a review on the head by a login in `review_cross_lineage_bots`. The tier comes from `classify-risk` with `.github/review-risk.json` read at the default branch tip. `advisory` lists what is missing in the report's `approval.missing` and leaves the verdict alone; `enforce` makes a missing or stale approval and a missing cross-lineage review blockers, and an unreadable tier or evidence an unknown; `off` makes no approval lookups. Read only from an untracked repo file in a checkout of the PR's repository: a tracked file's approval keys are ignored with a note, since a PR could edit them. Other values warn and use `advisory`. |
+| `review_approval_humans` | array of GitHub logins | the repository owner's login | The humans whose approval counts for `review_approval_gate`. Only a `User` account counts: a bot's approval never does, even with a listed login. Logins compare case-insensitively; an invalid login warns and is dropped, and a list with none left uses the default. In an organization-owned repository the default (the organization's login) can never approve, so set this list there. Flow (`[a, b]`) or block (`- a`) sequence. |
+| `review_cross_lineage_bots` | array of GitHub logins | `chatgpt-codex-connector[bot]` | Accounts whose review on the head SHA counts as the high-tier cross-lineage pass. Only an author GitHub reports as a `Bot` counts; a `User` account with a matching login (even one ending in `[bot]`) never does. Quote a `[bot]` login in a flow sequence (`["chatgpt-codex-connector[bot]"]`). The `[bot]` suffix is optional. Same fallback rules as `review_approval_humans`. |
 | `stack` | array of `ts` \| `py` \| `rust` \| `go` | auto-detect | Forces language-specific reviewer behavior. When set, `polyglot-reviewer` (when triggered) scopes to listed languages and skips non-matching files. Auto-detect uses repo root signals: `package.json` → `ts`, `pyproject.toml`/`requirements.txt` → `py`, `Cargo.toml` → `rust`, `go.mod` → `go`. Multi-stack repos may set this explicitly to scope review to a subset. Acted on by W3-pending consumers (see status table). |
 | `agent_native_focus` | boolean | `false` | When `true`, always invokes the W3.5 agent-native reviewer triplet (`cli-readiness-reviewer`, `agent-cli-readiness-reviewer`, `agent-native-reviewer`) regardless of whether the diff touches `plugins/*/agents/`, `plugins/*/skills/`, or `plugins/*/commands/`. Useful for repos that author Claude Code plugins but house plugin code outside the standard `plugins/` layout. Acted on by W3.5 (pending). |
 | `confidence_threshold` | integer 0–100 | `75` | Override the Wave 2 confidence aggregation gate used by `review:pr` and `audit-synthesizer`. Values below `75` surface more findings (more false positives, fewer missed issues); values above `75` suppress more (fewer false positives, more missed issues). Set above `100` to suppress all findings (effectively a dry-run). Acted on by W3.13b (pending). |
@@ -219,8 +225,8 @@ use_persona_dispatch(reviewer_set)
   → `exclude` wins; emit a warning naming the conflicting agent.
 - A `reviewer_set.force_depth` name that is not in `include` → ignore it and
   emit a warning naming it; `force_depth` never adds an agent.
-- `review_pipeline` values other than `persona` / `legacy` → fall back to
-  `persona` and emit a warning.
+- `review_pipeline` values other than `persona` / `legacy` / `workflow` →
+  fall back to `persona` and emit a warning.
 - `stack` entries other than `ts` / `py` / `rust` / `go` → drop the
   unknown entry, emit a warning naming it. An empty array after dropping
   unknowns falls back to auto-detection.
@@ -229,6 +235,9 @@ use_persona_dispatch(reviewer_set)
   parses that as a string, not a boolean.
 - `confidence_threshold` outside `0..100` → clamp to the range and emit
   a warning. Non-integer values fall back to the default (`75`).
+- `review_approval_gate` values other than `off` / `advisory` / `enforce`
+  → `advisory` with a warning; a review approval list given twice or not a
+  list → its default with a warning.
 - `resolve_pr.*` keys with an invalid type or range → emit a warning naming
   the key and fall back to its default (see the field reference). An empty
   `verify_command` counts as unset. `review:resolve` reads these keys once

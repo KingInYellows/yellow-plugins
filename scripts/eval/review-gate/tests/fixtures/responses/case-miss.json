@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "tier": "medium",
+  "findings": [
+    {
+      "id": "f1",
+      "severity": "P1",
+      "display": "Important",
+      "file": "lib/x.sh",
+      "line": 9,
+      "title": "Unquoted path variable",
+      "category": "correctness",
+      "rule": "unclassified",
+      "confidence": 75,
+      "reviewers": ["correctness-reviewer"],
+      "votes": { "confirmed": 2, "refuted": 1, "unverifiable": 0 },
+      "unverified": false,
+      "evidence": { "file": "lib/x.sh", "line": 9 },
+      "suggested_fix": "Quote the path"
+    },
+    {
+      "id": "f2",
+      "severity": "P2",
+      "display": "Nit",
+      "file": "lib/x.sh",
+      "line": 5,
+      "title": "Unquoted path",
+      "category": "correctness",
+      "rule": "unclassified",
+      "confidence": 50,
+      "reviewers": ["correctness-reviewer"],
+      "votes": { "confirmed": 1, "refuted": 0, "unverifiable": 0 },
+      "unverified": false,
+      "evidence": null,
+      "suggested_fix": "Quote the path"
+    }
+  ],
+  "dropped": [],
+  "coverage": { "ran": ["correctness-reviewer"], "failed": [], "skipped": [] },
+  "agents": 4
+}

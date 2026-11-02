@@ -93,7 +93,7 @@ it before editing a script, library or command.
   mergeability, ledger P0-P2); ends with the `MergeReady:` contract line and
   never writes to GitHub or adds ledger records
 
-### Agents (17)
+### Agents (18)
 
 Review agents report findings and never edit files; the orchestrating command
 applies fixes.
@@ -111,7 +111,8 @@ applies fixes.
 - Specialists: `pr-test-analyzer`, `comment-analyzer`, `code-simplifier` (final
   pass), `type-design-analyzer`, `silent-failure-hunter`
 - Workflow: `pr-comment-resolver` — one fix per comment cluster plus a proposed
-  per-thread disposition; no Bash tool
+  per-thread disposition; no Bash tool. `review-gate-verifier` — the
+  `review-gate` workflow's read-only voter (Read, Grep, Glob only)
 
 ### Skills (3)
 
@@ -121,7 +122,27 @@ all scripts), `stack-traversal` (shared by `/review:all` and
 `thermonuclear-reviewer`; the only Codex/Cursor-distributed skill). None is
 user-invocable.
 
-### Scripts (20)
+### Workflows (1)
+
+`workflows/review-gate.js` runs as `/yellow-review:review-gate` (Claude Code
+2.1.316 loads `workflows/` without a manifest field; not yet checked on CI's
+pinned 2.1.293, which gates Phase 3). It is the Hunt → Vote → Rank core of the
+risk-tiered pipeline: one persona agent per `args.include` name, a plain-code
+dedup barrier, 1 or 3 votes per finding by severity and tier from the read-only
+`review-gate-verifier` agent, then Important / Nit / Pre-existing display with
+the REVIEW.md Nit cap. Its `args` and return shape are a fixed contract the eval
+runner builds against; a hunter that returns `null`, or an unknown persona name,
+lands in `coverage.failed`, and `coverage.empty` marks a run in which no hunter
+returned; neither counts as clean. Today only `/review:pr` under
+`review_pipeline: workflow` calls it, in shadow mode
+(`references/review-pr/workflow-shadow.md`): agents read a detached checkout of
+the head commit under the git common dir (removed on every exit path), Coverage
+gets a comparison line, and its findings are never applied or written to the
+ledger. `tests/integration/review-gate-workflow.test.ts` runs the body in
+`node:vm` with stub agents; ESLint ignores `plugins/*/workflows/` because no
+parser accepts top-level `return` beside `export`.
+
+### Scripts (21)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
@@ -132,7 +153,19 @@ the resolve scripts: `references/resolve/dispositions.md`.
   re-pass
 - `check-merge-ready` — read-only `/review:merge-ready` gate combining the
   readers above with a PR-state and CI read and the ledger summary; exits 0
-  ready, 1 blocked, 3 unknown
+  ready, 1 blocked, 3 unknown. Its `approval` section (CLAUDE-234) runs
+  `classify-risk --policy-file --stdin --numstat` on the files API list and line
+  counts with the policy fetched at the default branch tip, and checks one
+  listed human's approval on the head SHA, or a `graphite-queue` label they
+  added after the head arrived and that is still on the PR (medium, high), plus
+  a cross-lineage bot review on the head (high, whose fresh-review check stays
+  unknown until the ledger records each run's reviewed head);
+  `review_approval_gate` (`off`, `advisory` default, `enforce`) in an untracked
+  `yellow-plugins.local.md` decides whether gaps block
+- `classify-risk` — the review risk tier (`low`, `medium`, `high`) of a change
+  from its changed paths and `.github/review-risk.json` read at a trusted ref
+  (`--policy-ref`, the default branch for stacked PRs) or local file; local git
+  only, no network
 - `sync-blocking-comment` — Step 9's sticky "blocking threads" PR comment for
   repos that do not enforce conversation resolution; one comment per PR, found
   by its marker and edited in place

@@ -408,11 +408,12 @@ Located at `skills/pr-review-workflow/scripts/`:
   `/review:merge-ready`. Prints one JSON object with `verdict`
   (`ready`/`blocked`/`unknown`), `blockers` (`not_open`, `draft`, `conflicts`,
   `unresolved_threads`, `changes_requested`, `review_required`, `ci_failing`,
-  `ci_pending`, `ledger_findings`), `unknowns` (`pr_state`, `threads`,
-  `reviews`, `ci`, `mergeable`, `merge_state` for a `BLOCKED` or `BEHIND` merge
-  state, `ledger` when the PR's ledger files cannot be summarized or the summary
-  skipped unreadable records) and the detail behind each. Exits 0 ready, 1
-  blocked, 3 unknown, 2 usage; give it a Bash `timeout` of 420000 ms
+  `ci_pending`, `ledger_findings`, and the approval tokens under
+  `review_approval_gate: enforce`), `unknowns` (`pr_state`, `threads`,
+  `reviews`, `ci`, `mergeable`, `merge_state`, `ledger`, `approval`) and the
+  detail behind each; `commands/review/merge-ready.md` defines every token.
+  Exits 0 ready, 1 blocked, 3 unknown, 2 usage; give it a Bash `timeout` of
+  420000 ms
 - **sync-blocking-comment** `[--reasons <file>] <owner/repo> <pr> <resolution>`
   — Keeps one sticky PR comment (marker line, edited in place) listing every
   unresolved thread with a link and status, unless `<resolution>` is `enforced`;
@@ -476,9 +477,9 @@ walk several PRs use (`commit-resolve-fixes`, `run-verify-command`,
 `check-resolve-text`) are documented in `references/local-scripts.md`; Read it
 before calling them.
 
-## File Line Counts Script
+## Local Git Scripts
 
-Same directory. Not GraphQL; it reads only the local repository:
+Same directory. Not GraphQL; they read only the local repository:
 
 - **file-line-counts** `<diff-base-ref>` — Prints a
   `file-line-counts rows=N dropped=M skipped=K` header, N
@@ -488,6 +489,9 @@ Same directory. Not GraphQL; it reads only the local repository:
   more than 500 changed files. Consumed by `review-pr.md` Step 5 item 6 for the
   `thermonuclear-reviewer` size rule; `review-all.md` delegates to that item
   rather than calling the script itself.
+- **classify-risk** — Review risk tier of a change from its paths; flags, output
+  and policy rules are in the script header and
+  `../../references/components-reference.md`
 
 ## Verification Loop
 
