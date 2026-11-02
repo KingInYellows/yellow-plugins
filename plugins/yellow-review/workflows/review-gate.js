@@ -424,6 +424,13 @@ function dismissalMatches(d, f) {
 // a cluster when it has the same file, category and pre_existing flag, a line
 // within LINE_WINDOW of the representative's line, and a similar title. The
 // other members are returned so the caller can list them in dropped.
+// Two findings with different known rule slugs describe different defects,
+// however similar their titles read.
+function distinctRules(a, b) {
+  const known = (r) => r && r !== 'unclassified';
+  return known(a.rule) && known(b.rule) && a.rule !== b.rule;
+}
+
 function dedup(raw) {
   const sorted = raw
     .slice()
@@ -440,6 +447,7 @@ function dedup(raw) {
         c.rep.file === f.file &&
         c.rep.category === f.category &&
         c.rep.pre_existing === f.pre_existing &&
+        !distinctRules(c.rep, f) &&
         Math.abs(c.rep.line - f.line) <= LINE_WINDOW &&
         similarTitles(c.rep.title, f.title)
     );
@@ -534,6 +542,15 @@ function cleanPath(p) {
     if (best) s = best;
   }
   return s;
+}
+
+function cited(v) {
+  return (
+    typeof v.evidence_file === 'string' &&
+    v.evidence_file.trim() !== '' &&
+    Number.isInteger(v.evidence_line) &&
+    v.evidence_line > 0
+  );
 }
 
 function evidenceFrom(verdicts) {
@@ -715,9 +732,11 @@ const judged = candidates.length
             counted(verifierPrompt(input, f, lens), voterOpts(f, lens))
         )
       );
-      const returned = verdicts.filter(
-        (v) => v && Object.hasOwn(VOTE_KEYS, v.verdict)
-      );
+      // A verdict without a file:line citation counts as unverifiable, as
+      // the verifier prompt says, so it can neither confirm nor refute.
+      const returned = verdicts
+        .filter((v) => v && Object.hasOwn(VOTE_KEYS, v.verdict))
+        .map((v) => (cited(v) ? v : { ...v, verdict: 'unverifiable' }));
       if (returned.length < lenses.length) {
         log(
           `Vote: ${f.id} got ${returned.length} of ${lenses.length} verdicts back`

@@ -670,20 +670,22 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
     before dedup and voting.
   - **Dedup:** plain code. Findings are taken most severe, then most confident,
     first; each cluster's first member is its representative. A finding joins a
-    cluster with the same file, category and `pre_existing` flag, a line within
-    3 of the representative's line and a similar title (one contains the other,
-    or word overlap of at least a fifth). `reviewers` are merged; each merged
-    finding is listed in `dropped` as `merged into F<n>`.
+    cluster with the same file, category and `pre_existing` flag, no conflicting
+    known rule slug, a line within 3 of the representative's line and a similar
+    title (one contains the other, or word overlap of at least a fifth).
+    `reviewers` are merged; each merged finding is listed in `dropped` as
+    `merged into F<n>`.
   - **Vote:** `pipeline()` over findings, each voter the read-only
     `yellow-review:workflow:review-gate-verifier` agent. Three voters with the
     lenses reproduces / handled-elsewhere / reachable-from-entry-point for P0/P1
     on medium and high, and for P2 on high; one voter otherwise, and for every
     pre-existing finding. P0/P1 voters keep the agent's `opus` at `medium`
-    effort; P2/P3 voters run `sonnet` at `low`. Kept on a confirmed majority of
-    the verdicts returned; with no majority and no refutation (all unverifiable,
-    or no verdict came back) it is kept with `unverified: true`; otherwise
-    dropped as refuted. The verifier prompt carries `/review:pr` Step 6's
-    quality gates (line accuracy, protected-artifact filter, skim-FP).
+    effort; P2/P3 voters run `sonnet` at `low`. A verdict without a file:line
+    citation counts as unverifiable. Kept on a confirmed majority of the
+    verdicts returned; with no majority and no refutation (all unverifiable, or
+    no verdict came back) it is kept with `unverified: true`; otherwise dropped
+    as refuted. The verifier prompt carries `/review:pr` Step 6's quality gates
+    (line accuracy, protected-artifact filter, skim-FP).
   - **Rank:** plain code. P0/P1 → Important, P2/P3 → Nit, `pre_existing` or a
     file outside `changed_files` → Pre-existing. At most five Nits are shown;
     the overflow goes to `dropped` with reason `nit cap (5)`. Every drop is

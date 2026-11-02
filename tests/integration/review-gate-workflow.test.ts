@@ -487,6 +487,30 @@ describe('review-gate dedup', () => {
     });
   });
 
+  it('keeps nearby findings with different known rules apart', async () => {
+    const r = await run(baseArgs(), {
+      hunter: (name) => ({
+        reviewer: name,
+        findings: [
+          finding({
+            line: 10,
+            rule: 'invalid-json',
+            title: 'Validate input before parsing',
+          }),
+          finding({
+            line: 12,
+            rule: 'out-of-bounds',
+            title: 'Validate input before indexing',
+          }),
+        ],
+      }),
+    });
+    expect(r.result.findings.map((f: Finding) => f.line).sort()).toEqual([
+      10, 12,
+    ]);
+    expect(r.result.dropped).toEqual([]);
+  });
+
   it('drops dismissed findings before any vote', async () => {
     const r = await run(
       baseArgs({
@@ -681,6 +705,26 @@ describe('review-gate Vote', () => {
       votes: { confirmed: 2, refuted: 1, unverifiable: 0 },
       unverified: false,
       evidence: { file: 'src/a.sh', line: 11 },
+    });
+  });
+
+  it('counts a verdict without a citation as unverifiable', async () => {
+    const bare = (verdict: Verdict['verdict']): Verdict => ({
+      verdict,
+      evidence_file: null,
+      evidence_line: null,
+      reason: 'No citation.',
+    });
+    const r = await withVotes([
+      bare('confirmed'),
+      bare('refuted'),
+      bare('confirmed'),
+    ]);
+    expect(r.result.findings).toHaveLength(1);
+    expect(r.result.findings[0]).toMatchObject({
+      votes: { confirmed: 0, refuted: 0, unverifiable: 3 },
+      unverified: true,
+      evidence: null,
     });
   });
 
