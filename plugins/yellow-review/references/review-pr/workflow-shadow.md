@@ -71,20 +71,26 @@ Build `args` as a JSON object, not a JSON-encoded string:
 | `review_md`        | the `REVIEW.md` text, or `null`                                                                                             |
 | `include`          | the final Step 4 reviewer set by bare agent name (`correctness-reviewer`), without `code-simplifier` and the learnings pass |
 | `exclude`          | `reviewer_set.exclude`, or `[]`                                                                                             |
-| `dismissed`        | one `{file, line, rule}` per `<finding>` in the Step 3e dismissed-findings block (see below), or `[]`                       |
+| `dismissed`        | one `{file, line, rule, scope}` per `<finding>` in the Step 3e dismissed-findings block (see below), or `[]`                |
 | `file_line_counts` | only when `include` has `thermonuclear-reviewer`: see below                                                                 |
 
 The Step 3e block (`review-ledger.sh dismissed-context`) prints each entry as
 `<finding><where>FILE:LINE</where><rule>CATEGORY/RULE</rule><scope>…</scope><reason>…</reason></finding>`,
-XML-escaped. For each entry:
+XML-escaped. `<where>` is where the dismissed finding sits at the head commit,
+so it still lines up with the hunters' line numbers after lines move above it.
+For each entry:
 
 - `file` is the `<where>` text before its last `:`, and `line` the integer after
   it. When that part is not an integer (the ledger prints `null` for a finding
   with no line), pass `line: null`; the workflow skips that entry.
-- `rule` is the `<rule>` text as is, for example `correctness/null-deref`.
-- Unescape `file` and `rule`: `&lt;` to `<`, `&gt;` to `>`, then `&amp;` to `&`.
-- Leave out `<scope>` and `<reason>`: they are free text from the ledger, and
-  the workflow matches on file, line within 3 and `rule`.
+- `rule` is the `<rule>` text as is, for example `correctness/null-handling`.
+- `scope` is the `<scope>` text as is: the enclosing function or heading the
+  ledger verified, or `unscoped`. The workflow drops a repeat only within that
+  scope, so a dismissal does not hide the same rule in the next function down.
+- Unescape `file`, `rule` and `scope`: `&lt;` to `<`, `&gt;` to `>`, then
+  `&amp;` to `&`.
+- Leave out `<reason>`: it is free text from the ledger, and the workflow
+  matches on file, line within 3, `rule` and `scope`.
 
 When `include` has `thermonuclear-reviewer`, run the Step 5 item 6
 `file-line-counts` block now and check its output as item 6 says. Pass the
