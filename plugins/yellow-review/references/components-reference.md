@@ -180,7 +180,14 @@ flags, exit codes, trust-boundary rules and library behavior.
   one GraphQL read of the PR state and head-commit status-check rollup, then
   `review-ledger.sh summary`; prints one JSON report (verdict, `blockers`,
   `unknowns`, per-source detail) and exits 0 ready, 1 blocked, 3 unknown, 2
-  usage. Worst case about 370 s (the callers' Bash timeout is 420000 ms)
+  usage. Worst case about 370 s (the callers' Bash timeout is 420000 ms).
+  Unless `review_approval_gate` is `off`, it also reads the PR's reviews, its
+  files (files API, old paths of renames included) and
+  `.github/review-risk.json` at the default branch tip (contents API), pipes
+  the paths into `classify-risk --policy-file <tmp> --stdin`, and reports an
+  `approval` object: tier, required humans (0 or 1), a listed human's
+  approval on the head SHA, the high-tier cross-lineage review on the head,
+  and `missing` tokens, which block only under `enforce`
 - `classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>`
   (or `--stdin [<base-ref>]` with paths on stdin) — Review risk tier of a
   change. Each file takes the tier of the first rule in
@@ -723,7 +730,9 @@ in the transcript (Ctrl-O) on a second `/review:pr` run within the hour.
   `tests/mocks/gh`
 - `check-merge-ready.bats` — stub `get-pr-comments`, `get-pr-blockers` and
   ledger beside a copy of the script, with the state query served by
-  `tests/mocks/gh` (`MOCK_GH_MR_BODY`)
+  `tests/mocks/gh` (`MOCK_GH_MR_BODY`) and the approval reads by
+  `MOCK_GH_MRA_BODY`, `MOCK_GH_MR_FILES` and `MOCK_GH_MR_POLICY` (served only
+  for the default branch's tip), with the real `classify-risk`
 - `commit-resolve-fixes.bats`, `run-verify-command.bats` — a throwaway
   repository with a bare origin and stub `gt`/`node`/`gh`, built by
   `tests/helpers/resolve-repo.bash`

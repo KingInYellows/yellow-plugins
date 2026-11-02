@@ -412,7 +412,8 @@ Located at `skills/pr-review-workflow/scripts/`:
   `reviews`, `ci`, `mergeable`, `merge_state` for a `BLOCKED` or `BEHIND` merge
   state, `ledger` when the PR's ledger files cannot be summarized or the summary
   skipped unreadable records) and the detail behind each. Exits 0 ready, 1
-  blocked, 3 unknown, 2 usage; give it a Bash `timeout` of 420000 ms
+  blocked, 3 unknown, 2 usage; give it a Bash `timeout` of 420000 ms. Its
+  risk-tier `approval` object blocks only under `review_approval_gate: enforce`
 - **classify-risk** — Review risk tier of a change from its paths; flags, output
   and policy rules are in the script header and
   `references/components-reference.md`
