@@ -376,15 +376,36 @@ export async function resetToSnapshot(
       'Move the named ignored files out of the worktree, then retry --reset-partial.'
     );
   }
-  await git(exec, worktree, ['reset', '--hard', snapshot.head]);
-  await git(exec, worktree, ['read-tree', '--reset', '-u', snapshot.commit]);
-  // Clean against the snapshot's own tree and ignore rules, and keep every
-  // path that was ignored before the reset as well.
-  await git(exec, worktree, [
-    'clean',
-    '-fd',
-    ...ignored.flatMap((p) => ['-e', literalPattern(p)]),
-  ]);
+  const unlistable = ignored.find((p) => /[\r\n]/.test(p));
+  if (unlistable !== undefined) {
+    throw new AgyError(
+      'AGY_WORKTREE',
+      `an ignored path has a line break in its name: ${JSON.stringify(unlistable)}`,
+      'Move that file out of the worktree, then retry --reset-partial.'
+    );
+  }
+  // The pre-reset ignored set goes in an excludes file, not on the command
+  // line, so a large ignored tree can't overflow the argument limit. It
+  // replaces the global excludes file, whose matches are already in the set.
+  const excludes = await tempIndexPath(exec, worktree, localId, 'excludes');
+  await exec.writeFile(
+    excludes,
+    ignored.map((p) => `${literalPattern(p)}\n`).join('')
+  );
+  try {
+    await git(exec, worktree, ['reset', '--hard', snapshot.head]);
+    await git(exec, worktree, ['read-tree', '--reset', '-u', snapshot.commit]);
+    // Clean against the snapshot's own tree and ignore rules, keeping every
+    // path that was ignored before the reset as well.
+    await git(exec, worktree, [
+      '-c',
+      `core.excludesFile=${excludes}`,
+      'clean',
+      '-fd',
+    ]);
+  } finally {
+    await exec.removeFile(excludes);
+  }
   await git(exec, worktree, ['read-tree', snapshot.indexTree]);
   await dropSnapshotRefs(exec, worktree, localId);
 }

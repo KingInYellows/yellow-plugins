@@ -189,12 +189,12 @@ local processes.
   passes `--keep-partial` (continue on top of them) or `--reset-partial`. Reset
   first lists the ignored untracked paths under the rules in force, then runs
   `git reset --hard <pre-turn HEAD>` and `git read-tree --reset -u <snapshot>`,
-  then `git clean -fd` with an anchored `-e` exclude for each listed path, and
-  finally the index-only `git read-tree <pre-turn-index>`. Work from earlier
-  turns, deletions included, comes back with its staged and unstaged parts as
-  they were, and a file protected only by an uncommitted ignore rule survives
-  the swap of `.gitignore` files. Both refs are deleted once the reset or the
-  next turn settles.
+  then `git clean -fd` with a temporary `core.excludesFile` holding an anchored
+  pattern for each listed path, and finally the index-only
+  `git read-tree <pre-turn-index>`. Work from earlier turns, deletions included,
+  comes back with its staged and unstaged parts as they were, and a file
+  protected only by an uncommitted ignore rule survives the swap of `.gitignore`
+  files. Both refs are deleted once the reset or the next turn settles.
 
 ## Permission profiles (`--settings` JSON)
 

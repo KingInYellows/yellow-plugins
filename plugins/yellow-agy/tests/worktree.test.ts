@@ -181,6 +181,14 @@ describe('worktree', () => {
       'pre\n'
     );
     expect(fs.existsSync(path.join(wt, 'junk.txt'))).toBe(false);
+    const excludes = git(
+      wt,
+      'rev-parse',
+      '--path-format=absolute',
+      '--git-path',
+      'yellow-agy-excludes-t1'
+    ).trim();
+    expect(fs.existsSync(excludes)).toBe(false);
   });
 
   it('refuses a reset that would delete an ignored file in the way', async () => {
