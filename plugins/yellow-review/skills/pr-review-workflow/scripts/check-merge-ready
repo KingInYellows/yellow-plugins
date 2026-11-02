@@ -349,13 +349,14 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
             # the head arrived. That time is the later of the head commit's
             # committer date and its first check suite (set by GitHub at
             # push), so an old committer date cannot predate a fresh push.
+            # With no check suite there is no push-time evidence, so the
+            # time is unknown and the label cannot approve.
             jq -c --arg h "$A_HEAD" '
               .data.repository.pullRequest as $p
               | ([($p.commits.nodes // [])[] | .commit | select(.oid == $h)] | first) as $c
-              | {headTime: (if $c == null or ($c.committedDate | type) != "string" then null
-                            else ([$c.committedDate]
-                                  + ([($c.checkSuites.nodes // [])[] | .createdAt | strings] | sort | .[:1]))
-                                 | max end),
+              | ([($c.checkSuites.nodes // [])[]? | .createdAt | strings] | sort | first) as $suite
+              | {headTime: (if $c == null or ($c.committedDate | type) != "string" or $suite == null then null
+                            else [$c.committedDate, $suite] | max end),
                  events: (if ($p.timelineItems.nodes | type) == "array"
                           then [$p.timelineItems.nodes[] | select(type == "object" and (.createdAt | type) == "string")]
                           else null end)}' "$WORK/approval.raw" >"$WORK/labels" 2>/dev/null \
@@ -371,10 +372,13 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
         # classify-risk rates high, so it can never lower the tier or forge a
         # row. A list shorter than changedFiles (GitHub stops at 3000) fails.
         if [ "$F_RC" -eq 0 ] && jq -s -r --argjson n "$CHANGED" '
+              def safe: if type == "string" and test("\\A[A-Za-z0-9._/@+-]+\\z") then . else "unsafe?path" end;
               (map(if type == "array" then . else error("not a list") end) | add // []) as $f
               | if ($f | length) < $n then error("short list") else $f[] end
-              | (.filename, (.previous_filename // empty))
-              | if type == "string" and test("\\A[A-Za-z0-9._/@+-]+\\z") then . else "unsafe?path" end
+              | (if (.additions | type) == "number" and (.deletions | type) == "number"
+                 then "\(.additions)\t\(.deletions)" else "?\t?" end) as $counts
+              | ("\($counts)\t\(.filename | safe)",
+                 (.previous_filename // empty | "0\t0\t\(safe)"))
             ' "$WORK/files" >"$WORK/paths" 2>/dev/null; then
             P_RC=0
             rg_gh api -H 'Accept: application/vnd.github.raw+json' \
@@ -388,7 +392,7 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
             else
                 note "policy lookup failed; tier unknown: $(head -c 300 "$WORK/policy.err" | tr '\n' ' ')"
             fi
-            if [ "$POLICY" != null ] && "$HERE/classify-risk" --policy-file "$WORK/policy.json" --stdin \
+            if [ "$POLICY" != null ] && "$HERE/classify-risk" --policy-file "$WORK/policy.json" --stdin --numstat \
                 <"$WORK/paths" >"$WORK/risk" 2>"$WORK/risk.err" \
                 && TIER=$(jq -er '.tier | select(IN("low", "medium", "high"))' "$WORK/risk" 2>/dev/null); then
                 TIER_OK=true

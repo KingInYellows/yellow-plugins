@@ -183,13 +183,14 @@ flags, exit codes, trust-boundary rules and library behavior.
   usage. Worst case about 370 s (the callers' Bash timeout is 420000 ms). Unless
   `review_approval_gate` is `off`, it also reads the PR's reviews, its files
   (files API, old paths of renames included) and `.github/review-risk.json` at
-  the default branch tip (contents API), pipes the paths into
-  `classify-risk --policy-file <tmp> --stdin`, and reports an `approval` object:
-  tier, required humans (0 or 1), a listed human's approval of the head SHA (an
-  approving review on it, or adding `graphite-queue` after the head arrived: the
-  later of its committer date and its first check suite), the high-tier
-  cross-lineage review on the head, and `missing` tokens, which block only under
-  `enforce`
+  the default branch tip (contents API), pipes the paths with their line counts
+  into `classify-risk --policy-file <tmp> --stdin --numstat` (so the size rule
+  applies), and reports an `approval` object: tier, required humans (0 or 1), a
+  listed human's approval of the head SHA (an approving review on it, or adding
+  `graphite-queue` after the head arrived: the later of its committer date and
+  its first check suite; no check suite means `head_time_unknown`), the
+  high-tier cross-lineage review on the head, and `missing` tokens, which block
+  only under `enforce`
 - `classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>`
   (or `--stdin [--numstat] [<base-ref>]` with paths, or
   `<added>\t<deleted>\t<path>` numstat rows, one per line on stdin) — Review

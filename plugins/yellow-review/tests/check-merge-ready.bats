@@ -64,10 +64,11 @@ rv() {
     '{state:$s, author:{__typename:$t, login:$l}, commit:{oid:$c}}'
 }
 
-# with_files <path>...: the PR's file list, and an approval response whose
+# with_files <path>...: the PR's file list (ADDED lines each, default 1), and an approval response whose
 # changedFiles matches it (reviews from REVIEWS, default none).
 with_files() {
-  MOCK_GH_MR_FILES=$(printf '%s\n' "$@" | jq -R . | jq -sc 'map({filename: .})')
+  MOCK_GH_MR_FILES=$(printf '%s\n' "$@" | jq -R . \
+    | jq -sc --argjson a "${ADDED:-1}" 'map({filename: ., additions: $a, deletions: 0})')
   MOCK_GH_MRA_BODY=$(approval_body "${REVIEWS:-[]}" "$#")
 }
 
@@ -420,6 +421,32 @@ state_body() {
   [ "$status" -eq 3 ]
   [ "$(jq -c .approval.missing <<<"$output")" = '["head_time_unknown"]' ]
   [ "$(jq -c .unknowns <<<"$output")" = '["approval"]' ]
+}
+
+@test "CLAUDE-234: a head with no check suite has no arrival time, so a label cannot approve it" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  MOCK_GH_MRA_BODY=$(jq -c '.data.repository.pullRequest.commits.nodes[0].commit.checkSuites.nodes = []' <<<"$MOCK_GH_MRA_BODY")
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["head_time_unknown"]' ]
+}
+
+@test "CLAUDE-234: the files API line counts reach the size rule, so a large low-path change is medium" {
+  config 'review_approval_gate: enforce'
+  ADDED=1000 with_files docs/a.md
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -r .approval.tier <<<"$output")" = medium ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_required"]' ]
+}
+
+@test "CLAUDE-234: a file without line counts makes a low-path change medium" {
+  config 'review_approval_gate: enforce'
+  with_files docs/a.md
+  MOCK_GH_MR_FILES='[{"filename":"docs/a.md"}]'
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$(jq -r .approval.tier <<<"$output")" = medium ]
 }
 
 @test "CLAUDE-234: an approval on an older commit is stale" {
