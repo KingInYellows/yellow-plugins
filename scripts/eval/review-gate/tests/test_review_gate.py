@@ -254,7 +254,7 @@ class PipelineTest(Tmp):
         s = rg.summarize(self.work)
         self.assertEqual((s["synthetic_complete"], s["synthetic_with_fp"]), (1, 0))
         self.assertEqual((s["controls_with_fp"], s["controls_complete"]), (1, 3))
-        res = self.cli("grade", self.work, "--date", "2026-11-02", "--results-dir", self.results)
+        self.cli("grade", self.work, "--date", "2026-11-02", "--results-dir", self.results)
         with open(os.path.join(self.results, "results-2026-11-02.md"), encoding="utf-8") as handle:
             md = handle.read()
         self.assertIn("| of which synthetic", md)
