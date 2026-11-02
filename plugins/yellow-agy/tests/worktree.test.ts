@@ -1,4 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -138,7 +140,11 @@ describe('hostCommand', () => {
       { kind: 'wsl-bridge' },
       'git',
       ['status'],
-      { cwd: '/home/o/w', env: { GIT_INDEX_FILE: '/home/o/i' } },
+      {
+        cwd: '/home/o/w',
+        env: { GIT_INDEX_FILE: '/home/o/i' },
+        filterDrivers: ['lfs'],
+      },
       { WSLENV: 'X', GIT_CONFIG_PARAMETERS: "'core.hooksPath=/x'" }
     );
     expect(spec.file).toBe('wsl.exe');
@@ -146,10 +152,45 @@ describe('hostCommand', () => {
     expect(spec.args).toContain('GIT_CONFIG_PARAMETERS');
     expect(spec.args).toContain('GIT_CONFIG_VALUE_0=/dev/null');
     expect(spec.args).toContain('GIT_CONFIG_VALUE_1=false');
+    expect(spec.args).toContain('GIT_CONFIG_KEY_10=filter.lfs.clean');
     expect(spec.args.slice(-2)).toEqual(['git', 'status']);
     expect(spec.env['WSLENV']).toBeUndefined();
     expect(() =>
-      hostCommand({ kind: 'wsl-bridge' }, 'git', [], { cwd: '/mnt/c/x' }, {})
+      hostCommand(
+        { kind: 'wsl-bridge' },
+        'git',
+        [],
+        { cwd: '/mnt/c/x', filterDrivers: [] },
+        {}
+      )
     ).toThrow(AgyError);
+  });
+});
+
+describe('createHostExec', () => {
+  it('turns off the repo filter drivers on every git call', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agy-hostfilter-'));
+    try {
+      const marker = path.join(dir, 'ran');
+      const raw = (args: string[]) =>
+        execFileSync('git', args, { cwd: dir, stdio: 'pipe' });
+      raw(['init', '-q']);
+      fs.writeFileSync(
+        path.join(dir, 'f.sh'),
+        `#!/bin/sh\ntouch '${marker}'\ncat\n`,
+        {
+          mode: 0o755,
+        }
+      );
+      raw(['config', 'filter.demo.clean', 'sh ./f.sh']);
+      fs.writeFileSync(path.join(dir, '.gitattributes'), 'd.txt filter=demo\n');
+      fs.writeFileSync(path.join(dir, 'd.txt'), 'hi\n');
+      expect(await exec.filterDrivers(dir)).toContain('demo');
+      const res = await exec.git(['add', 'd.txt'], { cwd: dir });
+      expect(res.code).toBe(0);
+      expect(fs.existsSync(marker)).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

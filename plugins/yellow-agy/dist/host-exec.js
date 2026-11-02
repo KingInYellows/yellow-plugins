@@ -61,7 +61,7 @@ function hostCommand(host, cmd, args, options, baseEnv) {
         }
     }
     const nullDevice = host.kind === 'windows-native' ? 'NUL' : '/dev/null';
-    const hooks = (0, invocation_1.hookConfig)(nullDevice);
+    const hooks = (0, invocation_1.hookConfig)(nullDevice, options.filterDrivers);
     if (host.kind !== 'wsl-bridge') {
         return {
             file: cmd,
@@ -134,10 +134,24 @@ function runSpawn(spec, stdin, timeoutMs) {
 }
 /** The real HostExec for `host`. */
 function createHostExec(host, baseEnv = process.env) {
-    const run = (cmd, args, options) => runSpawn(hostCommand(host, cmd, args, options, baseEnv), options.stdin, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    const run = (cmd, args, options, filterDrivers = []) => runSpawn(hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv), options.stdin, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    // Reading config runs no filter, so discovery itself needs none turned off.
+    const discover = async (cwd) => {
+        const res = await run('git', ['config', '--name-only', '--get-regexp', '^filter\\.'], { cwd });
+        // Exit 1 with no output means no filter.* key is set.
+        if (res.code === 1 && res.stdout === '')
+            return [];
+        if (res.code !== 0) {
+            throw new errors_1.AgyError('AGY_WORKTREE', `reading the repository's git filter config failed: ${res.stderr.trim() || `exit ${res.code}`}`);
+        }
+        return (0, invocation_1.filterDriverNames)(res.stdout);
+    };
     return {
         host,
-        git: (args, options) => run('git', args, options),
+        async git(args, options) {
+            return run('git', args, options, await discover(options.cwd));
+        },
+        filterDrivers: discover,
         async writeFile(filePath, content) {
             if (host.kind !== 'wsl-bridge') {
                 fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });

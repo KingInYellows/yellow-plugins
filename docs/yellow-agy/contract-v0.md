@@ -215,8 +215,8 @@ defense in depth.
   program-running or rerouting `GIT_*` variable git(1) documents (`GIT_EDITOR`,
   `GIT_EXTERNAL_DIFF`, `GIT_PAGER`, `GIT_ASKPASS`, …), since the distro's own
   environment is out of the Windows-side scrub's reach. The adapter's own host
-  git calls (`collect`, snapshots, in the lifecycle PR) use the same override
-  set and scrubbed environment.
+  git calls (`collect`, snapshots) use the same override set and scrubbed
+  environment, and discover the filter drivers afresh before each call.
 
 ## Result classification
 

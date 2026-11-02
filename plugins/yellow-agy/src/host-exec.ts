@@ -13,7 +13,12 @@ import * as path from 'node:path';
 
 import { AgyError } from './errors';
 import type { Host } from './invocation';
-import { BRIDGE_UNSET_VARS, hookConfig, scrubEnv } from './invocation';
+import {
+  BRIDGE_UNSET_VARS,
+  filterDriverNames,
+  hookConfig,
+  scrubEnv,
+} from './invocation';
 
 export interface ExecResult {
   readonly code: number | null;
@@ -32,7 +37,13 @@ export interface ExecOptions {
 /** The port the lifecycle uses; tests swap in a host-local implementation. */
 export interface HostExec {
   readonly host: Host;
+  /**
+   * Runs git with every filter driver the repo at `options.cwd` defines
+   * turned off (discovered fresh on each call).
+   */
   git(args: readonly string[], options: ExecOptions): Promise<ExecResult>;
+  /** The filter driver names the repo at `cwd` defines, for agy turns. */
+  filterDrivers(cwd: string): Promise<string[]>;
   writeFile(filePath: string, content: string): Promise<void>;
   removeFile(filePath: string): Promise<void>;
 }
@@ -56,6 +67,8 @@ export function hostCommand(
   options: {
     readonly cwd: string;
     readonly env?: Readonly<Record<string, string>>;
+    /** Filter drivers to turn off; [] only for non-git commands or discovery. */
+    readonly filterDrivers: readonly string[];
   },
   baseEnv: Readonly<Record<string, string | undefined>>
 ): SpawnSpec {
@@ -69,7 +82,7 @@ export function hostCommand(
     }
   }
   const nullDevice = host.kind === 'windows-native' ? 'NUL' : '/dev/null';
-  const hooks = hookConfig(nullDevice);
+  const hooks = hookConfig(nullDevice, options.filterDrivers);
   if (host.kind !== 'wsl-bridge') {
     return {
       file: cmd,
@@ -159,16 +172,37 @@ export function createHostExec(
   const run = (
     cmd: string,
     args: readonly string[],
-    options: ExecOptions
+    options: ExecOptions,
+    filterDrivers: readonly string[] = []
   ): Promise<ExecResult> =>
     runSpawn(
-      hostCommand(host, cmd, args, options, baseEnv),
+      hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv),
       options.stdin,
       options.timeoutMs ?? DEFAULT_TIMEOUT_MS
     );
+  // Reading config runs no filter, so discovery itself needs none turned off.
+  const discover = async (cwd: string): Promise<string[]> => {
+    const res = await run(
+      'git',
+      ['config', '--name-only', '--get-regexp', '^filter\\.'],
+      { cwd }
+    );
+    // Exit 1 with no output means no filter.* key is set.
+    if (res.code === 1 && res.stdout === '') return [];
+    if (res.code !== 0) {
+      throw new AgyError(
+        'AGY_WORKTREE',
+        `reading the repository's git filter config failed: ${res.stderr.trim() || `exit ${res.code}`}`
+      );
+    }
+    return filterDriverNames(res.stdout);
+  };
   return {
     host,
-    git: (args, options) => run('git', args, options),
+    async git(args, options) {
+      return run('git', args, options, await discover(options.cwd));
+    },
+    filterDrivers: discover,
     async writeFile(filePath, content) {
       if (host.kind !== 'wsl-bridge') {
         fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });

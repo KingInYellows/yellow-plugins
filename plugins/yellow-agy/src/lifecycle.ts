@@ -323,6 +323,7 @@ export class Lifecycle {
     const inv = buildInvocation(this.deps.host, args, {
       cwd: worktree,
       baseEnv: this.deps.baseEnv,
+      filterDrivers: await this.deps.exec.filterDrivers(worktree),
     });
     const outcome = await this.deps.runTurn(inv, {
       deadlineMs: this.deps.deadlineMs,
