@@ -1,0 +1,8 @@
+{
+  "id": "synthetic-test-only",
+  "repo": "KingInYellows/yellow-plugins",
+  "base": "098fa5f804b4ace62b95dc5fd0a8f1172485bc3d",
+  "tier": "medium",
+  "source": "written for the eval (CLAUDE-239)",
+  "notes": "Adds two unit tests to the review-gate eval's own test file. Test-only and the tests pass at base."
+}

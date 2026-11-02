@@ -1,0 +1,8 @@
+{
+  "id": "synthetic-docs-wording",
+  "repo": "KingInYellows/yellow-plugins",
+  "base": "098fa5f804b4ace62b95dc5fd0a8f1172485bc3d",
+  "tier": "low",
+  "source": "written for the eval (CLAUDE-239)",
+  "notes": "A one-sentence clarification in docs/architecture-overview.md. Prose only; nothing for a reviewer to flag as Important."
+}
