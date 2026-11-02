@@ -146,11 +146,17 @@ async function dropUnusedBranch(exec, repo, branch, base) {
 }
 /** Deletes every leftover private fetch ref in `repo`, best effort. */
 async function dropFetchRefs(exec, repo) {
-    const res = await exec.git(['for-each-ref', '--format=%(refname)', FETCH_REF_PREFIX], { cwd: repo });
-    if (res.code !== 0)
+    const res = await exec
+        .git(['for-each-ref', '--format=%(refname)', FETCH_REF_PREFIX], {
+        cwd: repo,
+    })
+        .catch(() => undefined);
+    if (res === undefined || res.code !== 0)
         return;
     for (const ref of res.stdout.split('\n').filter((r) => r !== '')) {
-        await exec.git(['update-ref', '-d', ref], { cwd: repo });
+        await exec
+            .git(['update-ref', '-d', ref], { cwd: repo })
+            .catch(() => undefined);
     }
 }
 /** The temporary index path for `localId`, inside the worktree's git dir. */
