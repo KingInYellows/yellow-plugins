@@ -490,7 +490,7 @@ Same directory. Not GraphQL; they read only the local repository:
   rather than calling the script itself.
 - **classify-risk** — Review risk tier of a change from its paths; flags, output
   and policy rules are in the script header and
-  `references/components-reference.md`
+  `../../references/components-reference.md`
 
 ## Verification Loop
 

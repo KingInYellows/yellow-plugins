@@ -81,6 +81,7 @@
       "paths": [
         "plugins/yellow-core/lib/validate-fs.sh",
         "plugins/yellow-core/lib/stack-operation-registry.js",
+        "plugins/yellow-core/lib/stack-tooling-probe.js",
         "plugins/yellow-core/lib/stack-provider-state.js",
         "plugins/yellow-core/lib/remote-agent-provider-state.js"
       ]
