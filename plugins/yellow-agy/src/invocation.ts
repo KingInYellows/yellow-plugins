@@ -18,6 +18,16 @@ export const AUTH_MODE_VARS = [
   'AGY_ADC_AUTH',
 ] as const;
 
+/**
+ * Unset inside WSL on the bridge, where the Windows-side scrub can't reach
+ * the distro's own environment. GIT_CONFIG_PARAMETERS (what `git -c` sets)
+ * overrides the GIT_CONFIG_COUNT hooks setting, so it goes too.
+ */
+export const BRIDGE_UNSET_VARS = [
+  ...AUTH_MODE_VARS,
+  'GIT_CONFIG_PARAMETERS',
+] as const;
+
 /** Flags the CLI never passes, whatever the caller asks for. */
 const FORBIDDEN_FLAGS = ['--dangerously-skip-permissions'] as const;
 
@@ -160,7 +170,7 @@ export function buildInvocation(
   }
   // Exec-only: -e runs env directly, so no distro shell re-parses argv.
   args.push('--cd', wslCwd, '-e', 'env');
-  for (const name of AUTH_MODE_VARS) args.push('-u', name);
+  for (const name of BRIDGE_UNSET_VARS) args.push('-u', name);
   for (const [key, value] of Object.entries(hookConfig('/dev/null'))) {
     args.push(`${key}=${value}`);
   }

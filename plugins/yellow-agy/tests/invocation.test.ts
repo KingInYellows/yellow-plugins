@@ -84,7 +84,10 @@ describe('buildInvocation', () => {
     );
     expect(inv.file).toBe('wsl.exe');
     expect(inv.cwd).toBeUndefined();
-    const unsets = AUTH_MODE_VARS.flatMap((v) => ['-u', v]);
+    const unsets = [...AUTH_MODE_VARS, 'GIT_CONFIG_PARAMETERS'].flatMap((v) => [
+      '-u',
+      v,
+    ]);
     expect(inv.args).toEqual([
       '-d',
       'Ubuntu-24.04',

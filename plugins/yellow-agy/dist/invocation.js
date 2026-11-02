@@ -7,7 +7,7 @@
  * permission-flag guard cannot be skipped.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WINDOWS_ARGV_LIMIT = exports.AUTH_MODE_VARS = void 0;
+exports.WINDOWS_ARGV_LIMIT = exports.BRIDGE_UNSET_VARS = exports.AUTH_MODE_VARS = void 0;
 exports.scrubEnv = scrubEnv;
 exports.authModeVarsSet = authModeVarsSet;
 exports.windowsCommandLineLength = windowsCommandLineLength;
@@ -21,6 +21,15 @@ exports.AUTH_MODE_VARS = [
     'GOOGLE_CLOUD_PROJECT',
     'GOOGLE_APPLICATION_CREDENTIALS',
     'AGY_ADC_AUTH',
+];
+/**
+ * Unset inside WSL on the bridge, where the Windows-side scrub can't reach
+ * the distro's own environment. GIT_CONFIG_PARAMETERS (what `git -c` sets)
+ * overrides the GIT_CONFIG_COUNT hooks setting, so it goes too.
+ */
+exports.BRIDGE_UNSET_VARS = [
+    ...exports.AUTH_MODE_VARS,
+    'GIT_CONFIG_PARAMETERS',
 ];
 /** Flags the CLI never passes, whatever the caller asks for. */
 const FORBIDDEN_FLAGS = ['--dangerously-skip-permissions'];
@@ -118,7 +127,7 @@ function buildInvocation(host, agyArgs, options) {
     }
     // Exec-only: -e runs env directly, so no distro shell re-parses argv.
     args.push('--cd', wslCwd, '-e', 'env');
-    for (const name of exports.AUTH_MODE_VARS)
+    for (const name of exports.BRIDGE_UNSET_VARS)
         args.push('-u', name);
     for (const [key, value] of Object.entries(hookConfig('/dev/null'))) {
         args.push(`${key}=${value}`);
