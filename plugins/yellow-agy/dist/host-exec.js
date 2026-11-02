@@ -61,11 +61,7 @@ function hostCommand(host, cmd, args, options, baseEnv) {
         }
     }
     const nullDevice = host.kind === 'windows-native' ? 'NUL' : '/dev/null';
-    const hooks = {
-        GIT_CONFIG_COUNT: '1',
-        GIT_CONFIG_KEY_0: 'core.hooksPath',
-        GIT_CONFIG_VALUE_0: nullDevice,
-    };
+    const hooks = (0, invocation_1.hookConfig)(nullDevice);
     if (host.kind !== 'wsl-bridge') {
         return {
             file: cmd,

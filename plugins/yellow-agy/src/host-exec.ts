@@ -13,7 +13,7 @@ import * as path from 'node:path';
 
 import { AgyError } from './errors';
 import type { Host } from './invocation';
-import { BRIDGE_UNSET_VARS, scrubEnv } from './invocation';
+import { BRIDGE_UNSET_VARS, hookConfig, scrubEnv } from './invocation';
 
 export interface ExecResult {
   readonly code: number | null;
@@ -69,11 +69,7 @@ export function hostCommand(
     }
   }
   const nullDevice = host.kind === 'windows-native' ? 'NUL' : '/dev/null';
-  const hooks = {
-    GIT_CONFIG_COUNT: '1',
-    GIT_CONFIG_KEY_0: 'core.hooksPath',
-    GIT_CONFIG_VALUE_0: nullDevice,
-  };
+  const hooks = hookConfig(nullDevice);
   if (host.kind !== 'wsl-bridge') {
     return {
       file: cmd,

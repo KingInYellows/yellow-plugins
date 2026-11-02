@@ -146,6 +146,7 @@ describe('hostCommand', () => {
     expect(spec.args.slice(0, 4)).toEqual(['--cd', '/home/o/w', '-e', 'env']);
     expect(spec.args).toContain('GIT_CONFIG_PARAMETERS');
     expect(spec.args).toContain('GIT_CONFIG_VALUE_0=/dev/null');
+    expect(spec.args).toContain('GIT_CONFIG_VALUE_1=false');
     expect(spec.args.slice(-2)).toEqual(['git', 'status']);
     expect(spec.env['WSLENV']).toBeUndefined();
     expect(() =>
