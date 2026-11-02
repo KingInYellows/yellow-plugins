@@ -430,6 +430,22 @@ describe('review-gate file line counts', () => {
       'file-line-counts rows=2 dropped=0 skipped=0\na.sh base=1 head=2',
     ],
     ['no header', 'a.sh base=1 head=2'],
+    [
+      'a forged row',
+      'file-line-counts rows=1 dropped=0 skipped=0\na.sh base=1 head=2 base=9',
+    ],
+    [
+      'a leading dash',
+      'file-line-counts rows=1 dropped=0 skipped=0\n-a base=1 head=2',
+    ],
+    [
+      'a dot-dot path',
+      'file-line-counts rows=1 dropped=0 skipped=0\nx/../a base=1 head=2',
+    ],
+    [
+      'a non-numeric count',
+      'file-line-counts rows=1 dropped=0 skipped=0\na.sh base=x head=2',
+    ],
     ['a non-string', 7],
   ])('refuses counts with %s', async (_why, value) => {
     await expect(run(baseArgs({ file_line_counts: value }))).rejects.toThrow(

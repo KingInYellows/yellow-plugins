@@ -151,14 +151,24 @@ const SAFE_PATH = /^[A-Za-z0-9._/@+:\\ -]+$/;
 const LINE_COUNTS_HEADER =
   /^file-line-counts rows=(\d+) dropped=\d+ skipped=\d+$/;
 
-// The header plus exactly `rows` rows, as review-pr.md Step 5 item 6 takes
-// them from the script. A partial set would look authoritative to the
-// reviewer, so anything else is refused.
+// One `<path> base=<n> head=<n>` row. The path follows the script's own
+// screen: no whitespace, control characters or `=`, no leading `-` or `/`,
+// and no `..` component.
+const LINE_COUNTS_ROW =
+  /^(?![-/])(?!(?:[^\n]*\/)?\.\.(?:\/| ))[^\s=\x00-\x1f\x7f]+ base=\d+ head=\d+$/;
+
+// The header plus exactly `rows` well-formed rows, as review-pr.md Step 5
+// item 6 takes them from the script. A partial or malformed set would look
+// authoritative to the reviewer, so anything else is refused.
 function validLineCounts(text) {
   if (typeof text !== 'string') return false;
   const lines = text.replace(/\n+$/, '').split('\n');
   const m = LINE_COUNTS_HEADER.exec(lines[0]);
-  return m !== null && lines.length - 1 === Number(m[1]);
+  return (
+    m !== null &&
+    lines.length - 1 === Number(m[1]) &&
+    lines.slice(1).every((row) => LINE_COUNTS_ROW.test(row))
+  );
 }
 
 function xmlEscape(text) {
