@@ -173,6 +173,8 @@ export class Lifecycle {
   private readonly deps: LifecycleDeps;
   private readonly ownerPid: number;
   private readonly alive: (pid: number | undefined) => boolean;
+  /** Request ids whose agy turn spawned in this process. */
+  private readonly spawned = new Set<string>();
 
   constructor(deps: LifecycleDeps) {
     this.deps = deps;
@@ -245,10 +247,13 @@ export class Lifecycle {
             meta.branch
           );
         }
-        const removed = await this.deps.exec.git(
-          ['worktree', 'remove', '--force', '--', meta.worktree],
-          { cwd: meta.repo }
-        );
+        // A thrown removal (repo gone, spawn failure) is judged like a
+        // nonzero exit: fine once the orphan no longer exists.
+        const removed = await this.deps.exec
+          .git(['worktree', 'remove', '--force', '--', meta.worktree], {
+            cwd: meta.repo,
+          })
+          .catch((err: unknown) => ({ code: -1, stderr: String(err) }));
         // Fail closed: keep the claim while the orphan still exists.
         if (
           removed.code !== 0 &&
@@ -434,7 +439,10 @@ export class Lifecycle {
       deadlineMs: this.deps.deadlineMs,
       // Durable before the turn can settle: if the owner dies, the claim
       // still names a live agy. A failed write stops the turn.
-      onSpawn: (pid) => this.patchClaim(requestId, { childPid: pid }),
+      onSpawn: (pid) => {
+        this.spawned.add(requestId);
+        return this.patchClaim(requestId, { childPid: pid });
+      },
     });
     return classifyTurn(outcome);
   }
@@ -456,13 +464,16 @@ export class Lifecycle {
         outcome,
         at: nowIso(),
       });
-      next = {
-        ...next,
-        usage: [
-          ...next.usage,
-          { at: nowIso(), localId: task.localId, requestId },
-        ],
-      };
+      // Only a turn that actually started counts against the quota window.
+      if (this.spawned.delete(requestId)) {
+        next = {
+          ...next,
+          usage: [
+            ...next.usage,
+            { at: nowIso(), localId: task.localId, requestId },
+          ],
+        };
+      }
       return { journal: next, result: outcome };
     });
   }
@@ -507,7 +518,22 @@ export class Lifecycle {
       }
     );
     if (res.replay !== undefined) return res.replay;
-    const profile = await this.prepare(input.requestId, () => this.readOnly());
+    // Build (and so validate) the turn's argv before any git side effect,
+    // so a bad prompt is refused without a branch or worktree left behind.
+    const profile = await this.prepare(input.requestId, () => {
+      const p = this.readOnly();
+      buildInvocation(
+        this.deps.host,
+        turnArgs({
+          prompt: input.prompt,
+          profile: p,
+          printTimeoutSeconds: this.deps.printTimeoutSeconds,
+          jsonSchemaPath: this.deps.schemaPath,
+        }),
+        { cwd: worktree, baseEnv: this.deps.baseEnv, filterDrivers: [] }
+      );
+      return p;
+    });
     let base: string;
     try {
       base = await createWorktree(this.deps.exec, {

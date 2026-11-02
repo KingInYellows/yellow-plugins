@@ -87,6 +87,11 @@ function runTurn(inv, options) {
             if (child.pid === undefined || closed)
                 return;
             killLinux(sig);
+            // On the bridge a SIGTERM goes to the Linux group only: killing
+            // wsl.exe now would orphan agy before its pgid arrives. SIGKILL (after
+            // the grace period) still takes wsl.exe down too.
+            if (bridge !== undefined && sig === 'SIGTERM')
+                return;
             if (!groupKill && child.exitCode !== null)
                 return;
             try {

@@ -29,8 +29,9 @@ function harness(steps: Step[], extra: Partial<LifecycleDeps> = {}) {
     worktreeRoot: path.join(root, 'worktrees'),
     schemaPath: path.join(root, 'schema', 'plan.schema.json'),
     baseEnv: testEnv,
-    runTurn: async (inv) => {
+    runTurn: async (inv, options) => {
       calls.push(inv);
+      await options.onSpawn?.(process.pid);
       const step = steps.shift();
       if (step === undefined) throw new Error('unexpected turn');
       const { json, ...rest } = step(inv);
@@ -520,6 +521,24 @@ describe('Lifecycle', () => {
     });
     expect(readJournal(h.deps.dataDir).tasks['t1']?.state).toBe('ABANDONED');
     expect(readJournal(h.deps.dataDir).requests['a1']?.status).toBe('done');
+  });
+
+  it('refuses an invalid prompt before creating a branch, and records no usage', async () => {
+    const h = harness([]);
+    await expect(
+      h.lc.delegate({ ...delegateInput(h.repo), prompt: '--settings=x' })
+    ).rejects.toBeInstanceOf(AgyError);
+    expect(git(h.repo, 'branch', '--list', 'agy/t1')).toBe('');
+    expect(fs.existsSync(path.join(h.deps.worktreeRoot, 't1'))).toBe(false);
+    const j = readJournal(h.deps.dataDir);
+    expect(j.usage).toEqual([]);
+    expect(j.activeRun).toBeUndefined();
+  });
+
+  it('records usage only for turns that spawned', async () => {
+    const h = harness([planTurn]);
+    await h.lc.delegate(delegateInput(h.repo));
+    expect(readJournal(h.deps.dataDir).usage).toHaveLength(1);
   });
 
   it('abandon collects, removes the worktree and keeps the branch', async () => {
