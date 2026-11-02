@@ -184,6 +184,20 @@ manifest change or plugin-authoring path still does.
 | `stack-traversal`             | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack`                                      |
 | `yellow-thermonuclear-review` | Portable structural-quality rubric preloaded by `thermonuclear-reviewer`; adapted from Cursor's MIT-licensed `thermo-nuclear-code-quality-review` |
 
+## Workflows
+
+| Workflow      | Description                                                                                                                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `review-gate` | Risk-tiered review core: persona hunters, 1 or 3 verifier votes per finding, Important / Nit / Pre-existing ranking. Runs as `/yellow-review:review-gate` with `args` from the caller. |
+
+`/review:pr` calls it only when `yellow-plugins.local.md` sets
+`review_pipeline: workflow`, and only in shadow mode: the normal persona review
+runs unchanged, and the Coverage section adds one line comparing the two
+reviews' findings. The workflow's findings are not applied or recorded. Each run
+spends usage on its own agents (3 to 6 on a low-tier change, more on medium and
+high). A `claude -p` run needs a `Workflow(yellow-review:review-gate)` allow
+rule to launch it.
+
 ## Scripts
 
 Helpers under `skills/pr-review-workflow/scripts/` that implement the mechanical

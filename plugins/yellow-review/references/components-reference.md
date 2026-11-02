@@ -630,6 +630,50 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   (`~/.claude/projects/<slug>/compound-staging/`) and the review-findings ledger
   above are separate stores; this script never touches the latter.
 
+### Workflows (1)
+
+- `workflows/review-gate.js` — `/yellow-review:review-gate`, a Claude Code
+  dynamic workflow (plain JavaScript; `export const meta` first, then a body
+  using `agent`, `parallel`, `pipeline`, `phase`, `log` and `args`). Claude Code
+  discovers the plugin's `workflows/` directory by default; the optional
+  `workflows` manifest field would replace that scan, so the catalog does not
+  set it. Design: `plans/risk-tiered-review-pipeline.md` section 4.
+  - **Args (fixed contract):**
+    `{repo, pr, base, head, tier, diff_path, changed_files, review_md, include, exclude, dismissed}`.
+    Bad input throws `review-gate: invalid args: <reason>` before any agent
+    runs.
+  - **Hunt:** one agent per `include` name not in `exclude`, launched by
+    `agentType` (`yellow-review:review:<name>`, `yellow-core:review:<name>`,
+    `yellow-codex:review:codex-reviewer`; a name with `:` is used as is; an
+    unknown bare name runs as a plain prompt naming the persona) with the
+    compact-return schema as JSON Schema. Hunters are told to report every issue
+    with its confidence; the persona bodies' own confidence floors still apply
+    until the eval-gated follow-up removes them. The low tier runs only
+    `correctness-reviewer` and `project-compliance-reviewer`; the rest go to
+    `coverage.skipped` with a log line. A `null` or failed hunter goes to
+    `coverage.failed`.
+  - **Dedup:** plain code; same file, same category, line within 3 of the
+    cluster. Keeps the most severe, then most confident, finding and merges
+    `reviewers`. Findings matching an `args.dismissed` entry (file, line within
+    3, normalized title) are dropped before voting.
+  - **Vote:** `pipeline()` over findings. Three voters with the lenses
+    reproduces / handled-elsewhere / reachable-from-entry-point for P0/P1 on
+    medium and high, and for P2 on high; one voter otherwise, and for every
+    pre-existing finding. P0/P1 voters inherit the session model at `medium`
+    effort; P2/P3 voters run `sonnet` at `low`. Kept on a confirmed majority of
+    the verdicts returned; with no majority and no refutation (all unverifiable,
+    or no verdict came back) it is kept with `unverified: true`; otherwise
+    dropped as refuted. The verifier prompt carries `/review:pr` Step 6's
+    quality gates (line accuracy, protected-artifact filter, skim-FP).
+  - **Rank:** plain code. P0/P1 → Important, P2/P3 → Nit, `pre_existing` or a
+    file outside `changed_files` → Pre-existing. At most five Nits are shown;
+    the overflow goes to `dropped` with reason `nit cap (5)`. Every drop is
+    logged.
+  - **Return:**
+    `{version: 1, tier, findings[], dropped[], coverage{ran, failed, skipped}, agents}`.
+  - **Tests:** `tests/integration/review-gate-workflow.test.ts` (repo root) runs
+    the body in `node:vm` with stub agents; no model is called.
+
 ### Hooks (1)
 
 - `SessionStart` → `hooks/scripts/session-start.sh` (timeout 3 s, declared in
