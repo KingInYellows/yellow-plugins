@@ -22,7 +22,14 @@ it. `>|` overwrites even under zsh `noclobber`. Use the `DIFF_BASE` value from
 Step 3a:
 
 ```bash
-gate_dir="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/review-gate"
+gate_dir="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/review-gate" || exit 1
+case "$gate_dir" in
+  /*) ;;
+  *) printf '[review:pr] review-gate: git dir path is not absolute\n' >&2; exit 1 ;;
+esac
+case "$gate_dir" in
+  *[!A-Za-z0-9._/@+-]*) printf '[review:pr] review-gate: git dir path has unsafe characters\n' >&2; exit 1 ;;
+esac
 mkdir -p "$gate_dir" || exit 1
 git worktree prune
 gate_root=$(mktemp -d "$gate_dir/pr-<PR#>.XXXXXX") || exit 1
@@ -35,7 +42,9 @@ gh repo view --json nameWithOwner -q .nameWithOwner
 ```
 
 If this block fails, run Cleanup below, record `not run (checkout failed)` for
-Step 10 and skip the rest of this file.
+Step 10 and skip the rest of this file. When it stops at the path checks,
+nothing was created: skip Cleanup too. Those checks mean the printed `repo_root`
+holds only plain path characters, so Cleanup can quote it safely.
 
 Read `REVIEW.md` from the default branch, never from the PR head, so a PR cannot
 weaken its own review. Step 3a2 already fetched that branch:
@@ -88,7 +97,9 @@ never blocks or changes the review.
 
 ## Compare (before Step 10)
 
-Wait for the run's result. It returns
+Wait for the run's result, for at most 15 minutes after Step 9 ends. If it has
+not finished by then, stop it with `TaskStop`, record `not run (timed out)` for
+Step 10 and run Cleanup. The result is
 `{version, tier, findings[], dropped[], coverage{ran, failed, skipped, empty}, agents}`.
 Compare it with the findings Step 6 kept (every severity plus Pre-existing): a
 workflow finding overlaps when a Step 6 finding has the same `file` and a `line`
@@ -108,10 +119,21 @@ Run this once the workflow result is in, and on every other way the review ends
 after the Inputs block ran: the checkout fails, the launch is refused, the run
 fails, or the review stops early. Stop a run that is still going first with
 `TaskStop` on the task id the `Workflow` call returned, because its agents read
-the checkout. Use the `repo_root` printed by the Inputs block:
+the checkout. Put the `repo_root` printed by the Inputs block inside the single
+quotes. The block removes nothing unless that path is a direct child of this
+repository's `review-gate` directory made of plain path characters:
 
 ```bash
-gate_root="<repo_root>"
+gate_root='<repo_root>'
+gate_dir="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/review-gate" || exit 1
+case "$gate_root" in
+  *[!A-Za-z0-9._/@+-]* | */../* | */..) printf '[review:pr] review-gate: refusing to clean %s\n' "$gate_root" >&2; exit 1 ;;
+  "$gate_dir"/pr-*) ;;
+  *) printf '[review:pr] review-gate: refusing to clean %s\n' "$gate_root" >&2; exit 1 ;;
+esac
+case "${gate_root#"$gate_dir"/}" in
+  */*) printf '[review:pr] review-gate: refusing to clean %s\n' "$gate_root" >&2; exit 1 ;;
+esac
 git worktree remove --force "$gate_root" 2>/dev/null
 rm -rf "$gate_root"
 rm -f "$gate_root.diff"
