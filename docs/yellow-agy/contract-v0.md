@@ -199,7 +199,7 @@ agy's `status` alone isn't trustworthy. Classify in this order:
 | `status: "SUCCESS"`, empty `denied_actions`, `finished_reason` absent (agy 1.4.12's normal finish)      | `OK`                                                                              | 0                                     |
 | `status: "SUCCESS"`, empty `denied_actions`, `finished_reason` present but unrecognized                 | Not `OK`. Report with partial output kept                                         | 0 with `requiresAttention`            |
 | `authentication required` on stderr                                                                     | `AGY_AUTH_REQUIRED`. The owner signs in interactively once                        | 1                                     |
-| exit 3 / `status: "ERROR"`, no auth message                                                             | `AGY_MODEL_ERROR` (quota exhaustion → `AGY_QUOTA`)                                | 1                                     |
+| exit 3 / `status: "ERROR"`, no auth message                                                             | `AGY_MODEL_ERROR` (quota text on stderr → `AGY_QUOTA`)                            | 1                                     |
 
 A Not `OK` turn (`SUCCESS` with an unrecognized `finished_reason`) is still a
 settled turn. It settles its reservation as completed, journaling the usage and

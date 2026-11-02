@@ -111,18 +111,24 @@ describe('classifyTurn', () => {
     ).toBe('AUTH_REQUIRED');
   });
 
-  it('quota exhaustion is QUOTA, other errors MODEL_ERROR', () => {
+  it('quota exhaustion on stderr is QUOTA, other errors MODEL_ERROR', () => {
     expect(
       classifyTurn(
         outcome({
           exitCode: 3,
-          json: {
-            status: 'ERROR',
-            response: 'RESOURCE_EXHAUSTED: quota exceeded',
-          },
+          json: { status: 'ERROR' },
+          stderr: 'RESOURCE_EXHAUSTED: quota exceeded',
         })
       ).kind
     ).toBe('QUOTA');
+    expect(
+      classifyTurn(
+        outcome({
+          exitCode: 3,
+          json: { status: 'ERROR', response: 'fixed the 429 quota handler' },
+        })
+      ).kind
+    ).toBe('MODEL_ERROR');
     const e = classifyTurn(
       outcome({
         exitCode: 3,
@@ -136,6 +142,36 @@ describe('classifyTurn', () => {
     expect(empty.kind === 'MODEL_ERROR' && empty.detail).toBe(
       'agy exited with 7'
     );
+  });
+});
+
+describe('classifyTurn row order', () => {
+  it('print_timeout wins over denied_actions', () => {
+    expect(
+      classifyTurn(
+        outcome({
+          json: {
+            ...ok,
+            finished_reason: 'print_timeout',
+            denied_actions: [{ tool: 'command' }],
+          },
+        })
+      ).kind
+    ).toBe('TIMED_OUT');
+  });
+
+  it('our deadline kill wins over a SUCCESS result', () => {
+    expect(
+      classifyTurn(outcome({ killedByDeadline: true, json: ok })).kind
+    ).toBe('TIMED_OUT');
+  });
+
+  it('a clean SUCCESS wins over auth text on stderr', () => {
+    expect(
+      classifyTurn(
+        outcome({ json: ok, stderr: 'warning: authentication required soon' })
+      ).kind
+    ).toBe('OK');
   });
 });
 

@@ -13,7 +13,7 @@
     "preinstall": "node scripts/check-node-version.js && npx only-allow pnpm",
     "build": "pnpm -r run build",
     "clean": "pnpm -r run clean && rm -rf node_modules",
-    "typecheck": "tsc --noEmit && pnpm --filter yellow-cursor run typecheck && pnpm --filter yellow-goal run typecheck && pnpm --filter yellow-jules run typecheck",
+    "typecheck": "tsc --noEmit && pnpm --filter yellow-cursor run typecheck && pnpm --filter yellow-goal run typecheck && pnpm --filter yellow-jules run typecheck && pnpm --filter yellow-agy run typecheck",
     "lint": "eslint . --ext .js,.ts",
     "test:unit": "vitest run --dir packages --passWithNoTests && pnpm --filter yellow-cursor run test && pnpm --filter yellow-goal run test && pnpm --filter yellow-jules run test && pnpm --filter yellow-agy run test",
     "test:integration": "vitest run --dir tests/integration --passWithNoTests",

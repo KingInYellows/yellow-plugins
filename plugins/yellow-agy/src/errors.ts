@@ -110,7 +110,7 @@ export const ERROR_CATALOG: Readonly<Record<AgyErrorCode, CatalogEntry>> = {
   AGY_MCP: {
     exit: 2,
     recoveryAction:
-      'Remove the configured MCP servers from agy, or wait for a per-run way to turn them off.',
+      'Disable each enabled MCP server with agy mcp disable <name> (see agy mcp list), then run /agy:setup.',
   },
   AGY_PROMPT_TOO_LONG: {
     exit: 2,
@@ -127,7 +127,8 @@ export const ERROR_CATALOG: Readonly<Record<AgyErrorCode, CatalogEntry>> = {
   },
   AGY_INTERNAL: {
     exit: 1,
-    recoveryAction: 'Report the message; nothing was changed by this failure.',
+    recoveryAction:
+      'Report the message, and check the worktree and run journal before retrying.',
   },
 };
 

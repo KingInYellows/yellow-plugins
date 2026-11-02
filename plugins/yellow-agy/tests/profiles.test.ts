@@ -139,6 +139,8 @@ describe('validateAllowCommand', () => {
     'GIT push',
     'Git -C . push',
     'NPM publish',
+    'pnpm -r publish',
+    'npx curl x',
   ])('refuses %s', (c) => {
     expect(codeOf(() => validateAllowCommand(c))).toBe('AGY_INVALID_INPUT');
   });

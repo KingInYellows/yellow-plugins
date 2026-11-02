@@ -58,7 +58,7 @@ yarn.lock
 # Build outputs (Task I1.T1: pnpm workspace)
 dist/
 **/dist/
-# yellow-cursor / yellow-goal / yellow-jules / yellow-agy ship compiled CLIs so installed plugins are
+# yellow-cursor / yellow-goal / yellow-jules / yellow-agy commit compiled output so installed plugins are
 # runnable without a build step; CI's build job drift-checks them against src/.
 !plugins/yellow-cursor/dist/
 !plugins/yellow-goal/dist/

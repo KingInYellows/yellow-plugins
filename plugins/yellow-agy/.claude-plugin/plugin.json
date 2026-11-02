@@ -10,12 +10,5 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-agy",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "keywords": [
-    "antigravity",
-    "agy",
-    "google",
-    "local-agent",
-    "delegation",
-    "ai-agent"
-  ]
+  "keywords": ["antigravity", "agy", "google", "local-agent", "delegation", "ai-agent"]
 }

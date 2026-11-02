@@ -74,15 +74,17 @@ function classifyTurn(outcome) {
     if (AUTH_RE.test(outcome.stderr)) {
         return { kind: 'AUTH_REQUIRED', ...withResult };
     }
+    // Quota is read from agy's stderr only: the model's response can mention
+    // "quota" or "429" while describing the repo it is working on.
+    if (QUOTA_RE.test(outcome.stderr)) {
+        return { kind: 'QUOTA', ...withResult };
+    }
     const detail = [
         outcome.stderr,
         typeof result?.response === 'string' ? result.response : '',
     ]
         .join('\n')
         .trim();
-    if (QUOTA_RE.test(detail)) {
-        return { kind: 'QUOTA', ...withResult };
-    }
     return {
         kind: 'MODEL_ERROR',
         ...withResult,

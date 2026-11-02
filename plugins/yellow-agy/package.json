@@ -4,7 +4,7 @@
   "private": true,
   "description": "Local supervised delegate on the Antigravity CLI (agy) under the owner's Google AI Pro sign-in — successor to yellow-jules (scaffold: setup checks only)",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --dir tests"
   },

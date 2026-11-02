@@ -70,7 +70,7 @@ exports.ERROR_CATALOG = {
     },
     AGY_MCP: {
         exit: 2,
-        recoveryAction: 'Remove the configured MCP servers from agy, or wait for a per-run way to turn them off.',
+        recoveryAction: 'Disable each enabled MCP server with agy mcp disable <name> (see agy mcp list), then run /agy:setup.',
     },
     AGY_PROMPT_TOO_LONG: {
         exit: 2,
@@ -86,7 +86,7 @@ exports.ERROR_CATALOG = {
     },
     AGY_INTERNAL: {
         exit: 1,
-        recoveryAction: 'Report the message; nothing was changed by this failure.',
+        recoveryAction: 'Report the message, and check the worktree and run journal before retrying.',
     },
 };
 class AgyError extends Error {
