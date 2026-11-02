@@ -892,12 +892,18 @@ rr_warn() { printf '[review:resolve] Warning: risk tier unknown (%s)\n' "$1" >&2
 RISK_FILE=""
 DEFAULT_BRANCH=$(rr_net gh repo view --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
 BASE_BRANCH=$(rr_net gh pr view "<PR#>" --json baseRefName -q .baseRefName) || BASE_BRANCH=""
+PR_HEAD=$(rr_net gh pr view "<PR#>" --json headRefOid -q .headRefOid) || PR_HEAD=""
 RISK_OK=1
 for rr_b in "$DEFAULT_BRANCH" "$BASE_BRANCH"; do
   case "$rr_b" in '' | -* | *..* | *[!A-Za-z0-9._/-]*) RISK_OK=0 ;; esac
 done
+case "$PR_HEAD" in *[!0-9a-f]* | '') RISK_OK=0 ;; esac
 if [ "$RISK_OK" != 1 ]; then
-  rr_warn 'no usable default or base branch'
+  rr_warn 'no usable default branch, base branch or PR head'
+elif ! git cat-file -e "$PR_HEAD^{commit}" 2>/dev/null &&
+  ! { rr_net git fetch --no-tags --quiet origin "refs/pull/<PR#>/head" &&
+    git cat-file -e "$PR_HEAD^{commit}" 2>/dev/null; }; then
+  rr_warn 'published PR head unreadable'
 elif ! rr_net git fetch --no-tags --quiet origin "+refs/heads/$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"; then
   rr_warn 'base branch fetch failed'
 elif ! rr_net git fetch --no-tags --quiet origin "refs/heads/$DEFAULT_BRANCH"; then
@@ -908,7 +914,7 @@ elif ! RISK_FILE=$(mktemp "${TMPDIR:-/tmp}/resolve-risk.XXXXXX"); then
   RISK_FILE=""
   rr_warn 'mktemp failed'
 elif ! "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
-  --policy-ref "$POLICY_SHA" "origin/$BASE_BRANCH" HEAD >|"$RISK_FILE"; then
+  --policy-ref "$POLICY_SHA" "origin/$BASE_BRANCH" "$PR_HEAD" >|"$RISK_FILE"; then
   rm -f "$RISK_FILE"
   RISK_FILE=""
   rr_warn 'classify-risk failed'
@@ -916,11 +922,13 @@ fi
 printf 'risk_file=%s\n' "$RISK_FILE"
 ```
 
-Each network call is bounded at 30 s as in `/review:pr` Step 3a2, and each
-failure prints a `risk tier unknown (<stage>)` warning. An empty `risk_file=`
-drops `--risk` below and the comment has no tier line; it never stops the run.
-Run the sync as its own Bash call with a `timeout` of 420000 ms, with
-`--risk "<risk-file>"` only when the path printed above is not empty:
+It classifies the published head (`headRefOid`), the commit the comment names,
+not local `HEAD`, which can hold an unpushed Step 6 commit. Each network call is
+bounded at 30 s as in `/review:pr` Step 3a2, and each failure prints a
+`risk tier unknown (<stage>)` warning. An empty `risk_file=` drops `--risk`
+below and the comment has no tier line; it never stops the run. Run the sync as
+its own Bash call with a `timeout` of 420000 ms, with `--risk "<risk-file>"`
+only when the path printed above is not empty:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/sync-blocking-comment" --reasons "<reasons-file>" --risk "<risk-file>" "<owner/repo>" "<PR#>" "<conversationResolution>"
