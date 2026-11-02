@@ -266,8 +266,10 @@ number of humans.
 Rules from the infographic kept literally:
 
 - **An agent's approval never counts.** `check-merge-ready` accepts only a
-  review by, or a `graphite-queue` label added by, a listed human login; bot and
-  Claude approvals and labels are ignored.
+  review by, or a `graphite-queue` label added by, a listed human login; bot
+  approvals and labels are ignored. Claude acting through the owner's account is
+  indistinguishable from the owner, so for labels this rule rests on Claude
+  never adding the label to a medium or high PR (see below).
 - **An approval covers one commit.** Compare the approving review's `commit_id`
   with the head SHA, or the label event's time with the time the head arrived
   (the latest of its committer date, its first check suite on the PR's head
@@ -408,8 +410,9 @@ prompt changes") already matches the loop; the eval runner must only ever use
 
 ## 10. Open questions for the user
 
-1. **Standing label approval.** Should Claude's right to add `graphite-queue`
-   shrink to low-tier PRs only? (Recommended: yes.)
+1. ~~**Standing label approval.**~~ Decided 2026-11-02: Claude adds
+   `graphite-queue` only to low-tier PRs; the owner's label approves medium and
+   high.
 2. **High-tier automated extras.** Is "cross-lineage pass plus fresh re-review
    on the final commit" the right extra scrutiny for high-tier PRs? (Human
    approvals stay at one, per the user's 2026-11-02 note.)

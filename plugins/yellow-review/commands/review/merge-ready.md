@@ -71,7 +71,7 @@ Print one row per check, then the contract line. Mark each row `ok`, `blocks` or
   CI:          <ci.state>; failing: <names>; pending: <names>
   Ledger:      <mergeBlocking> pending P0-P2 findings[; <skipped> unreadable records] | none | other repo | unavailable
   Queue:       graphite-queue <present | absent>
-  Approval:    <tier> tier (<mode>); needs <required> human; approved by <login> on head | missing: <tokens>
+  Approval:    <tier> tier (<mode>); needs <required> human; approved by <login> via <review | label> on head | missing: <tokens>
 
 MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens or none> queued=<true|false|unknown>
 ```
@@ -94,23 +94,25 @@ MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens
   reads `off`, no lookups), `advisory` (default: list `missing`, the verdict
   ignores it) or `enforce` (`approval_required`, `approval_stale` and
   `cross_lineage_missing` block; `tier_unknown`, `reviews_unknown`,
-  `head_time_unknown` and `fresh_review_unknown` make the verdict `unknown`). Low needs no human; medium
-  and high need approval of the head SHA by a login in `review_approval_humans`
-  (default: the repository owner): an approving review on that commit, or that
-  login adding the `graphite-queue` label after the head arrived (GitHub will
-  not let the owner approve their own PR, so the owner approves by queueing).
-  `humanApproval.via` says which. A bot's or unlisted account's approval or
-  label never counts (`approval_required`); a listed human's from before the
-  head is `approval_stale`; a label whose timing cannot be checked is
-  `head_time_unknown`. High also needs a review on the head by a
-  login in `review_cross_lineage_bots`; `freshReview` is always unknown until
-  the ledger records the head of each review run, so under `enforce` a high PR
-  is `unknown` until then (Phase 3), and the default `advisory` only lists it.
+  `head_time_unknown` and `fresh_review_unknown` make the verdict `unknown`).
+  Low needs no human; medium and high need approval of the head SHA by a login
+  in `review_approval_humans` (default: the repository owner): an approving
+  review on that commit, or that login adding the `graphite-queue` label after
+  the head arrived (GitHub will not let the owner approve their own PR, so the
+  owner approves by queueing). `humanApproval.via` says which. A bot's or
+  unlisted account's approval or label never counts (`approval_required`); a
+  listed human's from before the head is `approval_stale`; a label whose timing
+  cannot be checked is `head_time_unknown`. High also needs a review on the head
+  by an account GitHub reports as a `Bot` whose login is in
+  `review_cross_lineage_bots`; `freshReview` is always unknown until the ledger
+  records the head of each review run, so under `enforce` a high PR with no
+  other blocker is `unknown` until then (Phase 3), and the default `advisory`
+  only lists it.
 - For `blocked`, end with the next step for each blocker: `/review:resolve` for
   threads, the reviewer for changes requested, the failing check names for CI, a
   rebase for conflicts, the user adding `graphite-queue` again (or approving the
-  head commit) for `approval_required` or `approval_stale`, a review of the head by a
-  `review_cross_lineage_bots` account (Codex by default) for
+  head commit) for `approval_required` or `approval_stale`, a review of the head
+  by a `review_cross_lineage_bots` account (Codex by default) for
   `cross_lineage_missing`.
 - For `unknown`, say what could not be read and suggest re-running; an unknown
   is never reported as ready. `merge_state` means GitHub reports the merge as
