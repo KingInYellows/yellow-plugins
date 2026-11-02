@@ -88,13 +88,21 @@ def referenced_prs(commit):
 
 def old_side_hunks(diff):
     """[{file, line}] for each hunk's first old-side line: where the defect was."""
-    hunks, path = [], None
+    hunks, path, header = [], None, False
     for line in diff.splitlines():
-        if line.startswith("--- "):
+        if line.startswith("diff --git "):
+            # A `--- ` line names the file only here, before the first @@; in
+            # a hunk it is a removed line such as `-- comment`.
+            path, header = None, True
+            continue
+        if header and line.startswith("--- "):
             path = line[6:] if line.startswith("--- a/") else None
+            continue
         m = HUNK_RE.match(line)
-        if m and path and len(hunks) < MAX_HUNKS:
-            hunks.append({"file": path, "line": max(1, int(m.group(1)))})
+        if m:
+            header = False
+            if path and len(hunks) < MAX_HUNKS:
+                hunks.append({"file": path, "line": max(1, int(m.group(1)))})
     return hunks
 
 
@@ -179,8 +187,9 @@ def bot_candidates(comments, pulls, since=None, until=None, logins=BOT_LOGINS, b
             "comment_url": c.get("html_url"),
             "created_at": c.get("created_at"),
             "file": c.get("path"),
-            "line": c.get("line") or c.get("original_line"),
-            # The head the bot reviewed; the PR's later head may have fixed it.
+            # The line and head the bot reviewed, as a pair; the PR's later
+            # head (commit_id, line) may have moved or fixed it.
+            "line": c.get("original_line") if c.get("original_commit_id") else c.get("line"),
             "head": c.get("original_commit_id") or c.get("commit_id"),
             "base": (pull.get("base") or {}).get("sha"),
             "pr_head": (pull.get("head") or {}).get("sha"),
@@ -200,21 +209,27 @@ def gh_get(path, params=None):
     return json.loads(res.stdout)
 
 
-def harvest_bots(repo, since, until, max_pages=20, get=gh_get):
-    comments = []
+def harvest_bots(repo, since, until, max_pages=50, get=gh_get):
+    """(candidates, truncated). Pages newest first and stops once a page
+    reaches comments created before --since, so a cap only ever drops the
+    oldest comments, and `truncated` says when it did."""
+    comments, truncated = [], False
     for page in range(1, max_pages + 1):
-        params = {"sort": "created", "direction": "asc", "per_page": 100, "page": page}
+        params = {"sort": "created", "direction": "desc", "per_page": 100, "page": page}
         if since:
             params["since"] = since + "T00:00:00Z"
         batch = get("repos/%s/pulls/comments" % repo, params)
         comments += batch
-        if len(batch) < 100:
+        oldest = min((str(c.get("created_at") or "")[:10] for c in batch if isinstance(c, dict)), default="")
+        if len(batch) < 100 or (since and oldest and oldest < since):
             break
+    else:
+        truncated = True
     pulls = {}
     for c in bot_candidates(comments, {}, since, until):
         if c["pr"] is not None and c["pr"] not in pulls:
             pulls[c["pr"]] = get("repos/%s/pulls/%d" % (repo, c["pr"]))
-    return bot_candidates(comments, pulls, since, until)
+    return bot_candidates(comments, pulls, since, until), truncated
 
 
 # --- main -------------------------------------------------------------------------
@@ -264,8 +279,10 @@ def main(argv=None):
         result["sources"]["bots"] = "skipped: gh not found"
     else:
         try:
-            result["candidates"] += harvest_bots(repo, a.since, a.until)
-            result["sources"]["bots"] = "ok"
+            found, truncated = harvest_bots(repo, a.since, a.until)
+            result["candidates"] += found
+            result["sources"]["bots"] = ("truncated: hit the page cap; comments older than the last "
+                                         "page were not read, narrow --since" if truncated else "ok")
         except (RuntimeError, ValueError, TypeError) as err:
             result["sources"]["bots"] = "skipped: %s" % err
     text = json.dumps(result, indent=1) + "\n"
@@ -275,7 +292,7 @@ def main(argv=None):
         print("harvest: %d candidates -> %s" % (len(result["candidates"]), a.output), file=sys.stderr)
     else:
         sys.stdout.write(text)
-    if result["sources"]["bots"].startswith("skipped"):
+    if result["sources"]["bots"].startswith(("skipped", "truncated")):
         print("harvest: bot source %s" % result["sources"]["bots"], file=sys.stderr)
     return 0
 

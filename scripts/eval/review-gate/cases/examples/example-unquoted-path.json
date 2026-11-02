@@ -1,7 +1,7 @@
 {
   "id": "example-unquoted-path",
   "example": true,
-  "notes": "EXAMPLE ONLY, not a real case. The SHAs and the defect are made up to show the format; prepare refuses it without --allow-examples.",
+  "notes": "EXAMPLE ONLY, not a real case. The SHAs and the defect are made up to show the format; prepare loads it only with --examples.",
   "repo": "KingInYellows/yellow-plugins",
   "pr": 1467,
   "base": "1111111111111111111111111111111111111111",

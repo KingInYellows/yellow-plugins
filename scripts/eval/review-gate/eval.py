@@ -22,6 +22,7 @@ prepare, run --dry-run and grade spend nothing.
 import argparse
 import concurrent.futures
 import datetime
+import hashlib
 import importlib.util
 import json
 import os
@@ -34,17 +35,17 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def _load_model_swap():
-    path = os.path.join(HERE, "..", "model-swap", "eval.py")
-    spec = importlib.util.spec_from_file_location("model_swap_eval", path)
+def _load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-# git(), fingerprint(), output_fingerprint(), fixture_parts() and SAFE_NAME are
-# model-swap's; its REPO is this checkout.
-ms = _load_model_swap()
+# git(), fresh_worktree(), fixture_parts() and SAFE_NAME are model-swap's; its
+# REPO is this checkout. origin_repo() is harvest.py's.
+ms = _load("model_swap_eval", os.path.join(HERE, "..", "model-swap", "eval.py"))
+hv = _load("review_gate_harvest", os.path.join(HERE, "harvest.py"))
 REPO = ms.REPO
 
 WORKFLOW = "yellow-review:review-gate"
@@ -53,16 +54,10 @@ WORKFLOW = "yellow-review:review-gate"
 PLUGINS = ("yellow-core", "yellow-linear", "yellow-review")
 CLASSIFY = os.path.join(REPO, "plugins", "yellow-review", "skills", "pr-review-workflow",
                         "scripts", "classify-risk")
-# The reviewer under test. Their content goes into every row's fingerprint, so
-# a reviewer change reruns every row and nothing else does.
-REVIEWER_PATHS = (
-    "plugins/yellow-review/.claude-plugin",
-    "plugins/yellow-review/agents",
-    "plugins/yellow-review/skills",
-    "plugins/yellow-review/workflows",
-    "plugins/yellow-core/agents/review",
-    "REVIEW.md",
-)
+# The reviewer under test: every plugin passed with --plugin-dir, whole. Their
+# content goes into every row's fingerprint, so any change to what the run
+# loads reruns every row. (REVIEW.md reaches the run through args.review_md.)
+REVIEWER_PATHS = tuple("plugins/%s" % name for name in PLUGINS)
 # The workflow does the reviewing; the parent only launches it.
 DENIED_TOOLS = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch"
 COST_KEYS = ("total_cost_usd", "num_turns", "duration_ms", "duration_api_ms", "usage", "modelUsage",
@@ -167,19 +162,9 @@ def load_items(cases_dir, controls_dir, examples=False):
 
 # --- prepare ----------------------------------------------------------------
 
-def origin_repo(path):
-    """owner/name of a checkout's origin remote, or None."""
-    try:
-        url = ms.git("remote", "get-url", "origin", cwd=path).strip()
-    except subprocess.CalledProcessError:
-        return None
-    m = re.search(r"[:/]([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$", url)
-    return "%s/%s" % m.groups() if m else None
-
-
 def repo_dirs(pairs):
     dirs = {}
-    own = origin_repo(REPO)
+    own = hv.origin_repo(REPO)
     if own:
         dirs[own] = REPO
     for pair in pairs:
@@ -188,13 +173,6 @@ def repo_dirs(pairs):
             sys.exit("prepare: --repo-dir takes owner/name=PATH, got %r" % pair)
         dirs[name] = os.path.abspath(path)
     return dirs
-
-
-def fresh_worktree(repo_dir, path, commit):
-    """A detached worktree at commit, recreated so a stale tree is never reused."""
-    if os.path.isdir(path):
-        ms.git("worktree", "remove", "--force", path, cwd=repo_dir)
-    ms.git("worktree", "add", "--quiet", "--detach", path, commit, cwd=repo_dir)
 
 
 def classify(repo_dir, base, head):
@@ -218,8 +196,25 @@ def review_md_at(repo_dir, base):
 
 
 def reviewer_hash():
-    present = [p for p in REVIEWER_PATHS if os.path.exists(os.path.join(REPO, p))]
-    return ms.fixture_parts({"fixtures": present}) + present
+    return ms.fixture_parts({"fixtures": list(REVIEWER_PATHS)})[0]
+
+
+def row_fingerprint(args_path, diff_path, model, reviewer):
+    """Hash of what one run consumes: the args and diff file contents, the
+    parent model, the prompt and flags, and the reviewer's files. Grading-only
+    case fields (golden, notes, source, confirmed_*) are not in it, so editing
+    a golden regex never reruns a row. Files are read by explicit path, so the
+    hash does not depend on the process's working directory."""
+    h = hashlib.sha256()
+    parts = [("model", model), ("prompt", PROMPT), ("denied", DENIED_TOOLS), ("plugins", ",".join(PLUGINS)),
+             ("workflow", WORKFLOW), ("reviewer", reviewer)]
+    for label, path in (("args", args_path), ("diff", diff_path)):
+        with open(path, "rb") as handle:
+            parts.append((label, handle.read().decode("utf-8", "replace")))
+    for label, value in parts:
+        data = value.encode("utf-8")
+        h.update(b"%s:%d:" % (label.encode(), len(data)) + data)
+    return h.hexdigest()[:16]
 
 
 def prepare(work, items, dirs, model, only=None):
@@ -242,7 +237,7 @@ def prepare(work, items, dirs, model, only=None):
                 sys.exit("prepare: %s: commit %s is not in %s; fetch it first" % (doc["id"], sha, repo_dir))
         rid = doc["id"]
         wt = os.path.join(work, "wt", rid)
-        fresh_worktree(repo_dir, wt, doc["head"])
+        ms.fresh_worktree(wt, doc["head"], cwd=repo_dir)
         span = "%s...%s" % (doc["base"], doc["head"])
         diff_path = os.path.join(work, "prompts", rid + ".diff")
         with open(diff_path, "w", encoding="utf-8") as handle:
@@ -268,7 +263,7 @@ def prepare(work, items, dirs, model, only=None):
         args_path = os.path.join(work, "prompts", rid + ".args.json")
         with open(args_path, "w", encoding="utf-8") as handle:
             json.dump(args, handle, indent=1, sort_keys=True)
-        fp = ms.fingerprint(kind, doc, args_path, diff_path, model, PROMPT, DENIED_TOOLS, PLUGINS, *reviewer)
+        fp = row_fingerprint(args_path, diff_path, model, reviewer)
         rows.append({"id": rid, "kind": kind, "wt": wt, "args": args_path, "model": model,
                      "tier": risk["tier"], "fingerprint": fp})
     with open(os.path.join(work, "matrix.json"), "w", encoding="utf-8") as handle:
@@ -335,6 +330,18 @@ def shape_problems(wf):
     return problems
 
 
+def ungradable(wf):
+    """Why grade would call a run incomplete, or None. run --retry-incomplete
+    and grade both use it."""
+    problems = shape_problems(wf)
+    if problems:
+        return "; ".join(problems)
+    failed = coverage_failed(wf)
+    if failed:
+        return "coverage.failed: %s" % ", ".join(map(str, failed))
+    return None
+
+
 def coverage_failed(wf):
     cov = wf.get("coverage") if isinstance(wf, dict) else None
     return list(cov.get("failed") or []) if isinstance(cov, dict) else []
@@ -397,8 +404,8 @@ def run_one(row, work, claude, timeout):
         "eval_fingerprint": row["fingerprint"], "eval_rc": rc, "eval_wall_s": wall,
         "cli": {k: cli.get(k) for k in COST_KEYS if k in cli}, "workflow": wf,
     })
-    failed = coverage_failed(wf)
-    return rid, True, "incomplete: coverage.failed %s" % failed if failed else ""
+    why = ungradable(wf)
+    return rid, True, "incomplete: %s" % why if why else ""
 
 
 def run(work, jobs, dry_run, retry_incomplete=False, timeout=3600):
@@ -408,7 +415,7 @@ def run(work, jobs, dry_run, retry_incomplete=False, timeout=3600):
     for row in rows:
         out = load_output(work, row["id"])
         current = isinstance(out, dict) and out.get("eval_fingerprint") == row["fingerprint"]
-        if current and not (retry_incomplete and coverage_failed(out.get("workflow"))):
+        if current and not (retry_incomplete and ungradable(out.get("workflow"))):
             skipped.append(row)
         else:
             todo.append(row)
@@ -476,11 +483,9 @@ def summarize(work):
             s["missing"].append(rid)
             continue
         wf = out.get("workflow")
-        problems = shape_problems(wf)
-        failed = coverage_failed(wf)
-        if problems or failed:
-            s["incomplete"].append({"id": rid, "why": "; ".join(problems) or "coverage.failed: %s"
-                                    % ", ".join(map(str, failed))})
+        why = ungradable(wf)
+        if why:
+            s["incomplete"].append({"id": rid, "why": why})
             continue
         important = [f for f in wf["findings"] if is_important(f)]
         cli = out.get("cli") or {}
@@ -523,15 +528,15 @@ def verdict(new, base):
         return "no verdict", "needs at least one case and one control"
     if new["fp_rate"] > base["fp_rate"]:
         return "drop", "control FP rate rose %.2f -> %.2f" % (base["fp_rate"], new["fp_rate"])
-    # Cost: the CLI's API-equivalent cost when both report it, else agent count.
-    cost_key = "mean_cost_usd" if new["mean_cost_usd"] and base["mean_cost_usd"] else "mean_agents"
+    # Cost is the mean agent count. The CLI's cost_usd may cover only the
+    # parent session, so it is reported alongside, never decided on.
+    cost = "mean agents %.1f -> %.1f (cost_usd %.4f -> %.4f, reported only)" % (
+        base["mean_agents"], new["mean_agents"], base["mean_cost_usd"], new["mean_cost_usd"])
     if new["recall"] > base["recall"]:
-        return "keep", "Important recall rose %.2f -> %.2f" % (base["recall"], new["recall"])
-    if new["recall"] == base["recall"] and new[cost_key] < base[cost_key]:
-        return "keep", "recall held at %.2f and %s fell %.4g -> %.4g" % (
-            new["recall"], cost_key, base[cost_key], new[cost_key])
-    return "drop", "recall %.2f -> %.2f, %s %.4g -> %.4g" % (
-        base["recall"], new["recall"], cost_key, base[cost_key], new[cost_key])
+        return "keep", "Important recall rose %.2f -> %.2f; %s" % (base["recall"], new["recall"], cost)
+    if new["recall"] == base["recall"] and new["mean_agents"] < base["mean_agents"]:
+        return "keep", "recall held at %.2f; %s" % (new["recall"], cost)
+    return "drop", "recall %.2f -> %.2f; %s" % (base["recall"], new["recall"], cost)
 
 
 def md_table(header, rows):
@@ -624,7 +629,8 @@ def main(argv=None):
     r.add_argument("work")
     r.add_argument("-j", "--jobs", type=int, default=1)
     r.add_argument("--dry-run", action="store_true")
-    r.add_argument("--retry-incomplete", action="store_true", help="rerun rows whose coverage.failed is non-empty")
+    r.add_argument("--retry-incomplete", action="store_true",
+                   help="rerun rows grade calls incomplete (coverage.failed or a malformed result)")
     r.add_argument("--timeout", type=int, default=3600, help="seconds per run")
     g = sub.add_parser("grade")
     g.add_argument("work")

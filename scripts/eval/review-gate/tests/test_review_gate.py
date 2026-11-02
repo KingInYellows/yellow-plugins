@@ -184,6 +184,30 @@ class PipelineTest(Tmp):
         with open(args["diff_path"], encoding="utf-8") as handle:
             self.assertIn("+cp $path /tmp", handle.read())
 
+    def test_fingerprint_ignores_grading_fields_and_cwd(self):
+        self.prepare()
+        before = {r["id"]: r["fingerprint"] for r in rg.read_matrix(self.work)}
+        path = os.path.join(self.cases, "case-hit.json")
+        with open(path, encoding="utf-8") as handle:
+            doc = json.load(handle)
+        doc.update(golden=[{"file": "lib/x.sh", "line": 6, "match": ["other"]}], notes="edited",
+                   source="elsewhere", confirmed_by="someone", confirmed_at="2026-11-03")
+        write(path, json.dumps(doc))
+        # Run prepare from a cwd holding files named like fingerprint inputs.
+        for name in ("sonnet", "case", "REVIEW.md"):
+            write(os.path.join(self.tmp, name), "decoy\n")
+        res = subprocess.run([sys.executable, EVAL, "prepare", self.work, "--cases", self.cases,
+                              "--controls", self.controls, "--repo-dir", "test/demo=" + self.repo],
+                             cwd=self.tmp, capture_output=True, text=True, env=self.env, check=False)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual({r["id"]: r["fingerprint"] for r in rg.read_matrix(self.work)}, before)
+        self.prepare("--model", "haiku")
+        self.assertNotEqual(rg.read_matrix(self.work)[0]["fingerprint"], before[rg.read_matrix(self.work)[0]["id"]])
+
+    def test_reviewer_hash_covers_every_loaded_plugin(self):
+        self.assertEqual(rg.REVIEWER_PATHS, tuple("plugins/" + p for p in rg.PLUGINS))
+        self.assertEqual(rg.PLUGINS, ("yellow-core", "yellow-linear", "yellow-review"))
+
     def test_prepare_needs_a_checkout_for_the_repo(self):
         res = self.cli("prepare", self.work, "--cases", self.cases, "--controls", self.controls)
         self.assertNotEqual(res.returncode, 0)
@@ -215,8 +239,16 @@ class PipelineTest(Tmp):
         res = self.cli("run", self.work)
         self.assertEqual(self.logged(), [])
         self.assertEqual(res.stdout.count("skip "), 5)
+        # A malformed result (current fingerprint) is incomplete to grade, so it reruns too.
+        out_path = os.path.join(self.work, "out", "case-hit.json")
+        with open(out_path, encoding="utf-8") as handle:
+            out = json.load(handle)
+        out["workflow"]["version"] = 2
+        with open(out_path, "w", encoding="utf-8") as handle:
+            json.dump(out, handle)
+        self.assertIn("case-hit", [i["id"] for i in rg.summarize(self.work)["incomplete"]])
         res = self.cli("run", self.work, "--retry-incomplete")
-        self.assertEqual(self.logged(), ["case-incomplete.json"])
+        self.assertEqual(self.logged(), ["case-hit.json", "case-incomplete.json"])
         # A changed input (the parent model) changes every fingerprint.
         shutil.rmtree(self.log)
         self.prepare("--model", "haiku")
@@ -279,20 +311,26 @@ class GradeMathTest(unittest.TestCase):
         self.assertEqual(rg.shape_problems({"version": 2, "findings": "x"}),
                          ["version is 2, not 1", "findings is not a list of objects", "coverage is missing"])
 
-    def summary(self, recall, fp, cost, ids=("a", "b")):
-        return {"recall": recall, "fp_rate": fp, "mean_cost_usd": cost, "mean_agents": 10,
+    def summary(self, recall, fp, agents, cost=1.0, ids=("a", "b")):
+        return {"recall": recall, "fp_rate": fp, "mean_cost_usd": cost, "mean_agents": agents,
                 "missing": [], "incomplete": [], "rows": [{"id": i} for i in ids]}
 
     def test_keep_drop_rule(self):
         v = lambda new, base: rg.verdict(new, base)[0]
-        base = self.summary(0.5, 0.1, 1.0)
-        self.assertEqual(v(self.summary(0.6, 0.1, 2.0), base), "keep")
-        self.assertEqual(v(self.summary(0.5, 0.1, 0.8), base), "keep")
-        self.assertEqual(v(self.summary(0.5, 0.1, 1.0), base), "drop")
-        self.assertEqual(v(self.summary(0.9, 0.2, 0.5), base), "drop")
-        self.assertEqual(v(self.summary(0.4, 0.0, 0.5), base), "drop")
-        self.assertEqual(v(self.summary(0.9, 0.0, 0.5, ids=("a",)), base), "no verdict")
-        self.assertEqual(v({**self.summary(0.9, 0.0, 0.5), "incomplete": [{"id": "a"}]}, base), "no verdict")
+        base = self.summary(0.5, 0.1, 10)
+        self.assertEqual(v(self.summary(0.6, 0.1, 20), base), "keep")
+        self.assertEqual(v(self.summary(0.5, 0.1, 8), base), "keep")
+        self.assertEqual(v(self.summary(0.5, 0.1, 10), base), "drop")
+        self.assertEqual(v(self.summary(0.9, 0.2, 5), base), "drop")
+        self.assertEqual(v(self.summary(0.4, 0.0, 5), base), "drop")
+        self.assertEqual(v(self.summary(0.9, 0.0, 5, ids=("a",)), base), "no verdict")
+        self.assertEqual(v({**self.summary(0.9, 0.0, 5), "incomplete": [{"id": "a"}]}, base), "no verdict")
+
+    def test_cost_usd_never_decides(self):
+        base = self.summary(0.5, 0.1, 10, cost=1.0)
+        decision, why = rg.verdict(self.summary(0.5, 0.1, 10, cost=0.1), base)
+        self.assertEqual(decision, "drop")
+        self.assertIn("reported only", why)
 
     def test_md_table_pads_columns(self):
         self.assertEqual(rg.md_table(["a", "long head"], [["x|y", 1]]),
@@ -331,6 +369,13 @@ class HarvestGitTest(Tmp):
         self.assertEqual([t["pr"] for t in revert["targets"]], [11])
         self.assertEqual(revert["hunks"], [{"file": "lib/o.sh", "line": 1}])
 
+    def test_removed_dash_dash_line_is_not_a_file_header(self):
+        diff = ("diff --git a/q.sql b/q.sql\nindex 1..2 100644\n--- a/q.sql\n+++ b/q.sql\n"
+                "@@ -3 +3 @@\n--- old comment\n+-- new comment\n@@ -9,2 +9 @@\n-x\n"
+                "diff --git a/new.sh b/new.sh\nnew file mode 100644\n--- /dev/null\n+++ b/new.sh\n"
+                "@@ -0,0 +1 @@\n+y\n")
+        self.assertEqual(hv.old_side_hunks(diff), [{"file": "q.sql", "line": 3}, {"file": "q.sql", "line": 9}])
+
     def test_cli_refuses_to_write_into_cases(self):
         res = subprocess.run([sys.executable, HARVEST, "--repo-dir", ROOT, "--repo", "test/demo",
                               "-o", os.path.join(ROOT, "cases", "x.json")],
@@ -350,7 +395,8 @@ class HarvestBotsTest(Tmp):
         self.assertEqual([(c["bot"], c["pr"]) for c in found],
                          [("chatgpt-codex-connector[bot]", 7), ("cursor[bot]", 9)])
         codex, bugbot = found
-        self.assertEqual((codex["file"], codex["line"]), ("plugins/x/lib/y.sh", 42))
+        # original_line (40) goes with original_commit_id, not line (42) on commit_id.
+        self.assertEqual((codex["file"], codex["line"]), ("plugins/x/lib/y.sh", 40))
         self.assertEqual(codex["head"], "a" * 40)  # the head the bot reviewed
         self.assertEqual(codex["base"], "1" * 40)
         self.assertTrue(codex["merged"])
@@ -369,10 +415,32 @@ class HarvestBotsTest(Tmp):
                 return comments
             return pulls[path.rsplit("/", 1)[1]]
 
-        found = hv.harvest_bots("test/demo", "2026-10-01", "2026-10-31", get=get)
+        found, truncated = hv.harvest_bots("test/demo", "2026-10-01", "2026-10-31", get=get)
         self.assertEqual(len(found), 2)
+        self.assertFalse(truncated)
         self.assertEqual(calls[0][1]["since"], "2026-10-01T00:00:00Z")
+        self.assertEqual(calls[0][1]["direction"], "desc")
         self.assertEqual([c[0] for c in calls[1:]], ["repos/test/demo/pulls/7", "repos/test/demo/pulls/9"])
+
+    def test_page_cap_keeps_newest_and_reports_truncation(self):
+        def page(n, day):
+            return [{"user": {"login": "cursor[bot]"}, "body": "![P1 Badge](https://img.shields.io/badge/P1-x)",
+                     "path": "a", "original_line": 1, "original_commit_id": "e" * 40,
+                     "pull_request_url": "https://api.github.com/repos/t/d/pulls/%d" % n,
+                     "created_at": day}] * 100
+
+        pages = {1: page(1, "2026-10-30T00:00:00Z"), 2: page(2, "2026-10-20T00:00:00Z"),
+                 3: page(3, "2026-10-10T00:00:00Z")}
+
+        def get(path, params=None):
+            return pages[params["page"]] if path.endswith("/comments") else {}
+
+        found, truncated = hv.harvest_bots("t/d", "2026-10-01", None, max_pages=2, get=get)
+        self.assertTrue(truncated)
+        self.assertEqual({c["pr"] for c in found}, {1, 2})  # page 3 (oldest) dropped
+        # A page that reaches back past --since ends paging without truncation.
+        found, truncated = hv.harvest_bots("t/d", "2026-10-25", None, max_pages=2, get=get)
+        self.assertFalse(truncated)
 
     def test_bots_skipped_without_gh(self):
         repo = os.path.join(self.tmp, "repo")
