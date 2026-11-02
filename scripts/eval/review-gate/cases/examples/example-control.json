@@ -1,0 +1,11 @@
+{
+  "id": "example-control",
+  "example": true,
+  "notes": "EXAMPLE ONLY, not a real control. A control file lives under controls/, not cases/; it sits here so the examples stay in one place.",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1500,
+  "base": "3333333333333333333333333333333333333333",
+  "head": "4444444444444444444444444444444444444444",
+  "tier": "medium",
+  "source": "EXAMPLE: merged PR #1500, no revert or fix referencing it since"
+}

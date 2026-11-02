@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "tier": "medium",
+  "findings": [
+    {
+      "id": "f1",
+      "severity": "P1",
+      "display": "Important",
+      "file": "lib/x.sh",
+      "line": 8,
+      "title": "Unquoted variable splits on spaces",
+      "category": "correctness",
+      "rule": "unclassified",
+      "confidence": 100,
+      "reviewers": ["correctness-reviewer"],
+      "votes": { "confirmed": 3, "refuted": 0, "unverifiable": 0 },
+      "unverified": false,
+      "evidence": { "file": "lib/x.sh", "line": 8 },
+      "suggested_fix": "Quote the path: \"$path\""
+    },
+    {
+      "id": "f2",
+      "severity": "P3",
+      "display": "Nit",
+      "file": "lib/x.sh",
+      "line": 1,
+      "title": "Missing set -u",
+      "category": "maintainability",
+      "rule": "unclassified",
+      "confidence": 50,
+      "reviewers": ["project-compliance-reviewer"],
+      "votes": { "confirmed": 1, "refuted": 0, "unverifiable": 0 },
+      "unverified": false,
+      "evidence": null,
+      "suggested_fix": "Add set -u"
+    }
+  ],
+  "dropped": [],
+  "coverage": {
+    "ran": ["correctness-reviewer", "project-compliance-reviewer"],
+    "failed": [],
+    "skipped": []
+  },
+  "agents": 5
+}

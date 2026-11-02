@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KingInYellows/yellow-plugins/scripts/eval/review-gate/schema/control.schema.json",
+  "title": "review-gate eval control",
+  "description": "A merged PR with no later incident. Any Important finding on a control counts as a false positive.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "repo", "base", "head", "tier", "source"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$" },
+    "repo": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "pr": { "type": ["integer", "null"], "minimum": 1 },
+    "base": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "tier": { "enum": ["low", "medium", "high"] },
+    "include": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9:_.-]+$" }
+    },
+    "exclude": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9:_.-]+$" }
+    },
+    "source": { "type": "string", "minLength": 1 },
+    "example": { "type": "boolean" },
+    "notes": { "type": "string" }
+  }
+}

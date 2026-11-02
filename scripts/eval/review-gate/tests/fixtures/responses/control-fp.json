@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "tier": "medium",
+  "findings": [
+    {
+      "id": "f1",
+      "severity": "P1",
+      "display": "Important",
+      "file": "lib/x.sh",
+      "line": 5,
+      "title": "Possible race on temp file",
+      "category": "reliability",
+      "rule": "unclassified",
+      "confidence": 75,
+      "reviewers": ["reliability-reviewer"],
+      "votes": { "confirmed": 2, "refuted": 1, "unverifiable": 0 },
+      "unverified": false,
+      "evidence": { "file": "lib/x.sh", "line": 5 },
+      "suggested_fix": "Use mktemp"
+    }
+  ],
+  "dropped": [],
+  "coverage": { "ran": ["reliability-reviewer"], "failed": [], "skipped": [] },
+  "agents": 3
+}
