@@ -13,7 +13,7 @@ import * as path from 'node:path';
 
 import { AgyError } from './errors';
 import type { Host } from './invocation';
-import { scrubEnv } from './invocation';
+import { BRIDGE_UNSET_VARS, scrubEnv } from './invocation';
 
 export interface ExecResult {
   readonly code: number | null;
@@ -91,6 +91,7 @@ export function hostCommand(
   const wslArgs: string[] = [];
   if (host.distro !== undefined) wslArgs.push('-d', host.distro);
   wslArgs.push('--cd', options.cwd, '-e', 'env');
+  for (const name of BRIDGE_UNSET_VARS) wslArgs.push('-u', name);
   for (const [key, value] of Object.entries({ ...hooks, ...extra })) {
     wslArgs.push(`${key}=${value}`);
   }

@@ -131,3 +131,25 @@ describe('worktree', () => {
     expect(await deleteBranchIfEmpty(exec, repo, 'agy/t1', base)).toBe(false);
   });
 });
+
+describe('hostCommand', () => {
+  it('bridge commands are exec-only and unset distro git config', async () => {
+    const { hostCommand } = await import('../src/host-exec');
+    const spec = hostCommand(
+      { kind: 'wsl-bridge' },
+      'git',
+      ['status'],
+      { cwd: '/home/o/w', env: { GIT_INDEX_FILE: '/home/o/i' } },
+      { WSLENV: 'X', GIT_CONFIG_PARAMETERS: "'core.hooksPath=/x'" }
+    );
+    expect(spec.file).toBe('wsl.exe');
+    expect(spec.args.slice(0, 4)).toEqual(['--cd', '/home/o/w', '-e', 'env']);
+    expect(spec.args).toContain('GIT_CONFIG_PARAMETERS');
+    expect(spec.args).toContain('GIT_CONFIG_VALUE_0=/dev/null');
+    expect(spec.args.slice(-2)).toEqual(['git', 'status']);
+    expect(spec.env['WSLENV']).toBeUndefined();
+    expect(() =>
+      hostCommand({ kind: 'wsl-bridge' }, 'git', [], { cwd: '/mnt/c/x' }, {})
+    ).toThrow(AgyError);
+  });
+});

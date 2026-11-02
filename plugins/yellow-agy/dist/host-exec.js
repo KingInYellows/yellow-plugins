@@ -81,6 +81,8 @@ function hostCommand(host, cmd, args, options, baseEnv) {
     if (host.distro !== undefined)
         wslArgs.push('-d', host.distro);
     wslArgs.push('--cd', options.cwd, '-e', 'env');
+    for (const name of invocation_1.BRIDGE_UNSET_VARS)
+        wslArgs.push('-u', name);
     for (const [key, value] of Object.entries({ ...hooks, ...extra })) {
         wslArgs.push(`${key}=${value}`);
     }
