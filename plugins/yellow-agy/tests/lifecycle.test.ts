@@ -350,6 +350,41 @@ describe('Lifecycle', () => {
     ).toContain('+x');
   });
 
+  it('abandon removes a patch whose edits were reverted after collect', async () => {
+    const h = harness([planTurn, editTurn('x\n')]);
+    await h.lc.delegate(delegateInput(h.repo));
+    await h.lc.approve({ requestId: 'r2', localId: 't1' });
+    const c = await h.lc.collect('t1');
+    expect(c.uncommittedPatch).toBeDefined();
+    fs.rmSync(path.join(h.deps.worktreeRoot, 't1', 'b.txt'));
+    await h.lc.abandon({ requestId: 'r3', localId: 't1' });
+    const dir = path.join(h.deps.dataDir, 'artifacts', 't1');
+    expect(fs.existsSync(path.join(dir, 'uncommitted.patch'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, 'commits.patch'))).toBe(false);
+  });
+
+  it('a correction with no valid plan drops the old one and blocks approve', async () => {
+    const h = harness([
+      planTurn,
+      () => ({
+        json: { status: 'SUCCESS', conversation_id: 'c1', response: 'hmm' },
+      }),
+    ]);
+    await h.lc.delegate(delegateInput(h.repo));
+    const c = await h.lc.reply({
+      requestId: 'r2',
+      localId: 't1',
+      message: 'redo',
+      correction: true,
+    });
+    expect(c).toMatchObject({ state: 'PLAN_PENDING', requiresAttention: true });
+    expect(c).not.toHaveProperty('plan');
+    await expect(
+      h.lc.approve({ requestId: 'r3', localId: 't1' })
+    ).rejects.toMatchObject({ code: 'AGY_INVALID_INPUT' });
+    expect(h.calls).toHaveLength(2);
+  });
+
   it('flags secret-shaped content in collected patches', async () => {
     const h = harness([
       planTurn,

@@ -351,15 +351,18 @@ class Lifecycle {
         let plan = task.plan;
         if (passedSchema) {
             const out = result === undefined ? undefined : (0, classify_1.structuredOutput)(result, true);
-            if ((0, plan_schema_1.isPlan)(out))
-                plan = out;
-            else
+            // The conversation has moved past the old plan, so a turn that asked
+            // for a plan and got none leaves nothing to approve.
+            plan = (0, plan_schema_1.isPlan)(out) ? out : undefined;
+            if (plan === undefined)
                 attention.push('agy returned no valid plan; reply with --correction to ask for one');
         }
         if (cls.kind !== 'OK')
             attention.push(attentionFor(cls));
+        const { plan: _old, ...base } = task;
+        void _old;
         const next = {
-            ...task,
+            ...base,
             state: 'PLAN_PENDING',
             conversationId,
             ...(plan === undefined ? {} : { plan }),
@@ -538,18 +541,11 @@ class Lifecycle {
         }
         return this.settlePlanTurn(input.requestId, 'reply', task, cls, withSchema);
     }
-    /** Writes the task's patches under artifacts/<localId>/. Needs no live run. */
-    async collect(localId) {
-        const j = (0, state_1.readJournal)(this.deps.dataDir);
-        const task = (0, state_1.getTask)(j, localId);
-        if (j.activeRun?.localId === localId &&
-            (this.alive(j.activeRun.ownerPid) || this.alive(j.activeRun.childPid))) {
-            throw new errors_1.AgyError('AGY_BUSY', `a run on ${localId} is live`);
-        }
-        if (task.state === 'ABANDONED') {
-            throw new errors_1.AgyError('AGY_INVALID_INPUT', `task ${localId} was abandoned; its last collect is in artifacts/${localId}`);
-        }
-        const got = await (0, worktree_1.collectWorktree)(this.deps.exec, task.worktree, localId, task.base);
+    /**
+     * Writes the patches under artifacts/<localId>/, removing any whose new
+     * content is empty, so a stale patch never outlives the edits it showed.
+     */
+    writePatches(localId, got) {
         const dir = path.join(this.deps.dataDir, 'artifacts', localId);
         fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
         const write = (name, text) => {
@@ -563,6 +559,24 @@ class Lifecycle {
         };
         const commitsPatch = write('commits.patch', got.commits);
         const uncommittedPatch = write('uncommitted.patch', got.uncommitted);
+        return {
+            ...(commitsPatch === undefined ? {} : { commitsPatch }),
+            ...(uncommittedPatch === undefined ? {} : { uncommittedPatch }),
+        };
+    }
+    /** Writes the task's patches under artifacts/<localId>/. Needs no live run. */
+    async collect(localId) {
+        const j = (0, state_1.readJournal)(this.deps.dataDir);
+        const task = (0, state_1.getTask)(j, localId);
+        if (j.activeRun?.localId === localId &&
+            (this.alive(j.activeRun.ownerPid) || this.alive(j.activeRun.childPid))) {
+            throw new errors_1.AgyError('AGY_BUSY', `a run on ${localId} is live`);
+        }
+        if (task.state === 'ABANDONED') {
+            throw new errors_1.AgyError('AGY_INVALID_INPUT', `task ${localId} was abandoned; its last collect is in artifacts/${localId}`);
+        }
+        const got = await (0, worktree_1.collectWorktree)(this.deps.exec, task.worktree, localId, task.base);
+        const { commitsPatch, uncommittedPatch } = this.writePatches(localId, got);
         const secret = (0, redact_1.scanSecretShapes)(got.commits) || (0, redact_1.scanSecretShapes)(got.uncommitted);
         return {
             localId,
@@ -587,16 +601,7 @@ class Lifecycle {
         let attention = [];
         try {
             const got = await (0, worktree_1.collectWorktree)(this.deps.exec, task.worktree, task.localId, task.base);
-            const dir = path.join(this.deps.dataDir, 'artifacts', task.localId);
-            fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-            if (got.commits !== '')
-                fs.writeFileSync(path.join(dir, 'commits.patch'), got.commits, {
-                    mode: 0o600,
-                });
-            if (got.uncommitted !== '')
-                fs.writeFileSync(path.join(dir, 'uncommitted.patch'), got.uncommitted, {
-                    mode: 0o600,
-                });
+            this.writePatches(task.localId, got);
             if ((0, redact_1.scanSecretShapes)(got.commits) || (0, redact_1.scanSecretShapes)(got.uncommitted)) {
                 attention = ['the collected patches contain secret-shaped content'];
             }

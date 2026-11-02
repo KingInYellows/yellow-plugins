@@ -33,8 +33,14 @@ function runTurn(inv, options) {
         const out = [];
         const err = [];
         let graceTimer;
+        let closed = false;
+        // After the leader exits, a tool it started can still hold the pipes open,
+        // so on POSIX the group stays killable until 'close'. The group id can't be
+        // reused while any member is alive.
         const kill = (sig) => {
-            if (child.pid === undefined || child.exitCode !== null)
+            if (child.pid === undefined || closed)
+                return;
+            if (!groupKill && child.exitCode !== null)
                 return;
             try {
                 if (groupKill)
@@ -89,7 +95,13 @@ function runTurn(inv, options) {
             if (child.pid !== undefined)
                 options.onSpawn?.(child.pid);
         });
+        child.on('exit', () => {
+            // agy is done; a tool still in its group would keep 'close' from firing.
+            if (groupKill)
+                kill('SIGKILL');
+        });
         child.on('close', (code, signal) => {
+            closed = true;
             cleanup();
             // Leave nothing behind in the group once the leader is gone.
             if (groupKill && child.pid !== undefined) {

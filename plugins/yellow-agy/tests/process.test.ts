@@ -63,6 +63,22 @@ describe('runTurn', () => {
     expect(out.killedByDeadline).toBe(false);
   });
 
+  it.skipIf(process.platform === 'win32')(
+    'settles when agy exits but a tool it started still holds the pipes',
+    async () => {
+      // The leader spawns a long sleeper sharing its stdout, then exits.
+      const f = script(
+        "const {spawn}=require('node:child_process');spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:['ignore','inherit','inherit']});process.stdout.write('done');process.exit(0);"
+      );
+      const started = Date.now();
+      const out = await runTurn(inv(f), { deadlineMs: 20_000, graceMs: 500 });
+      expect(Date.now() - started).toBeLessThan(10_000);
+      expect(out.exitCode).toBe(0);
+      expect(out.stdout).toBe('done');
+    },
+    15_000
+  );
+
   it('a missing binary is AGY_NOT_INSTALLED', async () => {
     await expect(
       runTurn(

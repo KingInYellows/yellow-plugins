@@ -489,15 +489,19 @@ export class Lifecycle {
     if (passedSchema) {
       const out =
         result === undefined ? undefined : structuredOutput(result, true);
-      if (isPlan(out)) plan = out;
-      else
+      // The conversation has moved past the old plan, so a turn that asked
+      // for a plan and got none leaves nothing to approve.
+      plan = isPlan(out) ? out : undefined;
+      if (plan === undefined)
         attention.push(
           'agy returned no valid plan; reply with --correction to ask for one'
         );
     }
     if (cls.kind !== 'OK') attention.push(attentionFor(cls));
+    const { plan: _old, ...base } = task;
+    void _old;
     const next: Task = {
-      ...task,
+      ...base,
       state: 'PLAN_PENDING',
       conversationId,
       ...(plan === undefined ? {} : { plan }),
@@ -784,6 +788,33 @@ export class Lifecycle {
     return this.settlePlanTurn(input.requestId, 'reply', task, cls, withSchema);
   }
 
+  /**
+   * Writes the patches under artifacts/<localId>/, removing any whose new
+   * content is empty, so a stale patch never outlives the edits it showed.
+   */
+  private writePatches(
+    localId: string,
+    got: { readonly commits: string; readonly uncommitted: string }
+  ): { commitsPatch?: string; uncommittedPatch?: string } {
+    const dir = path.join(this.deps.dataDir, 'artifacts', localId);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const write = (name: string, text: string): string | undefined => {
+      const file = path.join(dir, name);
+      if (text === '') {
+        fs.rmSync(file, { force: true });
+        return undefined;
+      }
+      fs.writeFileSync(file, text, { mode: 0o600 });
+      return file;
+    };
+    const commitsPatch = write('commits.patch', got.commits);
+    const uncommittedPatch = write('uncommitted.patch', got.uncommitted);
+    return {
+      ...(commitsPatch === undefined ? {} : { commitsPatch }),
+      ...(uncommittedPatch === undefined ? {} : { uncommittedPatch }),
+    };
+  }
+
   /** Writes the task's patches under artifacts/<localId>/. Needs no live run. */
   async collect(localId: string): Promise<{
     readonly localId: string;
@@ -813,19 +844,7 @@ export class Lifecycle {
       localId,
       task.base
     );
-    const dir = path.join(this.deps.dataDir, 'artifacts', localId);
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    const write = (name: string, text: string): string | undefined => {
-      const file = path.join(dir, name);
-      if (text === '') {
-        fs.rmSync(file, { force: true });
-        return undefined;
-      }
-      fs.writeFileSync(file, text, { mode: 0o600 });
-      return file;
-    };
-    const commitsPatch = write('commits.patch', got.commits);
-    const uncommittedPatch = write('uncommitted.patch', got.uncommitted);
+    const { commitsPatch, uncommittedPatch } = this.writePatches(localId, got);
     const secret =
       scanSecretShapes(got.commits) || scanSecretShapes(got.uncommitted);
     return {
@@ -867,16 +886,7 @@ export class Lifecycle {
         task.localId,
         task.base
       );
-      const dir = path.join(this.deps.dataDir, 'artifacts', task.localId);
-      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-      if (got.commits !== '')
-        fs.writeFileSync(path.join(dir, 'commits.patch'), got.commits, {
-          mode: 0o600,
-        });
-      if (got.uncommitted !== '')
-        fs.writeFileSync(path.join(dir, 'uncommitted.patch'), got.uncommitted, {
-          mode: 0o600,
-        });
+      this.writePatches(task.localId, got);
       if (scanSecretShapes(got.commits) || scanSecretShapes(got.uncommitted)) {
         attention = ['the collected patches contain secret-shaped content'];
       }
