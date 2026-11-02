@@ -286,4 +286,40 @@ describe('injected git config', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('git status and git add run no named filter driver', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agy-filter-'));
+    try {
+      const git = (args: string[], env?: Record<string, string>) =>
+        execFileSync('git', args, { cwd: dir, env, stdio: 'pipe' });
+      git(['init', '-q']);
+      const marker = join(dir, 'ran');
+      writeFileSync(join(dir, 'f.sh'), `#!/bin/sh\ntouch '${marker}'\ncat\n`, {
+        mode: 0o755,
+      });
+      git(['config', 'filter.demo.clean', 'sh ./f.sh']);
+      writeFileSync(join(dir, '.gitattributes'), 'd.txt filter=demo\n');
+      writeFileSync(join(dir, 'd.txt'), 'hi\n');
+      const inv = buildInvocation({ kind: 'posix' }, ['-p', 'x'], {
+        cwd: dir,
+        baseEnv: { PATH: process.env['PATH'], HOME: dir },
+        filterDrivers: ['demo'],
+      });
+      git(['status', '--porcelain'], { ...inv.env });
+      git(['add', 'd.txt'], { ...inv.env });
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a filter driver name that could inject config', () => {
+    expect(() =>
+      buildInvocation({ kind: 'posix' }, ['-p', 'x'], {
+        cwd: '/w',
+        baseEnv: {},
+        filterDrivers: ['x.clean=evil y'],
+      })
+    ).toThrow(AgyError);
+  });
 });

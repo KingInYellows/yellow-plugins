@@ -94,6 +94,14 @@ describe('classifyTurn', () => {
     }
   });
 
+  it('SUCCESS with a non-array denied_actions is MODEL_ERROR', () => {
+    for (const bad of [null, 'x', { a: 1 }]) {
+      expect(
+        classifyTurn(outcome({ json: { ...ok, denied_actions: bad } })).kind
+      ).toBe('MODEL_ERROR');
+    }
+  });
+
   it('SUCCESS with a non-zero exit is not OK', () => {
     expect(classifyTurn(outcome({ exitCode: 3, json: ok })).kind).toBe(
       'MODEL_ERROR'

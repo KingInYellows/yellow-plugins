@@ -167,11 +167,12 @@ replaces the global key wholesale, and a key it leaves out leaks through (probed
 2026-11 on agy 1.4.12). The pinned keys are `useG1Credits: false`,
 `allowNonWorkspaceAccess: false`, `toolPermission` (default `request-review`,
 never `always-proceed`), `agentMode`, `enableTerminalSandbox` and `permissions`.
-Every `toolPermission` value runs headless: a call the profile doesn't allow is
-soft-denied at once and shows up in `denied_actions`. A per-run `agentMode: ""`
-overrides a global `accept-edits`, and `--mode` beats both, so the profile alone
-keeps a plan turn from editing. `setup` still refuses a loose global `agentMode`
-as defense in depth.
+The profiles accept only `request-review`, `strict` and `proceed-in-sandbox`;
+each of these runs headless: a call the profile doesn't allow is soft-denied at
+once and shows up in `denied_actions`. A per-run `agentMode: ""` overrides a
+global `accept-edits`, and `--mode` beats both, so the profile alone keeps a
+plan turn from editing. `setup` still refuses a loose global `agentMode` as
+defense in depth.
 
 - **read-only:** `permissions.allow: ["command(git status)"]`, `agentMode: ""`,
   `enableTerminalSandbox: false`. No `--mode accept-edits`. `git diff` and
@@ -179,15 +180,28 @@ as defense in depth.
   `--output=<file>` writes a file anywhere even with edits off.
 - **implement:** read-only, plus `command(git add)` and `command(git commit)`,
   with `agentMode: "accept-edits"` and `--mode accept-edits`. A `command(...)`
-  rule matches any arguments after its words, so no `regex:` rules are needed,
-  and for the same reason a grant can't be broad. The repo's own test and lint
-  commands named in the grant (`--allow-command`, which `authorize` validates:
-  plain words, no `git`, nothing that reaches the network or publishes, and a
-  package or build tool only with a test, lint or build subcommand or
-  `run <script>`) are added only on a host where `--sandbox` is verified (hard
+  rule is a prefix match: it matches any arguments after its words, so no
+  `regex:` rules are needed, and every grant has to be safe with any trailing
+  arguments. The repo's own test and lint commands named in the grant
+  (`--allow-command`, which `authorize` validates: plain words, a first word
+  from a fixed list of test, lint and build tools with no path or `.exe`-style
+  suffix, so no wrappers such as `env` or `timeout`; a package or build tool
+  only with a test, lint or build subcommand, or `run <script>` for npm, pnpm,
+  yarn and bun) are added only on a host where `--sandbox` is verified (hard
   rules). Every turn that runs with those commands also passes `--sandbox`; the
   adapter refuses to build an implement invocation that grants them without the
   flag.
+- **Unverified:** whether agy runs a matched command through a shell, so that
+  `$(…)`, backticks or `>` in the trailing arguments of an allowed rule (such as
+  `git status $(…)`) would execute or write. The 2026-11 probe covered only `&&`
+  chaining with every part granted, and not a chain with an ungranted part. Both
+  are probed before the first real delegated run.
+- **Git config every agy child sees** (`GIT_CONFIG_COUNT`/`KEY_n`/`VALUE_n`):
+  `core.hooksPath=<null device>`, `core.fsmonitor=false`, and, for each filter
+  driver the repo's effective config defines (the caller passes the names),
+  `filter.<name>.clean`, `.smudge` and `.process` set to empty and
+  `filter.<name>.required=false`, so no hook, fsmonitor or filter command runs
+  during the allowed `git status`, `git add` and `git commit`.
 
 ## Result classification
 
@@ -274,11 +288,12 @@ The adapter probe answered five of the six open questions; the run sheet is
    `print_timeout` and `interrupted`; any other value stays Not `OK`.
 4. **`--input-format stream-json`:** exists (one message per stdin line, needs
    `--output-format stream-json`). v0 keeps one process per turn.
-5. **Settings merge:** per top-level key (see Permission profiles). Every
+5. **Settings merge:** per top-level key (see Permission profiles). Each probed
    `toolPermission` value runs headless; `agentMode` accepts `accept-edits`,
    `plan`, `auto` and `""`.
-6. **Command matching:** `command(<words>)` matches extra arguments, and each
-   part of a chained command is matched on its own. No `regex:` rules.
+6. **Command matching:** `command(<words>)` matches extra arguments. A chain
+   whose parts were all granted ran; denial of a chain with an ungranted part,
+   and shell expansion in trailing arguments, are still unverified.
 
 ## Non-goals for v0
 

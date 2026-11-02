@@ -65,22 +65,51 @@ export interface InvocationOptions {
   readonly cwd: string;
   /** The caller's environment; the scrub is applied to a copy. */
   readonly baseEnv: Readonly<Record<string, string | undefined>>;
+  /**
+   * Filter driver names the repo's effective git config defines
+   * (`git config --name-only --get-regexp '^filter\\.'`). Each is turned off.
+   */
+  readonly filterDrivers?: readonly string[];
 }
 
 const DISTRO_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
+const FILTER_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
 /**
- * Config every agy child's git sees: no hooks, and no fsmonitor command
- * (core.fsmonitor can name a script that `git status` would run).
+ * Config every agy child's git sees: no hooks, no fsmonitor command
+ * (core.fsmonitor can name a script that `git status` would run), and every
+ * named filter driver emptied (its clean/smudge/process commands run on
+ * `git status` and `git add`).
  */
-function hookConfig(nullDevice: string): Record<string, string> {
-  return {
-    GIT_CONFIG_COUNT: '2',
-    GIT_CONFIG_KEY_0: 'core.hooksPath',
-    GIT_CONFIG_VALUE_0: nullDevice,
-    GIT_CONFIG_KEY_1: 'core.fsmonitor',
-    GIT_CONFIG_VALUE_1: 'false',
+export function hookConfig(
+  nullDevice: string,
+  filterDrivers: readonly string[] = []
+): Record<string, string> {
+  const pairs: [string, string][] = [
+    ['core.hooksPath', nullDevice],
+    ['core.fsmonitor', 'false'],
+  ];
+  for (const name of new Set(filterDrivers)) {
+    if (!FILTER_NAME_RE.test(name)) {
+      throw new AgyError(
+        'AGY_INTERNAL',
+        `invalid git filter driver name ${JSON.stringify(name)}`
+      );
+    }
+    for (const key of ['clean', 'smudge', 'process']) {
+      pairs.push([`filter.${name}.${key}`, '']);
+    }
+    pairs.push([`filter.${name}.required`, 'false']);
+  }
+  const out: Record<string, string> = {
+    GIT_CONFIG_COUNT: String(pairs.length),
   };
+  pairs.forEach(([key, value], i) => {
+    out[`GIT_CONFIG_KEY_${i}`] = key;
+    out[`GIT_CONFIG_VALUE_${i}`] = value;
+  });
+  return out;
 }
 
 /**
@@ -161,7 +190,7 @@ export function buildInvocation(
       file: 'agy',
       args: [...agyArgs],
       cwd: options.cwd,
-      env: { ...env, ...hookConfig('/dev/null') },
+      env: { ...env, ...hookConfig('/dev/null', options.filterDrivers) },
     };
   }
 
@@ -170,7 +199,7 @@ export function buildInvocation(
       file: 'agy.exe',
       args: [...agyArgs],
       cwd: options.cwd,
-      env: { ...env, ...hookConfig('NUL') },
+      env: { ...env, ...hookConfig('NUL', options.filterDrivers) },
     };
     checkWindowsLength(inv);
     return inv;
@@ -207,7 +236,9 @@ export function buildInvocation(
   // Exec-only: -e runs env directly, so no distro shell re-parses argv.
   args.push('--cd', wslCwd, '-e', 'env');
   for (const name of BRIDGE_UNSET_VARS) args.push('-u', name);
-  for (const [key, value] of Object.entries(hookConfig('/dev/null'))) {
+  for (const [key, value] of Object.entries(
+    hookConfig('/dev/null', options.filterDrivers)
+  )) {
     args.push(`${key}=${value}`);
   }
   args.push('agy', ...agyArgs);

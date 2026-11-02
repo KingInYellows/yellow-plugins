@@ -57,23 +57,20 @@ exports.DEFAULT_TOOL_PERMISSION = 'request-review';
  * Package and build tools whose subcommands can publish or run arbitrary code.
  * A grant for one must name a safe subcommand, because a rule matches every
  * argument after its words: `pnpm` alone would allow `pnpm publish`, and
- * `pnpm --filter x` would allow `pnpm --filter x publish`.
+ * `pnpm --filter x` would allow `pnpm --filter x publish`. npx, pnpx and bunx
+ * are left out: they fetch and run packages by name.
  */
 const SUBCOMMAND_TOOLS = new Set([
     'npm',
     'pnpm',
     'yarn',
     'bun',
-    'npx',
-    'pnpx',
-    'bunx',
     'cargo',
     'go',
     'pip',
     'pip3',
     'uv',
     'poetry',
-    'twine',
     'gem',
     'bundle',
     'dotnet',
@@ -81,6 +78,8 @@ const SUBCOMMAND_TOOLS = new Set([
     'gradle',
     'make',
 ]);
+/** Only these run a named package script with `run <script>`. */
+const SCRIPT_RUNNERS = new Set(['npm', 'pnpm', 'yarn', 'bun']);
 const SAFE_SUBCOMMANDS = new Set([
     'test',
     'lint',
@@ -91,6 +90,32 @@ const SAFE_SUBCOMMANDS = new Set([
     'format',
     'clippy',
     'vet',
+]);
+/**
+ * Test and lint tools a grant may name on their own. The first word of a grant
+ * must be one of these or a SUBCOMMAND_TOOLS entry, so wrappers (`env`,
+ * `timeout`, `xargs`, shells), paths and `.exe`/`.cmd` spellings are refused.
+ */
+const STANDALONE_TOOLS = new Set([
+    'pytest',
+    'tox',
+    'nox',
+    'jest',
+    'vitest',
+    'mocha',
+    'eslint',
+    'prettier',
+    'tsc',
+    'ruff',
+    'mypy',
+    'black',
+    'flake8',
+    'pylint',
+    'rspec',
+    'bats',
+    'shellcheck',
+    'phpunit',
+    'ctest',
 ]);
 function refuse(command, why) {
     throw new errors_1.AgyError('AGY_INVALID_INPUT', `--allow-command ${JSON.stringify(command)} ${why}`);
@@ -110,12 +135,16 @@ function validateAllowCommand(command) {
     if (SUBCOMMAND_TOOLS.has(tool)) {
         const sub = words[1] ?? '';
         const script = words[2] ?? '';
-        const runsScript = (sub === 'run' || sub === 'run-script') &&
+        const runsScript = SCRIPT_RUNNERS.has(tool) &&
+            (sub === 'run' || sub === 'run-script') &&
             script !== '' &&
             !script.startsWith('-');
         if (!SAFE_SUBCOMMANDS.has(sub) && !runsScript) {
             refuse(command, `must name a test, lint or build subcommand of ${tool} (or run <script>)`);
         }
+    }
+    else if (!STANDALONE_TOOLS.has(tool)) {
+        refuse(command, 'must start with a known test, lint or build tool (no wrappers, paths or .exe names)');
     }
     for (const prefix of DENIED_COMMAND_PREFIXES) {
         if (lower === prefix || lower.startsWith(`${prefix} `)) {

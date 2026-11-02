@@ -97,6 +97,15 @@ describe('profiles', () => {
         })
       )
     ).toBe('AGY_SETTINGS');
+    expect(
+      codeOf(() =>
+        implementProfile({
+          toolPermission: '',
+          allowCommands: [],
+          sandboxVerified: true,
+        })
+      )
+    ).toBe('AGY_SETTINGS');
   });
 });
 
@@ -107,6 +116,8 @@ describe('validateAllowCommand', () => {
     'pytest -q',
     'cargo test --workspace',
     'make check',
+    'vitest run',
+    'PNPM run lint',
   ])('accepts %s', (c) => {
     expect(validateAllowCommand(c)).toBe(c);
   });
@@ -141,6 +152,18 @@ describe('validateAllowCommand', () => {
     'NPM publish',
     'pnpm -r publish',
     'npx curl x',
+    'git.exe push',
+    'curl.exe x',
+    'npm.cmd publish',
+    'pnpm.cmd publish',
+    'env git push',
+    'timeout 5 curl x',
+    'xargs rm',
+    'sh -c x',
+    './run-tests',
+    '/usr/bin/pytest',
+    'cargo run x',
+    'npx vitest',
   ])('refuses %s', (c) => {
     expect(codeOf(() => validateAllowCommand(c))).toBe('AGY_INVALID_INPUT');
   });

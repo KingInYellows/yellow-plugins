@@ -32,8 +32,9 @@ pre-probe hash afterwards.
   is rejected. A per-run `""` overrides a global `accept-edits`, and `--mode`
   beats both.
 - **Command matching:** `command(git diff)` matches extra arguments. A chained
-  `git add … && git commit …` passed because each part matched. No `regex:` rule
-  was needed.
+  `git add … && git commit …` passed with both parts granted. No `regex:` rule
+  was needed. Not probed: denial of a chain with an ungranted part, and whether
+  `$(…)`, backticks or redirects in trailing arguments run through a shell.
 - **`--input-format stream-json`** exists: one message per stdin line, and it
   needs `--output-format stream-json`. v0 stays one process per turn.
 - **`/usage` works in print mode** without a model call and returns

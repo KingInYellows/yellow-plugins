@@ -72,7 +72,7 @@ export const ERROR_CATALOG: Readonly<Record<AgyErrorCode, CatalogEntry>> = {
   AGY_QUOTA_LOW: {
     exit: 2,
     recoveryAction:
-      'Wait for the AI Pro quota to reset, or lower minQuotaPercent in the grant.',
+      'Wait for the AI Pro quota to reset, or re-authorize the grant with a lower minQuotaPercent.',
   },
   AGY_QUOTA_UNKNOWN: {
     exit: 2,

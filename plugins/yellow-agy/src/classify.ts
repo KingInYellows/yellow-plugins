@@ -114,6 +114,18 @@ export function classifyTurn(outcome: TurnOutcome): TurnClass {
   }
   if (
     result !== undefined &&
+    'denied_actions' in result &&
+    !Array.isArray(result.denied_actions)
+  ) {
+    // A malformed envelope never counts as "nothing was denied".
+    return {
+      kind: 'MODEL_ERROR',
+      result,
+      detail: 'agy returned a non-array denied_actions',
+    };
+  }
+  if (
+    result !== undefined &&
     result.status === 'SUCCESS' &&
     outcome.exitCode === 0
   ) {
