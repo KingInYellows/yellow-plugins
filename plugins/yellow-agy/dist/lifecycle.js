@@ -550,7 +550,7 @@ class Lifecycle {
         fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
         const write = (name, text) => {
             const file = path.join(dir, name);
-            if (text === '') {
+            if (text.length === 0) {
                 fs.rmSync(file, { force: true });
                 return undefined;
             }

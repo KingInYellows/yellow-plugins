@@ -23,6 +23,8 @@ import {
 export interface ExecResult {
   readonly code: number | null;
   readonly stdout: string;
+  /** stdout as raw bytes, for patches (text files need not be UTF-8). */
+  readonly stdoutBytes: Buffer;
   readonly stderr: string;
 }
 
@@ -154,9 +156,11 @@ export function runSpawn(
         );
         return;
       }
+      const stdoutBytes = Buffer.concat(out);
       resolve({
         code,
-        stdout: Buffer.concat(out).toString('utf8'),
+        stdout: stdoutBytes.toString('utf8'),
+        stdoutBytes,
         stderr: Buffer.concat(err).toString('utf8'),
       });
     });

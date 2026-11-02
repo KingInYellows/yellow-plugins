@@ -794,13 +794,13 @@ export class Lifecycle {
    */
   private writePatches(
     localId: string,
-    got: { readonly commits: string; readonly uncommitted: string }
+    got: { readonly commits: Buffer; readonly uncommitted: Buffer }
   ): { commitsPatch?: string; uncommittedPatch?: string } {
     const dir = path.join(this.deps.dataDir, 'artifacts', localId);
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    const write = (name: string, text: string): string | undefined => {
+    const write = (name: string, text: Buffer): string | undefined => {
       const file = path.join(dir, name);
-      if (text === '') {
+      if (text.length === 0) {
         fs.rmSync(file, { force: true });
         return undefined;
       }

@@ -119,10 +119,43 @@ describe('worktree', () => {
     const status = git(wt, 'status', '--porcelain');
     const got = await collectWorktree(exec, wt, 't1', base);
     expect(got.commitCount).toBe(1);
-    expect(got.commits).toContain('Subject: [PATCH] change a');
-    expect(got.uncommitted).toContain('+untracked');
-    expect(got.uncommitted).toContain('+dirty');
+    expect(got.commits.toString()).toContain('Subject: [PATCH] change a');
+    expect(got.uncommitted.toString()).toContain('+untracked');
+    expect(got.uncommitted.toString()).toContain('+dirty');
     expect(git(wt, 'status', '--porcelain')).toBe(status);
+  });
+
+  it('collect runs no external diff or textconv helper', async () => {
+    const { wt, base } = await setup();
+    const marker = path.join(wt, '..', 'helper-ran');
+    const helper = path.join(wt, '..', 'helper.sh');
+    fs.writeFileSync(helper, `#!/bin/sh\ntouch '${marker}'\necho HIJACK\n`, {
+      mode: 0o755,
+    });
+    git(wt, 'config', 'diff.external', helper);
+    git(wt, 'config', 'diff.conv.textconv', helper);
+    fs.writeFileSync(path.join(wt, '.gitattributes'), '*.txt diff=conv\n');
+    fs.writeFileSync(path.join(wt, 'a.txt'), 'committed\n');
+    git(wt, 'add', '-A');
+    git(wt, 'commit', '-q', '-m', 'change a');
+    fs.writeFileSync(path.join(wt, 'a.txt'), 'dirty\n');
+    const got = await collectWorktree(exec, wt, 't1', base);
+    expect(fs.existsSync(marker)).toBe(false);
+    expect(got.commits.toString()).not.toContain('HIJACK');
+    expect(got.uncommitted.toString()).toContain('+dirty');
+    expect(got.uncommitted.toString()).not.toContain('HIJACK');
+  });
+
+  it('collect keeps non-UTF-8 bytes in patches', async () => {
+    const { wt, base } = await setup();
+    fs.writeFileSync(
+      path.join(wt, 'latin1.txt'),
+      Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0a])
+    );
+    const got = await collectWorktree(exec, wt, 't1', base);
+    expect(got.uncommitted.includes(Buffer.from([0x66, 0xe9, 0x0a]))).toBe(
+      true
+    );
   });
 
   it('removes the worktree and deletes only an empty branch', async () => {

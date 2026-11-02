@@ -122,9 +122,11 @@ function runSpawn(spec, stdin, timeoutMs) {
                 reject(new errors_1.AgyError('AGY_INTERNAL', `${spec.file} printed more than ${MAX_OUTPUT_BYTES} bytes`));
                 return;
             }
+            const stdoutBytes = Buffer.concat(out);
             resolve({
                 code,
-                stdout: Buffer.concat(out).toString('utf8'),
+                stdout: stdoutBytes.toString('utf8'),
+                stdoutBytes,
                 stderr: Buffer.concat(err).toString('utf8'),
             });
         });

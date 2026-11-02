@@ -48,6 +48,12 @@ async function git(exec, cwd, args, env) {
         throw gitError(args, res);
     return res.stdout;
 }
+async function gitBytes(exec, cwd, args, env) {
+    const res = await exec.git(args, env === undefined ? { cwd } : { cwd, env });
+    if (res.code !== 0)
+        throw gitError(args, res);
+    return res.stdoutBytes;
+}
 function gitError(args, res) {
     const detail = res.stderr.trim().split(/\r?\n/).slice(-3).join(' ');
     return new errors_1.AgyError('AGY_WORKTREE', `git ${args.slice(0, 2).join(' ')} failed: ${detail || `exit ${res.code}`}`);
@@ -198,21 +204,25 @@ async function dropSnapshotRefs(exec, worktree, localId) {
 async function collectWorktree(exec, worktree, localId, base) {
     sha(base);
     const count = Number.parseInt((await git(exec, worktree, ['rev-list', '--count', `${base}..HEAD`])).trim(), 10);
+    // The repo's external diff and textconv helpers would run outside agy's
+    // sandbox and replace the patch with their output, so both are off.
     const commits = count > 0
-        ? await git(exec, worktree, [
+        ? await gitBytes(exec, worktree, [
             'format-patch',
             '--stdout',
             '--binary',
+            '--no-ext-diff',
+            '--no-textconv',
             `${base}..HEAD`,
         ])
-        : '';
+        : Buffer.alloc(0);
     const realIndex = await git(exec, worktree, ['write-tree']);
     const indexFile = await tempIndexPath(exec, worktree, localId, 'collect');
     const env = { GIT_INDEX_FILE: indexFile };
     try {
         await git(exec, worktree, ['read-tree', sha(realIndex)], env);
         await git(exec, worktree, ['add', '--intent-to-add', '--all'], env);
-        const uncommitted = await git(exec, worktree, ['diff', '--binary', 'HEAD'], env);
+        const uncommitted = await gitBytes(exec, worktree, ['diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD'], env);
         return { commits, uncommitted, commitCount: count };
     }
     finally {

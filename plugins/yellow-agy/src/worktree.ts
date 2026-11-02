@@ -60,6 +60,17 @@ async function git(
   return res.stdout;
 }
 
+async function gitBytes(
+  exec: HostExec,
+  cwd: string,
+  args: readonly string[],
+  env?: Readonly<Record<string, string>>
+): Promise<Buffer> {
+  const res = await exec.git(args, env === undefined ? { cwd } : { cwd, env });
+  if (res.code !== 0) throw gitError(args, res);
+  return res.stdoutBytes;
+}
+
 function gitError(args: readonly string[], res: ExecResult): AgyError {
   const detail = res.stderr.trim().split(/\r?\n/).slice(-3).join(' ');
   return new AgyError(
@@ -288,9 +299,9 @@ export async function dropSnapshotRefs(
 
 export interface Collected {
   /** format-patch output for commits since the base; empty when none. */
-  readonly commits: string;
+  readonly commits: Buffer;
   /** Binary diff of staged, unstaged and untracked changes against HEAD. */
-  readonly uncommitted: string;
+  readonly uncommitted: Buffer;
   readonly commitCount: number;
 }
 
@@ -308,25 +319,29 @@ export async function collectWorktree(
     ).trim(),
     10
   );
+  // The repo's external diff and textconv helpers would run outside agy's
+  // sandbox and replace the patch with their output, so both are off.
   const commits =
     count > 0
-      ? await git(exec, worktree, [
+      ? await gitBytes(exec, worktree, [
           'format-patch',
           '--stdout',
           '--binary',
+          '--no-ext-diff',
+          '--no-textconv',
           `${base}..HEAD`,
         ])
-      : '';
+      : Buffer.alloc(0);
   const realIndex = await git(exec, worktree, ['write-tree']);
   const indexFile = await tempIndexPath(exec, worktree, localId, 'collect');
   const env = { GIT_INDEX_FILE: indexFile };
   try {
     await git(exec, worktree, ['read-tree', sha(realIndex)], env);
     await git(exec, worktree, ['add', '--intent-to-add', '--all'], env);
-    const uncommitted = await git(
+    const uncommitted = await gitBytes(
       exec,
       worktree,
-      ['diff', '--binary', 'HEAD'],
+      ['diff', '--binary', '--no-ext-diff', '--no-textconv', 'HEAD'],
       env
     );
     return { commits, uncommitted, commitCount: count };

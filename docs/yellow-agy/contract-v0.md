@@ -109,15 +109,19 @@ characters fails with `AGY_PROMPT_TOO_LONG` before anything spawns.
    `approve` can start implementation. After approval it uses the implement
    profile. A correction spends a corrective round (R31 counters, unchanged). A
    `PLAN_PENDING` correction passes `--json-schema <plan.schema.json>` and
-   replaces the stored plan, so `approve` implements the corrected plan.
+   replaces the stored plan, so `approve` implements the corrected plan; a
+   correction that returns no valid plan clears it, and `approve` refuses until
+   one arrives.
 4. `collect` (no live run): `git -C <worktree> format-patch <base>..HEAD` for
    commits, then, in a temporary `GIT_INDEX_FILE` seeded from the real index,
    `git add --intent-to-add --all` and `git diff --binary HEAD`, leaving the
    real index untouched, for staged, unstaged and untracked changes, into
-   `artifacts/<localId>/`. Every artifact is scanned with yellow-jules'
-   secret-shape layers; a hit sets `secretShapedContent: true` and
-   `requiresAttention`, and the owner reviews it before the stack provider opens
-   a PR.
+   `artifacts/<localId>/`. Both pass `--no-ext-diff --no-textconv`, so no
+   repository diff helper runs outside agy's sandbox, and patches are kept as
+   raw bytes (text files need not be UTF-8). A patch whose new content is empty
+   is removed. Every artifact is scanned with yellow-jules' secret-shape layers;
+   a hit sets `secretShapedContent: true` and `requiresAttention`, and the owner
+   reviews it before the stack provider opens a PR.
 5. `abandon` (terminal-gated, no live run): run `collect` first so nothing is
    lost, settle the journal, `git worktree remove --force` the worktree, and
    keep the branch.
