@@ -677,7 +677,7 @@ export class Lifecycle {
     );
   }
 
-  private settleImplementTurn(
+  private async settleImplementTurn(
     requestId: string,
     op: Operation,
     task: Task,
@@ -748,12 +748,15 @@ export class Lifecycle {
       next,
       code === undefined ? extras : { ...extras, code }
     );
-    const settled = this.settle(requestId, op, next, outcome);
-    if (next.partial !== undefined) return settled;
-    return settled.then(async (o) => {
-      await dropSnapshotRefs(this.deps.exec, task.worktree, task.localId);
-      return o;
-    });
+    if (next.partial === undefined) {
+      // Drop the snapshot refs while the claim is still held, so a command
+      // that starts after the release can't have its own refs removed.
+      // Best effort: stale refs only pin objects until the next snapshot.
+      await dropSnapshotRefs(this.deps.exec, task.worktree, task.localId).catch(
+        () => undefined
+      );
+    }
+    return this.settle(requestId, op, next, outcome);
   }
 
   /** Applies --keep-partial / --reset-partial, or refuses when neither was given. */

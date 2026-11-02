@@ -506,7 +506,7 @@ class Lifecycle {
         };
         return this.settle(requestId, op, next, outcomeOf(next, extrasOf(cls, result, attention)));
     }
-    settleImplementTurn(requestId, op, task, snapshot, cls) {
+    async settleImplementTurn(requestId, op, task, snapshot, cls) {
         const result = 'result' in cls ? cls.result : undefined;
         const at = (0, state_1.nowIso)();
         const base = { ...task, approved: true, updatedAt: at };
@@ -563,13 +563,13 @@ class Lifecycle {
         }
         const extras = extrasOf(cls, result, attention);
         const outcome = outcomeOf(next, code === undefined ? extras : { ...extras, code });
-        const settled = this.settle(requestId, op, next, outcome);
-        if (next.partial !== undefined)
-            return settled;
-        return settled.then(async (o) => {
-            await (0, worktree_1.dropSnapshotRefs)(this.deps.exec, task.worktree, task.localId);
-            return o;
-        });
+        if (next.partial === undefined) {
+            // Drop the snapshot refs while the claim is still held, so a command
+            // that starts after the release can't have its own refs removed.
+            // Best effort: stale refs only pin objects until the next snapshot.
+            await (0, worktree_1.dropSnapshotRefs)(this.deps.exec, task.worktree, task.localId).catch(() => undefined);
+        }
+        return this.settle(requestId, op, next, outcome);
     }
     /** Applies --keep-partial / --reset-partial, or refuses when neither was given. */
     async resolvePartial(task, keep, reset) {
