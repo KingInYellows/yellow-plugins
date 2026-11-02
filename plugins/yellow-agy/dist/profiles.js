@@ -124,10 +124,17 @@ function validateAllowCommand(command) {
     if (!COMMAND_RE.test(command) || command.length > 200) {
         throw new errors_1.AgyError('AGY_INVALID_INPUT', `--allow-command must be plain words without shell syntax: ${JSON.stringify(command)}`);
     }
-    // Windows resolves executables case-insensitively, so compare lower-cased.
+    // Windows resolves executables case-insensitively, so compare lower-cased,
+    // and require the tool (and subcommand) to be written lower-case, so the
+    // emitted rule is the string that was checked.
     const lower = command.toLowerCase();
     const words = lower.split(' ');
     const tool = words[0] ?? '';
+    const original = command.split(' ');
+    if (original[0] !== tool ||
+        (SUBCOMMAND_TOOLS.has(tool) && original[1] !== words[1])) {
+        refuse(command, 'must write the tool and subcommand in lower case');
+    }
     // No profile allows git; a grant can't add it (git -C . push).
     if (tool === 'git')
         refuse(command, 'may not grant git');
@@ -191,6 +198,12 @@ function readOnlyProfile(options = {}) {
         flags: [],
     };
 }
+/**
+ * Profiles implementProfile built after checking sandboxVerified. A profile
+ * with command grants must be one of these, so a hand-built (or spread) copy
+ * can't claim a sandbox the host was never checked for.
+ */
+const sandboxedProfiles = new WeakSet();
 function implementProfile(options) {
     const toolPermission = options.toolPermission ?? exports.DEFAULT_TOOL_PERMISSION;
     checkToolPermission(toolPermission);
@@ -203,15 +216,18 @@ function implementProfile(options) {
     const flags = ['--mode', 'accept-edits'];
     if (sandbox)
         flags.push('--sandbox');
-    return {
+    const profile = Object.freeze({
         settings: settingsJson({
             toolPermission,
             commands,
             agentMode: 'accept-edits',
             sandbox,
         }),
-        flags,
-    };
+        flags: Object.freeze(flags),
+    });
+    if (sandbox)
+        sandboxedProfiles.add(profile);
+    return profile;
 }
 const SETTINGS_KEYS = [
     'useG1Credits',
@@ -282,6 +298,9 @@ function assertSafeProfile(profile) {
     }
     if (extra > 0 && mode !== 'accept-edits') {
         badProfile('extra commands need the implement profile');
+    }
+    if (extra > 0 && !sandboxedProfiles.has(profile)) {
+        badProfile('command grants must come from implementProfile on a host with a verified sandbox');
     }
 }
 const CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;

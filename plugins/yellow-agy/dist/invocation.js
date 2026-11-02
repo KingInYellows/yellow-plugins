@@ -8,6 +8,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WINDOWS_ARGV_LIMIT = exports.BRIDGE_UNSET_VARS = exports.AUTH_MODE_VARS = void 0;
+exports.filterDriverNames = filterDriverNames;
 exports.hookConfig = hookConfig;
 exports.scrubEnv = scrubEnv;
 exports.authModeVarsSet = authModeVarsSet;
@@ -24,16 +25,21 @@ exports.AUTH_MODE_VARS = [
     'AGY_ADC_AUTH',
 ];
 /**
- * Unset inside WSL on the bridge, where the Windows-side scrub can't reach
- * the distro's own environment. GIT_CONFIG_PARAMETERS (what `git -c` sets)
- * overrides the GIT_CONFIG_COUNT hooks setting, so it goes too.
+ * Unset inside WSL on the bridge, where the Windows-side scrub (which drops
+ * every GIT_* name) can't reach the distro's own environment. `env` can't
+ * unset by prefix, so this lists every variable git(1) documents that runs a
+ * program, reroutes the repository or config, or writes files.
+ * GIT_CONFIG_PARAMETERS (what `git -c` sets) overrides GIT_CONFIG_COUNT.
  */
 exports.BRIDGE_UNSET_VARS = [
     ...exports.AUTH_MODE_VARS,
+    // Config sources.
     'GIT_CONFIG_PARAMETERS',
     'GIT_CONFIG',
     'GIT_CONFIG_GLOBAL',
     'GIT_CONFIG_SYSTEM',
+    'GIT_CONFIG_NOSYSTEM',
+    // Repository routing.
     'GIT_DIR',
     'GIT_WORK_TREE',
     'GIT_INDEX_FILE',
@@ -41,9 +47,40 @@ exports.BRIDGE_UNSET_VARS = [
     'GIT_OBJECT_DIRECTORY',
     'GIT_ALTERNATE_OBJECT_DIRECTORIES',
     'GIT_NAMESPACE',
+    'GIT_CEILING_DIRECTORIES',
+    'GIT_DISCOVERY_ACROSS_FILESYSTEM',
+    'GIT_ATTR_SOURCE',
+    'GIT_REPLACE_REF_BASE',
+    'GIT_GRAFT_FILE',
+    'GIT_SHALLOW_FILE',
+    'GIT_TEMPLATE_DIR',
+    // Programs git runs.
     'GIT_EXEC_PATH',
+    'GIT_EDITOR',
+    'GIT_SEQUENCE_EDITOR',
+    'GIT_PAGER',
+    'GIT_EXTERNAL_DIFF',
+    'GIT_DIFF_OPTS',
+    'GIT_ASKPASS',
     'GIT_SSH',
     'GIT_SSH_COMMAND',
+    'GIT_SSH_VARIANT',
+    'GIT_PROXY_COMMAND',
+    'GIT_ALLOW_PROTOCOL',
+    'GIT_PROTOCOL_FROM_USER',
+    // Trace output goes to a path the variable names.
+    'GIT_TRACE',
+    'GIT_TRACE2',
+    'GIT_TRACE2_EVENT',
+    'GIT_TRACE2_PERF',
+    'GIT_TRACE_PACKET',
+    'GIT_TRACE_PACKFILE',
+    'GIT_TRACE_PERFORMANCE',
+    'GIT_TRACE_SETUP',
+    'GIT_TRACE_SHALLOW',
+    'GIT_TRACE_CURL',
+    'GIT_TRACE_FSMONITOR',
+    'GIT_TRACE_REFS',
 ];
 /** Flags the CLI never passes, whatever the caller asks for. */
 const FORBIDDEN_FLAGS = ['--dangerously-skip-permissions'];
@@ -52,13 +89,33 @@ exports.WINDOWS_ARGV_LIMIT = 30_000;
 const DISTRO_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const FILTER_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 /**
+ * Driver names from `git config --name-only --get-regexp '^filter\.'`
+ * output (lines like `filter.lfs.clean`; a name may itself hold dots, so the
+ * key is the last segment). Throws on any line of another shape, so a
+ * discovery result that isn't what we expect fails closed.
+ */
+function filterDriverNames(configOutput) {
+    const names = new Set();
+    for (const raw of configOutput.split('\n')) {
+        const line = raw.replace(/\r$/, '');
+        if (line === '')
+            continue;
+        const m = /^filter\.(.+)\.([a-z]+)$/.exec(line);
+        if (m === null || m[1] === undefined) {
+            throw new errors_1.AgyError('AGY_INVALID_INPUT', `unexpected git filter config line ${JSON.stringify(line)}`);
+        }
+        names.add(m[1]);
+    }
+    return [...names].sort();
+}
+/**
  * Config every git child sees (defense in depth: no profile allows git, but a
  * granted test command or the adapter's own host calls may run it): no hooks,
  * fsmonitor, editors, signing programs or submodule recursion, and every named
  * filter driver emptied (its clean/smudge/process commands run on status and
  * add).
  */
-function hookConfig(nullDevice, filterDrivers = []) {
+function hookConfig(nullDevice, filterDrivers) {
     const pairs = [
         ['core.hooksPath', nullDevice],
         ['core.fsmonitor', 'false'],
@@ -76,7 +133,7 @@ function hookConfig(nullDevice, filterDrivers = []) {
     ];
     for (const name of new Set(filterDrivers)) {
         if (!FILTER_NAME_RE.test(name)) {
-            throw new errors_1.AgyError('AGY_INTERNAL', `invalid git filter driver name ${JSON.stringify(name)}`);
+            throw new errors_1.AgyError('AGY_INVALID_INPUT', `the repository's git config defines a filter driver yellow-agy can't turn off safely: ${JSON.stringify(name)}`);
         }
         for (const key of ['clean', 'smudge', 'process']) {
             pairs.push([`filter.${name}.${key}`, '']);
