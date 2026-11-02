@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "default_tier": "medium",
+  "low_max_lines": 300,
+  "rules": [
+    {
+      "tier": "medium",
+      "why": "validators, checks, evals and data files; covered by tests",
+      "paths": [
+        "scripts/eval/*",
+        "scripts/*.json",
+        "scripts/snippets/*",
+        "scripts/validate-*",
+        "scripts/check-*",
+        "scripts/exercise-*",
+        "scripts/smoke-*"
+      ]
+    },
+    {
+      "tier": "medium",
+      "why": "generated marketplace listings, drift-checked in CI",
+      "paths": [".claude-plugin/marketplace.json", ".agents/plugins/*"]
+    },
+    {
+      "tier": "high",
+      "why": "CI, release and repository automation",
+      "paths": [".github/workflows/*", ".github/actions/*", ".graphite.yml", ".claude/*"]
+    },
+    {
+      "tier": "high",
+      "why": "hook registrations and plugin manifests",
+      "paths": [
+        "catalog/plugins/*",
+        "plugins/*/.claude-plugin/*",
+        "plugins/*/.codex-plugin/*",
+        "plugins/*/.cursor-plugin/*"
+      ]
+    },
+    {
+      "tier": "high",
+      "why": "instructions that reviewers and agents follow",
+      "paths": ["CLAUDE.md", "AGENTS.md", ".github/instructions/*", "review-*.md"]
+    },
+    {
+      "tier": "high",
+      "why": "manifest schemas and catalog root",
+      "paths": ["schemas/*", "catalog/*", ".claude-plugin/*", ".agents/*", ".cursor-plugin/*"]
+    },
+    {
+      "tier": "high",
+      "why": "release, generator and dependency code",
+      "paths": ["scripts/*", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".npmrc"]
+    },
+    {
+      "tier": "high",
+      "why": "plugin hooks run on every session",
+      "paths": ["plugins/*/hooks/*"]
+    },
+    {
+      "tier": "high",
+      "why": "scripts that write to GitHub or git unattended",
+      "paths": [
+        "plugins/yellow-review/skills/pr-review-workflow/scripts/*",
+        "plugins/yellow-review/lib/*",
+        "plugins/yellow-core/lib/compound-staging.sh",
+        "plugins/github-workflow/lib/*",
+        "plugins/gt-workflow/lib/*"
+      ]
+    },
+    {
+      "tier": "low",
+      "why": "documentation and release notes",
+      "paths": [
+        "README.md",
+        "*/README.md",
+        "CHANGELOG.md",
+        "*/CHANGELOG.md",
+        ".changeset/*",
+        "docs/*",
+        "plans/*",
+        "RESEARCH/*",
+        "*/docs/solutions/*"
+      ]
+    }
+  ]
+}

@@ -165,6 +165,30 @@ else
 fi
 ```
 
+### Step 3a2: Risk tier (display only)
+
+Classify the change from its paths. The tier is reported in Step 10 and
+does not change which reviewers run yet. The policy comes from the default
+branch, not the PR's base: in a stack the base is the parent PR's unmerged
+branch. Only the tier, the policy source and the policy's own rule names are
+printed; the changed paths are PR-controlled text and stay out of context.
+
+```bash
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+case "$DEFAULT_BRANCH" in
+  '' | -* | *..* | *[!A-Za-z0-9._/-]*) printf '[review:pr] Warning: no usable default branch; risk tier unknown\n' >&2 ;;
+  *)
+    git fetch origin "$DEFAULT_BRANCH" --no-tags --quiet || true
+    "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
+      --policy-ref "origin/$DEFAULT_BRANCH" "<DIFF_BASE>" HEAD |
+      jq -r '"tier=\(.tier) policy=\(.policy) rules=\([.reasons[].rule] | unique | join("; "))"'
+    ;;
+esac
+```
+
+Substitute the `DIFF_BASE` value chosen above. When nothing is printed,
+record the tier as `unknown` and continue.
+
 ### Step 3b: Query institutional memory (optional)
 
 1. If `.ruvector/` does not exist in the project root: proceed to Step 3c.
@@ -1252,6 +1276,7 @@ reader can distinguish "no contract changes detected" from "contract
 findings were produced but extension classification was malformed."
 
 ### Coverage
+- Risk tier: <low | medium | high | unknown> (<policy>; <distinct reason rules>)
 - Reviewers run: <list>
 - Reviewers skipped (graceful degradation): <list with reasons>
 - Findings suppressed at confidence < 75: <count>

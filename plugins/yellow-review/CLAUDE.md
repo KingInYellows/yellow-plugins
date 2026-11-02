@@ -121,7 +121,7 @@ all scripts), `stack-traversal` (shared by `/review:all` and
 `thermonuclear-reviewer`; the only Codex/Cursor-distributed skill). None is
 user-invocable.
 
-### Scripts (20)
+### Scripts (21)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
@@ -133,6 +133,10 @@ the resolve scripts: `references/resolve/dispositions.md`.
 - `check-merge-ready` — read-only `/review:merge-ready` gate combining the
   readers above with a PR-state and CI read and the ledger summary; exits 0
   ready, 1 blocked, 3 unknown
+- `classify-risk` — the review risk tier (`low`, `medium`, `high`) of a change
+  from its changed paths and `.github/review-risk.json` read at a trusted ref
+  (`--policy-ref`, the default branch for stacked PRs) or local file; local git
+  only, no network
 - `sync-blocking-comment` — Step 9's sticky "blocking threads" PR comment for
   repos that do not enforce conversation resolution; one comment per PR, found
   by its marker and edited in place
