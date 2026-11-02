@@ -52,6 +52,11 @@ describe('worktree', () => {
     ).rejects.toMatchObject({ code: 'AGY_WORKTREE' });
   });
 
+  it('rejects a .lock component anywhere in a branch name', () => {
+    expect(() => validateBranchName('agy/x.lock/y')).toThrow(AgyError);
+    expect(validateBranchName('agy/x.locked/y')).toBe('agy/x.locked/y');
+  });
+
   it('rejects unsafe branch names', () => {
     for (const bad of ['-x', 'a..b', 'a/', 'a.lock', 'a b', 'a/.b', '@{x}']) {
       expect(() => validateBranchName(bad)).toThrow(AgyError);
@@ -74,7 +79,8 @@ describe('worktree', () => {
     // The real index is untouched by the snapshot.
     expect(git(wt, 'status', '--porcelain')).toBe(status);
 
-    // The turn makes a mess.
+    // The turn makes a mess, including deleting a tracked file.
+    fs.rmSync(path.join(wt, '.gitignore'));
     fs.rmSync(path.join(wt, 'new.txt'));
     fs.writeFileSync(path.join(wt, 'a.txt'), 'agy\n');
     fs.writeFileSync(path.join(wt, 'junk.txt'), 'junk\n');
@@ -83,6 +89,9 @@ describe('worktree', () => {
     await resetToSnapshot(exec, wt, 't1', snap);
     expect(fs.readFileSync(path.join(wt, 'a.txt'), 'utf8')).toBe('unstaged\n');
     expect(fs.readFileSync(path.join(wt, 'new.txt'), 'utf8')).toBe('new\n');
+    expect(fs.readFileSync(path.join(wt, '.gitignore'), 'utf8')).toBe(
+      'build/\n*.log\n'
+    );
     expect(fs.existsSync(path.join(wt, 'junk.txt'))).toBe(false);
     expect(git(wt, 'show', ':a.txt')).toBe('staged\n');
     expect(git(wt, 'status', '--porcelain')).toBe(status);
@@ -115,14 +124,20 @@ describe('worktree', () => {
     fs.writeFileSync(path.join(wt, 'a.txt'), 'committed\n');
     git(wt, 'commit', '-q', '-am', 'change a');
     fs.writeFileSync(path.join(wt, 'b.txt'), 'untracked\n');
+    fs.writeFileSync(path.join(wt, 'c.txt'), 'staged only\n');
+    git(wt, 'add', 'c.txt');
     fs.writeFileSync(path.join(wt, 'a.txt'), 'dirty\n');
     const status = git(wt, 'status', '--porcelain');
     const got = await collectWorktree(exec, wt, 't1', base);
+    expect(got.uncommitted.toString()).toContain('+staged only');
     expect(got.commitCount).toBe(1);
     expect(got.commits.toString()).toContain('Subject: [PATCH] change a');
     expect(got.uncommitted.toString()).toContain('+untracked');
     expect(got.uncommitted.toString()).toContain('+dirty');
     expect(git(wt, 'status', '--porcelain')).toBe(status);
+    await expect(
+      collectWorktree(exec, wt, '../../x', base)
+    ).rejects.toMatchObject({ code: 'AGY_INVALID_INPUT' });
   });
 
   it('collect runs no external diff or textconv helper', async () => {
@@ -197,6 +212,45 @@ describe('hostCommand', () => {
         {}
       )
     ).toThrow(AgyError);
+    for (const cwd of ['/mnt', '/home/o/../../mnt/c', '/home//o', 'rel']) {
+      expect(
+        () =>
+          hostCommand(
+            { kind: 'wsl-bridge' },
+            'git',
+            [],
+            { cwd, filterDrivers: [] },
+            {}
+          ),
+        cwd
+      ).toThrow(AgyError);
+    }
+    // '/' is allowed (the bridge file ops run there).
+    expect(
+      hostCommand(
+        { kind: 'wsl-bridge' },
+        'rm',
+        [],
+        { cwd: '/', filterDrivers: [] },
+        {}
+      ).file
+    ).toBe('wsl.exe');
+  });
+
+  it('callers cannot set GIT_CONFIG_* over the hook overrides', () => {
+    expect(() =>
+      hostCommand(
+        { kind: 'posix' },
+        'git',
+        [],
+        {
+          cwd: '/x',
+          env: { GIT_CONFIG_COUNT: '0' },
+          filterDrivers: [],
+        },
+        {}
+      )
+    ).toThrow(AgyError);
   });
 });
 
@@ -221,6 +275,16 @@ describe('createHostExec', () => {
       expect(await exec.filterDrivers(dir)).toContain('demo');
       const res = await exec.git(['add', 'd.txt'], { cwd: dir });
       expect(res.code).toBe(0);
+      expect(fs.existsSync(marker)).toBe(false);
+      // A driver added after the first call is discovered on the next one.
+      raw(['config', 'filter.later.clean', 'sh ./f.sh']);
+      fs.writeFileSync(
+        path.join(dir, '.gitattributes'),
+        'e.txt filter=later\n'
+      );
+      fs.writeFileSync(path.join(dir, 'e.txt'), 'hi\n');
+      const res2 = await exec.git(['add', 'e.txt'], { cwd: dir });
+      expect(res2.code).toBe(0);
       expect(fs.existsSync(marker)).toBe(false);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });

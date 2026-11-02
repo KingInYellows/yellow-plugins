@@ -192,6 +192,18 @@ describe('parseResult', () => {
     expect(parseResult('')).toBeUndefined();
     expect(parseResult('not json')).toBeUndefined();
   });
+
+  it('drops a malformed conversation_id so the next turn cannot break', () => {
+    expect(
+      parseResult('{"status":"SUCCESS","conversation_id":"abc-123_X"}')
+    ).toEqual({ status: 'SUCCESS', conversation_id: 'abc-123_X' });
+    for (const bad of ['"--settings=x"', '"a b"', '42', '""']) {
+      expect(
+        parseResult(`{"status":"SUCCESS","conversation_id":${bad}}`),
+        bad
+      ).toEqual({ status: 'SUCCESS' });
+    }
+  });
 });
 
 describe('needsInput and structuredOutput', () => {

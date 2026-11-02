@@ -8,7 +8,9 @@
 
 const REDACTED = '***REDACTED***';
 
-const AUTHORIZATION_HEADER_RE = /authorization\s*:\s*(?:bearer\s+)?\S+/gi;
+// Any scheme (Bearer, Basic, Token, …): mask the scheme word and credential.
+const AUTHORIZATION_HEADER_RE =
+  /authorization[ \t]*:[ \t]*(?:[A-Za-z][\w.-]*[ \t]+)?[^\s"',;]+/gi;
 const BEARER_TOKEN_RE = /\bBearer\s+\S+/gi;
 const GOOG_API_KEY_HEADER_RE = /x-goog-api-key\s*:\s*\S+/gi;
 const KEY_FIELD_RE =
@@ -17,9 +19,13 @@ const PREFIXED_SECRET_RE = /\b(?:sk|pk|key|tok)[-_][A-Za-z0-9]{16,}\b/gi;
 const GOOGLE_API_KEY_RE = /\bAIza[A-Za-z0-9_-]{16,}/g;
 const OAUTH_TOKEN_RE = /\bya29\.[A-Za-z0-9_-]{20,}/g;
 const PRIVATE_KEY_RE = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
+// The whole block; an unterminated one is masked to the end of the text.
+const PRIVATE_KEY_BLOCK_RE =
+  /-----BEGIN ([A-Z ]*)PRIVATE KEY-----[\s\S]*?(?:-----END \1PRIVATE KEY-----|$)/g;
 
 export function redact(input: string): string {
   return input
+    .replace(PRIVATE_KEY_BLOCK_RE, `-----BEGIN $1PRIVATE KEY----- ${REDACTED}`)
     .replace(AUTHORIZATION_HEADER_RE, `authorization: ${REDACTED}`)
     .replace(BEARER_TOKEN_RE, `Bearer ${REDACTED}`)
     .replace(GOOG_API_KEY_HEADER_RE, `X-Goog-Api-Key: ${REDACTED}`)
@@ -55,7 +61,7 @@ export function truncateRedacted(
 export function scanSecretShapes(content: Buffer | string): boolean {
   const text = typeof content === 'string' ? content : content.toString('utf8');
   return [
-    /authorization\s*:\s*(?:bearer\s+)?\S+/i,
+    new RegExp(AUTHORIZATION_HEADER_RE.source, 'i'),
     /\bBearer\s+\S+/i,
     /x-goog-api-key\s*:\s*\S+/i,
     /["']?(?:api[_-]?key|apikey)["']?\s*[:=]\s*["']?[^"'\s,}&]+/i,

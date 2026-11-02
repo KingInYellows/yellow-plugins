@@ -121,6 +121,28 @@ function outcomeOf(task: Task, extra: Partial<Outcome> = {}): Outcome {
   };
 }
 
+/** HEAD of `worktree` when it has `refs/heads/<branch>` checked out. */
+async function ownBranchHead(
+  exec: HostExec,
+  worktree: string,
+  branch: string
+): Promise<string | undefined> {
+  try {
+    const ref = await exec.git(['symbolic-ref', '--quiet', 'HEAD'], {
+      cwd: worktree,
+    });
+    if (ref.code !== 0 || ref.stdout.trim() !== `refs/heads/${branch}`) {
+      return undefined;
+    }
+    const head = await exec.git(['rev-parse', '--verify', 'HEAD'], {
+      cwd: worktree,
+    });
+    return head.code === 0 ? head.stdout.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export class Lifecycle {
   private readonly deps: LifecycleDeps;
   private readonly ownerPid: number;
@@ -164,16 +186,27 @@ export class Lifecycle {
         | { worktree?: string; branch?: string; repo?: string; base?: string }
         | undefined;
       if (meta?.worktree !== undefined && meta.repo !== undefined) {
+        // A crash between createWorktree and the journal write leaves no
+        // base recorded. No turn has run then, so the worktree's HEAD, read
+        // only while it still has our branch checked out, is the base.
+        let base = meta.base;
+        if (base === undefined && meta.branch !== undefined) {
+          base = await ownBranchHead(
+            this.deps.exec,
+            meta.worktree,
+            meta.branch
+          );
+        }
         await this.deps.exec.git(
           ['worktree', 'remove', '--force', '--', meta.worktree],
           { cwd: meta.repo }
         );
-        if (meta.branch !== undefined && meta.base !== undefined) {
+        if (meta.branch !== undefined && base !== undefined) {
           await deleteBranchIfEmpty(
             this.deps.exec,
             meta.repo,
             meta.branch,
-            meta.base
+            base
           ).catch(() => false);
         }
       }
@@ -327,10 +360,9 @@ export class Lifecycle {
     });
     const outcome = await this.deps.runTurn(inv, {
       deadlineMs: this.deps.deadlineMs,
-      onSpawn: (pid) => {
-        // Best effort: the owner pid already holds the claim.
-        this.patchClaim(requestId, { childPid: pid }).catch(() => undefined);
-      },
+      // Durable before the turn can settle: if the owner dies, the claim
+      // still names a live agy. A failed write stops the turn.
+      onSpawn: (pid) => this.patchClaim(requestId, { childPid: pid }),
     });
     return classifyTurn(outcome);
   }

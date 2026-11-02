@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { AgyError } from '../src/errors';
 import {
   AUTH_MODE_VARS,
+  BRIDGE_GROUP_SCRIPT,
   BRIDGE_UNSET_VARS,
   authModeVarsSet,
   buildInvocation,
@@ -105,10 +106,17 @@ describe('buildInvocation', () => {
       ...Object.entries(hookConfig('/dev/null', [])).map(
         ([k, v]) => `${k}=${v}`
       ),
+      'setsid',
+      '-w',
+      'sh',
+      '-c',
+      BRIDGE_GROUP_SCRIPT,
+      'sh',
       'agy',
       '-p',
       'do "this"; rm -rf /',
     ]);
+    expect(inv.linuxGroup).toEqual({ distro: 'Ubuntu-24.04' });
     expect(inv.args).not.toContain('--');
     expect(inv.env['WSLENV']).toBeUndefined();
     expect(inv.env['GEMINI_API_KEY']).toBeUndefined();

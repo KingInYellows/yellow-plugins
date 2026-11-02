@@ -5,6 +5,8 @@
  * are checked in the contract's order and the first match wins.
  */
 
+import { CONVERSATION_RE } from './profiles';
+
 /**
  * The 2026-11 probe showed agy 1.4.12 omits `finished_reason` on a normal
  * finish, so only an absent key is OK. Any present value that isn't a known
@@ -77,6 +79,17 @@ export function parseResult(stdout: string): AgyResult | undefined {
         typeof value === 'object' &&
         !Array.isArray(value)
       ) {
+        // A malformed conversation id would break the next turn's argv;
+        // dropping it makes a plan turn a model error instead.
+        const r = value as Record<string, unknown>;
+        const conv = r['conversation_id'];
+        if (
+          conv !== undefined &&
+          (typeof conv !== 'string' || !CONVERSATION_RE.test(conv))
+        ) {
+          const { conversation_id: _dropped, ...rest } = r;
+          return rest as AgyResult;
+        }
         return value as AgyResult;
       }
     } catch {

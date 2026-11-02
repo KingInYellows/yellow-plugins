@@ -10,6 +10,7 @@ exports.parseResult = parseResult;
 exports.classifyTurn = classifyTurn;
 exports.needsInput = needsInput;
 exports.structuredOutput = structuredOutput;
+const profiles_1 = require("./profiles");
 /** Parses agy's JSON output; undefined when stdout holds no JSON object. */
 function parseResult(stdout) {
     const trimmed = stdout.trim();
@@ -32,6 +33,15 @@ function parseResult(stdout) {
             if (value !== null &&
                 typeof value === 'object' &&
                 !Array.isArray(value)) {
+                // A malformed conversation id would break the next turn's argv;
+                // dropping it makes a plan turn a model error instead.
+                const r = value;
+                const conv = r['conversation_id'];
+                if (conv !== undefined &&
+                    (typeof conv !== 'string' || !profiles_1.CONVERSATION_RE.test(conv))) {
+                    const { conversation_id: _dropped, ...rest } = r;
+                    return rest;
+                }
                 return value;
             }
         }

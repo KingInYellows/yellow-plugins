@@ -29,12 +29,17 @@ export interface Plan {
   readonly risks: readonly string[];
 }
 
+/** Length in code points, as JSON Schema's maxLength counts. */
+function len(s: string): number {
+  return [...s].length;
+}
+
 function isStringArray(v: unknown, min: number, max: number): v is string[] {
   return (
     Array.isArray(v) &&
     v.length >= min &&
     v.length <= max &&
-    v.every((s) => typeof s === 'string' && s.length > 0 && s.length <= 1000)
+    v.every((s) => typeof s === 'string' && s.length > 0 && len(s) <= 1000)
   );
 }
 
@@ -48,7 +53,7 @@ export function isPlan(value: unknown): value is Plan {
     keys.every((k) => k === 'summary' || k === 'steps' || k === 'risks') &&
     typeof v['summary'] === 'string' &&
     v['summary'].length > 0 &&
-    v['summary'].length <= 2000 &&
+    len(v['summary']) <= 2000 &&
     isStringArray(v['steps'], 1, 30) &&
     isStringArray(v['risks'], 0, 20)
   );

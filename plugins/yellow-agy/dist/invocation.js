@@ -7,7 +7,9 @@
  * permission-flag guard cannot be skipped.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WINDOWS_ARGV_LIMIT = exports.BRIDGE_UNSET_VARS = exports.AUTH_MODE_VARS = void 0;
+exports.BRIDGE_GROUP_SCRIPT = exports.BRIDGE_PGID_MARKER = exports.WINDOWS_ARGV_LIMIT = exports.BRIDGE_UNSET_VARS = exports.AUTH_MODE_VARS = void 0;
+exports.bridgeKillCommand = bridgeKillCommand;
+exports.assertWslPath = assertWslPath;
 exports.filterDriverNames = filterDriverNames;
 exports.hookConfig = hookConfig;
 exports.scrubEnv = scrubEnv;
@@ -86,6 +88,36 @@ exports.BRIDGE_UNSET_VARS = [
 const FORBIDDEN_FLAGS = ['--dangerously-skip-permissions'];
 /** Windows caps a command line at 32,767 characters; keep a margin. */
 exports.WINDOWS_ARGV_LIMIT = 30_000;
+/** Prefix of the first stderr line a bridge turn prints: its Linux pgid. */
+exports.BRIDGE_PGID_MARKER = 'yellow-agy-pgid:';
+// Fixed script, arguments passed positionally: no shell re-parses argv.
+exports.BRIDGE_GROUP_SCRIPT = `printf '${exports.BRIDGE_PGID_MARKER}%s\\n' "$$" >&2; exec "$@"`;
+/** `wsl.exe … kill -s <sig> -- -<pgid>`: signals a bridge turn's Linux group. */
+function bridgeKillCommand(distro, pgid, sig) {
+    if (!Number.isInteger(pgid) || pgid <= 1) {
+        throw new errors_1.AgyError('AGY_INTERNAL', `invalid Linux pgid ${pgid}`);
+    }
+    const args = [];
+    if (distro !== undefined)
+        args.push('-d', distro);
+    args.push('-e', 'kill', '-s', sig, '--', `-${pgid}`);
+    return { file: 'wsl.exe', args };
+}
+/**
+ * Throws unless `wslPath` is absolute, inside the WSL filesystem (not /mnt
+ * or below), and free of `.`, `..` and empty segments, so the string check
+ * sees the real path. A symlink into /mnt can't be seen from here; setup
+ * checks the worktree root with realpath inside WSL.
+ */
+function assertWslPath(wslPath, what) {
+    const segments = wslPath.split('/');
+    if (!wslPath.startsWith('/') ||
+        wslPath === '/mnt' ||
+        wslPath.startsWith('/mnt/') ||
+        segments.some((seg, i) => seg === '.' || seg === '..' || (seg === '' && i > 0 && wslPath !== '/'))) {
+        throw new errors_1.AgyError('AGY_BRIDGE', `${what} must be an absolute path inside the WSL filesystem, not ${JSON.stringify(wslPath)}`);
+    }
+}
 const DISTRO_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const FILTER_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 /**
@@ -228,16 +260,7 @@ function buildInvocation(host, agyArgs, options) {
         return inv;
     }
     const wslCwd = options.cwd;
-    // Reject . and .. segments so the string check below sees the real path.
-    // A symlink into /mnt can't be seen from here; the worktree root is the
-    // adapter's own directory and setup checks it with realpath inside WSL.
-    const segments = wslCwd.split('/');
-    if (!wslCwd.startsWith('/') ||
-        wslCwd === '/mnt' ||
-        wslCwd.startsWith('/mnt/') ||
-        segments.some((seg, i) => seg === '.' || seg === '..' || (seg === '' && i > 0))) {
-        throw new errors_1.AgyError('AGY_BRIDGE', `the bridge worktree must be an absolute path inside the WSL filesystem, not ${JSON.stringify(wslCwd)}`);
-    }
+    assertWslPath(wslCwd, 'the bridge worktree');
     const args = [];
     if (host.distro !== undefined) {
         if (!DISTRO_RE.test(host.distro)) {
@@ -252,8 +275,16 @@ function buildInvocation(host, agyArgs, options) {
     for (const [key, value] of Object.entries(hookConfig('/dev/null', options.filterDrivers))) {
         args.push(`${key}=${value}`);
     }
+    // setsid makes the shell (then agy, via exec) lead a new Linux group.
+    args.push('setsid', '-w', 'sh', '-c', exports.BRIDGE_GROUP_SCRIPT, 'sh');
     args.push('agy', ...agyArgs);
-    const inv = { file: 'wsl.exe', args, cwd: undefined, env };
+    const inv = {
+        file: 'wsl.exe',
+        args,
+        cwd: undefined,
+        env,
+        linuxGroup: host.distro === undefined ? {} : { distro: host.distro },
+    };
     checkWindowsLength(inv);
     return inv;
 }

@@ -15,16 +15,25 @@ const GIT_ENV = {
   GIT_CONFIG_NOSYSTEM: '1',
 };
 
+/** process.env without inherited GIT_* (GIT_DIR, GIT_INDEX_FILE, …). */
+function cleanEnv(): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !/^GIT_/i.test(k))
+  );
+}
+
+const ISOLATED = { ...GIT_ENV, GIT_CONFIG_GLOBAL: os.devNull };
+
 export const testEnv: Record<string, string | undefined> = {
-  ...process.env,
-  ...GIT_ENV,
+  ...cleanEnv(),
+  ...ISOLATED,
   HOME: process.env['HOME'],
 };
 
 export function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, {
     cwd,
-    env: { ...process.env, ...GIT_ENV },
+    env: { ...cleanEnv(), ...ISOLATED },
     encoding: 'utf8',
   });
 }

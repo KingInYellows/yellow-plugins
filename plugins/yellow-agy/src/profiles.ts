@@ -372,7 +372,7 @@ export interface TurnArgsOptions {
   readonly printTimeoutSeconds: number;
 }
 
-const CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
+export const CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 /** The agy argv (without the binary) for one model turn. */
 export function turnArgs(options: TurnArgsOptions): string[] {

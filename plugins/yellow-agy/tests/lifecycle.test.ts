@@ -10,6 +10,7 @@ import type { Invocation } from '../src/invocation';
 import type { LifecycleDeps } from '../src/lifecycle';
 import { Lifecycle } from '../src/lifecycle';
 import { readJournal, writeJournal } from '../src/state';
+import { createWorktree } from '../src/worktree';
 
 import { git, makeRepo, testEnv } from './helpers';
 
@@ -331,6 +332,49 @@ describe('Lifecycle', () => {
     });
     await expect(h.lc.delegate(delegateInput(h.repo))).resolves.toMatchObject({
       state: 'PLAN_PENDING',
+    });
+  });
+
+  it('a crash between creating the worktree and recording its base leaks no branch', async () => {
+    const h = harness([planTurn], { isAlive: () => false });
+    const dir = h.deps.dataDir;
+    fs.mkdirSync(dir, { recursive: true });
+    const worktree = path.join(h.deps.worktreeRoot, 't0');
+    await createWorktree(h.deps.exec, {
+      repo: h.repo,
+      worktree,
+      branch: 'agy/t0',
+      remote: 'origin',
+      baseBranch: 'main',
+    });
+    const at = new Date().toISOString();
+    writeJournal(dir, {
+      version: 1,
+      tasks: {},
+      requests: {
+        r0: {
+          requestId: 'r0',
+          op: 'delegate',
+          localId: 't0',
+          status: 'pending',
+          outcome: { worktree, branch: 'agy/t0', repo: h.repo },
+          at,
+        },
+      },
+      usage: [],
+      activeRun: {
+        requestId: 'r0',
+        op: 'delegate',
+        localId: 't0',
+        ownerPid: 1111,
+        startedAt: at,
+      },
+    });
+    await h.lc.delegate(delegateInput(h.repo));
+    expect(fs.existsSync(worktree)).toBe(false);
+    expect(git(h.repo, 'branch', '--list', 'agy/t0')).toBe('');
+    expect(readJournal(dir).requests['r0']?.outcome).toMatchObject({
+      code: 'AGY_INTERRUPTED',
     });
   });
 

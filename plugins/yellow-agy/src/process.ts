@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import type { TurnOutcome } from './classify';
 import { AgyError } from './errors';
 import type { Invocation } from './invocation';
+import { BRIDGE_PGID_MARKER, bridgeKillCommand } from './invocation';
 
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
 const DEFAULT_GRACE_MS = 10_000;
@@ -22,8 +23,38 @@ export interface RunOptions {
   readonly graceMs?: number;
   /** Aborting it cancels the run (owner cancel). */
   readonly signal?: AbortSignal;
-  /** Called with the child pid as soon as it exists, for the active-run claim. */
-  readonly onSpawn?: (pid: number) => void;
+  /**
+   * Called with the child pid as soon as it exists, to make the active-run
+   * claim durable. A rejection stops the turn and the run rejects with it.
+   */
+  readonly onSpawn?: (pid: number) => Promise<void> | void;
+  /** Spawns a bridge group kill; tests replace it. */
+  readonly spawnKill?: (file: string, args: readonly string[]) => void;
+}
+
+function defaultSpawnKill(file: string, args: readonly string[]): void {
+  const k = spawn(file, [...args], { stdio: 'ignore', windowsHide: true });
+  k.on('error', () => undefined);
+}
+
+/**
+ * Splits the bridge's leading pgid line off `stderr`. Returns undefined
+ * until a full first line has arrived.
+ */
+export function splitPgidMarker(
+  stderr: Buffer
+): { pgid: number | undefined; rest: Buffer } | undefined {
+  const nl = stderr.indexOf(0x0a);
+  if (nl < 0) return undefined;
+  const line = stderr.subarray(0, nl).toString('utf8');
+  if (!line.startsWith(BRIDGE_PGID_MARKER)) {
+    return { pgid: undefined, rest: stderr };
+  }
+  const pgid = Number(line.slice(BRIDGE_PGID_MARKER.length));
+  return {
+    pgid: Number.isInteger(pgid) && pgid > 1 ? pgid : undefined,
+    rest: stderr.subarray(nl + 1),
+  };
 }
 
 export function runTurn(
@@ -53,12 +84,32 @@ export function runTurn(
     const err: Buffer[] = [];
     let graceTimer: NodeJS.Timeout | undefined;
     let closed = false;
+    let spawnError: unknown;
+    let spawnDone: Promise<void> = Promise.resolve();
+    const bridge = inv.linuxGroup;
+    let linuxPgid: number | undefined;
+    let markerPending = bridge !== undefined;
+    const spawnKill = options.spawnKill ?? defaultSpawnKill;
+    const killLinux = (sig: NodeJS.Signals): void => {
+      if (bridge === undefined || linuxPgid === undefined) return;
+      const cmd = bridgeKillCommand(
+        bridge.distro,
+        linuxPgid,
+        sig === 'SIGKILL' ? 'KILL' : 'TERM'
+      );
+      try {
+        spawnKill(cmd.file, cmd.args);
+      } catch {
+        // best effort; wsl.exe is killed below too
+      }
+    };
 
     // After the leader exits, a tool it started can still hold the pipes open,
     // so on POSIX the group stays killable until 'close'. The group id can't be
     // reused while any member is alive.
     const kill = (sig: NodeJS.Signals): void => {
       if (child.pid === undefined || closed) return;
+      killLinux(sig);
       if (!groupKill && child.exitCode !== null) return;
       try {
         if (groupKill) process.kill(-child.pid, sig);
@@ -81,7 +132,19 @@ export function runTurn(
       sink.push(chunk);
     };
     child.stdout?.on('data', collect(out));
-    child.stderr?.on('data', collect(err));
+    const collectErr = collect(err);
+    child.stderr?.on('data', (chunk: Buffer) => {
+      collectErr(chunk);
+      if (!markerPending) return;
+      const split = splitPgidMarker(Buffer.concat(err));
+      if (split === undefined) return;
+      markerPending = false;
+      linuxPgid = split.pgid;
+      err.length = 0;
+      if (split.rest.length > 0) err.push(split.rest);
+      // A stop requested before the pgid arrived reaches the group now.
+      if (killedByDeadline || cancelled) killLinux('SIGTERM');
+    });
 
     const deadline = setTimeout(() => {
       killedByDeadline = true;
@@ -108,11 +171,19 @@ export function runTurn(
       );
     });
     child.on('spawn', () => {
-      if (child.pid !== undefined) options.onSpawn?.(child.pid);
+      if (child.pid === undefined || options.onSpawn === undefined) return;
+      spawnDone = Promise.resolve()
+        .then(() => options.onSpawn?.(child.pid as number))
+        .catch((e: unknown) => {
+          spawnError = e;
+          cancelled = true;
+          stop();
+        });
     });
     child.on('exit', () => {
       // agy is done; a tool still in its group would keep 'close' from firing.
       if (groupKill) kill('SIGKILL');
+      killLinux('SIGKILL');
     });
     child.on('close', (code, signal) => {
       closed = true;
@@ -124,6 +195,16 @@ export function runTurn(
         } catch {
           // group already empty
         }
+      }
+      void spawnDone.then(() => finish(code, signal));
+    });
+    const finish = (
+      code: number | null,
+      signal: NodeJS.Signals | null
+    ): void => {
+      if (spawnError !== undefined) {
+        reject(spawnError);
+        return;
       }
       if (overflow) {
         reject(
@@ -142,6 +223,6 @@ export function runTurn(
         stdout: Buffer.concat(out).toString('utf8'),
         stderr: Buffer.concat(err).toString('utf8'),
       });
-    });
+    };
   });
 }

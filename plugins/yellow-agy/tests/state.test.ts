@@ -16,9 +16,13 @@ import { tmpDir } from './helpers';
 
 describe('state', () => {
   it('picks YELLOW_AGY_DATA_DIR, then the XDG state dir', () => {
-    expect(dataDir({ YELLOW_AGY_DATA_DIR: '/x/y' })).toBe('/x/y');
+    expect(dataDir({ YELLOW_AGY_DATA_DIR: '/x/y' })).toBe(path.resolve('/x/y'));
     if (process.platform !== 'win32') {
       expect(dataDir({ XDG_STATE_HOME: '/s' })).toBe('/s/yellow-agy');
+      // Empty values count as unset.
+      expect(dataDir({ YELLOW_AGY_DATA_DIR: '', XDG_STATE_HOME: '' })).toBe(
+        dataDir({})
+      );
     }
   });
 
@@ -95,5 +99,53 @@ describe('state', () => {
     const dir = tmpDir('agy-state-');
     fs.writeFileSync(path.join(dir, 'journal.json'), '{not json');
     expect(() => readJournal(dir)).toThrow(/not valid JSON/);
+  });
+
+  it('removes a stale lock only if it is still the one judged stale', async () => {
+    const dir = tmpDir('agy-state-');
+    const lock = path.join(dir, 'journal.lock');
+    fs.writeFileSync(lock, '999999999\n');
+    // A takeover in progress elsewhere: this waiter must not remove the lock.
+    fs.writeFileSync(`${lock}.takeover`, '');
+    await expect(
+      withLock(dir, () => 'x', { timeoutMs: 150 })
+    ).rejects.toMatchObject({ code: 'AGY_BUSY' });
+    expect(fs.readFileSync(lock, 'utf8')).toBe('999999999\n');
+    // A takeover file a crash left behind expires.
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(`${lock}.takeover`, old, old);
+    await expect(withLock(dir, () => 'ok', { timeoutMs: 1_000 })).resolves.toBe(
+      'ok'
+    );
+    expect(fs.existsSync(lock)).toBe(false);
+  });
+
+  it('a holder whose lock was taken over leaves the new lock in place', async () => {
+    const dir = tmpDir('agy-state-');
+    const lock = path.join(dir, 'journal.lock');
+    await withLock(dir, () => {
+      fs.writeFileSync(lock, `${process.pid}\nsomeone else\n`);
+    });
+    expect(fs.readFileSync(lock, 'utf8')).toBe(
+      `${process.pid}\nsomeone else\n`
+    );
+  });
+
+  it('refuses structurally damaged journals with AGY_INTERNAL', () => {
+    const dir = tmpDir('agy-state-');
+    const file = path.join(dir, 'journal.json');
+    for (const body of [
+      'null',
+      '[]',
+      '{"version":1,"tasks":null,"requests":{}}',
+      '{"version":1,"tasks":{},"requests":{"r":null}}',
+      '{"version":1,"tasks":{},"requests":{},"activeRun":null}',
+      '{"version":1,"tasks":{},"requests":{},"activeRun":{"requestId":"r"}}',
+    ]) {
+      fs.writeFileSync(file, body);
+      expect(() => readJournal(dir), body).toThrow(
+        expect.objectContaining({ code: 'AGY_INTERNAL' })
+      );
+    }
   });
 });

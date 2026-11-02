@@ -38,7 +38,7 @@ export function validateBranchName(branch: string): string {
     !BRANCH_RE.test(branch) ||
     branch.endsWith('/') ||
     branch.endsWith('.') ||
-    branch.endsWith('.lock') ||
+    branch.split('/').some((part) => part.endsWith('.lock')) ||
     branch.includes('/.')
   ) {
     throw new AgyError(
@@ -292,8 +292,15 @@ export async function dropSnapshotRefs(
 ): Promise<void> {
   const refs = snapshotRefs(localId);
   for (const ref of [refs.preTurn, refs.preTurnIndex]) {
-    // Missing refs are fine: the turn may have settled already.
-    await exec.git(['update-ref', '-d', ref], { cwd: worktree });
+    // A missing ref is fine (the turn may have settled already); any other
+    // failure must surface, or a reset reports success with refs left over.
+    const present = await exec.git(
+      ['show-ref', '--verify', '--quiet', '--', ref],
+      { cwd: worktree }
+    );
+    if (present.code === 1) continue;
+    if (present.code !== 0) throw gitError(['show-ref', ref], present);
+    await git(exec, worktree, ['update-ref', '-d', ref]);
   }
 }
 
@@ -312,6 +319,7 @@ export async function collectWorktree(
   localId: string,
   base: string
 ): Promise<Collected> {
+  checkLocalId(localId);
   sha(base);
   const count = Number.parseInt(
     (

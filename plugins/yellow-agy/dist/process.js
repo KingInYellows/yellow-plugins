@@ -7,11 +7,35 @@
  * SIGKILL after a grace period.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.splitPgidMarker = splitPgidMarker;
 exports.runTurn = runTurn;
 const node_child_process_1 = require("node:child_process");
 const errors_1 = require("./errors");
+const invocation_1 = require("./invocation");
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
 const DEFAULT_GRACE_MS = 10_000;
+function defaultSpawnKill(file, args) {
+    const k = (0, node_child_process_1.spawn)(file, [...args], { stdio: 'ignore', windowsHide: true });
+    k.on('error', () => undefined);
+}
+/**
+ * Splits the bridge's leading pgid line off `stderr`. Returns undefined
+ * until a full first line has arrived.
+ */
+function splitPgidMarker(stderr) {
+    const nl = stderr.indexOf(0x0a);
+    if (nl < 0)
+        return undefined;
+    const line = stderr.subarray(0, nl).toString('utf8');
+    if (!line.startsWith(invocation_1.BRIDGE_PGID_MARKER)) {
+        return { pgid: undefined, rest: stderr };
+    }
+    const pgid = Number(line.slice(invocation_1.BRIDGE_PGID_MARKER.length));
+    return {
+        pgid: Number.isInteger(pgid) && pgid > 1 ? pgid : undefined,
+        rest: stderr.subarray(nl + 1),
+    };
+}
 function runTurn(inv, options) {
     if (!Number.isFinite(options.deadlineMs) || options.deadlineMs <= 0) {
         return Promise.reject(new errors_1.AgyError('AGY_INTERNAL', 'deadlineMs must be a positive number'));
@@ -34,12 +58,30 @@ function runTurn(inv, options) {
         const err = [];
         let graceTimer;
         let closed = false;
+        let spawnError;
+        let spawnDone = Promise.resolve();
+        const bridge = inv.linuxGroup;
+        let linuxPgid;
+        let markerPending = bridge !== undefined;
+        const spawnKill = options.spawnKill ?? defaultSpawnKill;
+        const killLinux = (sig) => {
+            if (bridge === undefined || linuxPgid === undefined)
+                return;
+            const cmd = (0, invocation_1.bridgeKillCommand)(bridge.distro, linuxPgid, sig === 'SIGKILL' ? 'KILL' : 'TERM');
+            try {
+                spawnKill(cmd.file, cmd.args);
+            }
+            catch {
+                // best effort; wsl.exe is killed below too
+            }
+        };
         // After the leader exits, a tool it started can still hold the pipes open,
         // so on POSIX the group stays killable until 'close'. The group id can't be
         // reused while any member is alive.
         const kill = (sig) => {
             if (child.pid === undefined || closed)
                 return;
+            killLinux(sig);
             if (!groupKill && child.exitCode !== null)
                 return;
             try {
@@ -66,7 +108,23 @@ function runTurn(inv, options) {
             sink.push(chunk);
         };
         child.stdout?.on('data', collect(out));
-        child.stderr?.on('data', collect(err));
+        const collectErr = collect(err);
+        child.stderr?.on('data', (chunk) => {
+            collectErr(chunk);
+            if (!markerPending)
+                return;
+            const split = splitPgidMarker(Buffer.concat(err));
+            if (split === undefined)
+                return;
+            markerPending = false;
+            linuxPgid = split.pgid;
+            err.length = 0;
+            if (split.rest.length > 0)
+                err.push(split.rest);
+            // A stop requested before the pgid arrived reaches the group now.
+            if (killedByDeadline || cancelled)
+                killLinux('SIGTERM');
+        });
         const deadline = setTimeout(() => {
             killedByDeadline = true;
             stop();
@@ -92,13 +150,21 @@ function runTurn(inv, options) {
                 : e);
         });
         child.on('spawn', () => {
-            if (child.pid !== undefined)
-                options.onSpawn?.(child.pid);
+            if (child.pid === undefined || options.onSpawn === undefined)
+                return;
+            spawnDone = Promise.resolve()
+                .then(() => options.onSpawn?.(child.pid))
+                .catch((e) => {
+                spawnError = e;
+                cancelled = true;
+                stop();
+            });
         });
         child.on('exit', () => {
             // agy is done; a tool still in its group would keep 'close' from firing.
             if (groupKill)
                 kill('SIGKILL');
+            killLinux('SIGKILL');
         });
         child.on('close', (code, signal) => {
             closed = true;
@@ -112,6 +178,13 @@ function runTurn(inv, options) {
                     // group already empty
                 }
             }
+            void spawnDone.then(() => finish(code, signal));
+        });
+        const finish = (code, signal) => {
+            if (spawnError !== undefined) {
+                reject(spawnError);
+                return;
+            }
             if (overflow) {
                 reject(new errors_1.AgyError('AGY_INTERNAL', `agy printed more than ${MAX_OUTPUT_BYTES} bytes`));
                 return;
@@ -124,6 +197,6 @@ function runTurn(inv, options) {
                 stdout: Buffer.concat(out).toString('utf8'),
                 stderr: Buffer.concat(err).toString('utf8'),
             });
-        });
+        };
     });
 }

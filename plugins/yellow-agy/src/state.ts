@@ -98,15 +98,20 @@ const USAGE_KEEP_MS = 24 * 60 * 60 * 1000;
 export function dataDir(
   env: Readonly<Record<string, string | undefined>> = process.env
 ): string {
-  const explicit = env['YELLOW_AGY_DATA_DIR'];
-  if (explicit !== undefined && explicit !== '') return path.resolve(explicit);
+  // An empty value counts as unset, as the XDG spec says.
+  const set = (name: string): string | undefined => {
+    const v = env[name];
+    return v === undefined || v === '' ? undefined : v;
+  };
+  const explicit = set('YELLOW_AGY_DATA_DIR');
+  if (explicit !== undefined) return path.resolve(explicit);
   if (process.platform === 'win32') {
     const base =
-      env['LOCALAPPDATA'] ?? path.join(os.homedir(), 'AppData', 'Local');
+      set('LOCALAPPDATA') ?? path.join(os.homedir(), 'AppData', 'Local');
     return path.join(base, 'yellow-agy');
   }
   const base =
-    env['XDG_STATE_HOME'] ?? path.join(os.homedir(), '.local', 'state');
+    set('XDG_STATE_HOME') ?? path.join(os.homedir(), '.local', 'state');
   return path.join(base, 'yellow-agy');
 }
 
@@ -160,18 +165,16 @@ export async function withLock<T>(
   const timeoutMs = options.timeoutMs ?? 10_000;
   const staleMs = options.staleMs ?? 60_000;
   const started = Date.now();
+  const token = `${process.pid}\n${new Date().toISOString()}\n${Math.random().toString(36).slice(2)}\n`;
   for (;;) {
     try {
       const fd = fs.openSync(lockPath, 'wx', 0o600);
-      fs.writeSync(fd, `${process.pid}\n${new Date().toISOString()}\n`);
+      fs.writeSync(fd, token);
       fs.closeSync(fd);
       break;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-      if (lockIsStale(lockPath, staleMs)) {
-        fs.rmSync(lockPath, { force: true });
-        continue;
-      }
+      if (removeStaleLock(lockPath, staleMs)) continue;
       if (Date.now() - started > timeoutMs) {
         throw new AgyError(
           'AGY_BUSY',
@@ -184,22 +187,81 @@ export async function withLock<T>(
   try {
     return await fn();
   } finally {
-    fs.rmSync(lockPath, { force: true });
+    // Remove only our own lock: a peer may have taken over a lock it judged
+    // stale.
+    if (readText(lockPath) === token) fs.rmSync(lockPath, { force: true });
   }
 }
 
-function lockIsStale(lockPath: string, staleMs: number): boolean {
-  let text: string;
+function readText(file: string): string | undefined {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+const TAKEOVER_STALE_MS = 5_000;
+
+/**
+ * Removes the lock at `lockPath` if it is stale, and says whether it did.
+ * Removal happens only while holding `<lock>.takeover` (created with `wx`),
+ * and only if the lock still holds the exact text judged stale, so two
+ * waiters can't both remove it and one of them can't remove a fresh lock a
+ * third process just took.
+ */
+function removeStaleLock(lockPath: string, staleMs: number): boolean {
+  const seen = readText(lockPath);
+  if (seen === undefined) return true; // vanished: retry the create
+  if (!lockIsStale(lockPath, seen, staleMs)) return false;
+  const takeover = `${lockPath}.takeover`;
+  let fd: number;
+  try {
+    fd = fs.openSync(takeover, 'wx', 0o600);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    // The takeover window is a few syscalls; one left by a crash expires.
+    try {
+      if (Date.now() - fs.statSync(takeover).mtimeMs > TAKEOVER_STALE_MS) {
+        fs.rmSync(takeover, { force: true });
+      }
+    } catch {
+      // gone already
+    }
+    return false;
+  }
+  fs.closeSync(fd);
+  try {
+    if (readText(lockPath) !== seen) return false;
+    fs.rmSync(lockPath, { force: true });
+    return true;
+  } finally {
+    fs.rmSync(takeover, { force: true });
+  }
+}
+
+function lockIsStale(lockPath: string, text: string, staleMs: number): boolean {
   let mtime: number;
   try {
-    text = fs.readFileSync(lockPath, 'utf8');
     mtime = fs.statSync(lockPath).mtimeMs;
   } catch {
-    return false; // vanished between open and read: just retry
+    return false; // vanished between read and stat: just retry
   }
   const pid = Number.parseInt(text.split('\n')[0] ?? '', 10);
   if (Number.isInteger(pid) && pid > 0) return !pidAlive(pid);
   return Date.now() - mtime > staleMs;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function badJournal(part: string): AgyError {
+  return new AgyError(
+    'AGY_INTERNAL',
+    `the journal has an unknown format (${part})`,
+    'Move the damaged journal aside; yellow-agy starts a new one.'
+  );
 }
 
 export function readJournal(dir: string): Journal {
@@ -220,24 +282,42 @@ export function readJournal(dir: string): Journal {
       'Move the damaged journal aside; yellow-agy starts a new one.'
     );
   }
-  const j = value as Partial<Journal>;
+  if (!isRecord(value)) throw badJournal('not an object');
+  const j = value as Partial<Journal> & Record<string, unknown>;
+  if (j.version !== 1) throw badJournal('unknown version');
+  if (!isRecord(j.tasks) || !Object.values(j.tasks).every(isRecord)) {
+    throw badJournal('tasks');
+  }
+  if (!isRecord(j.requests) || !Object.values(j.requests).every(isRecord)) {
+    throw badJournal('requests');
+  }
+  if (j.usage !== undefined && !Array.isArray(j.usage)) {
+    throw badJournal('usage');
+  }
+  const claim: unknown = j.activeRun;
   if (
-    j.version !== 1 ||
-    typeof j.tasks !== 'object' ||
-    typeof j.requests !== 'object'
+    claim !== undefined &&
+    !(
+      isRecord(claim) &&
+      typeof claim['requestId'] === 'string' &&
+      typeof claim['localId'] === 'string' &&
+      typeof claim['op'] === 'string' &&
+      Number.isInteger(claim['ownerPid']) &&
+      (claim['childPid'] === undefined || Number.isInteger(claim['childPid']))
+    )
   ) {
-    throw new AgyError('AGY_INTERNAL', 'the journal has an unknown format');
+    throw badJournal('activeRun');
   }
   return {
     version: 1,
-    tasks: j.tasks ?? {},
-    requests: j.requests ?? {},
-    usage: Array.isArray(j.usage) ? j.usage : [],
+    tasks: j.tasks,
+    requests: j.requests,
+    usage: (j.usage ?? []).filter(isRecord) as unknown as UsageEntry[],
     ...(j.activeRun === undefined ? {} : { activeRun: j.activeRun }),
   };
 }
 
-/** Atomic write: a 0600 temp file in the same dir, then rename. */
+/** Atomic, durable write: a 0600 temp file fsynced, renamed, dir fsynced. */
 export function writeJournal(dir: string, journal: Journal): void {
   const cutoff = Date.now() - USAGE_KEEP_MS;
   const trimmed: Journal = {
@@ -245,10 +325,23 @@ export function writeJournal(dir: string, journal: Journal): void {
     usage: journal.usage.filter((u) => Date.parse(u.at) >= cutoff),
   };
   const tmp = path.join(dir, `${JOURNAL}.${process.pid}.tmp`);
-  fs.writeFileSync(tmp, `${JSON.stringify(trimmed, null, 2)}\n`, {
-    mode: 0o600,
-  });
+  const fd = fs.openSync(tmp, 'w', 0o600);
+  try {
+    fs.writeSync(fd, `${JSON.stringify(trimmed, null, 2)}\n`);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
   fs.renameSync(tmp, path.join(dir, JOURNAL));
+  // Make the rename itself durable; Windows can't open a directory.
+  if (process.platform !== 'win32') {
+    const dfd = fs.openSync(dir, 'r');
+    try {
+      fs.fsyncSync(dfd);
+    } finally {
+      fs.closeSync(dfd);
+    }
+  }
 }
 
 /** Read, change and write the journal under the lock. */

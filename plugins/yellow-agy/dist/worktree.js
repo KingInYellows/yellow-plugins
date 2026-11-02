@@ -36,7 +36,7 @@ function validateBranchName(branch) {
     if (!BRANCH_RE.test(branch) ||
         branch.endsWith('/') ||
         branch.endsWith('.') ||
-        branch.endsWith('.lock') ||
+        branch.split('/').some((part) => part.endsWith('.lock')) ||
         branch.includes('/.')) {
         throw new errors_1.AgyError('AGY_INVALID_INPUT', `invalid branch name ${JSON.stringify(branch)}`);
     }
@@ -196,12 +196,19 @@ async function resetToSnapshot(exec, worktree, localId, snapshot) {
 async function dropSnapshotRefs(exec, worktree, localId) {
     const refs = snapshotRefs(localId);
     for (const ref of [refs.preTurn, refs.preTurnIndex]) {
-        // Missing refs are fine: the turn may have settled already.
-        await exec.git(['update-ref', '-d', ref], { cwd: worktree });
+        // A missing ref is fine (the turn may have settled already); any other
+        // failure must surface, or a reset reports success with refs left over.
+        const present = await exec.git(['show-ref', '--verify', '--quiet', '--', ref], { cwd: worktree });
+        if (present.code === 1)
+            continue;
+        if (present.code !== 0)
+            throw gitError(['show-ref', ref], present);
+        await git(exec, worktree, ['update-ref', '-d', ref]);
     }
 }
 /** Reads the delegate's work without touching the real index. */
 async function collectWorktree(exec, worktree, localId, base) {
+    checkLocalId(localId);
     sha(base);
     const count = Number.parseInt((await git(exec, worktree, ['rev-list', '--count', `${base}..HEAD`])).trim(), 10);
     // The repo's external diff and textconv helpers would run outside agy's

@@ -73,11 +73,11 @@ in WSL. The hard rules apply on every host. `--sandbox` is unverified on native
 Windows, so test and lint commands stay off there. `setup` resolves one
 invocation and records it in the data dir:
 
-| Host                       | Invocation                                                                                                                         | Worktree root                                                            |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                    | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
-| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u <each BRIDGE_UNSET_VARS name> <the GIT_CONFIG_COUNT/KEY_n/VALUE_n set below> agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
-| Windows native agy         | `agy.exe`                                                                                                                          | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
+| Host                       | Invocation                                                                                                                                                                | Worktree root                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                                                           | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
+| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u <each BRIDGE_UNSET_VARS name> <the GIT_CONFIG_COUNT/KEY_n/VALUE_n set below> setsid -w sh -c <fixed pgid script> sh agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
+| Windows native agy         | `agy.exe`                                                                                                                                                                 | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
 
 The worktree is created where agy runs. On the WSL bridge that means a WSL clone
 of the repo, never `/mnt/c`. The bridge always uses `wsl.exe --exec` (`-e`),
@@ -86,6 +86,13 @@ never the `--` form, so no shell in the distro re-parses prompts or the
 `stream-json` mode, which v0 doesn't use. Windows caps a command line at 32,767
 characters, so on the bridge a prompt whose full argv would exceed 30,000
 characters fails with `AGY_PROMPT_TOO_LONG` before anything spawns.
+
+Killing `wsl.exe` does not stop the Linux processes behind it, so on the bridge
+`setsid` makes agy lead its own Linux process group, a fixed `sh -c` script
+(arguments stay positional) prints `yellow-agy-pgid:<pgid>` as the first stderr
+line, and a deadline or cancel runs `wsl.exe -e kill -s TERM|KILL -- -<pgid>`.
+The marker line is stripped before classification. On POSIX hosts agy and every
+host git call run in their own process group, and a timeout signals the group.
 
 ## Run lifecycle
 
@@ -155,7 +162,15 @@ local processes.
 - A claim whose pid is dead is stale. The next call settles it before doing
   anything else. A `delegate` reservation with no `conversation_id` is released:
   its worktree is removed, and its branch is deleted if it has no commits beyond
-  the base. A turn reservation is settled as `INTERRUPTED`.
+  the base. When the crash came before the base was journaled, no turn has run,
+  so the base is the worktree's `HEAD`, read only while it still has that branch
+  checked out. A turn reservation is settled as `INTERRUPTED`.
+- The agy child's pid is written to the claim before the turn can settle; if
+  that write fails, the turn is stopped and the call fails with the write's
+  error. Journal writes fsync the temp file and then the directory around the
+  rename. A stale lock is removed only by the holder of `journal.lock.takeover`,
+  and only if it still holds the exact text judged stale; a holder removes its
+  lock on release only if the lock still holds its own token.
 - After `INTERRUPTED` or `TIMED_OUT`, the worktree may hold partial edits. The
   next `approve` or `reply` refuses with `requiresAttention` until the owner
   passes `--keep-partial` (continue on top of them) or `--reset-partial`. Reset

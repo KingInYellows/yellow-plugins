@@ -56,7 +56,8 @@ const ENV_NAME_RE = /^[A-Z_][A-Z0-9_]*$/;
 function hostCommand(host, cmd, args, options, baseEnv) {
     const extra = options.env ?? {};
     for (const key of Object.keys(extra)) {
-        if (!ENV_NAME_RE.test(key)) {
+        // GIT_CONFIG_* carries the hook and filter overrides; no caller may touch it.
+        if (!ENV_NAME_RE.test(key) || key.startsWith('GIT_CONFIG')) {
             throw new errors_1.AgyError('AGY_INTERNAL', `invalid env name ${JSON.stringify(key)}`);
         }
     }
@@ -67,19 +68,17 @@ function hostCommand(host, cmd, args, options, baseEnv) {
             file: cmd,
             args: [...args],
             cwd: options.cwd,
-            env: { ...(0, invocation_1.scrubEnv)(baseEnv), ...hooks, ...extra },
+            env: { ...(0, invocation_1.scrubEnv)(baseEnv), ...extra, ...hooks },
         };
     }
-    if (!options.cwd.startsWith('/') || options.cwd.startsWith('/mnt/')) {
-        throw new errors_1.AgyError('AGY_BRIDGE', `bridge commands must run inside the WSL filesystem, not ${JSON.stringify(options.cwd)}`);
-    }
+    (0, invocation_1.assertWslPath)(options.cwd, 'a bridge command directory');
     const wslArgs = [];
     if (host.distro !== undefined)
         wslArgs.push('-d', host.distro);
     wslArgs.push('--cd', options.cwd, '-e', 'env');
     for (const name of invocation_1.BRIDGE_UNSET_VARS)
         wslArgs.push('-u', name);
-    for (const [key, value] of Object.entries({ ...hooks, ...extra })) {
+    for (const [key, value] of Object.entries({ ...extra, ...hooks })) {
         wslArgs.push(`${key}=${value}`);
     }
     wslArgs.push(cmd, ...args);
@@ -91,33 +90,63 @@ function hostCommand(host, cmd, args, options, baseEnv) {
     };
 }
 function runSpawn(spec, stdin, timeoutMs) {
+    // Own process group on POSIX, so a timeout also reaches what git started
+    // (a credential helper, ssh).
+    const group = process.platform !== 'win32';
     return new Promise((resolve, reject) => {
         const child = (0, node_child_process_1.spawn)(spec.file, [...spec.args], {
             cwd: spec.cwd,
             env: spec.env,
             stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+            detached: group,
             windowsHide: true,
         });
+        let closed = false;
+        const killAll = () => {
+            if (child.pid === undefined || closed)
+                return;
+            try {
+                if (group)
+                    process.kill(-child.pid, 'SIGKILL');
+                else
+                    child.kill('SIGKILL');
+            }
+            catch {
+                // already gone
+            }
+        };
+        // A child that exits before reading stdin must not crash the host.
+        child.stdin?.on('error', () => undefined);
         const out = [];
         const err = [];
         let size = 0;
         const collect = (sink) => (chunk) => {
             size += chunk.length;
             if (size > MAX_OUTPUT_BYTES) {
-                child.kill('SIGKILL');
+                killAll();
                 return;
             }
             sink.push(chunk);
         };
         child.stdout?.on('data', collect(out));
         child.stderr?.on('data', collect(err));
-        const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+        let timedOut = false;
+        const timer = setTimeout(() => {
+            timedOut = true;
+            killAll();
+        }, timeoutMs);
         child.on('error', (e) => {
             clearTimeout(timer);
             reject(e);
         });
         child.on('close', (code) => {
             clearTimeout(timer);
+            killAll();
+            closed = true;
+            if (timedOut) {
+                reject(new errors_1.AgyError('AGY_INTERNAL', `${spec.file} did not finish within ${timeoutMs} ms`));
+                return;
+            }
             if (size > MAX_OUTPUT_BYTES) {
                 reject(new errors_1.AgyError('AGY_INTERNAL', `${spec.file} printed more than ${MAX_OUTPUT_BYTES} bytes`));
                 return;
@@ -179,7 +208,9 @@ function createHostExec(host, baseEnv = process.env) {
                 fs.rmSync(filePath, { force: true });
                 return;
             }
-            await run('rm', ['-f', '--', filePath], { cwd: '/' });
+            const res = await run('rm', ['-f', '--', filePath], { cwd: '/' });
+            if (res.code !== 0)
+                throw new errors_1.AgyError('AGY_BRIDGE', `removing ${filePath} in WSL failed: ${res.stderr.trim()}`);
         },
     };
 }

@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { AgyError } from './errors';
 import type { Host } from './invocation';
 import {
+  assertWslPath,
   BRIDGE_UNSET_VARS,
   filterDriverNames,
   hookConfig,
@@ -76,7 +77,8 @@ export function hostCommand(
 ): SpawnSpec {
   const extra = options.env ?? {};
   for (const key of Object.keys(extra)) {
-    if (!ENV_NAME_RE.test(key)) {
+    // GIT_CONFIG_* carries the hook and filter overrides; no caller may touch it.
+    if (!ENV_NAME_RE.test(key) || key.startsWith('GIT_CONFIG')) {
       throw new AgyError(
         'AGY_INTERNAL',
         `invalid env name ${JSON.stringify(key)}`
@@ -90,20 +92,15 @@ export function hostCommand(
       file: cmd,
       args: [...args],
       cwd: options.cwd,
-      env: { ...scrubEnv(baseEnv), ...hooks, ...extra },
+      env: { ...scrubEnv(baseEnv), ...extra, ...hooks },
     };
   }
-  if (!options.cwd.startsWith('/') || options.cwd.startsWith('/mnt/')) {
-    throw new AgyError(
-      'AGY_BRIDGE',
-      `bridge commands must run inside the WSL filesystem, not ${JSON.stringify(options.cwd)}`
-    );
-  }
+  assertWslPath(options.cwd, 'a bridge command directory');
   const wslArgs: string[] = [];
   if (host.distro !== undefined) wslArgs.push('-d', host.distro);
   wslArgs.push('--cd', options.cwd, '-e', 'env');
   for (const name of BRIDGE_UNSET_VARS) wslArgs.push('-u', name);
-  for (const [key, value] of Object.entries({ ...hooks, ...extra })) {
+  for (const [key, value] of Object.entries({ ...extra, ...hooks })) {
     wslArgs.push(`${key}=${value}`);
   }
   wslArgs.push(cmd, ...args);
@@ -120,33 +117,64 @@ export function runSpawn(
   stdin: string | undefined,
   timeoutMs: number
 ): Promise<ExecResult> {
+  // Own process group on POSIX, so a timeout also reaches what git started
+  // (a credential helper, ssh).
+  const group = process.platform !== 'win32';
   return new Promise((resolve, reject) => {
     const child = spawn(spec.file, [...spec.args], {
       cwd: spec.cwd,
       env: spec.env,
       stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+      detached: group,
       windowsHide: true,
     });
+    let closed = false;
+    const killAll = (): void => {
+      if (child.pid === undefined || closed) return;
+      try {
+        if (group) process.kill(-child.pid, 'SIGKILL');
+        else child.kill('SIGKILL');
+      } catch {
+        // already gone
+      }
+    };
+    // A child that exits before reading stdin must not crash the host.
+    child.stdin?.on('error', () => undefined);
     const out: Buffer[] = [];
     const err: Buffer[] = [];
     let size = 0;
     const collect = (sink: Buffer[]) => (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_OUTPUT_BYTES) {
-        child.kill('SIGKILL');
+        killAll();
         return;
       }
       sink.push(chunk);
     };
     child.stdout?.on('data', collect(out));
     child.stderr?.on('data', collect(err));
-    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killAll();
+    }, timeoutMs);
     child.on('error', (e) => {
       clearTimeout(timer);
       reject(e);
     });
     child.on('close', (code) => {
       clearTimeout(timer);
+      killAll();
+      closed = true;
+      if (timedOut) {
+        reject(
+          new AgyError(
+            'AGY_INTERNAL',
+            `${spec.file} did not finish within ${timeoutMs} ms`
+          )
+        );
+        return;
+      }
       if (size > MAX_OUTPUT_BYTES) {
         reject(
           new AgyError(
@@ -238,7 +266,12 @@ export function createHostExec(
         fs.rmSync(filePath, { force: true });
         return;
       }
-      await run('rm', ['-f', '--', filePath], { cwd: '/' });
+      const res = await run('rm', ['-f', '--', filePath], { cwd: '/' });
+      if (res.code !== 0)
+        throw new AgyError(
+          'AGY_BRIDGE',
+          `removing ${filePath} in WSL failed: ${res.stderr.trim()}`
+        );
     },
   };
 }
