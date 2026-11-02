@@ -49,11 +49,17 @@ const FORBIDDEN_FLAGS = ['--dangerously-skip-permissions'];
 /** Windows caps a command line at 32,767 characters; keep a margin. */
 exports.WINDOWS_ARGV_LIMIT = 30_000;
 const DISTRO_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+/**
+ * Config every agy child's git sees: no hooks, and no fsmonitor command
+ * (core.fsmonitor can name a script that `git status` would run).
+ */
 function hookConfig(nullDevice) {
     return {
-        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_COUNT: '2',
         GIT_CONFIG_KEY_0: 'core.hooksPath',
         GIT_CONFIG_VALUE_0: nullDevice,
+        GIT_CONFIG_KEY_1: 'core.fsmonitor',
+        GIT_CONFIG_VALUE_1: 'false',
     };
 }
 /**

@@ -1,3 +1,8 @@
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { AgyError } from '../src/errors';
@@ -59,9 +64,11 @@ describe('buildInvocation', () => {
     expect(inv.env).toEqual({
       PATH: '/usr/bin',
       HOME: '/home/owner',
-      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_COUNT: '2',
       GIT_CONFIG_KEY_0: 'core.hooksPath',
       GIT_CONFIG_VALUE_0: '/dev/null',
+      GIT_CONFIG_KEY_1: 'core.fsmonitor',
+      GIT_CONFIG_VALUE_1: 'false',
     });
   });
 
@@ -94,9 +101,11 @@ describe('buildInvocation', () => {
       '-e',
       'env',
       ...unsets,
-      'GIT_CONFIG_COUNT=1',
+      'GIT_CONFIG_COUNT=2',
       'GIT_CONFIG_KEY_0=core.hooksPath',
       'GIT_CONFIG_VALUE_0=/dev/null',
+      'GIT_CONFIG_KEY_1=core.fsmonitor',
+      'GIT_CONFIG_VALUE_1=false',
       'agy',
       '-p',
       'do "this"; rm -rf /',
@@ -247,5 +256,34 @@ describe('buildInvocation', () => {
     expect(windowsCommandLineLength('a', ['b'])).toBe(3);
     expect(windowsCommandLineLength('a', ['b c'])).toBe(7);
     expect(windowsCommandLineLength('a', ['"'])).toBe(6);
+  });
+});
+
+describe('injected git config', () => {
+  it('git status runs no configured fsmonitor or hook script', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agy-fsmon-'));
+    try {
+      const git = (args: string[], env?: Record<string, string>) =>
+        execFileSync('git', args, { cwd: dir, env, stdio: 'pipe' });
+      git(['init', '-q']);
+      const marker = join(dir, 'ran');
+      writeFileSync(join(dir, 'monitor.sh'), `#!/bin/sh\ntouch '${marker}'\n`, {
+        mode: 0o755,
+      });
+      git(['config', 'core.fsmonitor', './monitor.sh']);
+      const inv = buildInvocation({ kind: 'posix' }, ['-p', 'x'], {
+        cwd: dir,
+        baseEnv: { PATH: process.env['PATH'], HOME: dir },
+      });
+      git(['status', '--porcelain'], { ...inv.env });
+      expect(existsSync(marker)).toBe(false);
+      git(['status', '--porcelain'], {
+        PATH: process.env['PATH'] ?? '',
+        HOME: dir,
+      });
+      expect(existsSync(marker)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

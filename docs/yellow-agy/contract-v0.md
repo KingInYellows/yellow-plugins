@@ -43,14 +43,16 @@ adapter verifies, and they fail closed until it does:
   retries and recovery"). A second `delegate`, `reply`, `approve`, `collect` or
   `abandon` while a run is live fails with `AGY_BUSY`.
 - **agy never pushes.** `git push`, `gh` and any network-reaching command stay
-  off every allowlist. Every agy child gets `GIT_CONFIG_COUNT=1`,
-  `GIT_CONFIG_KEY_0=core.hooksPath` and `GIT_CONFIG_VALUE_0=<null device>`
-  (`/dev/null` on POSIX hosts and inside WSL, `NUL` for native `agy.exe`), so
-  the `git commit` agy runs fires no repo or global hooks. On the WSL bridge
-  they are set inside the distro as `env` arguments, not through `WSLENV`. Every
-  spawn drops all other `GIT_*` variables (config overrides and repository
-  routing such as `GIT_DIR`), and the bridge unsets them inside the distro too.
-  `collect` stages patches, and the owner's stack provider opens the PR.
+  off every allowlist. Every agy child gets `GIT_CONFIG_COUNT=2`,
+  `core.hooksPath=<null device>` (`/dev/null` on POSIX hosts and inside WSL,
+  `NUL` for native `agy.exe`) and `core.fsmonitor=false` through
+  `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n`, so the `git status` and `git commit`
+  agy runs fire no repo or global hooks and no fsmonitor command. On the WSL
+  bridge they are set inside the distro as `env` arguments, not through
+  `WSLENV`. Every spawn drops all other `GIT_*` variables (config overrides and
+  repository routing such as `GIT_DIR`), and the bridge unsets them inside the
+  distro too. `collect` stages patches, and the owner's stack provider opens the
+  PR.
 - **No MCP servers in delegated runs.** agy starts every configured MCP server
   on every run, and the command allowlist doesn't govern their tools. A
   delegated run must start with none. agy 1.4.12 has no per-run way to turn them
@@ -69,11 +71,11 @@ in WSL. The hard rules apply on every host. `--sandbox` is unverified on native
 Windows, so test and lint commands stay off there. `setup` resolves one
 invocation and records it in the data dir:
 
-| Host                       | Invocation                                                                                                                              | Worktree root                                                            |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                         | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
-| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u … GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
-| Windows native agy         | `agy.exe`                                                                                                                               | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
+| Host                       | Invocation                                                                                                                                                                                       | Worktree root                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                                                                                  | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
+| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u … GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null GIT_CONFIG_KEY_1=core.fsmonitor GIT_CONFIG_VALUE_1=false agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
+| Windows native agy         | `agy.exe`                                                                                                                                                                                        | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
 
 The worktree is created where agy runs. On the WSL bridge that means a WSL clone
 of the repo, never `/mnt/c`. The bridge always uses `wsl.exe --exec` (`-e`),
