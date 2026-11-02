@@ -457,9 +457,10 @@ describe('Lifecycle', () => {
       'utf8'
     );
     expect(text).not.toContain(secret);
-    expect(readJournal(h.deps.dataDir).tasks['t1']?.plan?.steps[0]).toContain(
-      'REDACTED'
-    );
+    const plan = readJournal(h.deps.dataDir).tasks['t1']?.plan as
+      | { steps: string[] }
+      | undefined;
+    expect(plan?.steps[0]).toContain('REDACTED');
   });
 
   it('collect refuses while any run is live', async () => {
