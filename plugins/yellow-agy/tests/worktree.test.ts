@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { AgyError } from '../src/errors';
-import { createHostExec } from '../src/host-exec';
+import { createHostExec, hostCommand } from '../src/host-exec';
 import {
   collectWorktree,
   createWorktree,
@@ -133,8 +133,7 @@ describe('worktree', () => {
 });
 
 describe('hostCommand', () => {
-  it('bridge commands are exec-only and unset distro git config', async () => {
-    const { hostCommand } = await import('../src/host-exec');
+  it('bridge commands are exec-only and unset distro git config', () => {
     const spec = hostCommand(
       { kind: 'wsl-bridge' },
       'git',
