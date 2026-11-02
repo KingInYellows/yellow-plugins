@@ -116,7 +116,17 @@ importers:
 
   plugins/gt-workflow: {}
 
-  plugins/yellow-agy: {}
+  plugins/yellow-agy:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.15
+        version: 22.19.15
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+      vitest:
+        specifier: ^1.2.0
+        version: 1.6.1(@types/node@22.19.15)
 
   plugins/yellow-browser-test: {}
 
