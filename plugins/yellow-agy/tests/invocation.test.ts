@@ -11,6 +11,7 @@ import {
   BRIDGE_UNSET_VARS,
   authModeVarsSet,
   buildInvocation,
+  hookConfig,
   scrubEnv,
   windowsCommandLineLength,
   WINDOWS_ARGV_LIMIT,
@@ -64,11 +65,7 @@ describe('buildInvocation', () => {
     expect(inv.env).toEqual({
       PATH: '/usr/bin',
       HOME: '/home/owner',
-      GIT_CONFIG_COUNT: '2',
-      GIT_CONFIG_KEY_0: 'core.hooksPath',
-      GIT_CONFIG_VALUE_0: '/dev/null',
-      GIT_CONFIG_KEY_1: 'core.fsmonitor',
-      GIT_CONFIG_VALUE_1: 'false',
+      ...hookConfig('/dev/null'),
     });
   });
 
@@ -101,11 +98,7 @@ describe('buildInvocation', () => {
       '-e',
       'env',
       ...unsets,
-      'GIT_CONFIG_COUNT=2',
-      'GIT_CONFIG_KEY_0=core.hooksPath',
-      'GIT_CONFIG_VALUE_0=/dev/null',
-      'GIT_CONFIG_KEY_1=core.fsmonitor',
-      'GIT_CONFIG_VALUE_1=false',
+      ...Object.entries(hookConfig('/dev/null')).map(([k, v]) => `${k}=${v}`),
       'agy',
       '-p',
       'do "this"; rm -rf /',
@@ -321,5 +314,35 @@ describe('injected git config', () => {
         filterDrivers: ['x.clean=evil y'],
       })
     ).toThrow(AgyError);
+  });
+
+  it('git commit runs no configured editor or signing program', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agy-commit-'));
+    try {
+      const marker = join(dir, 'ran');
+      const inv = buildInvocation({ kind: 'posix' }, ['-p', 'x'], {
+        cwd: dir,
+        baseEnv: { PATH: process.env['PATH'], HOME: dir },
+      });
+      const git = (args: string[]) =>
+        execFileSync('git', args, {
+          cwd: dir,
+          env: { ...inv.env },
+          stdio: 'pipe',
+        });
+      git(['init', '-q']);
+      writeFileSync(join(dir, 'x.sh'), `#!/bin/sh\ntouch '${marker}'\n`, {
+        mode: 0o755,
+      });
+      git(['config', 'user.email', 'a@b']);
+      git(['config', 'user.name', 'a']);
+      git(['config', 'core.editor', './x.sh']);
+      git(['config', 'gpg.program', './x.sh']);
+      git(['commit', '--allow-empty', '-m', 'm', '--edit']);
+      expect(() => git(['commit', '--allow-empty', '-m', 'm', '-S'])).toThrow();
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -198,11 +198,15 @@ defense in depth.
   chaining with every part granted, and not a chain with an ungranted part. Both
   are probed before the first real delegated run.
 - **Git config every agy child sees** (`GIT_CONFIG_COUNT`/`KEY_n`/`VALUE_n`):
-  `core.hooksPath=<null device>`, `core.fsmonitor=false`, and, for each filter
-  driver the repo's effective config defines (the caller passes the names),
-  `filter.<name>.clean`, `.smudge` and `.process` set to empty and
-  `filter.<name>.required=false`, so no hook, fsmonitor or filter command runs
-  during the allowed `git status`, `git add` and `git commit`.
+  `core.hooksPath=<null device>`, `core.fsmonitor=false`, `core.editor=true`,
+  `sequence.editor=true`, `commit.gpgSign=false`, `gpg.program`,
+  `gpg.ssh.program` and `gpg.x509.program` set to `false`,
+  `diff.ignoreSubmodules=all`, `status.submoduleSummary=false`, and, for each
+  filter driver the repo's effective config defines (the caller passes the
+  names), `filter.<name>.clean`, `.smudge` and `.process` set to empty and
+  `filter.<name>.required=false`. So no hook, fsmonitor, editor, signer,
+  submodule or filter command runs during the allowed `git status`, `git add`
+  and `git commit`, even with `--edit` or `-S`; agy's commits are unsigned.
 
 ## Result classification
 

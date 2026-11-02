@@ -77,10 +77,10 @@ const DISTRO_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const FILTER_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 /**
- * Config every agy child's git sees: no hooks, no fsmonitor command
- * (core.fsmonitor can name a script that `git status` would run), and every
- * named filter driver emptied (its clean/smudge/process commands run on
- * `git status` and `git add`).
+ * Config every agy child's git sees, overriding every key that names a command
+ * the allowed `git status`, `git add` and `git commit` could run: hooks,
+ * fsmonitor, editors, signing programs, submodule recursion, and every named
+ * filter driver (its clean/smudge/process commands run on status and add).
  */
 export function hookConfig(
   nullDevice: string,
@@ -89,6 +89,17 @@ export function hookConfig(
   const pairs: [string, string][] = [
     ['core.hooksPath', nullDevice],
     ['core.fsmonitor', 'false'],
+    // `git commit --edit` runs the editor; `true` exits 0 without editing.
+    ['core.editor', 'true'],
+    ['sequence.editor', 'true'],
+    // `git commit -S` runs the signer; agy's commits stay unsigned.
+    ['commit.gpgSign', 'false'],
+    ['gpg.program', 'false'],
+    ['gpg.ssh.program', 'false'],
+    ['gpg.x509.program', 'false'],
+    // Submodules have their own config (filters, fsmonitor) we can't see.
+    ['diff.ignoreSubmodules', 'all'],
+    ['status.submoduleSummary', 'false'],
   ];
   for (const name of new Set(filterDrivers)) {
     if (!FILTER_NAME_RE.test(name)) {
