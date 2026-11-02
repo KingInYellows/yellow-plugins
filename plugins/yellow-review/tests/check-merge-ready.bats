@@ -387,6 +387,18 @@ state_body() {
   [ "$(jq -c .approval.missing <<<"$output")" = '[]' ]
 }
 
+@test "CLAUDE-234: a later request for changes withdraws an approver's approval" {
+  config 'review_approval_gate: enforce' 'review_approval_humans: [alice]'
+  REVIEWS="[$(rv APPROVED alice User "$HEAD_SHA"),$(rv CHANGES_REQUESTED alice User "$HEAD_SHA")]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+  REVIEWS="[$(rv CHANGES_REQUESTED alice User "$HEAD_SHA"),$(rv COMMENTED alice User "$HEAD_SHA"),$(rv APPROVED alice User "$HEAD_SHA")]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.humanApproval.login <<<"$output")" = alice ]
+}
+
 @test "CLAUDE-234: the owner adding graphite-queue after the head arrived approves" {
   config 'review_approval_gate: enforce'
   LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
