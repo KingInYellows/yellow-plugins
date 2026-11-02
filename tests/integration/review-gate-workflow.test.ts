@@ -821,7 +821,7 @@ describe('review-gate dismissal scope (CLAUDE-243)', () => {
     expect(r.result.findings).toEqual([]);
   });
 
-  it('needs the finding to name the scope before the rule alone drops it', async () => {
+  it('needs the finding to name the scope before the rule alone drops it; a title match still does', async () => {
     const r = await run(
       baseArgs({
         dismissed: [

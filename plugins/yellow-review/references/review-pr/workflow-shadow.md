@@ -85,8 +85,9 @@ For each entry:
   with no line), pass `line: null`; the workflow skips that entry.
 - `rule` is the `<rule>` text as is, for example `correctness/null-handling`.
 - `scope` is the `<scope>` text as is: the enclosing function or heading the
-  ledger verified, or `unscoped`. The workflow drops a repeat only within that
-  scope, so a dismissal does not hide the same rule in the next function down.
+  ledger verified, or `unscoped`. A scoped dismissal drops a repeat only within
+  that scope, so it does not hide the same rule in the next function down. An
+  `unscoped` dismissal matches in any scope, as before.
 - Unescape `file`, `rule` and `scope`: `&lt;` to `<`, `&gt;` to `>`, then
   `&amp;` to `&`.
 - Leave out `<reason>`: it is free text from the ledger, and the workflow
