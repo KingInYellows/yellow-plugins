@@ -83,7 +83,8 @@ approval_body() {
       pullRequest:{headRefOid:$h, changedFiles:$n, reviews:{nodes:$r},
         headRefName:"feature",
         commits:{nodes:[{commit:{oid:$h, committedDate:$ca, checkSuites:{nodes:[{createdAt:$sa, branch:{name:"feature"}}]}}}]},
-        timelineItems:{nodes:$l}}}}}'
+        labels:{nodes:[{name:"graphite-queue"}]},
+        timelineItems:{pageInfo:{hasPreviousPage:false}, nodes:$l}}}}}'
 }
 
 # lb <login> <User|Bot> <createdAt> [label]: one LabeledEvent node.
@@ -465,6 +466,24 @@ state_body() {
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 1 ]
   [ "$(jq -c .blockers <<<"$output")" = '["approval_stale"]' ]
+}
+
+@test "CLAUDE-234: removing the label revokes its approval" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  MOCK_GH_MRA_BODY=$(jq -c '.data.repository.pullRequest.labels.nodes = []' <<<"$MOCK_GH_MRA_BODY")
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_required"]' ]
+}
+
+@test "CLAUDE-234: a timeline longer than the events read leaves a label's head time unknown" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  MOCK_GH_MRA_BODY=$(jq -c '.data.repository.pullRequest.timelineItems.pageInfo.hasPreviousPage = true' <<<"$MOCK_GH_MRA_BODY")
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["head_time_unknown"]' ]
 }
 
 @test "CLAUDE-234: a head that moves before the check ends leaves the approval unknown" {

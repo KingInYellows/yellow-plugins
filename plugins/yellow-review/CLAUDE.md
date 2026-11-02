@@ -135,10 +135,12 @@ the resolve scripts: `references/resolve/dispositions.md`.
   ready, 1 blocked, 3 unknown. Its `approval` section (CLAUDE-234) runs
   `classify-risk --policy-file --stdin --numstat` on the files API list and line
   counts with the policy fetched at the default branch tip, and checks one
-  listed human's approval on the head SHA (medium, high) plus a cross-lineage
-  bot review on the head (high); `review_approval_gate` (`off`, `advisory`
-  default, `enforce`) in an untracked `yellow-plugins.local.md` decides whether
-  gaps block
+  listed human's approval on the head SHA, or a `graphite-queue` label they
+  added after the head arrived and that is still on the PR (medium, high), plus
+  a cross-lineage bot review on the head (high, whose fresh-review check stays
+  unknown until the ledger records each run's reviewed head);
+  `review_approval_gate` (`off`, `advisory` default, `enforce`) in an untracked
+  `yellow-plugins.local.md` decides whether gaps block
 - `classify-risk` — the review risk tier (`low`, `medium`, `high`) of a change
   from its changed paths and `.github/review-risk.json` read at a trusted ref
   (`--policy-ref`, the default branch for stacked PRs) or local file; local git

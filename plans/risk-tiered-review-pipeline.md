@@ -271,13 +271,14 @@ Rules from the infographic kept literally:
 - **An approval covers one commit.** Compare the approving review's `commit_id`
   with the head SHA, or the label event's time with the time the head arrived
   (the latest of its committer date, its first check suite on the PR's head
-  branch, and any force push to it); any later push invalidates it. GitHub will
-  not let the owner approve their own PR, so on 2026-11-02 the user chose the
-  label as their approval. Claude acts through the same account, so it must
-  never add the label to a medium or high PR. A repo ruleset with "dismiss stale
-  approvals" enforces the same for reviews on GitHub's side; nothing on GitHub
-  invalidates a stale label, so `check-merge-ready` is the only check of label
-  freshness.
+  branch, and any force push to it, read from the last 100 timeline events: a
+  longer timeline leaves the time unknown); any later push invalidates it, and
+  removing the label revokes it. GitHub will not let the owner approve their own
+  PR, so on 2026-11-02 the user chose the label as their approval. Claude acts
+  through the same account, so it must never add the label to a medium or high
+  PR. A repo ruleset with "dismiss stale approvals" enforces the same for
+  reviews on GitHub's side; nothing on GitHub invalidates a stale label, so
+  `check-merge-ready` is the only check of label freshness.
 - **The change sets the tier.** The tier is recomputed on every push and posted
   in the sticky comment `sync-blocking-comment` already maintains.
 

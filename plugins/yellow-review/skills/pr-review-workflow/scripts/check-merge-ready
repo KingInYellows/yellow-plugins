@@ -86,10 +86,11 @@
 # temp directory the report keeps its shape with every field null.
 # Time bound: get-pr-comments (270 s deadline) and get-pr-blockers (up to
 # 360 s) run in the background while the foreground makes the state query
-# and, unless approval is off, three approval calls (reviews, the paginated
-# file list, the policy), each under one rg_gh timeout (30 s by default, 60 s
-# at most): 240 s at most. The worst case stays about 370 s, inside the
-# 420000 ms Bash tool timeout merge-ready.md gives the call.
+# and, unless approval is off, four approval calls (reviews, the paginated
+# file list, the policy, the final head re-read), each under one rg_gh
+# timeout (30 s by default, 60 s at most): 300 s at most. The worst case
+# stays about 370 s, inside the 420000 ms Bash tool timeout merge-ready.md
+# gives the call.
 
 set -eu
 
@@ -304,7 +305,9 @@ query MergeReadyApproval($owner: String!, $name: String!, $number: Int!) {
       commits(last: 1) {
         nodes { commit { oid committedDate checkSuites(first: 100) { nodes { createdAt branch { name } } } } }
       }
+      labels(first: 100) { nodes { name } }
       timelineItems(last: 100, itemTypes: [LABELED_EVENT, HEAD_REF_FORCE_PUSHED_EVENT]) {
+        pageInfo { hasPreviousPage }
         nodes {
           ... on LabeledEvent { createdAt label { name } actor { __typename login } }
           ... on HeadRefForcePushedEvent { createdAt afterCommit { oid } }
@@ -356,8 +359,11 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
             # another branch do not count, since a commit checked elsewhere
             # first can be pushed here later. With no suite on the head
             # branch there is no push-time evidence, so the time is unknown
-            # and the label cannot approve.
-            jq -c --arg h "$A_HEAD" '
+            # and the label cannot approve. The label must still be on the PR
+            # (removing it revokes the approval), and a timeline longer than
+            # the 100 events read may hide a force push, so it leaves the
+            # time unknown too.
+            jq -c --arg h "$A_HEAD" --arg label "$APPROVAL_LABEL" '
               .data.repository.pullRequest as $p
               | ([($p.commits.nodes // [])[] | .commit | select(.oid == $h)] | first) as $c
               | ([($c.checkSuites.nodes // [])[]?
@@ -365,7 +371,11 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
                   | .createdAt | strings] | sort | first) as $suite
               | ([($p.timelineItems.nodes // [])[]? | select(type == "object" and .afterCommit.oid == $h)
                   | .createdAt | strings]) as $forced
-              | {headTime: (if $c == null or ($c.committedDate | type) != "string" or $suite == null then null
+              | (if ($p.labels.nodes | type) == "array"
+                 then any($p.labels.nodes[]; type == "object" and .name == $label) else null end) as $present
+              | {present: $present,
+                 headTime: (if $c == null or ($c.committedDate | type) != "string" or $suite == null
+                               or $present == null or $p.timelineItems.pageInfo.hasPreviousPage != false then null
                             else [$c.committedDate, $suite] + $forced | max end),
                  events: (if ($p.timelineItems.nodes | type) == "array"
                           then [$p.timelineItems.nodes[] | select(type == "object" and (.createdAt | type) == "string" and .label != null)]
@@ -436,7 +446,7 @@ jq -n -c \
           and ((.author.login // "") | ascii_downcase | IN($humans[])))] as $appr
     | ([$appr[] | select(.commit.oid == $head)] | last) as $onhead
     | $lab[0].headTime as $ht
-    | [($lab[0].events // [])[] | select(.label.name == $label and .actor.__typename == "User"
+    | [($lab[0].events // [])[] | select($lab[0].present != false and .label.name == $label and .actor.__typename == "User"
           and ((.actor.login // "") | test("\\[bot\\]\\z") | not)
           and ((.actor.login // "") | ascii_downcase | IN($humans[])))] as $lbl
     | (if $ht == null then null else ([$lbl[] | select(.createdAt >= $ht)] | last) end) as $lblhead
