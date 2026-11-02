@@ -142,6 +142,9 @@ function isStringArray(value) {
 }
 
 const ABSOLUTE = /^(\/|[A-Za-z]:[\\/])/;
+// Paths are interpolated into agent prompts, so keep them to plain path
+// characters: no newlines, backticks or fence text.
+const SAFE_PATH = /^[A-Za-z0-9._/@+:\\ -]+$/;
 
 function validateArgs(raw) {
   let a = raw;
@@ -167,15 +170,23 @@ function validateArgs(raw) {
     }
   }
   if (!TIERS.includes(a.tier)) fail('tier must be low, medium or high');
-  if (typeof a.diff_path !== 'string' || !ABSOLUTE.test(a.diff_path)) {
-    fail('diff_path must be an absolute path');
+  if (
+    typeof a.diff_path !== 'string' ||
+    !ABSOLUTE.test(a.diff_path) ||
+    !SAFE_PATH.test(a.diff_path)
+  ) {
+    fail('diff_path must be an absolute path of plain path characters');
   }
   if (
     a.repo_root !== undefined &&
     a.repo_root !== null &&
-    (typeof a.repo_root !== 'string' || !ABSOLUTE.test(a.repo_root))
+    (typeof a.repo_root !== 'string' ||
+      !ABSOLUTE.test(a.repo_root) ||
+      !SAFE_PATH.test(a.repo_root))
   ) {
-    fail('repo_root, when given, must be an absolute path');
+    fail(
+      'repo_root, when given, must be an absolute path of plain path characters'
+    );
   }
   if (!isStringArray(a.changed_files)) {
     fail('changed_files must be an array of paths');
@@ -267,8 +278,13 @@ function fence(label, text) {
   return `--- begin ${label} (reference only) ---\n${safe}\n--- end ${label} ---`;
 }
 
+// Only listed personas run, so a hunter is always a read-only review agent.
+// A qualified name must be exactly the agent type its bare name maps to.
 function agentTypeFor(name) {
-  if (name.includes(':')) return name;
+  if (name.includes(':')) {
+    const bare = name.slice(name.lastIndexOf(':') + 1);
+    return !bare.includes(':') && agentTypeFor(bare) === name ? name : null;
+  }
   if (YELLOW_REVIEW_PERSONAS.includes(name)) {
     return `yellow-review:review:${name}`;
   }
@@ -343,7 +359,6 @@ function voterPlan(finding, tier) {
   if (tier === 'low') return ['general'];
   const s = finding.severity;
   if (s === 'P0' || s === 'P1') return THREE_LENSES;
-  if (tier === 'high' && s === 'P2') return THREE_LENSES;
   return ['general'];
 }
 

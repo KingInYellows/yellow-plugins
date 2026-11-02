@@ -652,16 +652,17 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   - **Hunt:** one agent per `include` name not in `exclude`, compared by bare
     persona name (the part after the last `:`), launched by `agentType`
     (`yellow-review:review:<name>`, `yellow-core:review:<name>`,
-    `yellow-codex:review:codex-reviewer`; a name with `:` is used as is) with
-    the compact-return schema as JSON Schema. An unknown bare name is not run:
-    it goes to `coverage.failed`, because a default subagent would have edit and
-    shell tools over PR content. Hunters are told to report every issue with its
-    confidence and repo-relative paths; the persona bodies' own confidence
-    floors still apply until the eval-gated follow-up removes them. The low tier
-    runs only `correctness-reviewer` and `project-compliance-reviewer`; the rest
-    go to `coverage.skipped` with a log line. A `null` or failed hunter goes to
-    `coverage.failed`; `coverage.empty` is true when no hunter returned a
-    result, and callers treat that as incomplete.
+    `yellow-codex:review:codex-reviewer`; a name with `:` runs only when it is
+    exactly that mapped type) with the compact-return schema as JSON Schema. An
+    unknown or unmapped name is not run: it goes to `coverage.failed`, because a
+    default subagent would have edit and shell tools over PR content. Hunters
+    are told to report every issue with its confidence and repo-relative paths;
+    the persona bodies' own confidence floors still apply until the eval-gated
+    follow-up removes them. The low tier runs only `correctness-reviewer` and
+    `project-compliance-reviewer`; the rest go to `coverage.skipped` with a log
+    line. A `null` or failed hunter goes to `coverage.failed`; `coverage.empty`
+    is true when no hunter returned a result, and callers treat that as
+    incomplete.
   - **Paths:** a finding's path loses `./` and `repo_root`; any other absolute
     path ending in `/<changed file>` becomes that changed file.
   - **Dismissed:** each raw finding is matched on its own against `dismissed`
@@ -678,14 +679,14 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   - **Vote:** `pipeline()` over findings, each voter the read-only
     `yellow-review:workflow:review-gate-verifier` agent. Three voters with the
     lenses reproduces / handled-elsewhere / reachable-from-entry-point for P0/P1
-    on medium and high, and for P2 on high; one voter otherwise, and for every
-    pre-existing finding. P0/P1 voters keep the agent's `opus` at `medium`
-    effort; P2/P3 voters run `sonnet` at `low`. A verdict without a file:line
-    citation counts as unverifiable. Kept on a confirmed majority of the
-    verdicts returned; with no majority and no refutation (all unverifiable, or
-    no verdict came back) it is kept with `unverified: true`; otherwise dropped
-    as refuted. The verifier prompt carries `/review:pr` Step 6's quality gates
-    (line accuracy, protected-artifact filter, skim-FP).
+    on medium and high; one voter otherwise, and for every pre-existing finding.
+    P0/P1 voters keep the agent's `opus` at `medium` effort; P2/P3 voters run
+    `sonnet` at `low`. A verdict without a file:line citation counts as
+    unverifiable. Kept on a confirmed majority of the verdicts returned; with no
+    majority and no refutation (all unverifiable, or no verdict came back) it is
+    kept with `unverified: true`; otherwise dropped as refuted. The verifier
+    prompt carries `/review:pr` Step 6's quality gates (line accuracy,
+    protected-artifact filter, skim-FP).
   - **Rank:** plain code. P0/P1 → Important, P2/P3 → Nit, `pre_existing` or a
     file outside `changed_files` → Pre-existing. At most five Nits are shown;
     the overflow goes to `dropped` with reason `nit cap (5)`. Every drop is

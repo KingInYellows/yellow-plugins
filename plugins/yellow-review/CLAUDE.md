@@ -125,15 +125,16 @@ user-invocable.
 ### Workflows (1)
 
 `workflows/review-gate.js` runs as `/yellow-review:review-gate` (Claude Code
-loads `workflows/` without a manifest field). It is the Hunt → Vote → Rank core
-of the risk-tiered pipeline: one persona agent per `args.include` name, a
-plain-code dedup barrier, 1 or 3 votes per finding by severity and tier from the
-read-only `review-gate-verifier` agent, then Important / Nit / Pre-existing
-display with the REVIEW.md Nit cap. Its `args` and return shape are a fixed
-contract the eval runner builds against; a hunter that returns `null`, or an
-unknown persona name, lands in `coverage.failed`, and `coverage.empty` marks a
-run in which no hunter returned; neither counts as clean. Today only
-`/review:pr` under `review_pipeline: workflow` calls it, in shadow mode
+2.1.316 loads `workflows/` without a manifest field; not yet checked on CI's
+pinned 2.1.293, which gates Phase 3). It is the Hunt → Vote → Rank core of the
+risk-tiered pipeline: one persona agent per `args.include` name, a plain-code
+dedup barrier, 1 or 3 votes per finding by severity and tier from the read-only
+`review-gate-verifier` agent, then Important / Nit / Pre-existing display with
+the REVIEW.md Nit cap. Its `args` and return shape are a fixed contract the eval
+runner builds against; a hunter that returns `null`, or an unknown persona name,
+lands in `coverage.failed`, and `coverage.empty` marks a run in which no hunter
+returned; neither counts as clean. Today only `/review:pr` under
+`review_pipeline: workflow` calls it, in shadow mode
 (`references/review-pr/workflow-shadow.md`): agents read a detached checkout of
 the head commit under the git common dir (removed on every exit path), Coverage
 gets a comparison line, and its findings are never applied or written to the

@@ -16,18 +16,16 @@ it once per review.
 
 The workflow's agents read a separate detached checkout of the head commit, not
 the working tree: Steps 7 to 9 edit and commit in the working tree while the run
-is still going. The checkout and the diff live under the git common dir, keyed
-by PR number. The block first removes anything a stopped earlier run left
-behind. `>|` overwrites even under zsh `noclobber`. Use the `DIFF_BASE` value
-from Step 3a:
+is still going. The checkout and the diff live under the git common dir in a
+directory unique to this run, so a second review of the same PR cannot remove
+it. `>|` overwrites even under zsh `noclobber`. Use the `DIFF_BASE` value from
+Step 3a:
 
 ```bash
 gate_dir="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/review-gate"
-gate_root="$gate_dir/pr-<PR#>"
 mkdir -p "$gate_dir" || exit 1
-git worktree remove --force "$gate_root" 2>/dev/null
-rm -rf "$gate_root"
 git worktree prune
+gate_root=$(mktemp -d "$gate_dir/pr-<PR#>.XXXXXX") || exit 1
 head_sha=$(git rev-parse HEAD) || exit 1
 git worktree add --quiet --detach "$gate_root" "$head_sha" || exit 1
 git diff "<DIFF_BASE>"...HEAD >| "$gate_root.diff" || exit 1
@@ -108,11 +106,12 @@ clean one.
 
 Run this once the workflow result is in, and on every other way the review ends
 after the Inputs block ran: the checkout fails, the launch is refused, the run
-fails, or the review stops early. Stop a run that is still going first, because
-its agents read the checkout.
+fails, or the review stops early. Stop a run that is still going first with
+`TaskStop` on the task id the `Workflow` call returned, because its agents read
+the checkout. Use the `repo_root` printed by the Inputs block:
 
 ```bash
-gate_root="$(git rev-parse --path-format=absolute --git-common-dir)/yellow-review/review-gate/pr-<PR#>"
+gate_root="<repo_root>"
 git worktree remove --force "$gate_root" 2>/dev/null
 rm -rf "$gate_root"
 rm -f "$gate_root.diff"

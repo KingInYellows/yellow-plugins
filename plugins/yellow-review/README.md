@@ -195,9 +195,10 @@ manifest change or plugin-authoring path still does.
 `review_pipeline: workflow`, and only in shadow mode: the normal persona review
 runs unchanged, and the Coverage section adds one line comparing the two
 reviews' findings. The workflow's findings are not applied or recorded. Each run
-spends usage on its own agents (3 to 6 on a low-tier change, more on medium and
-high). A `claude -p` run needs a `Workflow(yellow-review:review-gate)` allow
-rule to launch it.
+spends usage on its own agents: one per hunter (two on a low-tier change, more
+on medium and high) plus one verifier per finding, three for a P0/P1 above low.
+A `claude -p` run needs a `Workflow(yellow-review:review-gate)` allow rule to
+launch it.
 
 ## Scripts
 
