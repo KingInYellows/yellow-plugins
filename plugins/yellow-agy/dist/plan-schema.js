@@ -25,9 +25,17 @@ exports.PLAN_SCHEMA = {
         },
     },
 };
-/** Length in code points, as JSON Schema's maxLength counts. */
+/** Longest maxLength in the schema; counting stops just past it. */
+const MAX_COUNTED = 2000;
+/** Length in code points, as JSON Schema's maxLength counts, capped. */
 function len(s) {
-    return [...s].length;
+    let count = 0;
+    for (const _ of s) {
+        void _;
+        if (++count > MAX_COUNTED)
+            break;
+    }
+    return count;
 }
 function isStringArray(v, min, max) {
     return (Array.isArray(v) &&

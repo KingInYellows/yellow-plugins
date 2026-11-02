@@ -154,6 +154,7 @@ describe('buildInvocation', () => {
       '/home/./o',
       '/home//o',
       '/mnt',
+      '/',
     ]) {
       expect(
         codeOf(() =>

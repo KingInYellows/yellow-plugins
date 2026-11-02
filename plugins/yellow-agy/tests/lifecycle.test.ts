@@ -336,6 +336,28 @@ describe('Lifecycle', () => {
     });
   });
 
+  it('a dead claim whose agy child started still counts against the quota', async () => {
+    const h = harness([planTurn], { isAlive: () => false });
+    const dir = h.deps.dataDir;
+    fs.mkdirSync(dir, { recursive: true });
+    writeJournal(dir, {
+      version: 1,
+      tasks: {},
+      requests: {},
+      usage: [],
+      activeRun: {
+        requestId: 'x',
+        op: 'reply',
+        localId: 'other',
+        ownerPid: 1111,
+        childPid: 2222,
+        startedAt: new Date().toISOString(),
+      },
+    });
+    await h.lc.delegate(delegateInput(h.repo));
+    expect(readJournal(dir).usage.map((u) => u.requestId)).toContain('x');
+  });
+
   it('a crash between creating the worktree and recording its base leaks no branch', async () => {
     const h = harness([planTurn], { isAlive: () => false });
     const dir = h.deps.dataDir;
@@ -527,7 +549,7 @@ describe('Lifecycle', () => {
     const h = harness([]);
     await expect(
       h.lc.delegate({ ...delegateInput(h.repo), prompt: '--settings=x' })
-    ).rejects.toBeInstanceOf(AgyError);
+    ).rejects.toMatchObject({ code: 'AGY_INVALID_INPUT' });
     expect(git(h.repo, 'branch', '--list', 'agy/t1')).toBe('');
     expect(fs.existsSync(path.join(h.deps.worktreeRoot, 't1'))).toBe(false);
     const j = readJournal(h.deps.dataDir);

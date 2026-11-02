@@ -90,9 +90,10 @@ characters fails with `AGY_PROMPT_TOO_LONG` before anything spawns.
 Killing `wsl.exe` does not stop the Linux processes behind it, so on the bridge
 `setsid` makes agy lead its own Linux process group, a fixed `sh -c` script
 (arguments stay positional) prints `yellow-agy-pgid:<pgid>` as the first stderr
-line, and a deadline or cancel runs `wsl.exe -e kill -s TERM|KILL -- -<pgid>`.
-The marker line is stripped before classification. On POSIX hosts agy and every
-host git call run in their own process group, and a timeout signals the group.
+line, and a deadline or cancel runs
+`wsl.exe [-d <distro>] -e kill -s TERM|KILL -- -<pgid>`. The marker line is
+stripped before classification. On POSIX hosts agy and every host git call run
+in their own process group, and a timeout signals the group.
 
 ## Run lifecycle
 
@@ -173,8 +174,10 @@ local processes.
   stays and the call fails with `AGY_WORKTREE` naming the command to run. A
   stale `collect` claim is dropped. A stale `abandon` claim settles the task as
   `ABANDONED` when its worktree is gone, and otherwise is dropped so `abandon`
-  can be retried. Other turn reservations are settled as `INTERRUPTED`. The
-  settlement is written before the new call's own checks run.
+  can be retried. Other turn reservations settle with an `AGY_INTERRUPTED`
+  outcome: an unapproved `PLAN_PENDING` task stays `PLAN_PENDING`, any other
+  task becomes `INTERRUPTED`, and a claim with a recorded child pid adds a usage
+  entry. The settlement is written before the new call's own checks run.
 - The agy child's pid is written to the claim before the turn can settle; if
   that write fails, the turn is stopped and the call fails with the write's
   error. Journal writes fsync the temp file and then the directory around the

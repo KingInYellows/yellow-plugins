@@ -152,6 +152,16 @@ class Lifecycle {
         let next = (0, state_1.withoutClaim)(j);
         const task = (0, state_1.own)(j.tasks, claim.localId);
         const at = (0, state_1.nowIso)();
+        // A recorded child pid means agy started, so the turn counts.
+        if (claim.childPid !== undefined) {
+            next = {
+                ...next,
+                usage: [
+                    ...next.usage,
+                    { at, localId: claim.localId, requestId: claim.requestId },
+                ],
+            };
+        }
         if (claim.op === 'collect') {
             // collect changes nothing but artifacts; a retry rewrites them.
             return (0, state_1.dropRequest)(next, claim.requestId);

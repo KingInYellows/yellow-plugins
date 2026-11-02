@@ -29,9 +29,17 @@ export interface Plan {
   readonly risks: readonly string[];
 }
 
-/** Length in code points, as JSON Schema's maxLength counts. */
+/** Longest maxLength in the schema; counting stops just past it. */
+const MAX_COUNTED = 2000;
+
+/** Length in code points, as JSON Schema's maxLength counts, capped. */
 function len(s: string): number {
-  return [...s].length;
+  let count = 0;
+  for (const _ of s) {
+    void _;
+    if (++count > MAX_COUNTED) break;
+  }
+  return count;
 }
 
 function isStringArray(v: unknown, min: number, max: number): v is string[] {

@@ -63,6 +63,7 @@ function runTurn(inv, options) {
         let graceTimer;
         let drainTimer;
         let closed = false;
+        let spawnFailed = false;
         let spawnError;
         let spawnDone = Promise.resolve();
         const bridge = inv.linuxGroup;
@@ -173,6 +174,7 @@ function runTurn(inv, options) {
             spawnDone = Promise.resolve()
                 .then(() => options.onSpawn?.(child.pid))
                 .catch((e) => {
+                spawnFailed = true;
                 spawnError = e;
                 cancelled = true;
                 stop();
@@ -205,7 +207,7 @@ function runTurn(inv, options) {
             void spawnDone.then(() => finish(code, signal));
         });
         const finish = (code, signal) => {
-            if (spawnError !== undefined) {
+            if (spawnFailed) {
                 reject(spawnError);
                 return;
             }

@@ -161,8 +161,18 @@ const TAKEOVER_STALE_MS = 5_000;
  */
 function removeStaleLock(lockPath, staleMs) {
     const seen = readText(lockPath);
-    if (seen === undefined)
-        return true; // vanished: retry the create
+    if (seen === undefined) {
+        // Gone: retry the create. Present but unreadable: wait for the timeout.
+        try {
+            fs.lstatSync(lockPath);
+            return false;
+        }
+        catch (err) {
+            if (err.code === 'ENOENT')
+                return true;
+            throw err;
+        }
+    }
     if (!lockIsStale(lockPath, seen, staleMs))
         return false;
     const takeover = `${lockPath}.takeover`;

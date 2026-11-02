@@ -208,6 +208,16 @@ export class Lifecycle {
     let next = withoutClaim(j);
     const task = own(j.tasks, claim.localId);
     const at = nowIso();
+    // A recorded child pid means agy started, so the turn counts.
+    if (claim.childPid !== undefined) {
+      next = {
+        ...next,
+        usage: [
+          ...next.usage,
+          { at, localId: claim.localId, requestId: claim.requestId },
+        ],
+      };
+    }
     if (claim.op === 'collect') {
       // collect changes nothing but artifacts; a retry rewrites them.
       return dropRequest(next, claim.requestId);

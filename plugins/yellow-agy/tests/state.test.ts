@@ -20,11 +20,11 @@ describe('state', () => {
     expect(dataDir({ YELLOW_AGY_DATA_DIR: '/x/y' })).toBe(path.resolve('/x/y'));
     if (process.platform !== 'win32') {
       expect(dataDir({ XDG_STATE_HOME: '/s' })).toBe('/s/yellow-agy');
-      // Empty values count as unset.
-      expect(dataDir({ YELLOW_AGY_DATA_DIR: '', XDG_STATE_HOME: '' })).toBe(
-        dataDir({})
-      );
     }
+    // Empty values count as unset.
+    expect(dataDir({ YELLOW_AGY_DATA_DIR: '', XDG_STATE_HOME: '' })).toBe(
+      dataDir({})
+    );
   });
 
   it('starts empty and round-trips atomically with owner-only modes', async () => {
@@ -98,6 +98,14 @@ describe('state', () => {
     await expect(withLock(dir, () => 'ok', { timeoutMs: 500 })).resolves.toBe(
       'ok'
     );
+  });
+
+  it('times out on a lock path it cannot read instead of spinning', async () => {
+    const dir = tmpDir('agy-state-');
+    fs.mkdirSync(path.join(dir, 'journal.lock'), { recursive: true });
+    await expect(
+      withLock(dir, () => 'ok', { timeoutMs: 200 })
+    ).rejects.toMatchObject({ code: 'AGY_BUSY' });
   });
 
   it('times out with AGY_BUSY while a live pid holds the lock', async () => {

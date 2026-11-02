@@ -261,6 +261,9 @@ function buildInvocation(host, agyArgs, options) {
     }
     const wslCwd = options.cwd;
     assertWslPath(wslCwd, 'the bridge worktree');
+    if (wslCwd === '/') {
+        throw new errors_1.AgyError('AGY_BRIDGE', 'the bridge worktree cannot be /');
+    }
     const args = [];
     if (host.distro !== undefined) {
         if (!DISTRO_RE.test(host.distro)) {

@@ -130,7 +130,8 @@ describe('bridge Linux process group', () => {
     expect(miss?.rest.toString()).toBe('setsid: not found\n');
   });
 
-  it.skipIf(process.platform === 'win32')(
+  // setsid(1) is util-linux; macOS has no such command.
+  it.skipIf(process.platform !== 'linux')(
     'a deadline signals the group the wrapper reports, not only the spawned process',
     async () => {
       const kills: string[][] = [];

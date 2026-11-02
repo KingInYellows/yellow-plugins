@@ -93,6 +93,7 @@ export function runTurn(
     let graceTimer: NodeJS.Timeout | undefined;
     let drainTimer: NodeJS.Timeout | undefined;
     let closed = false;
+    let spawnFailed = false;
     let spawnError: unknown;
     let spawnDone: Promise<void> = Promise.resolve();
     const bridge = inv.linuxGroup;
@@ -196,6 +197,7 @@ export function runTurn(
       spawnDone = Promise.resolve()
         .then(() => options.onSpawn?.(child.pid as number))
         .catch((e: unknown) => {
+          spawnFailed = true;
           spawnError = e;
           cancelled = true;
           stop();
@@ -229,7 +231,7 @@ export function runTurn(
       code: number | null,
       signal: NodeJS.Signals | null
     ): void => {
-      if (spawnError !== undefined) {
+      if (spawnFailed) {
         reject(spawnError);
         return;
       }
