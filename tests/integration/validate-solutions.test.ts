@@ -760,6 +760,37 @@ describe('validate-solutions — claim grounding (SOL-003)', () => {
     expect(archived.stderr).toMatch(/warning: link/);
   });
 
+  it('treats a commit URL to another repo as external', () => {
+    const r = runClaims(
+      'external-url',
+      [
+        '',
+        'Upstream fix: https://github.com/other/repo/commit/abc1234def.',
+        'Also https://github.com/other/repo/commits/fed4321cba for history.',
+        '',
+      ].join('\n')
+    );
+    expect(r.stdout + r.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(r.status).toBe(0);
+  });
+
+  it('ignores link-shaped code inside spans and fences', () => {
+    const r = runClaims(
+      'code-links',
+      [
+        '',
+        'Dispatch with `handlers[type](event)`.',
+        '',
+        '```js',
+        'const out = map[key](./not-a-link.md);',
+        '```',
+        '',
+      ].join('\n')
+    );
+    expect(r.stdout + r.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(r.status).toBe(0);
+  });
+
   it('warns for a path that existed in history but was deleted', () => {
     rmSync(join(repo, 'plugins', 'foo', 'real.md'));
     commitAll('delete');

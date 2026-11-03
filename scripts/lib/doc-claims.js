@@ -162,6 +162,16 @@ function maskCode(lines) {
 // Classify the text right before a hex word on the same line.
 // Returns 'commit', 'external-pin', or null.
 function commitCue(prefix, thisRepo) {
+  // A hex word inside a URL: checkable only when the URL names this repo.
+  const lastToken = prefix.split(/\s+/).pop() || '';
+  if (lastToken.includes('://')) {
+    const url = lastToken.match(
+      /github\.com\/([\w.-]+)\/([\w.-]+)\/commits?\/$/i
+    );
+    if (!url) return 'external-pin';
+    const named = `${url[1]}/${url[2]}`.toLowerCase();
+    return thisRepo && named === thisRepo ? 'commit' : 'external-pin';
+  }
   const pin = prefix.match(REPO_PIN_RE);
   if (pin) {
     const named = `${pin[1]}/${pin[2]}`.toLowerCase();
@@ -400,7 +410,8 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
 
   // 3. Relative and root-relative markdown links.
   const seenLinks = new Set();
-  for (const m of body.matchAll(MD_LINK_RE)) {
+  // Code spans and fences are masked so `handlers[type](event)` is not a link.
+  for (const m of maskCode(bodyLines).join('\n').matchAll(MD_LINK_RE)) {
     const target = m[1];
     if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('#')) continue;
     const bare = target.split('#')[0];
