@@ -57,8 +57,9 @@ The Workflow tool always runs in the background, and `claude -p` stops a
 background task once the session has been idle for
 `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` (10 minutes by default). The eval's
 `run_env()`, which this driver shares, sets it to `0`, so `--timeout` is the
-only deadline. Without that, any run longer than 10 minutes (a high-tier PR)
-ends as "no workflow result in the reply".
+only deadline. Without that, a workflow whose result has not arrived 10 minutes
+after the parent's turn ends (a high-tier PR) is killed, and the job fails with
+"no workflow result in the reply".
 
 ## Trust boundaries
 
