@@ -1,6 +1,6 @@
 # Run report template
 
-Loaded by `compound-lifecycle` SKILL.md Step 9. Content moved verbatim
+Loaded by `compound-lifecycle` SKILL.md Step 10. Content moved verbatim
 from SKILL.md (C6 progressive-disclosure split). Emit the report exactly
 in this shape — the sections are parsed by downstream readers.
 
@@ -36,5 +36,6 @@ in this shape — the sections are parsed by downstream readers.
 ### Coverage
 - ruvector available: <yes|no — degraded scoring>
 - Run mode: <interactive | autofix>
+- Discoverability: <ok | added: <file> | recommendation: <file> — <line> | none>
 - Total runtime: <sec>
 ```
