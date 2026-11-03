@@ -243,6 +243,16 @@ Generate a conventional commit message following this format:
 The message should be concise (under 72 chars for the subject line). Include a
 body if the changes are complex.
 
+Then decide whether the body needs a `## New concepts` section. Compare the
+terms the diff adds (new state names, ledger or config fields, protocols,
+vocabulary that later code or docs refer to by name) against `docs/CONCEPTS.md`
+when it exists. A term qualifies only when it is new to the repo and
+load-bearing; renames, routine fixes and one-off helper names do not. For each
+qualifying term, add two or three sentences under `## New concepts` saying what
+it is and why it exists. When nothing qualifies, add no section, never an empty
+one. The section explains the term to reviewers; recording it in `CONCEPTS.md`
+stays with `knowledge-compounder`, so do not edit that file here.
+
 Take the Linear ID only from the last path segment of the branch name, which must start with `[A-Z]{2,5}-[0-9]{1,6}` followed by `-` or the end of the name, or from the stack item's `Linear:` field; ignore IDs mentioned anywhere else.
 When an ID qualifies, end the body with `Part of <ISSUE-ID>`, and write `Closes
 <ISSUE-ID>` instead only when the user confirms through `AskUserQuestion` that
