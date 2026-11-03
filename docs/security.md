@@ -68,6 +68,9 @@ receipt marks Phase 1 acceptance partial even when these controls pass.
   (`tracker=github (linear unavailable)`).
 - **yellow-browser-test** — Uses `agent-browser` CLI locally, no MCP
 - **yellow-debt** — Pure local analysis, no network calls
+- **yellow-agy** — Ships no MCP server; runs the official Antigravity CLI
+  (`agy`) locally under the owner's Google AI Pro sign-in (see "Local Delegate"
+  below)
 - **yellow-council** — Ships no MCP server. Three of its four reviewers are
   shelled-out CLIs (`agy`, `opencode`, and Codex reused from yellow-codex); the
   fourth, `claude-reviewer`, runs in-process with no subprocess at all and holds
@@ -885,6 +888,46 @@ yellow-jules is experimental and read-only in this release: `setup`, `list`,
 - **SDK install.** `/jules:setup` installs the pinned `@google/jules-sdk` into
   the data directory only with consent, via `npm ci --ignore-scripts` from a
   shipped lockfile, and re-verifies the install on every load.
+
+### Local Delegate (yellow-agy)
+
+yellow-agy is experimental. It runs the unmodified `agy` binary on the owner's
+own machine to plan and then edit one task in a new git worktree. See
+`docs/yellow-agy/contract-v0.md` and `plugins/yellow-agy/README.md`.
+
+- **Subscription sign-in only.** Every agy child runs with the API-key, Vertex
+  and ADC variables removed (`GEMINI_API_KEY`, `GOOGLE_API_KEY`,
+  `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`,
+  `GOOGLE_APPLICATION_CREDENTIALS` and the agy ADC switch), and each run's
+  pinned settings profile sets `useG1Credits: false`. The plugin never reads,
+  copies or proxies agy's OAuth tokens or credential files; it reads only
+  agy's `settings.json`.
+- **Owner-confirmed authority.** Nothing runs without a grant naming the repo,
+  a branch pattern, the operations, a quota floor, task and correction limits
+  and an expiry (at most 24 hours). Only `authorize` creates a grant, and only
+  after the owner types a code shown on their own terminal (`/dev/tty`, or the
+  Windows console); a Claude session has no terminal and cannot do it.
+  `authorize --list` and `--revoke` only read or narrow. `abandon`, which
+  deletes a worktree, is confirmed the same way.
+- **What agy may do.** The plan turn is read-only. The implement turn is file
+  edits only, inside the task's worktree: no shell or git commands, no push,
+  and no `--dangerously-skip-permissions`. A grant's `--allow-command` list is
+  ignored until the host's agy sandbox is verified, which no host is yet. agy
+  children also run with `core.fsmonitor=false` and every configured git filter
+  driver emptied. yellow-agy itself runs the git commands (worktree, collect)
+  and never pushes.
+- **MCP servers.** agy starts every configured MCP server on every run, outside
+  the command allowlist, so `/agy:setup` refuses (`AGY_MCP`) while any is
+  enabled; the owner disables them.
+- **Quota and concurrency.** One run at a time, serialized by a journal claim.
+  Before each model turn a free `agy -p /usage` probe must show the grant's
+  quota floor is left, or the turn is refused.
+- **Local state.** The journal, grants and artifacts live in an owner-only
+  (`0700`) data directory; worktrees live under an owner-only root, and on the
+  Windows WSL bridge a root that resolves under `/mnt` is refused. `collect`
+  writes patches under `artifacts/<localId>/` and flags secret-shaped content.
+  agy's responses are redacted and shown to Claude inside untrusted-content
+  fences.
 
 ### Engine Process Boundary (yellow-goal)
 
