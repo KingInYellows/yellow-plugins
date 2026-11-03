@@ -48,7 +48,8 @@ tool. It never goes into Bash source.
 
 ### Step 3: Delegate
 
-Replace each `YELLOW_TODO_` token inside its single quotes. The plan turn can
+Replace each `YELLOW_TODO_` token inside its single quotes, writing each `'`
+in a value (a staged path, a repo path) as `'\''`. The plan turn can
 take several minutes; run this with a 600000 ms timeout.
 
 ```bash

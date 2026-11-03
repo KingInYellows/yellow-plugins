@@ -68,4 +68,5 @@ printf -- '--- end untrusted-content %s ---\n' "$TAG"
   The task is no longer `PLAN_PENDING`, so `/agy:approve` won't run again;
   continue with `/agy:reply --task <id> --keep-partial` (build on them) or
   `--reset-partial` (restore the pre-turn state) and a message. Ask which.
-- Any other code: report it with its recovery action.
+- Any other code: report `code` and `attention`, and `error.recoveryAction`
+  when the CLI refused the call.

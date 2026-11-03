@@ -279,7 +279,10 @@ async function authorize(ctx: Ctx, flags: Flags): Promise<unknown> {
         ctx.deps.wslRun
       ),
       branchPattern: str(flags['branch'], '--branch'),
-      operations: str(flags['operations'], '--operations'),
+      operations:
+        flags['operations'] === undefined
+          ? 'create,approve,reply,collect'
+          : str(flags['operations'], '--operations'),
       ...(Array.isArray(commands) ? { allowCommands: commands } : {}),
       ...(minQuota === undefined ? {} : { minQuotaPercent: minQuota }),
       ...(maxTasks === undefined ? {} : { maxTotalTasks: maxTasks }),

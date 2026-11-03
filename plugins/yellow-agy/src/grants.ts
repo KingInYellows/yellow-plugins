@@ -38,7 +38,10 @@ export interface Grant {
   readonly createdAt: string;
   readonly expiresAt: string;
   readonly revokedAt?: string;
-  /** Tasks created under the grant; never decremented. */
+  /**
+   * Tasks charged to the grant. A delegate refused or killed before its
+   * first turn gets its task back; one that ran a turn keeps it spent.
+   */
   readonly totalTasks: number;
 }
 

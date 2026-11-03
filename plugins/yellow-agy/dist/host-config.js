@@ -88,6 +88,8 @@ function detectHost(options = {}) {
         const root = path.join(base, 'yellow-agy', 'worktrees');
         fs.mkdirSync(root, { recursive: true, mode: 0o700 });
         const real = fs.realpathSync(root);
+        // mkdir's mode doesn't tighten a root that already existed.
+        fs.chmodSync(real, 0o700);
         return {
             version: 1,
             host: { kind: 'posix' },
@@ -127,7 +129,7 @@ function detectHost(options = {}) {
         real = run(distro, [
             'sh',
             '-c',
-            'd="$HOME/.local/share/yellow-agy/worktrees" && mkdir -p -m 700 "$d" && realpath -e -- "$d"',
+            'd="$HOME/.local/share/yellow-agy/worktrees" && mkdir -p -m 700 "$d" && chmod 700 "$d" && realpath -e -- "$d"',
         ]);
     }
     catch {

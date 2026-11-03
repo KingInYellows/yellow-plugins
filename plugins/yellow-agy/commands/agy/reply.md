@@ -38,7 +38,8 @@ Write the message verbatim to `<printed path>/message.txt` with the Write tool.
 
 ### Step 3: Reply
 
-Replace each `YELLOW_TODO_` token inside its single quotes (`CORRECTION` is
+Replace each `YELLOW_TODO_` token inside its single quotes, writing each `'`
+in the staged path as `'\''` (`CORRECTION` is
 `1` or `0`; `PARTIAL` is `keep`, `reset` or empty). Run with a 600000 ms
 timeout.
 

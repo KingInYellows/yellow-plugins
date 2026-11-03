@@ -54,7 +54,7 @@ printf '%s\n' "$OUT" | jq '{ok, error: .error.code, grantId, revokedAt, grants: 
 ### Step 2b: Create
 
 Print the command for the owner. Replace each `YELLOW_TODO_` token inside its
-single quotes:
+single quotes, writing each `'` in a value as `'\''`:
 
 ```bash
 set -uo pipefail
@@ -65,7 +65,9 @@ case "$REPO$BRANCH$OPS" in *YELLOW_TODO_*) printf 'ERROR: substitute every place
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -f "$CLI" ] || { printf 'ERROR: yellow-agy CLI not found at %s\n' "$CLI" >&2; exit 1; }
 [ "$OPS" = default ] && OPS=create,approve,reply,collect
-printf "node '%s' authorize --repo '%s' --branch '%s' --operations '%s'\n" "$CLI" "$REPO" "$BRANCH" "$OPS"
+# Each value goes inside single quotes on the owner's line, so escape any quote.
+_q() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
+printf "node '%s' authorize --repo '%s' --branch '%s' --operations '%s'\n" "$(_q "$CLI")" "$(_q "$REPO")" "$(_q "$BRANCH")" "$(_q "$OPS")"
 ```
 
 Show the printed line with the validated optional flags appended, each value
