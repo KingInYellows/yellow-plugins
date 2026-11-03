@@ -53,6 +53,13 @@ findings and incomplete coverage never fail it. The comment ends with a
 `<!-- review-gate-status {...} -->` line (`head`, `tier`, `status`, `important`)
 for a later merge-gate reader.
 
+The Workflow tool always runs in the background, and `claude -p` stops a
+background task once the session has been idle for
+`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` (10 minutes by default). The eval's
+`run_env()`, which this driver shares, sets it to `0`, so `--timeout` is the
+only deadline. Without that, any run longer than 10 minutes (a high-tier PR)
+ends as "no workflow result in the reply".
+
 ## Trust boundaries
 
 - The reviewer (plugins, this driver, `.github/review-risk.json`, `REVIEW.md`)

@@ -428,6 +428,17 @@ class PipelineTest(Tmp):
         self.assertNotEqual(edited["grading_set"], s["grading_set"])
 
 
+class RunEnvTest(unittest.TestCase):
+    def test_lifts_print_mode_background_ceiling(self):
+        # The Workflow tool runs in the background; `claude -p` would stop it
+        # after 10 idle minutes unless this ceiling is lifted.
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS": "600000",
+                                          "CLAUDE_EFFORT": "high"}):
+            env = rg.run_env()
+        self.assertEqual(env["CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS"], "0")
+        self.assertNotIn("CLAUDE_EFFORT", env)
+
+
 class GradeMathTest(unittest.TestCase):
     GOLDEN = {"file": "lib/x.sh", "line": 10, "match": [r"unquoted", r"\bpath\b"]}
 
