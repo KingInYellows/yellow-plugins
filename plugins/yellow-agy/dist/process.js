@@ -19,23 +19,41 @@ function defaultSpawnKill(file, args) {
     const k = (0, node_child_process_1.spawn)(file, [...args], { stdio: 'ignore', windowsHide: true });
     k.on('error', () => undefined);
 }
+/** Stderr bytes to search for the pgid line before giving up on it. */
+const MARKER_SCAN_BYTES = 64 * 1024;
 /**
- * Splits the bridge's leading pgid line off `stderr`. Returns undefined
- * until a full first line has arrived.
+ * Splits the bridge's pgid line off `stderr`. WSL may print diagnostics
+ * first, so every complete line is checked; the wrapper prints the line
+ * before it execs agy, so the first match is always the wrapper's. Returns
+ * undefined while the line may still arrive, and no pgid once
+ * MARKER_SCAN_BYTES have gone by without it.
  */
 function splitPgidMarker(stderr) {
-    const nl = stderr.indexOf(0x0a);
-    if (nl < 0)
-        return undefined;
-    const line = stderr.subarray(0, nl).toString('utf8');
-    if (!line.startsWith(invocation_1.BRIDGE_PGID_MARKER)) {
-        return { pgid: undefined, rest: stderr };
+    let start = 0;
+    for (;;) {
+        const nl = stderr.indexOf(0x0a, start);
+        if (nl < 0)
+            break;
+        const line = stderr
+            .subarray(start, nl)
+            .toString('utf8')
+            .replace(/^\0+/, '')
+            .replace(/\r$/, '');
+        if (line.startsWith(invocation_1.BRIDGE_PGID_MARKER)) {
+            const pgid = Number(line.slice(invocation_1.BRIDGE_PGID_MARKER.length));
+            return {
+                pgid: Number.isInteger(pgid) && pgid > 1 ? pgid : undefined,
+                rest: Buffer.concat([
+                    stderr.subarray(0, start),
+                    stderr.subarray(nl + 1),
+                ]),
+            };
+        }
+        start = nl + 1;
     }
-    const pgid = Number(line.slice(invocation_1.BRIDGE_PGID_MARKER.length));
-    return {
-        pgid: Number.isInteger(pgid) && pgid > 1 ? pgid : undefined,
-        rest: stderr.subarray(nl + 1),
-    };
+    if (stderr.length > MARKER_SCAN_BYTES)
+        return { pgid: undefined, rest: stderr };
+    return undefined;
 }
 function runTurn(inv, options) {
     const graceMs = options.graceMs ?? DEFAULT_GRACE_MS;

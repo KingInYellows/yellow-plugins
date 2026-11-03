@@ -118,16 +118,24 @@ describe('bridge Linux process group', () => {
     expect(() => bridgeKillCommand(undefined, 1, 'KILL')).toThrow(AgyError);
   });
 
-  it('splitPgidMarker strips the first line only when it is the marker', () => {
+  it('splitPgidMarker finds the marker line, even after a WSL warning', () => {
     expect(splitPgidMarker(Buffer.from(`${BRIDGE_PGID_MARKER}12`))).toBe(
       undefined
     );
     const hit = splitPgidMarker(Buffer.from(`${BRIDGE_PGID_MARKER}12\nwarn`));
     expect(hit?.pgid).toBe(12);
     expect(hit?.rest.toString()).toBe('warn');
-    const miss = splitPgidMarker(Buffer.from('setsid: not found\n'));
+    const late = splitPgidMarker(
+      Buffer.from(`wsl: Failed to translate\r\n\0${BRIDGE_PGID_MARKER}34\r\nx`)
+    );
+    expect(late?.pgid).toBe(34);
+    expect(late?.rest.toString()).toBe('wsl: Failed to translate\r\nx');
+    // No marker yet: keep waiting, until the scan limit passes.
+    expect(splitPgidMarker(Buffer.from('setsid: not found\n'))).toBe(undefined);
+    const flood = Buffer.from(`${'x'.repeat(100)}\n`.repeat(700));
+    const miss = splitPgidMarker(flood);
     expect(miss?.pgid).toBeUndefined();
-    expect(miss?.rest.toString()).toBe('setsid: not found\n');
+    expect(miss?.rest.equals(flood)).toBe(true);
   });
 
   // setsid(1) is util-linux; macOS has no such command.

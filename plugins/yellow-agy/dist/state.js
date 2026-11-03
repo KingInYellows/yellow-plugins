@@ -138,9 +138,15 @@ async function withLock(dir, fn, options = {}) {
     }
     finally {
         // Remove only our own lock: a peer may have taken over a lock it judged
-        // stale.
-        if (readText(lockPath) === token)
-            fs.rmSync(lockPath, { force: true });
+        // stale. Best effort, so a failed delete never replaces fn's result or
+        // error; a lock left behind names this pid and goes stale once it exits.
+        try {
+            if (readText(lockPath) === token)
+                fs.rmSync(lockPath, { force: true });
+        }
+        catch {
+            // ignored, see above
+        }
     }
 }
 function readText(file) {
