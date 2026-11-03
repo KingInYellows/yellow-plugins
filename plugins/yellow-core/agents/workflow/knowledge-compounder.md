@@ -518,6 +518,7 @@ track: <bug | knowledge>          # NEW: classifies the entry
 problem: <one-line problem statement>  # NEW: keyword-rich, ~80 chars
 tags: [<tag1>, <tag2>, ...]       # existing — ensure non-empty (3+ tags)
 components: [...]                  # existing
+retire_when: '<outside condition>' # OPTIONAL: see below; omit when none
 ---
 ```
 
@@ -540,6 +541,16 @@ When in doubt: `bug` if there was a specific incident being remembered;
 retrieval over `problem` + `tags` + `title` for relevance ranking. Keep it
 specific: not "auth issue" but "session token leaks via URL parameter on OAuth
 callback".
+
+**`retire_when` field (optional, from CE's ce-compound schema):** set it only
+when the guidance holds just while something outside the repo holds: an open
+upstream bug, a tool or platform version, a dependency's behavior. Name that
+change and how a refresh can check it without changing the repo, as one line,
+for example
+`retire_when: 'anthropics/claude-code issue closed as fixed in a released version; check the issue and the release notes'`.
+Omit it otherwise. A verification that needs a repo change, such as removing a
+workaround and rerunning CI, belongs in the body as the step before removal.
+`compound-lifecycle` checks these conditions on every refresh.
 
 #### Context Budget Precheck (CE ce-compound v2.39.0 pattern)
 

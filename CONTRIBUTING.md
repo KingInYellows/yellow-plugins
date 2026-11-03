@@ -532,12 +532,14 @@ feature PR's `## Notes` section: `Solution doc tracked separately in
 
 Two checks run on every PR that touches `docs/solutions/`:
 
-- **`validate-solutions` (blocking).** Runs inside `validate:schemas`.
-  Fails on exact-slug collisions (`ERROR-SOL-001`) when a NEW doc reuses an
-  existing slug from any category, and on missing or invalid required
-  frontmatter (`ERROR-SOL-002`). Diff-scoped — only new/modified files in
-  the current PR's diff are checked. Pre-existing non-conforming docs are
-  not retroactively gated; they only trip the validator when modified.
+- **`validate-solutions` (blocking).** Runs inside `validate:schemas`. Fails on
+  exact-slug collisions (`ERROR-SOL-001`) when a NEW doc reuses an existing slug
+  from any category, and on missing or invalid required frontmatter
+  (`ERROR-SOL-002`). The optional `retire_when` field must be a non-empty
+  single-line string when present (`ERROR-SOL-002` otherwise). Diff-scoped —
+  only new/modified files in the current PR's diff are checked. Pre-existing
+  non-conforming docs are not retroactively gated; they only trip the validator
+  when modified.
 - **`validate-solutions-advisory` (non-blocking).** Emits a
   `::warning::` annotation when a PR closes a P0/P1-labeled issue but
   contains no `docs/solutions/` change. This is a nudge, never a block —

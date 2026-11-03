@@ -49,7 +49,8 @@ function runScript(solutionsDir: string, opts: RunOpts = {}): RunResult {
     SOLUTIONS_DIR: solutionsDir,
   };
   if (opts.diff !== undefined) env.VALIDATE_SOLUTIONS_DIFF = opts.diff;
-  if (opts.baseRef !== undefined) env.VALIDATE_SOLUTIONS_BASE_REF = opts.baseRef;
+  if (opts.baseRef !== undefined)
+    env.VALIDATE_SOLUTIONS_BASE_REF = opts.baseRef;
   // Default CI to false; tests that want annotations opt in explicitly.
   if (opts.ci) env.GITHUB_ACTIONS = 'true';
   else delete env.GITHUB_ACTIONS;
@@ -409,7 +410,9 @@ describe('validate-solutions — nested path depth rejection (P2 regression test
 
     expect(status).toBe(1);
     expect(stdout + stderr).toMatch(/ERROR-SOL-002/);
-    expect(stdout + stderr).toMatch(/expected docs\/solutions\/<category>\/<slug>\.md \(depth 4\)/);
+    expect(stdout + stderr).toMatch(
+      /expected docs\/solutions\/<category>\/<slug>\.md \(depth 4\)/
+    );
   });
 });
 
@@ -532,5 +535,55 @@ describe('validate-solutions — GitHub Actions annotation format', () => {
     expect(stdout).toMatch(
       /::error file=docs\/solutions\/workflow\/missing-title\.md::ERROR-SOL-002/
     );
+  });
+});
+
+describe('validate-solutions — optional retire_when (SOL-002)', () => {
+  let tmpRoot: string;
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-vs-retire-when-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  const run = (extra: string) => {
+    writeDoc(
+      tmpRoot,
+      'workflow',
+      'retire-doc',
+      `${validFrontmatter()}\n${extra}`
+    );
+    return runScript(tmpRoot, {
+      diff: 'A\tdocs/solutions/workflow/retire-doc.md',
+    });
+  };
+
+  it('passes a doc without retire_when', () => {
+    expect(run('').status).toBe(0);
+  });
+
+  it('passes a single-line retire_when string', () => {
+    const { status } = run(
+      "retire_when: 'anthropics/claude-code issue closed as fixed in a released version; check the issue and release notes'"
+    );
+    expect(status).toBe(0);
+  });
+
+  it.each([
+    ['a list', 'retire_when: [one, two]'],
+    ['an empty value', 'retire_when:'],
+    ['a blank string', "retire_when: '  '"],
+    ['a number', 'retire_when: 3'],
+    ['a literal block scalar', 'retire_when: |\n  line one\n  line two'],
+    [
+      'a stripped folded block scalar',
+      'retire_when: >-\n  line one\n  line two',
+    ],
+  ])('blocks retire_when given %s', (_label, extra) => {
+    const { status, stdout, stderr } = run(extra);
+    expect(status).toBe(1);
+    expect(stdout + stderr).toMatch(/ERROR-SOL-002/);
+    expect(stdout + stderr).toMatch(/retire_when/);
   });
 });
