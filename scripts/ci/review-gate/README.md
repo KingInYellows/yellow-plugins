@@ -62,9 +62,12 @@ for a later merge-gate reader.
   job skips with a notice.
 - The PR's code is read, never run. The `claude` step gets the subscription
   token and no GitHub token; only `post` has `GH_TOKEN`.
-- Finding text comes from models that read untrusted code. `render` puts it on
-  one line and escapes HTML, links, code spans, table pipes and `@` mentions
-  before it reaches the comment.
+- Finding text comes from models that read untrusted code. Before `result.json`
+  is written, `run` passes every model-authored string through yellow-core's
+  `cs_redact_secrets` (the filter `review-ledger.sh` uses), so a credential a
+  hunter quotes never reaches the artifact, summary or comment; a string
+  redaction cannot vouch for is withheld. `render` then puts it on one line and
+  escapes HTML, links, code spans, table pipes and `@` mentions.
 - The PR's own `CLAUDE.md` files are still loaded as project memory, since the
   PR checkout is the working directory. With only read tools that can mislead
   the review but not act.

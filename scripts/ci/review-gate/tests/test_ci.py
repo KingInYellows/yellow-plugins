@@ -170,6 +170,34 @@ class Flow(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertIn("timed out", result["reason"])
 
+    def test_a_quoted_credential_never_reaches_the_outputs(self):
+        self.prepare({"docs/a.md": "b\n"})
+        token = "ghp_" + "A1b2" * 9
+        os.makedirs(os.path.join(self.tmp, "resp"))
+        finding = {"display": "Important", "severity": "P1", "file": "docs/a.md", "line": 1,
+                   # a zero-width space inside the token must not hide it
+                   "title": "hardcoded " + token[:10] + "\u200b" + token[10:],
+                   "suggested_fix": "drop " + token}
+        with open(os.path.join(self.tmp, "resp", "pr.json"), "w", encoding="utf-8") as handle:
+            json.dump({"version": 1, "tier": "low", "findings": [finding], "dropped": [],
+                       "agents": 2, "coverage": {"ran": ["correctness-reviewer",
+                                                         "project-compliance-reviewer"],
+                                                 "failed": [], "skipped": []}}, handle)
+        self.assertEqual(ci.run(self.work, STANDIN, "sonnet", 60), 0)
+        with mock.patch("sys.stdout"):
+            ci.render(self.work, "advisory")
+        for name in ("result.json", "comment.md"):
+            with open(os.path.join(self.work, name), encoding="utf-8") as handle:
+                text = handle.read()
+            self.assertNotIn(token[4:], text, name)
+            self.assertIn("REDACTED:github-token", text, name)
+        self.assertEqual(ci.read_json(os.path.join(self.work, "result.json"))["status"], "complete")
+
+    def test_redaction_failure_withholds_the_text(self):
+        with mock.patch.object(ci, "_redact_run", return_value=None):
+            self.assertEqual(ci.redact(["a", {"b": ["c"]}, 3]),
+                             [ci.WITHHELD, {ci.WITHHELD: [ci.WITHHELD]}, 3])
+
     def test_render_makes_model_text_inert(self):
         self.prepare({"docs/a.md": "b\n"})
         finding = {"display": "Important", "severity": "P1", "file": "docs/a.md", "line": 1,

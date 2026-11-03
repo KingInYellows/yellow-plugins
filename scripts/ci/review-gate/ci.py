@@ -25,10 +25,14 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REVIEWER = os.path.realpath(os.path.join(HERE, "..", "..", ".."))
 EVAL = os.path.join(REVIEWER, "scripts", "eval", "review-gate", "eval.py")
+REDACT_LIB = os.path.join(REVIEWER, "plugins", "yellow-core", "lib", "compound-staging.sh")
+REDACT_FAILED = "[REDACTED: sanitization failed]"
+WITHHELD = "[withheld: redaction unavailable]"
 CLASSIFY = os.path.join(REVIEWER, "plugins", "yellow-review", "skills", "pr-review-workflow",
                         "scripts", "classify-risk")
 MARKER = "<!-- yellow-review:review-gate-ci -->"
@@ -183,6 +187,7 @@ def run(work, claude, model, timeout):
     with open(os.path.join(work, "claude.err"), "w", encoding="utf-8") as handle:
         handle.write(stderr or "")
     result = classify_run(ev, rc, stdout, stderr)
+    result["reason"], result["workflow"] = redact([result["reason"], result["workflow"]])
     write_json(os.path.join(work, "result.json"), result)
     print("review-gate: %s%s" % (result["status"], ": " + result["reason"] if result["reason"] else ""))
     # A run that never produced a result fails the step so the check shows it.
@@ -214,6 +219,76 @@ def classify_run(ev, rc, stdout, stderr):
     why = ev.ungradable(wf)
     return {"status": "incomplete" if why else "complete", "reason": why or "",
             "workflow": wf, "cli": cost}
+
+
+# --- redaction ----------------------------------------------------------------
+# Hunters read untrusted code and may quote a credential they found. Every
+# model-authored string goes through yellow-core's cs_redact_secrets (the
+# filter review-ledger.sh uses) before result.json, the job summary or the
+# comment exist. Fail closed: a string redaction cannot vouch for is withheld.
+
+def _scrub(text):
+    # Invisible format characters inside a token defeat the patterns; the
+    # record separator and NUL would break the batch framing.
+    return "".join(" " if ch in "\x1e\x00" else ch for ch in text
+                   if unicodedata.category(ch) != "Cf")
+
+
+def _redact_run(text):
+    try:
+        res = subprocess.run(["bash", "-c", 'source "$1" && cs_redact_secrets', "_", REDACT_LIB],
+                             input=text, capture_output=True, text=True, timeout=60, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if res.returncode != 0 or REDACT_FAILED in res.stdout:
+        return None
+    return res.stdout
+
+
+def redact_strings(strings):
+    """Redacted copies in input order, one cs_redact_secrets run when it can."""
+    if not strings:
+        return []
+    clean = [_scrub(s) for s in strings]
+    out = _redact_run("".join(s + "\n\x1e\n" for s in clean))
+    parts = out.split("\n\x1e\n")[:-1] if out is not None else []
+    if len(parts) == len(clean):
+        return parts
+    # A multi-line range (a PEM block) can swallow a separator: one at a time.
+    single = []
+    for s in clean:
+        one = _redact_run(s + "\n")
+        single.append(WITHHELD if one is None else one[:-1] if one.endswith("\n") else one)
+    return single
+
+
+def redact(value):
+    found = []
+
+    def collect(v):
+        if isinstance(v, str):
+            found.append(v)
+        elif isinstance(v, list):
+            for item in v:
+                collect(item)
+        elif isinstance(v, dict):
+            for key, item in v.items():
+                collect(key)
+                collect(item)
+
+    collect(value)
+    red = iter(redact_strings(found))
+
+    def rebuild(v):
+        if isinstance(v, str):
+            return next(red)
+        if isinstance(v, list):
+            return [rebuild(item) for item in v]
+        if isinstance(v, dict):
+            return {rebuild(key): rebuild(item) for key, item in v.items()}
+        return v
+
+    return rebuild(value)
 
 
 # --- render -------------------------------------------------------------------
