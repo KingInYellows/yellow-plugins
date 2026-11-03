@@ -59,6 +59,17 @@ field() {
   [ "$(git worktree list | wc -l)" -eq 1 ]
 }
 
+@test "open refuses an in-place root whose path is not quote-safe" {
+  git checkout -q feat
+  here=$(pwd)
+  cd ..
+  mv "$here" "$here'q"
+  cd "$here'q"
+  run -1 "$ROR" open "$LEDGER_PR"
+  [[ "$output" == *"unsafe characters"* ]]
+  [ "$(git worktree list | wc -l)" -eq 1 ]
+}
+
 @test "open uses a worktree when HEAD is the PR head but the tree is dirty" {
   git checkout -q feat
   printf 'uncommitted\n' >|b.txt

@@ -70,6 +70,14 @@ cmd_open() {
   local_head=$(git rev-parse -q --verify HEAD 2>/dev/null) || local_head=''
   if [ "$local_head" = "$head" ] && [ -z "$(git status --porcelain --untracked-files=normal 2>/dev/null)" ]; then
     top=$(git rev-parse --show-toplevel) || die 1 "open: no work tree"
+    # Later calls run `cd '<review_root>'`, so the path must be quote-safe.
+    case "$top" in
+      /*) ;;
+      *) die 1 "open: work tree path is not absolute" ;;
+    esac
+    case "$top" in
+      *[!A-Za-z0-9._/@+-]*) die 1 "open: work tree path has unsafe characters" ;;
+    esac
     printf 'mode=in-place\nreview_root=%s\nhead=%s\n' "$top" "$head"
     return 0
   fi
