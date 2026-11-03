@@ -83,6 +83,10 @@ earlier; passing them does not clear the bar.
 - An existing learning that became materially inaccurate or incomplete
   qualifies, because leaving it would mislead. Route it to AMEND_EXISTING
   instead of creating a duplicate.
+- A `<consolidation-context>` handoff from `compound-lifecycle` (Consolidate or
+  Replace) merges or supersedes docs the caller will archive. Judge the
+  counterfactual with those source docs excluded, since they are about to
+  disappear; their being recoverable today is not a reason to skip.
 - Write one learning per run. When the session holds several, document the
   strongest and name the rest in the Success Output so the caller can run again
   for each; batching blurs the per-learning judgment.
