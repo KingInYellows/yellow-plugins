@@ -58,6 +58,7 @@ const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
 const path = __importStar(require("node:path"));
 const errors_1 = require("./errors");
+const grants_1 = require("./grants");
 const EMPTY = { version: 1, tasks: {}, requests: {}, usage: [] };
 const JOURNAL = 'journal.json';
 const LOCK = 'journal.lock';
@@ -264,6 +265,11 @@ function readJournal(dir) {
     if (j.usage !== undefined && !Array.isArray(j.usage)) {
         throw badJournal('usage');
     }
+    if (j.grants !== undefined &&
+        !(isRecord(j.grants) &&
+            Object.entries(j.grants).every(([k, g]) => (0, grants_1.isGrant)(k, g)))) {
+        throw badJournal('grants');
+    }
     const claim = j.activeRun;
     if (claim !== undefined &&
         !(isRecord(claim) &&
@@ -280,6 +286,7 @@ function readJournal(dir) {
         requests: j.requests,
         usage: (j.usage ?? []).filter(isRecord),
         ...(j.activeRun === undefined ? {} : { activeRun: j.activeRun }),
+        ...(j.grants === undefined ? {} : { grants: j.grants }),
     };
 }
 /** Atomic, durable write: a 0600 temp file fsynced, renamed, dir fsynced. */

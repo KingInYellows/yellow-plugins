@@ -20,6 +20,7 @@ import {
 } from './classify';
 import type { AgyErrorCode } from './errors';
 import { AgyError } from './errors';
+import { authorizeRequest, putGrant, requireGrant } from './grants';
 import type { HostExec } from './host-exec';
 import type { Host, Invocation } from './invocation';
 import { buildInvocation } from './invocation';
@@ -82,6 +83,12 @@ export interface LifecycleDeps {
   /** Our own deadline; a little longer than printTimeoutSeconds. */
   readonly deadlineMs: number;
   readonly newId?: () => string;
+  /**
+   * The grant every mutating call is checked and charged against, inside
+   * the reservation's locked write. The CLI always sets it.
+   */
+  readonly grantId?: string;
+  readonly now?: () => Date;
   readonly ownerPid?: number;
   readonly isAlive?: (pid: number | undefined) => boolean;
 }
@@ -342,7 +349,9 @@ export class Lifecycle {
     op: Operation,
     localId: string,
     check: (j: Journal) => void,
-    meta?: Record<string, string>
+    meta?: Record<string, string>,
+    scope?: { readonly repo: string; readonly branch: string },
+    correction?: boolean
   ): Promise<{ replay?: Outcome; journal: Journal }> {
     // Settle a dead claim in its own write, so a refusal below can't discard
     // the settlement.
@@ -380,6 +389,7 @@ export class Lifecycle {
           );
         }
         check(j);
+        const charged = this.authorize(j, op, localId, scope, correction);
         const claim: Claim = {
           requestId,
           op,
@@ -388,7 +398,7 @@ export class Lifecycle {
           startedAt: nowIso(),
         };
         const next = putRequest(
-          { ...j, activeRun: claim },
+          { ...charged, activeRun: claim },
           {
             requestId,
             op,
@@ -403,12 +413,51 @@ export class Lifecycle {
     );
   }
 
-  /** Drops the claim and the pending request: a refusal with no turn. */
+  /** Checks the request against the grant and charges it. */
+  private authorize(
+    j: Journal,
+    op: Operation,
+    localId: string,
+    scope: { readonly repo: string; readonly branch: string } | undefined,
+    correction: boolean | undefined
+  ): Journal {
+    const grantId = this.deps.grantId;
+    // Abandon is owner-confirmed on the terminal instead, and must work
+    // after a grant expires.
+    if (grantId === undefined || op === 'abandon') return j;
+    const task = op === 'delegate' ? undefined : getTask(j, localId);
+    const repo = scope?.repo ?? task?.repo ?? '';
+    const branch = scope?.branch ?? task?.branch ?? '';
+    return authorizeRequest(
+      j,
+      grantId,
+      {
+        op,
+        repo,
+        branch,
+        ...(task === undefined ? {} : { task }),
+        ...(correction === undefined ? {} : { correction }),
+      },
+      (this.deps.now ?? (() => new Date()))()
+    );
+  }
+
+  /**
+   * Drops the claim and the pending request: a refusal with no turn. A
+   * delegate refused before its worktree existed gets its task back.
+   */
   private release(requestId: string): Promise<void> {
     return updateJournal(this.deps.dataDir, (j) => {
+      const rec = own(j.requests, requestId);
       const { [requestId]: _gone, ...requests } = j.requests;
       void _gone;
-      const next = j.activeRun?.requestId === requestId ? withoutClaim(j) : j;
+      let next = j.activeRun?.requestId === requestId ? withoutClaim(j) : j;
+      const grantId = this.deps.grantId;
+      if (rec?.op === 'delegate' && grantId !== undefined) {
+        const g = requireGrant(next, grantId);
+        if (g.totalTasks > 0)
+          next = putGrant(next, { ...g, totalTasks: g.totalTasks - 1 });
+      }
       return { journal: { ...next, requests }, result: undefined };
     });
   }
@@ -530,7 +579,8 @@ export class Lifecycle {
         worktree,
         branch: input.branch,
         repo: input.repo,
-      }
+      },
+      { repo: input.repo, branch: input.branch }
     );
     if (res.replay !== undefined) return res.replay;
     // Build (and so validate) the turn's argv before any git side effect,
@@ -584,6 +634,9 @@ export class Lifecycle {
       approved: false,
       correctiveRounds: 0,
       requiresAttention: true,
+      ...(this.deps.grantId === undefined
+        ? {}
+        : { grantId: this.deps.grantId }),
       createdAt: at,
       updatedAt: at,
     };
@@ -922,7 +975,10 @@ export class Lifecycle {
             `task ${t.localId} is ${t.state}; there is no conversation to reply to`
           );
         }
-      }
+      },
+      undefined,
+      undefined,
+      input.correction === true
     );
     if (res.replay !== undefined) return res.replay;
     const approved = getTask(res.journal, input.localId).approved;

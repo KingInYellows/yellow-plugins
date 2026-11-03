@@ -47,6 +47,7 @@ const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const classify_1 = require("./classify");
 const errors_1 = require("./errors");
+const grants_1 = require("./grants");
 const invocation_1 = require("./invocation");
 const plan_schema_1 = require("./plan-schema");
 const profiles_1 = require("./profiles");
@@ -257,7 +258,7 @@ class Lifecycle {
      * Reserves `requestId` and the active-run claim. Returns the recorded
      * outcome instead when the request already finished.
      */
-    async reserve(requestId, op, localId, check, meta) {
+    async reserve(requestId, op, localId, check, meta, scope, correction) {
         // Settle a dead claim in its own write, so a refusal below can't discard
         // the settlement.
         await (0, state_1.updateJournal)(this.deps.dataDir, async (j) => ({
@@ -283,6 +284,7 @@ class Lifecycle {
                 throw new errors_1.AgyError('AGY_BUSY', `a ${j.activeRun.op} run on ${j.activeRun.localId} is live`);
             }
             check(j);
+            const charged = this.authorize(j, op, localId, scope, correction);
             const claim = {
                 requestId,
                 op,
@@ -290,7 +292,7 @@ class Lifecycle {
                 ownerPid: this.ownerPid,
                 startedAt: (0, state_1.nowIso)(),
             };
-            const next = (0, state_1.putRequest)({ ...j, activeRun: claim }, {
+            const next = (0, state_1.putRequest)({ ...charged, activeRun: claim }, {
                 requestId,
                 op,
                 localId,
@@ -301,12 +303,40 @@ class Lifecycle {
             return { journal: next, result: { journal: next } };
         });
     }
-    /** Drops the claim and the pending request: a refusal with no turn. */
+    /** Checks the request against the grant and charges it. */
+    authorize(j, op, localId, scope, correction) {
+        const grantId = this.deps.grantId;
+        // Abandon is owner-confirmed on the terminal instead, and must work
+        // after a grant expires.
+        if (grantId === undefined || op === 'abandon')
+            return j;
+        const task = op === 'delegate' ? undefined : (0, state_1.getTask)(j, localId);
+        const repo = scope?.repo ?? task?.repo ?? '';
+        const branch = scope?.branch ?? task?.branch ?? '';
+        return (0, grants_1.authorizeRequest)(j, grantId, {
+            op,
+            repo,
+            branch,
+            ...(task === undefined ? {} : { task }),
+            ...(correction === undefined ? {} : { correction }),
+        }, (this.deps.now ?? (() => new Date()))());
+    }
+    /**
+     * Drops the claim and the pending request: a refusal with no turn. A
+     * delegate refused before its worktree existed gets its task back.
+     */
     release(requestId) {
         return (0, state_1.updateJournal)(this.deps.dataDir, (j) => {
+            const rec = (0, state_1.own)(j.requests, requestId);
             const { [requestId]: _gone, ...requests } = j.requests;
             void _gone;
-            const next = j.activeRun?.requestId === requestId ? (0, state_1.withoutClaim)(j) : j;
+            let next = j.activeRun?.requestId === requestId ? (0, state_1.withoutClaim)(j) : j;
+            const grantId = this.deps.grantId;
+            if (rec?.op === 'delegate' && grantId !== undefined) {
+                const g = (0, grants_1.requireGrant)(next, grantId);
+                if (g.totalTasks > 0)
+                    next = (0, grants_1.putGrant)(next, { ...g, totalTasks: g.totalTasks - 1 });
+            }
             return { journal: { ...next, requests }, result: undefined };
         });
     }
@@ -394,7 +424,7 @@ class Lifecycle {
             worktree,
             branch: input.branch,
             repo: input.repo,
-        });
+        }, { repo: input.repo, branch: input.branch });
         if (res.replay !== undefined)
             return res.replay;
         // Build (and so validate) the turn's argv before any git side effect,
@@ -446,6 +476,9 @@ class Lifecycle {
             approved: false,
             correctiveRounds: 0,
             requiresAttention: true,
+            ...(this.deps.grantId === undefined
+                ? {}
+                : { grantId: this.deps.grantId }),
             createdAt: at,
             updatedAt: at,
         };
@@ -655,7 +688,7 @@ class Lifecycle {
                 t.conversationId === undefined) {
                 throw new errors_1.AgyError('AGY_INVALID_INPUT', `task ${t.localId} is ${t.state}; there is no conversation to reply to`);
             }
-        });
+        }, undefined, undefined, input.correction === true);
         if (res.replay !== undefined)
             return res.replay;
         const approved = (0, state_1.getTask)(res.journal, input.localId).approved;

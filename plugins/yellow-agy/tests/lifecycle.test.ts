@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { TurnOutcome } from '../src/classify';
 import { AgyError } from '../src/errors';
+import { buildGrant, putGrant } from '../src/grants';
 import { createHostExec } from '../src/host-exec';
 import type { Invocation } from '../src/invocation';
 import type { LifecycleDeps } from '../src/lifecycle';
@@ -655,5 +656,77 @@ describe('Lifecycle', () => {
     await expect(
       h.lc.approve({ requestId: 'r2', localId: 't1' })
     ).rejects.toMatchObject({ code: 'AGY_INVALID_INPUT' });
+  });
+
+  describe('under a grant', () => {
+    function granted(steps: Step[], extra: Partial<LifecycleDeps> = {}) {
+      const now = new Date();
+      const h0 = harness([]);
+      const g = buildGrant(
+        {
+          repo: h0.repo,
+          branchPattern: 'agy/*',
+          operations: 'create,approve,reply,collect',
+          maxTotalTasks: 1,
+        },
+        now
+      );
+      const h = harness(steps, { grantId: g.grantId, ...extra });
+      fs.mkdirSync(h.deps.dataDir, { recursive: true, mode: 0o700 });
+      writeJournal(
+        h.deps.dataDir,
+        putGrant(
+          { version: 1, tasks: {}, requests: {}, usage: [] },
+          { ...g, repo: h.repo }
+        )
+      );
+      return { h, g };
+    }
+
+    it('charges a task, records the grant, and refuses past the limit', async () => {
+      const { h, g } = granted([planTurn]);
+      await h.lc.delegate(delegateInput(h.repo));
+      const j = readJournal(h.deps.dataDir);
+      expect(j.grants?.[g.grantId]?.totalTasks).toBe(1);
+      expect(j.tasks['t1']?.grantId).toBe(g.grantId);
+      await expect(
+        h.lc.delegate({ ...delegateInput(h.repo), requestId: 'r9' })
+      ).rejects.toMatchObject({ code: 'AGY_GRANT_EXHAUSTED' });
+      await expect(
+        h.lc.delegate({
+          ...delegateInput(h.repo),
+          requestId: 'r8',
+          branch: 'main2',
+        })
+      ).rejects.toMatchObject({ code: 'AGY_AUTHORITY_DENIED' });
+    });
+
+    it('gives the task back when the quota gate refuses', async () => {
+      const { h, g } = granted([], {
+        quotaGate: async () => {
+          throw new AgyError('AGY_QUOTA_LOW', 'low');
+        },
+      });
+      await expect(h.lc.delegate(delegateInput(h.repo))).rejects.toMatchObject({
+        code: 'AGY_QUOTA_LOW',
+      });
+      const j = readJournal(h.deps.dataDir);
+      expect(j.grants?.[g.grantId]?.totalTasks).toBe(0);
+      expect(j.activeRun).toBeUndefined();
+    });
+
+    it('abandon still works once the grant has expired', async () => {
+      const { h, g } = granted([planTurn]);
+      await h.lc.delegate(delegateInput(h.repo));
+      const later = new Lifecycle({
+        ...h.deps,
+        now: () => new Date(Date.parse(g.expiresAt) + 1),
+      });
+      await expect(
+        later.approve({ requestId: 'r2', localId: 't1' })
+      ).rejects.toMatchObject({ code: 'AGY_GRANT_EXPIRED' });
+      const out = await later.abandon({ requestId: 'r3', localId: 't1' });
+      expect(out.state).toBe('ABANDONED');
+    });
   });
 });

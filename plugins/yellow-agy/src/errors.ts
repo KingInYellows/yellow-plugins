@@ -24,6 +24,10 @@ export type AgyErrorCode =
   | 'AGY_MCP'
   | 'AGY_PROMPT_TOO_LONG'
   | 'AGY_SETTINGS'
+  | 'AGY_AUTHORITY_DENIED'
+  | 'AGY_GRANT_EXPIRED'
+  | 'AGY_GRANT_EXHAUSTED'
+  | 'AGY_CONFIRMATION_REQUIRED'
   | 'AGY_INVALID_INPUT'
   | 'AGY_INTERNAL';
 
@@ -123,6 +127,25 @@ export const ERROR_CATALOG: Readonly<Record<AgyErrorCode, CatalogEntry>> = {
     exit: 2,
     recoveryAction:
       'Tighten the named keys in ~/.gemini/antigravity-cli/settings.json by hand.',
+  },
+  AGY_AUTHORITY_DENIED: {
+    exit: 2,
+    recoveryAction:
+      'Run /agy:authorize in a terminal for a grant that covers this repo, branch and operation.',
+  },
+  AGY_GRANT_EXPIRED: {
+    exit: 2,
+    recoveryAction: 'Run /agy:authorize in a terminal for a new grant.',
+  },
+  AGY_GRANT_EXHAUSTED: {
+    exit: 2,
+    recoveryAction:
+      'Run /agy:authorize in a terminal for a new grant with room left.',
+  },
+  AGY_CONFIRMATION_REQUIRED: {
+    exit: 2,
+    recoveryAction:
+      'Run the command yourself in a terminal; an agent without a terminal cannot confirm it.',
   },
   AGY_INVALID_INPUT: {
     exit: 2,

@@ -1,7 +1,7 @@
 # yellow-agy provider CLI contract, version 0 (draft)
 
-Status: draft for review, 2026-10-30. Nothing implements it yet. It replaces
-`docs/yellow-jules/contract-v1.md` once yellow-agy ships. Evidence:
+Status: draft, 2026-10-30; implemented by `plugins/yellow-agy` from 2026-11-03.
+It replaces `docs/yellow-jules/contract-v1.md` once yellow-agy ships. Evidence:
 `docs/spikes/antigravity-cli-delegate-2026-10.md`.
 
 ## Scope
@@ -321,11 +321,39 @@ only by `authorize` on `/dev/tty`, controller epoch). The changes are the
 `AGY_*` code prefix, the `YELLOW_AGY_*` env prefix, and a grant that names
 `--allow-command` patterns and `minQuotaPercent` instead of vendor sources.
 
+Grants live in the journal (`grants`), so a grant's check and its charge are
+part of the same locked write as the reservation they cover. A grant names the
+canonical repo path, an exact branch or a prefix ending in one `*`, the
+operations it permits (`create`, `approve`, `reply`, `collect`), the
+`--allow-command` list, `minQuotaPercent` (default 10), `maxTotalTasks` (default
+3, at most 10), `maxCorrectiveRounds` per task (default 2, at most 3) and an
+expiry (default 120 minutes, at most 24 hours). `delegate` picks the
+latest-expiring live grant that covers the repo and branch; every later call
+uses the grant its task was created under. A `delegate` refused before its
+worktree exists (quota gate, a worktree conflict) gives the task back; one that
+ran a turn keeps it spent. `authorize --list` and `--revoke` need no terminal,
+because they never widen authority. `abandon` needs no grant, so it works after
+one expires, and is confirmed on the terminal instead. The confirmation opens
+`/dev/tty`, or the console (`CONIN$`/`CONOUT$`) on Windows, which is unverified
+until the real-Windows check. v0 has no controller epoch: there is one journal
+on one host, and the active-run claim already serializes runs.
+
+`setup` records the resolved host in `host.json` in the data dir, and every
+other call refuses until it exists. On the bridge it resolves the worktree root
+with `realpath -e` inside WSL and refuses a result under `/mnt`.
+
+The `/usage` field names are unconfirmed. Until a captured output pins them, the
+gate reads the lowest numeric field whose key names a remaining amount (a 0-1
+fraction, or 0-100 under a key that says percent) and refuses with
+`AGY_QUOTA_UNKNOWN` when it finds none.
+
 New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
 `AGY_AUTH_MODE`, `AGY_OVERAGES`, `AGY_AUTH_REQUIRED`, `AGY_BUSY`, `AGY_QUOTA`,
 `AGY_QUOTA_LOW`, `AGY_TIMEOUT`, `AGY_INTERRUPTED`, `AGY_DENIED`,
 `AGY_MODEL_ERROR`, `AGY_WORKTREE`, `AGY_BRIDGE`, `AGY_MCP`,
-`AGY_PROMPT_TOO_LONG`, `AGY_QUOTA_UNKNOWN`, `AGY_SETTINGS`.
+`AGY_PROMPT_TOO_LONG`, `AGY_QUOTA_UNKNOWN`, `AGY_SETTINGS`,
+`AGY_AUTHORITY_DENIED`, `AGY_GRANT_EXPIRED`, `AGY_GRANT_EXHAUSTED`,
+`AGY_CONFIRMATION_REQUIRED`.
 
 ## Probe answers (2026-11, agy 1.4.12 under WSL2)
 

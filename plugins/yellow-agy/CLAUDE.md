@@ -6,9 +6,10 @@ Pro sign-in.
 
 ## Status
 
-Experimental. `commands/agy/setup.md` is the only command. The TypeScript
-adapter is landing in stages against `docs/yellow-agy/contract-v0.md`; the
-evidence for every flag it uses is in
+Experimental, built to `docs/yellow-agy/contract-v0.md`. Commands under
+`commands/agy/` call `node dist/cli.js <operation>`. The `/usage` field names
+the quota gate reads are unconfirmed, so it fails closed (`AGY_QUOTA_UNKNOWN`)
+on any shape it doesn't recognize. The evidence for every flag it uses is in
 `docs/spikes/antigravity-cli-delegate-2026-10.md` and
 `docs/spikes/antigravity-cli-adapter-probe-2026-11.md`.
 
@@ -26,6 +27,11 @@ plugins/yellow-agy/
     worktree.ts     # create, pre-turn snapshot refs, reset-partial, collect, remove
     state.ts        # journal in the data dir (0700 on POSIX; on Windows, private only under the per-user %LOCALAPPDATA%): lock, durable atomic writes
     lifecycle.ts    # delegate / approve / reply / collect / abandon / status
+    grants.ts       # owner grants, stored in the journal, checked and charged inside each reservation
+    quota.ts        # the /usage quota gate
+    tty.ts          # owner confirmation on the terminal (/dev/tty; CONIN$ on Windows, unverified)
+    host-config.ts  # the host setup records: posix, windows-native or wsl-bridge, worktree root
+    cli.ts          # one JSON envelope on stdout, exit 0/1/2
     plan-schema.ts  # the --json-schema a plan turn passes, and its shape check
     redact.ts       # secret-shape scan and untrusted-content fence (from yellow-jules)
   dist/             # committed compiled CJS; drift-checked in CI
@@ -42,3 +48,7 @@ plugins/yellow-agy/
 - Setup never runs a model turn. Quota is the owner's weekly AI Pro bucket.
 - Error codes use the `AGY_*` prefix and env vars the `YELLOW_AGY_*` prefix
   (contract-v0 "Output envelope" lists them).
+- Creating a grant and abandoning a task need the owner at a terminal. The
+  commands print the line for the owner to run; never try to answer the code.
+- A turn must end inside the wrappers' 600 s Bash timeout:
+  `YELLOW_AGY_PRINT_TIMEOUT_SECONDS` is 60-480 (default 480).
