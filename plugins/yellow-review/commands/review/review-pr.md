@@ -1,7 +1,7 @@
 ---
 name: review:pr
 description: 'Adaptive multi-agent review of a single PR with a tiered persona pipeline, learnings pre-pass, and confidence-rubric aggregation. Use when you want comprehensive code review with automatic agent selection based on PR size and content.'
-argument-hint: '[PR# | URL | branch] [--non-interactive]'
+argument-hint: '[PR# | URL | branch] [--non-interactive] [--report-only]'
 allowed-tools:
   - Bash
   - Read
@@ -24,7 +24,8 @@ allowed-tools:
 # Multi-Agent PR Review (Wave 2 persona pipeline)
 
 Run a tiered multi-agent persona review on a single PR, apply P0/P1 fixes,
-and push via the active stacked-PR provider. The pipeline includes a learnings
+and push via the active stacked-PR provider (`--report-only` reports the
+findings and changes nothing). The pipeline includes a learnings
 pre-pass against `docs/solutions/`, structured compact-return findings per
 reviewer, cross-reviewer agreement promotion, and a confidence gate before any
 finding is surfaced.
@@ -33,17 +34,18 @@ finding is surfaced.
 
 ### Step 1: Resolve PR and Parse Flags
 
-The `--non-interactive` flag contract below conforms to Interface 1 of
-`docs/plugin-scope-mode-protocol.md` (this file is a definition site);
-update that doc in the same PR if this contract changes.
+The `--non-interactive` and `--report-only` flag contracts below conform to
+Interfaces 1 and 6 of `docs/plugin-scope-mode-protocol.md` (this file is a
+definition site); update that doc in the same PR if either contract changes.
 
 Split `$ARGUMENTS` on whitespace into tokens.
 
-1. **Flag token**: if any token is exactly `--non-interactive`, set
-   non-interactive mode ON and remove it from the token list. Any token
-   beginning with `--` that is not `--non-interactive` is an error — report
-   `[review:pr] Error: unknown flag <token>.` and stop. Non-interactive mode
-   is OFF by default.
+1. **Flag tokens**: if any token is exactly `--non-interactive`, set
+   non-interactive mode ON and remove it from the token list. If any token is
+   exactly `--report-only`, set report-only mode ON and remove it. Any other
+   token beginning with `--` is an error — report
+   `[review:pr] Error: unknown flag <token>.` and stop. Both modes are OFF by
+   default and may be combined.
 2. **PR target token**: from the remaining tokens:
    - **If more than one token remains**: report
      `[review:pr] Error: too many arguments — expected at most one PR target.`
@@ -72,7 +74,20 @@ so the command runs unattended. It is set automatically when `/review:sweep`
 invokes this command; an interactive user can also pass `--non-interactive`
 explicitly. When the flag is absent, every gate behaves exactly as before.
 
+**Report-only mode** produces the same findings and changes nothing: no
+checkout or branch switch, no edits, no commit or push, no knowledge
+compounding. It runs Steps 1, 3a to 6 and 10, writes the ledger at Step 6 as
+usual (so `/review:sweep` still sees pending findings), and skips Steps 2, 3's
+checkout, 7, 8, 9, 9a and 9b. Read
+`${CLAUDE_PLUGIN_ROOT}/references/review-pr/report-only.md` now and follow it
+in place of Steps 2 and 3's checkout; if the Read fails, stop and report the
+exact path. Pass the flag when this review is a step inside a workflow that
+does not own the tree, such as `/flow:work` Phase 5. A direct
+`/review:pr <PR>` keeps applying fixes.
+
 ### Step 2: Check Working Directory
+
+Skipped in report-only mode.
 
 ```bash
 git status --porcelain
@@ -95,6 +110,9 @@ substituting it into any Bash command runs its `$(...)` before a check can
 reject it. Capture it from `gh` into a variable and validate the variable
 against `^[A-Za-z0-9._/-]+$` with no leading `-`, before any other command
 sees it, in the same Bash call as the checkout.
+
+In report-only mode, run the `gh pr view` above, then skip the rest of this
+step: `report-only.md` replaces the router and the checkout.
 
 Resolve the active stacked-PR provider before checking out: invoke the
 `Skill` tool with `skill: "stack-provider-router"` and keep `state` from its
@@ -1108,6 +1126,8 @@ are kept for Steps 7 and 9.
 
 ### Step 7: Apply Fixes
 
+Steps 7 to 9b are skipped in report-only mode; go to Step 10.
+
 For surviving P0/P1 findings with `autofix_class: safe_auto` and a
 non-null `suggested_fix`: apply sequentially using Edit tool. Review each
 change for correctness before proceeding to next.
@@ -1292,6 +1312,7 @@ NO_PRIOR_LEARNINGS.)
 
 ### Applied Fixes
 - <file:line> — <title> (<reviewer>)
+(report-only mode: the single line "report-only: none applied")
 
 ### Residual Actionable Work
 - <file:line> — <title> — <route>
@@ -1311,6 +1332,7 @@ reader can distinguish "no contract changes detected" from "contract
 findings were produced but extension classification was malformed."
 
 ### Coverage
+- Mode: <apply | report-only (in-place | worktree)>
 - Risk tier: <low | medium | high | unknown> (<policy>; <distinct reason rules>)
 - Reviewers run: <list>
 - Reviewers skipped (graceful degradation): <list with reasons>
