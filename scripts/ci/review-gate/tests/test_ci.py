@@ -148,7 +148,7 @@ class Flow(unittest.TestCase):
         with open(os.path.join(self.work, "comment.md"), encoding="utf-8") as handle:
             body = handle.read()
         self.assertIn("incomplete", body)
-        self.assertIn("project-compliance-reviewer", body)
+        self.assertIn("Failed: project-compliance-reviewer.", body)
         self.assertIn('"status": "incomplete"', body)
 
     def test_a_crashed_run_is_an_error(self):

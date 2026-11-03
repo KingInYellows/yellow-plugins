@@ -39,9 +39,10 @@ skipped, and so is any run when the secret is missing.
    Read/Grep/Glob allowed, Bash and every write tool denied. So CI runs the
    reviewer the eval scores. It writes `result.json`.
 3. `render` writes `comment.md` and the job summary.
-4. `post` (advisory only) creates or edits the comment that starts with
-   `<!-- yellow-review:review-gate-ci -->`, and skips when the PR head has moved
-   past the reviewed commit.
+4. `post` (advisory only) runs in a separate `comment` job, the only one with
+   `pull-requests: write`, from the uploaded artifact. It creates or edits the
+   comment that starts with `<!-- yellow-review:review-gate-ci -->`, and skips
+   when the PR head has moved past the reviewed commit.
 
 A result is `complete` only when the eval would grade it. A hunter that returned
 `null` (in `-p`, a usage-limit wait fails the agent instead of pausing), an
@@ -75,7 +76,8 @@ Otherwise the four always-on personas, plus `plugin-contract-reviewer` and
 `pattern-recognition-specialist` for plugin manifests, agents, commands, skills
 and hooks; `pr-test-analyzer` for test files; `security-reviewer` for shell,
 hooks, plugin `lib/`, scripts and workflows; `silent-failure-hunter` for added
-`try`/`catch`-style lines; `adversarial-reviewer` above 200 changed lines;
+lines with `try`, `catch`, `except`, `rescue`, `recover`, `|| null`,
+`?? undefined` or `or None`; `adversarial-reviewer` above 200 changed lines;
 `architecture-strategist` for 10+ files across 3+ top-level directories. High
 tier always adds `adversarial-reviewer`, `reliability-reviewer` and
 `security-reviewer`. `codex-reviewer` is not used: CI has no Codex.

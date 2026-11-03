@@ -351,8 +351,9 @@ untrusted PR code with a credential, so its boundary is:
 - **Known gap**: the PR's own `CLAUDE.md` files load as project memory because
   the PR checkout is the working directory. With read-only tools, injected text
   can mislead the review but cannot act or write.
-- **`GITHUB_TOKEN`**: `contents: read`, `pull-requests: write`, used only by the
-  `post` step (advisory mode) to edit one marker-identified comment. Finding
+- **`GITHUB_TOKEN`**: the review job has `contents: read` only.
+  `pull-requests: write` goes only to the separate `comment` job (advisory
+  mode), which runs no model and edits one marker-identified comment. Finding
   text is model output over untrusted code, so it is put on one line with HTML,
   links, code spans, table pipes and `@` mentions escaped before posting.
 

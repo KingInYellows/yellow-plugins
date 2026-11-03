@@ -35,10 +35,12 @@ jobs:
       vars.REVIEW_GATE_MODE != 'off'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Read-only: the run that reads untrusted PR code holds no write scope.
+    # The advisory comment is posted by the separate `comment` job below.
     permissions:
       contents: read
-      # advisory mode edits one PR comment; nothing else writes.
-      pull-requests: write
+    outputs:
+      ran: ${{ steps.gate.outputs.run }}
     env:
       MODE: ${{ vars.REVIEW_GATE_MODE == 'advisory' && 'advisory' || 'shadow' }}
     steps:
@@ -121,19 +123,46 @@ jobs:
           python3 reviewer/scripts/ci/review-gate/ci.py render --work "$RUNNER_TEMP/review-gate" \
             --mode "$MODE" --run-url "$RUN_URL" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Post the sticky comment
-        if: always() && steps.gate.outputs.run == 'true' && env.MODE == 'advisory'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 reviewer/scripts/ci/review-gate/ci.py post --work "$RUNNER_TEMP/review-gate"
-
       - name: Upload the result
         if: always() && steps.gate.outputs.run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: review-gate
           path: |
-            ${{ runner.temp }}/review-gate/*.json
+            ${{ runner.temp }}/review-gate/meta.json
+            ${{ runner.temp }}/review-gate/result.json
             ${{ runner.temp }}/review-gate/comment.md
           if-no-files-found: ignore
           retention-days: 14
+
+  # advisory only: edit the one sticky comment. This job runs no model and
+  # reads only the rendered comment and meta from the artifact.
+  comment:
+    needs: review-gate
+    if: >-
+      always() && needs.review-gate.outputs.ran == 'true' &&
+      vars.REVIEW_GATE_MODE == 'advisory'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out the driver (default branch)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: reviewer
+          persist-credentials: false
+          sparse-checkout: scripts/ci/review-gate
+
+      - name: Download the result
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: review-gate
+          path: ${{ runner.temp }}/review-gate
+
+      - name: Post the sticky comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 reviewer/scripts/ci/review-gate/ci.py post --work "$RUNNER_TEMP/review-gate"
