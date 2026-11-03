@@ -127,14 +127,35 @@ function isPathShaped(token, repoRoot) {
   }
 }
 
-// A missing path under a dot-directory (`.git/...`, `.claude/agents/`) is a
-// runtime or machine-local location, not a repo citation.
-function isRuntimePath(rel) {
-  return rel.split('/')[0].startsWith('.');
+// A missing path under a machine-local dot-directory (`.git/...`,
+// `.claude/agents/`) or a dot-directory the repo does not have is a runtime
+// location, not a repo citation. Repo-owned ones (`.github/`,
+// `.claude-plugin/`) are still checked.
+const RUNTIME_DIRS = new Set(['.git', '.claude', '.worktrees', '.cache']);
+function isRuntimePath(rel, repoRoot) {
+  const top = rel.split('/')[0];
+  if (!top.startsWith('.')) return false;
+  return RUNTIME_DIRS.has(top) || !fs.existsSync(path.join(repoRoot, top));
 }
 
-// Blank fenced blocks and inline code spans, keeping line count and length.
-// Blank fenced blocks, and inline code spans unless `inline` is false.
+// Blank inline code spans. A span opens and closes on backtick runs of the
+// same length (CommonMark), so ``a `b` c`` is masked whole.
+function maskInlineCode(line) {
+  const runs = [...line.matchAll(/`+/g)];
+  const out = line.split('');
+  for (let i = 0; i < runs.length; i += 1) {
+    const open = runs[i];
+    const j = runs.findIndex((r, k) => k > i && r[0].length === open[0].length);
+    if (j === -1) continue; // unmatched run is literal text
+    const end = runs[j].index + runs[j][0].length;
+    for (let c = open.index; c < end; c += 1) out[c] = ' ';
+    i = j;
+  }
+  return out.join('');
+}
+
+// Blank fenced blocks, and inline code spans unless `inline` is false,
+// keeping line count and length.
 function maskCode(lines, { inline = true } = {}) {
   const masked = [];
   let fence = null;
@@ -157,9 +178,7 @@ function maskCode(lines, { inline = true } = {}) {
       masked.push(' '.repeat(line.length));
       continue;
     }
-    masked.push(
-      inline ? line.replace(BACKTICK_RE, (x) => ' '.repeat(x.length)) : line
-    );
+    masked.push(inline ? maskInlineCode(line) : line);
   }
   return masked;
 }
@@ -327,7 +346,7 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
     if (seenPaths.has(check)) continue;
     seenPaths.add(check);
     if (fs.existsSync(path.join(repoRoot, check))) continue;
-    if (isRuntimePath(check)) continue;
+    if (isRuntimePath(check, repoRoot)) continue;
     if (suffixTracked(check)) continue; // plugin- or skill-relative citation
     const atHead = tracked('HEAD', check);
     const atUpstream = tracked(upstream, check);

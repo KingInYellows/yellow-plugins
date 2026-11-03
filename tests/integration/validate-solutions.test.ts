@@ -742,6 +742,34 @@ describe('validate-solutions — claim grounding (SOL-003)', () => {
     expect(bad.stdout + bad.stderr).toMatch(/ERROR-SOL-003.*\{\{FIX_PATH\}\}/);
   });
 
+  it('masks a double-backtick code span as a whole', () => {
+    const r = runClaims(
+      'double-backtick',
+      '\nExample ``x `{{VALUE}}` and `[a](./nope.md)` y`` here.\n'
+    );
+    expect(r.stdout + r.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(r.status).toBe(0);
+  });
+
+  it('checks repo-owned dot-directories but skips machine-local ones', () => {
+    mkdirSync(join(repo, '.claude-plugin'), { recursive: true });
+    mkdirSync(join(repo, '.github'), { recursive: true });
+    const bad = runClaims(
+      'dot-dir',
+      '\nSee `.claude-plugin/nonexistent.json` and `.github/nope.yml`.\n'
+    );
+    expect(bad.status).toBe(1);
+    expect(bad.stdout + bad.stderr).toMatch(
+      /\.claude-plugin\/nonexistent\.json/
+    );
+    expect(bad.stdout + bad.stderr).toMatch(/\.github\/nope\.yml/);
+    const ok = runClaims(
+      'dot-dir-local',
+      '\nState in `.git/hooks/pre-push.sh` and `.ruvector/db.json`.\n'
+    );
+    expect(ok.stdout + ok.stderr).not.toMatch(/ERROR-SOL-003/);
+  });
+
   it('downgrades a line marked (historical) to a warning', () => {
     const r = runClaims(
       'historical',
