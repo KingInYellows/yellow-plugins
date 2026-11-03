@@ -695,6 +695,23 @@ describe('Lifecycle', () => {
     }
   });
 
+  it('refuses a flag-shaped correction before charging a round', async () => {
+    const h = harness([planTurn]);
+    await h.lc.delegate(delegateInput(h.repo));
+    await expect(
+      h.lc.reply({
+        requestId: 'r2',
+        localId: 't1',
+        message: '--settings=x',
+        correction: true,
+      })
+    ).rejects.toMatchObject({ code: 'AGY_INVALID_INPUT' });
+    const j = readJournal(h.deps.dataDir);
+    expect(j.tasks['t1']?.correctiveRounds).toBe(0);
+    expect(j.requests['r2']).toBeUndefined();
+    expect(h.calls).toHaveLength(1);
+  });
+
   it('refuses a correction once the plan is approved', async () => {
     const h = harness([planTurn, editTurn('x\n')]);
     await h.lc.delegate(delegateInput(h.repo));

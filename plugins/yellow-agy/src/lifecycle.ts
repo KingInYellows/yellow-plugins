@@ -28,7 +28,12 @@ import type { Plan } from './plan-schema';
 import { isPlan, PLAN_SCHEMA } from './plan-schema';
 import type { RunOptions } from './process';
 import type { TurnProfile } from './profiles';
-import { implementProfile, readOnlyProfile, turnArgs } from './profiles';
+import {
+  assertPromptText,
+  implementProfile,
+  readOnlyProfile,
+  turnArgs,
+} from './profiles';
 import { redact, scanSecretShapes, truncateRedacted } from './redact';
 import type {
   Claim,
@@ -1022,6 +1027,9 @@ export class Lifecycle {
     readonly keepPartial?: boolean;
     readonly resetPartial?: boolean;
   }): Promise<Outcome> {
+    // Checked before reserving, so a refused message never charges a
+    // corrective round or leaves a settled request behind.
+    assertPromptText(input.message);
     const res = await this.reserve(
       input.requestId,
       'reply',

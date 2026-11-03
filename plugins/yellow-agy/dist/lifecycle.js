@@ -727,6 +727,9 @@ class Lifecycle {
         return this.implementTurn(input.requestId, 'approve', task, 'Implement the approved plan.', profile);
     }
     async reply(input) {
+        // Checked before reserving, so a refused message never charges a
+        // corrective round or leaves a settled request behind.
+        (0, profiles_1.assertPromptText)(input.message);
         const res = await this.reserve(input.requestId, 'reply', input.localId, (j) => {
             const t = (0, state_1.getTask)(j, input.localId);
             if (t.state === 'FAILED' ||
