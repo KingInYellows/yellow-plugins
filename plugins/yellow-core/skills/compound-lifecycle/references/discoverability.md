@@ -43,7 +43,7 @@ Keep it informational, not imperative: "always search before implementing"
 causes redundant reads when a workflow already searches. Calibration:
 
 ```text
-docs/solutions/  # documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (module, tags, problem_type)
+docs/solutions/  # documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (category, track, problem, tags)
 ```
 
 ## 4. Apply
