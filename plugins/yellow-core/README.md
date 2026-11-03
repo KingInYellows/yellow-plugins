@@ -105,7 +105,7 @@ grep '^STATUSLINE_VERSION' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-statuslin
 | ------------------------ | -------------------------------------------------------------- |
 | `spec-flow-analyzer`     | User flow analysis, gap identification                         |
 | `brainstorm-orchestrator` | Iterative brainstorm dialogue with research integration       |
-| `knowledge-compounder`   | Extract and document solved problems to compound knowledge; writes only learnings that pass the durable-bar counterfactual |
+| `knowledge-compounder`   | Extract and document solved problems to compound knowledge; writes only learnings that pass the durable-bar counterfactual, then checks cited paths, commits and links with `validate-solutions.js --doc` |
 | `session-historian`      | Cross-vendor session search across Claude Code (local JSONL), Devin (REST API via MCP), and Codex (local directory-per-session); BM25 + optional ruvector cosine + recency fused via Reciprocal Rank Fusion; secret redaction (AWS keys, GitHub tokens, API keys, JWTs, PEM blocks) before excerpts are returned |
 | `staging-reviewer`       | Drain orchestrator for the background-compounding pipeline; spawned by the SessionStart hook's `claude -p` drain subshell |
 | `staging-scorer`         | Haiku-backed rubric scorer for one transcript excerpt; structured JSON output with hardened prompt covering injection-attempt detection |

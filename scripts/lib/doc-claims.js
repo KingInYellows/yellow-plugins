@@ -59,7 +59,9 @@ const CITATION_VERBS = new Set(
 const CITATION_PREPS = new Set(['in', 'by', 'at', 'with']);
 const REPO_PIN_RE = /(?<![\w./@-])([\w.-]+)\/([\w.-]+)@$/;
 const BACKTICK_RE = /`([^`\n]+)`/g;
-const MD_LINK_RE = /\[[^\]]*\]\(([^)\s]+)\)/g;
+// An optional link title (`"..."`, `'...'` or `(...)`) may follow the target.
+const MD_LINK_RE =
+  /\[[^\]]*\]\(([^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\)/g;
 const FENCE_RE = /^\s*(`{3,}|~{3,})(.*)$/;
 const HISTORICAL_MARK = '(historical)';
 
@@ -132,7 +134,8 @@ function isRuntimePath(rel) {
 }
 
 // Blank fenced blocks and inline code spans, keeping line count and length.
-function maskCode(lines) {
+// Blank fenced blocks, and inline code spans unless `inline` is false.
+function maskCode(lines, { inline = true } = {}) {
   const masked = [];
   let fence = null;
   for (const line of lines) {
@@ -154,7 +157,9 @@ function maskCode(lines) {
       masked.push(' '.repeat(line.length));
       continue;
     }
-    masked.push(line.replace(BACKTICK_RE, (x) => ' '.repeat(x.length)));
+    masked.push(
+      inline ? line.replace(BACKTICK_RE, (x) => ' '.repeat(x.length)) : line
+    );
   }
   return masked;
 }
@@ -347,7 +352,10 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
   // 2. Cited commit SHAs.
   if (inGit) {
     const seen = new Map();
-    for (const m of body.matchAll(SHA_RE)) {
+    // Fenced blocks hold examples and fixtures, not citations; inline code
+    // spans stay, since `abc1234` is a common way to cite a commit.
+    const shaText = maskCode(bodyLines, { inline: false }).join('\n');
+    for (const m of shaText.matchAll(SHA_RE)) {
       const sha = m[0];
       if (!/\d/.test(sha) || !/[a-f]/.test(sha)) continue;
       const lineStart = body.lastIndexOf('\n', m.index - 1) + 1;

@@ -791,6 +791,30 @@ describe('validate-solutions — claim grounding (SOL-003)', () => {
     expect(r.status).toBe(0);
   });
 
+  it('checks links that carry a title', () => {
+    const r = runClaims(
+      'titled-link',
+      '\nSee [details](./missing-doc.md "Details").\n'
+    );
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/ERROR-SOL-003.*missing-doc/);
+  });
+
+  it('skips commit words inside fenced examples but checks inline spans', () => {
+    const fenced = runClaims(
+      'fenced-sha',
+      '\n```bash\ngit revert deadbeef1\n```\n'
+    );
+    expect(fenced.stdout + fenced.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(fenced.status).toBe(0);
+    const inline = runClaims(
+      'inline-sha',
+      '\nReverted in commit `deadbeef1`.\n'
+    );
+    expect(inline.status).toBe(1);
+    expect(inline.stdout + inline.stderr).toMatch(/ERROR-SOL-003.*deadbeef1/);
+  });
+
   it('warns for a path that existed in history but was deleted', () => {
     rmSync(join(repo, 'plugins', 'foo', 'real.md'));
     commitAll('delete');
