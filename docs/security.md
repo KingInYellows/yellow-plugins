@@ -331,6 +331,31 @@ ephemeral `GITHUB_TOKEN`.
 - **Revocation**: revoke the PAT in the owner's settings and run
   `gh secret delete RELEASE_PR_TOKEN`; the workflow reverts to `GITHUB_TOKEN`.
 
+### Headless review-gate CI job (`review-gate.yml`)
+
+`.github/workflows/review-gate.yml` runs yellow-review's `review-gate` workflow
+on non-draft pull requests (`scripts/ci/review-gate/README.md`). It reads
+untrusted PR code with a credential, so its boundary is:
+
+- **Who runs it**: same-repository, human-authored, non-draft PRs only. Fork PRs
+  (no secrets) and bot PRs are skipped. `REVIEW_GATE_MODE=off` disables it.
+- **Trusted code**: the reviewer (plugins, `scripts/ci/review-gate/ci.py`,
+  `.github/review-risk.json`, `REVIEW.md`) is checked out from the default
+  branch, so a PR cannot change how it is reviewed or tiered. The PR head is a
+  separate checkout that is read, never executed.
+- **`CLAUDE_CODE_OAUTH_TOKEN`**: passed only to the `claude -p` step. That run
+  has no GitHub token, no setting sources or MCP servers, Bash and every write
+  tool denied, and only Read/Grep/Glob plus
+  `Workflow(yellow-review:review-gate)` allowed. Exposure is limited to the
+  subscription's usage limits.
+- **Known gap**: the PR's own `CLAUDE.md` files load as project memory because
+  the PR checkout is the working directory. With read-only tools, injected text
+  can mislead the review but cannot act or write.
+- **`GITHUB_TOKEN`**: `contents: read`, `pull-requests: write`, used only by the
+  `post` step (advisory mode) to edit one marker-identified comment. Finding
+  text is model output over untrusted code, so it is put on one line with HTML,
+  links, code spans, table pipes and `@` mentions escaped before posting.
+
 ### Local Execution (yellow-ruvector, yellow-debt, yellow-review)
 
 - All processing happens locally on user's machine

@@ -228,6 +228,10 @@ def cell(text, limit=160):
     return "".join(CELL_ESCAPES.get(ch, ch) for ch in s.replace("&", "&amp;"))
 
 
+def as_list(value):
+    return value if isinstance(value, list) else []
+
+
 def path_cell(f):
     path = f.get("file") if isinstance(f.get("file"), str) else "?"
     if not re.fullmatch(r"[A-Za-z0-9._/@+-]+", path):
@@ -242,7 +246,9 @@ def render(work, mode, run_url=None):
     result = read_json(result_path) if os.path.exists(result_path) else {
         "status": "error", "reason": "the run step did not finish", "workflow": None, "cli": {}}
     wf = result.get("workflow") if isinstance(result.get("workflow"), dict) else {}
-    findings = [f for f in wf.get("findings") or [] if isinstance(f, dict)]
+    # A malformed result is already incomplete; never let its shape crash the
+    # report that says so.
+    findings = [f for f in as_list(wf.get("findings")) if isinstance(f, dict)]
     by = {d: [f for f in findings if f.get("display") == d] for d in ("Important", "Nit", "Pre-existing")}
     cov = wf.get("coverage") if isinstance(wf.get("coverage"), dict) else {}
     status = result["status"]
@@ -254,9 +260,9 @@ def render(work, mode, run_url=None):
     if status == "complete":
         out.append("**Result:** %d Important, %d Nit, %d Pre-existing; %d dropped by vote; %s agents."
                    % (len(by["Important"]), len(by["Nit"]), len(by["Pre-existing"]),
-                      len(wf.get("dropped") or []), wf.get("agents", "?")))
+                      len(as_list(wf.get("dropped"))), wf.get("agents", "?")))
     elif status == "incomplete":
-        failed = [cell(n, 60) for n in cov.get("failed") or []]
+        failed = [cell(n, 60) for n in as_list(cov.get("failed"))]
         out.append("**Result: incomplete.** Not every reviewer returned, so no finding here means "
                    "nothing about the rest of the change. %s"
                    % ("Failed: %s." % ", ".join(failed) if failed else cell(result["reason"], 200)))

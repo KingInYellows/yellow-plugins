@@ -182,6 +182,28 @@ class Flow(unittest.TestCase):
         self.assertIn('"important": 1', body)
 
 
+class RenderMalformedTest(unittest.TestCase):
+    def test_malformed_fields_render_as_incomplete(self):
+        work = tempfile.mkdtemp(prefix="review-gate-ci-bad-")
+        self.addCleanup(shutil.rmtree, work, True)
+        ci.write_json(os.path.join(work, "meta.json"), {
+            "repo": "o/r", "pr": 7, "head": "a" * 40, "include": ["correctness-reviewer"],
+            "risk": {"tier": "low"}})
+        ev = ci.load_eval()
+        wf = {"version": 1, "findings": 7, "dropped": "x", "agents": 1,
+              "coverage": {"ran": [], "failed": 7}}
+        result = ci.classify_run(ev, 0, json.dumps({"type": "result", "is_error": False,
+                                                    "result": json.dumps(wf)}), "")
+        self.assertEqual(result["status"], "incomplete")
+        ci.write_json(os.path.join(work, "result.json"), result)
+        with mock.patch("sys.stdout"):
+            ci.render(work, "advisory")
+        with open(os.path.join(work, "comment.md"), encoding="utf-8") as handle:
+            body = handle.read()
+        self.assertIn("incomplete", body)
+        self.assertIn("findings is not a list", body)
+
+
 class PostTest(unittest.TestCase):
     def setUp(self):
         self.work = tempfile.mkdtemp(prefix="review-gate-ci-post-")
