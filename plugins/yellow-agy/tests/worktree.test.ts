@@ -253,6 +253,31 @@ describe('worktree', () => {
     });
   });
 
+  it('collect refuses a worktree holding a nested git repository', async () => {
+    const { wt, base } = await setup();
+    const nested = path.join(wt, 'nested');
+    fs.mkdirSync(nested);
+    git(nested, 'init', '-q');
+    fs.writeFileSync(path.join(nested, 'only-copy.txt'), 'x\n');
+    git(nested, 'add', 'only-copy.txt');
+    git(
+      nested,
+      '-c',
+      'user.name=t',
+      '-c',
+      'user.email=t@t',
+      'commit',
+      '-qm',
+      'x'
+    );
+    const status = git(wt, 'status', '--porcelain');
+    await expect(collectWorktree(exec, wt, 't1', base)).rejects.toMatchObject({
+      code: 'AGY_WORKTREE',
+    });
+    expect(git(wt, 'status', '--porcelain')).toBe(status);
+    expect(fs.existsSync(path.join(nested, 'only-copy.txt'))).toBe(true);
+  });
+
   it('collect returns commits and uncommitted changes without touching the index', async () => {
     const { wt, base } = await setup();
     fs.writeFileSync(path.join(wt, 'a.txt'), 'committed\n');

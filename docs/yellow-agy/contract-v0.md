@@ -131,9 +131,11 @@ in their own process group, and a timeout signals the group.
    real index untouched, for staged, unstaged and untracked changes, into
    `artifacts/<localId>/`. Both pass `--no-ext-diff --no-textconv`, so no
    repository diff helper runs outside agy's sandbox, and patches are kept as
-   raw bytes (text files need not be UTF-8). An empty generated patch is
-   removed. Every artifact is scanned with yellow-jules' secret-shape layers; a
-   hit sets `secretShapedContent: true` and `requiresAttention`, and the owner
+   raw bytes (text files need not be UTF-8). A nested git repository that HEAD
+   doesn't already track as a gitlink can't be carried in a patch, so `collect`
+   (and with it `abandon`) refuses with `AGY_WORKTREE`. An empty generated patch
+   is removed. Every artifact is scanned with yellow-jules' secret-shape layers;
+   a hit sets `secretShapedContent: true` and `requiresAttention`, and the owner
    reviews it before the stack provider opens a PR.
 5. `abandon` (terminal-gated, no live run): run `collect` first so nothing is
    lost, settle the journal, `git worktree remove --force` the worktree, and

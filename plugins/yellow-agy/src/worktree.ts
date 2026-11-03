@@ -516,6 +516,16 @@ export async function collectWorktree(
   try {
     await git(exec, worktree, ['read-tree', sha(realIndex)], env);
     await git(exec, worktree, ['add', '--intent-to-add', '--all'], env);
+    // A nested repository shows up only as a gitlink: its files reach
+    // neither patch, so removing the worktree would destroy them.
+    const nested = await newGitlinks(exec, worktree, env);
+    if (nested.length > 0) {
+      throw new AgyError(
+        'AGY_WORKTREE',
+        `the worktree holds nested git repositories that can't be collected: ${nested.slice(0, 10).join(', ')}`,
+        'Move or commit their contents elsewhere, then retry.'
+      );
+    }
     const uncommitted = await gitBytes(
       exec,
       worktree,
@@ -526,6 +536,29 @@ export async function collectWorktree(
   } finally {
     await exec.removeFile(indexFile);
   }
+}
+
+/** Gitlink paths in the index at `env` that HEAD does not already have. */
+async function newGitlinks(
+  exec: HostExec,
+  worktree: string,
+  env: Readonly<Record<string, string>>
+): Promise<string[]> {
+  const gitlinks = (
+    entries: string[],
+    pathAt: (e: string) => string
+  ): string[] => entries.filter((e) => e.startsWith('160000 ')).map(pathAt);
+  const tab = (e: string): string => e.slice(e.indexOf('\t') + 1);
+  const known = new Set(
+    gitlinks(
+      nulList(await git(exec, worktree, ['ls-tree', '-r', '-z', 'HEAD'])),
+      tab
+    )
+  );
+  return gitlinks(
+    nulList(await git(exec, worktree, ['ls-files', '-s', '-z'], env)),
+    tab
+  ).filter((p) => !known.has(p));
 }
 
 /** Removes the worktree and keeps the branch. */
