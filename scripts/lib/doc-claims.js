@@ -307,7 +307,11 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
 
   // 1. Cited repo paths.
   const seenPaths = new Set();
-  for (const m of body.matchAll(BACKTICK_RE)) {
+  // Fenced blocks are examples; inline spans outside them are citations.
+  const fenceMasked = maskCode(bodyLines, { inline: false }).join('\n');
+  const lineAt = (offset) =>
+    fenceMasked.slice(0, offset).split('\n').length - 1;
+  for (const m of fenceMasked.matchAll(BACKTICK_RE)) {
     const raw = m[1];
     const token = normalizePath(raw);
     if (!isPathCandidate(token)) continue;
@@ -366,8 +370,7 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
     const seen = new Map();
     // Fenced blocks hold examples and fixtures, not citations; inline code
     // spans stay, since `abc1234` is a common way to cite a commit.
-    const shaText = maskCode(bodyLines, { inline: false }).join('\n');
-    for (const m of shaText.matchAll(SHA_RE)) {
+    for (const m of fenceMasked.matchAll(SHA_RE)) {
       const sha = m[0];
       if (!/\d/.test(sha) || !/[a-f]/.test(sha)) continue;
       const lineStart = body.lastIndexOf('\n', m.index - 1) + 1;
@@ -443,7 +446,10 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
     if (!bare || seenLinks.has(bare)) continue;
     if (PLACEHOLDER_CHARS.test(bare)) continue;
     if (PLACEHOLDER_SUBSTRINGS.some((x) => bare.includes(x))) continue;
-    seenLinks.add(bare);
+    // A (historical) occurrence does not stand in for later live ones.
+    if (!bodyLines[lineAt(m.index)].includes(HISTORICAL_MARK)) {
+      seenLinks.add(bare);
+    }
     // GitHub resolves a leading-slash link from the repo root.
     const resolved = bare.startsWith('/')
       ? path.join(repoRoot, bare)
@@ -459,7 +465,7 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
       (!rel.startsWith('..') &&
         (tracked('HEAD', rel) || tracked(upstream, rel)));
     report(
-      lineOf(`(${target})`),
+      lineAt(m.index),
       softMiss ? 'warning' : 'error',
       `link (${target}){loc} does not resolve from the doc's location` +
         (softMiss ? ' (target archived or deleted)' : ''),

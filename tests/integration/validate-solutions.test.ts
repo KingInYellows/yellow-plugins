@@ -858,6 +858,24 @@ describe('validate-solutions — claim grounding (SOL-003)', () => {
     expect(r.stdout + r.stderr).toMatch(/ERROR-SOL-003.*\(deep-doc\.md\)/);
   });
 
+  it('keeps the (historical) exemption for a titled link', () => {
+    const r = runClaims(
+      'titled-historical',
+      '\nSee [old](./gone-doc.md "Old") (historical).\n'
+    );
+    expect(r.status).toBe(0);
+    expect(r.stderr).toMatch(/warning: link/);
+  });
+
+  it('ignores backticked paths inside fenced examples', () => {
+    const r = runClaims(
+      'fenced-path',
+      '\n```markdown\nSee `plugins/nonexistent/example.md`.\n```\n'
+    );
+    expect(r.stdout + r.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(r.status).toBe(0);
+  });
+
   it('warns for a path that existed in history but was deleted', () => {
     rmSync(join(repo, 'plugins', 'foo', 'real.md'));
     commitAll('delete');
