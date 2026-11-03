@@ -6,7 +6,7 @@
  * permission could slip into a run, so they throw instead of degrading.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TOOL_PERMISSIONS = exports.DEFAULT_TOOL_PERMISSION = void 0;
+exports.CONVERSATION_RE = exports.TOOL_PERMISSIONS = exports.DEFAULT_TOOL_PERMISSION = void 0;
 exports.validateAllowCommand = validateAllowCommand;
 exports.readOnlyProfile = readOnlyProfile;
 exports.implementProfile = implementProfile;
@@ -303,7 +303,7 @@ function assertSafeProfile(profile) {
         badProfile('command grants must come from implementProfile on a host with a verified sandbox');
     }
 }
-const CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
+exports.CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 /** The agy argv (without the binary) for one model turn. */
 function turnArgs(options) {
     assertSafeProfile(options.profile);
@@ -329,7 +329,7 @@ function turnArgs(options) {
     }
     const args = ['-p', options.prompt, '--output-format', 'json'];
     if (options.conversationId !== undefined) {
-        if (!CONVERSATION_RE.test(options.conversationId)) {
+        if (!exports.CONVERSATION_RE.test(options.conversationId)) {
             throw new errors_1.AgyError('AGY_INVALID_INPUT', `invalid conversation id ${JSON.stringify(options.conversationId)}`);
         }
         args.push('--conversation', options.conversationId);

@@ -21,8 +21,15 @@ plugins/yellow-agy/
     profiles.ts     # --settings profiles (read-only, implement) and per-turn argv
     classify.ts     # result classification; an absent finished_reason is a normal finish
     errors.ts       # AGY_* catalog with exit codes and recovery actions
+    host-exec.ts    # git and file ops where agy runs (exec-only on the WSL bridge)
+    process.ts      # runs one agy turn: own POSIX (or bridge Linux) process group, deadline SIGTERM then SIGKILL
+    worktree.ts     # create, pre-turn snapshot refs, reset-partial, collect, remove
+    state.ts        # journal in the data dir (0700 on POSIX; on Windows, private only under the per-user %LOCALAPPDATA%): lock, durable atomic writes
+    lifecycle.ts    # delegate / approve / reply / collect / abandon / status
+    plan-schema.ts  # the --json-schema a plan turn passes, and its shape check
+    redact.ts       # secret-shape scan and untrusted-content fence (from yellow-jules)
   dist/             # committed compiled CJS; drift-checked in CI
-  tests/            # vitest, no agy binary needed
+  tests/            # vitest with real git in temp dirs and a fake agy; no agy binary needed
 ```
 
 ## Conventions

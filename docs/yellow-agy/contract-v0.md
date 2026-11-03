@@ -73,11 +73,11 @@ in WSL. The hard rules apply on every host. `--sandbox` is unverified on native
 Windows, so test and lint commands stay off there. `setup` resolves one
 invocation and records it in the data dir:
 
-| Host                       | Invocation                                                                                                                         | Worktree root                                                            |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                    | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
-| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u <each BRIDGE_UNSET_VARS name> <the GIT_CONFIG_COUNT/KEY_n/VALUE_n set below> agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
-| Windows native agy         | `agy.exe`                                                                                                                          | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
+| Host                       | Invocation                                                                                                                                                                | Worktree root                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                                                           | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
+| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u <each BRIDGE_UNSET_VARS name> <the GIT_CONFIG_COUNT/KEY_n/VALUE_n set below> setsid -w sh -c <fixed pgid script> sh agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
+| Windows native agy         | `agy.exe`                                                                                                                                                                 | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
 
 The worktree is created where agy runs. On the WSL bridge that means a WSL clone
 of the repo, never `/mnt/c`. The bridge always uses `wsl.exe --exec` (`-e`),
@@ -86,6 +86,14 @@ never the `--` form, so no shell in the distro re-parses prompts or the
 `stream-json` mode, which v0 doesn't use. Windows caps a command line at 32,767
 characters, so on the bridge a prompt whose full argv would exceed 30,000
 characters fails with `AGY_PROMPT_TOO_LONG` before anything spawns.
+
+Killing `wsl.exe` does not stop the Linux processes behind it, so on the bridge
+`setsid` makes agy lead its own Linux process group, a fixed `sh -c` script
+(arguments stay positional) prints `yellow-agy-pgid:<pgid>` as the first stderr
+line, and a deadline or cancel runs
+`wsl.exe [-d <distro>] -e kill -s TERM|KILL -- -<pgid>`. The marker line is
+stripped before classification. On POSIX hosts agy and every host git call run
+in their own process group, and a timeout signals the group.
 
 ## Run lifecycle
 
@@ -109,15 +117,28 @@ characters fails with `AGY_PROMPT_TOO_LONG` before anything spawns.
    `approve` can start implementation. After approval it uses the implement
    profile. A correction spends a corrective round (R31 counters, unchanged). A
    `PLAN_PENDING` correction passes `--json-schema <plan.schema.json>` and
-   replaces the stored plan, so `approve` implements the corrected plan.
-4. `collect` (no live run): `git -C <worktree> format-patch <base>..HEAD` for
+   replaces the stored plan, so `approve` implements the corrected plan. A
+   correction turn that completes without a valid plan clears it, and `approve`
+   refuses until one arrives; a correction turn that fails (auth, quota, model
+   error, timeout, interrupt) keeps the old plan. A plan turn that times out or
+   is interrupted is a failure with `AGY_TIMEOUT` / `AGY_INTERRUPTED`, never a
+   `PLAN_PENDING` success. Plans, denied actions and finish reasons are redacted
+   before they reach the journal.
+4. `collect` (no live run on any task; it holds the active-run claim until its
+   artifacts are written): `git -C <worktree> format-patch <base>..HEAD` for
    commits, then, in a temporary `GIT_INDEX_FILE` seeded from the real index,
    `git add --intent-to-add --all` and `git diff --binary HEAD`, leaving the
    real index untouched, for staged, unstaged and untracked changes, into
-   `artifacts/<localId>/`. Every artifact is scanned with yellow-jules'
-   secret-shape layers; a hit sets `secretShapedContent: true` and
-   `requiresAttention`, and the owner reviews it before the stack provider opens
-   a PR.
+   `artifacts/<localId>/`. Both pass `--no-ext-diff --no-textconv`, so no
+   repository diff helper runs outside agy's sandbox, and patches are kept as
+   raw bytes (text files need not be UTF-8). A nested git repository that HEAD
+   doesn't already track as a gitlink can't be carried in a patch, so `collect`
+   (and with it `abandon`) refuses with `AGY_WORKTREE`. Ignored paths are never
+   collected, a repository inside one included, and `abandon` removes them with
+   the worktree. An empty generated patch is removed. Every artifact is scanned
+   with yellow-jules' secret-shape layers; a hit sets
+   `secretShapedContent: true` and `requiresAttention`, and the owner reviews it
+   before the stack provider opens a PR.
 5. `abandon` (terminal-gated, no live run): run `collect` first so nothing is
    lost, settle the journal, `git worktree remove --force` the worktree, and
    keep the branch.
@@ -151,15 +172,34 @@ local processes.
 - A claim whose pid is dead is stale. The next call settles it before doing
   anything else. A `delegate` reservation with no `conversation_id` is released:
   its worktree is removed, and its branch is deleted if it has no commits beyond
-  the base. A turn reservation is settled as `INTERRUPTED`.
+  the base. When the crash came before the base was journaled, no turn has run,
+  so the base is the worktree's `HEAD`, read only while it still has that branch
+  checked out. If removing that worktree fails and it still exists, the claim
+  stays and the call fails with `AGY_WORKTREE` naming the command to run. A
+  stale `collect` claim is dropped. A stale `abandon` claim settles the task as
+  `ABANDONED` when its worktree is gone, and otherwise is dropped so `abandon`
+  can be retried. Other turn reservations settle with an `AGY_INTERRUPTED`
+  outcome: an unapproved `PLAN_PENDING` task stays `PLAN_PENDING`, any other
+  task becomes `INTERRUPTED`, and a claim with a recorded child pid adds a usage
+  entry. The settlement is written before the new call's own checks run.
+- The agy child's pid is written to the claim before the turn can settle; if
+  that write fails, the turn is stopped and the call fails with the write's
+  error. Journal writes fsync the temp file and then the directory around the
+  rename. A stale lock is removed only by the holder of `journal.lock.takeover`,
+  and only if it still holds the exact text judged stale; a holder removes its
+  lock on release only if the lock still holds its own token.
 - After `INTERRUPTED` or `TIMED_OUT`, the worktree may hold partial edits. The
   next `approve` or `reply` refuses with `requiresAttention` until the owner
   passes `--keep-partial` (continue on top of them) or `--reset-partial`. Reset
-  runs `git reset --hard <pre-turn HEAD>` and `git clean -fd`, then restores the
-  snapshot with `git read-tree --reset -u <snapshot>` followed by the index-only
-  `git read-tree <pre-turn-index>`, so work from earlier turns, deletions
-  included, comes back with its staged and unstaged parts as they were. Both
-  refs are deleted once the reset or the next turn settles.
+  first lists every ignored untracked file under the rules in force, then runs
+  `git reset --hard <pre-turn HEAD>` and `git read-tree --reset -u <snapshot>`,
+  then `git clean -fd` against a scratch index holding the snapshot tree plus
+  those files, and finally the index-only `git read-tree <pre-turn-index>`.
+  Clean never touches an indexed path, so a file the turn's rules ignored
+  survives even when the restored `.gitignore` files un-ignore it. Work from
+  earlier turns, deletions included, comes back with its staged and unstaged
+  parts as they were. Both refs are deleted once the reset or the next turn
+  settles.
 
 ## Permission profiles (`--settings` JSON)
 
@@ -215,8 +255,8 @@ defense in depth.
   program-running or rerouting `GIT_*` variable git(1) documents (`GIT_EDITOR`,
   `GIT_EXTERNAL_DIFF`, `GIT_PAGER`, `GIT_ASKPASS`, …), since the distro's own
   environment is out of the Windows-side scrub's reach. The adapter's own host
-  git calls (`collect`, snapshots, in the lifecycle PR) use the same override
-  set and scrubbed environment.
+  git calls (`collect`, snapshots) use the same override set and scrubbed
+  environment, and discover the filter drivers afresh before each call.
 
 ## Result classification
 
