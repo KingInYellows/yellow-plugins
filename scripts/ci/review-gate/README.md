@@ -48,16 +48,18 @@ A result is `complete` only when the eval would grade it. A hunter that returned
 `null` (in `-p`, a usage-limit wait fails the agent instead of pausing), an
 empty run or a malformed result is `incomplete`, and the comment says no finding
 means nothing about the rest of the change. A crash, timeout or reply without
-workflow JSON is `error` ("not run"). The comment ends with a
+workflow JSON is `error` ("not run") and fails the job, so the check shows it;
+findings and incomplete coverage never fail it. The comment ends with a
 `<!-- review-gate-status {...} -->` line (`head`, `tier`, `status`, `important`)
 for a later merge-gate reader.
 
 ## Trust boundaries
 
 - The reviewer (plugins, this driver, `.github/review-risk.json`, `REVIEW.md`)
-  comes from the default branch, so a PR cannot weaken its own review. A PR that
-  changes the reviewer is reviewed by the old one; the eval covers the new one.
-  On the PR that adds this driver the job skips with a notice.
+  comes from the default branch, so a PR cannot change them (its own `CLAUDE.md`
+  files still load; see below). A PR that changes the reviewer is reviewed by
+  the old one; the eval covers the new one. On the PR that adds this driver the
+  job skips with a notice.
 - The PR's code is read, never run. The `claude` step gets the subscription
   token and no GitHub token; only `post` has `GH_TOKEN`.
 - Finding text comes from models that read untrusted code. `render` puts it on

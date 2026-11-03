@@ -341,8 +341,14 @@ untrusted PR code with a credential, so its boundary is:
   (no secrets) and bot PRs are skipped. `REVIEW_GATE_MODE=off` disables it.
 - **Trusted code**: the reviewer (plugins, `scripts/ci/review-gate/ci.py`,
   `.github/review-risk.json`, `REVIEW.md`) is checked out from the default
-  branch, so a PR cannot change how it is reviewed or tiered. The PR head is a
-  separate checkout that is read, never executed.
+  branch, so a PR cannot change those or its tier (its own `CLAUDE.md` still
+  loads; see the known gap below). The PR head is a separate checkout that is
+  read, never executed.
+- **Workflow definition**: the job uses `pull_request`, so its steps come from
+  the PR. Only same-repository branches run it, and anyone who can push one can
+  already reach repository secrets through any `pull_request` workflow
+  (`claude-code-review.yml` does the same), so `pull_request_target` would add
+  its fork-checkout risk without narrowing who can read the token.
 - **`CLAUDE_CODE_OAUTH_TOKEN`**: passed only to the `claude -p` step. That run
   has no GitHub token, no setting sources or MCP servers, Bash and every write
   tool denied, and only Read/Grep/Glob plus

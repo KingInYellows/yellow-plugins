@@ -185,7 +185,9 @@ def run(work, claude, model, timeout):
     result = classify_run(ev, rc, stdout, stderr)
     write_json(os.path.join(work, "result.json"), result)
     print("review-gate: %s%s" % (result["status"], ": " + result["reason"] if result["reason"] else ""))
-    return 0
+    # A run that never produced a result fails the step so the check shows it.
+    # Findings and incomplete coverage never do: the review does not block.
+    return 1 if result["status"] == "error" else 0
 
 
 def classify_run(ev, rc, stdout, stderr):
@@ -225,7 +227,10 @@ def cell(text, limit=160):
     one line, and no HTML, links, mentions, code spans or table breaks."""
     s = re.sub(r"\s+", " ", str(text)).strip()
     s = s[:limit - 1] + "\u2026" if len(s) > limit else s
-    return "".join(CELL_ESCAPES.get(ch, ch) for ch in s.replace("&", "&amp;"))
+    s = "".join(CELL_ESCAPES.get(ch, ch) for ch in s.replace("&", "&amp;"))
+    # Bare URLs autolink on GitHub; a zero-width space after the scheme or
+    # `www.` keeps them as text.
+    return re.sub(r"(?i)([a-z][a-z0-9+.-]*:/|www\.)", lambda m: m.group(0) + "\u200b", s)
 
 
 def as_list(value):

@@ -4,8 +4,8 @@ name: Review Gate
 # yellow-review:review-gate workflow (Hunt -> Vote -> Rank) headless on every
 # non-draft PR. It sits beside claude-code-review.yml, whose upstream
 # code-review job stays as an independent lineage. It never approves or
-# blocks: the job passes whatever the review finds, and is not a required
-# check. Driver and rationale: scripts/ci/review-gate/README.md.
+# blocks on findings: the job fails only when the run produced no result at
+# all, and it is not a required check. Driver and rationale: scripts/ci/review-gate/README.md.
 #
 # repository variable REVIEW_GATE_MODE:
 #   shadow (default when unset) - result in the job summary and artifact only

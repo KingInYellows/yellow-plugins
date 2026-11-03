@@ -124,7 +124,7 @@ class Flow(unittest.TestCase):
 
     def test_run_complete(self):
         self.prepare({"docs/a.md": "b\n"})
-        ci.run(self.work, STANDIN, "sonnet", 60)
+        self.assertEqual(ci.run(self.work, STANDIN, "sonnet", 60), 0)
         result = ci.read_json(os.path.join(self.work, "result.json"))
         self.assertEqual(result["status"], "complete")
         with open(os.path.join(self.tmp, "log", "pr.json"), encoding="utf-8") as handle:
@@ -154,10 +154,21 @@ class Flow(unittest.TestCase):
     def test_a_crashed_run_is_an_error(self):
         self.prepare({"docs/a.md": "b\n"})
         with mock.patch.dict(os.environ, {"STANDIN_FAIL": "pr"}):
-            ci.run(self.work, STANDIN, "sonnet", 60)
+            self.assertEqual(ci.run(self.work, STANDIN, "sonnet", 60), 1)
         result = ci.read_json(os.path.join(self.work, "result.json"))
         self.assertEqual(result["status"], "error")
         self.assertIn("exited 1", result["reason"])
+
+    def test_a_timeout_is_an_error(self):
+        self.prepare({"docs/a.md": "b\n"})
+        slow = os.path.join(self.tmp, "slow-claude")
+        with open(slow, "w", encoding="utf-8") as handle:
+            handle.write("#!/bin/sh\nsleep 5\n")
+        os.chmod(slow, 0o755)
+        self.assertEqual(ci.run(self.work, slow, "sonnet", 1), 1)
+        result = ci.read_json(os.path.join(self.work, "result.json"))
+        self.assertEqual(result["status"], "error")
+        self.assertIn("timed out", result["reason"])
 
     def test_render_makes_model_text_inert(self):
         self.prepare({"docs/a.md": "b\n"})
@@ -174,8 +185,9 @@ class Flow(unittest.TestCase):
             body = handle.read()
         self.assertTrue(body.startswith(ci.MARKER))
         row = next(line for line in body.splitlines() if line.startswith("| `docs/a.md:1`"))
-        for bad in ("@someone", "<img", "](", "`code`", "\n"):
+        for bad in ("@someone", "<img", "](", "`code`", "http://x"):
             self.assertNotIn(bad, row)
+        self.assertIn("next", row)
         self.assertEqual(row.count("|"), 4)
         self.assertIn("1 Important", body)
         self.assertIn("[Run](https://github.com/o/r/actions/runs/5)", body)
