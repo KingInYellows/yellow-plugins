@@ -117,12 +117,16 @@ export function defaultOpenTty(
 }
 
 /**
- * Replaces terminal control characters (C0 but newline, DEL, C1) so a crafted
- * path in the summary can't move the cursor or rewrite what the owner reads.
+ * Replaces terminal control characters (C0 but newline, DEL, C1) and Unicode
+ * bidi and zero-width format characters, so a crafted path in the summary
+ * can't move the cursor or make what the owner reads differ from the grant.
  */
 export function printable(text: string): string {
-  // eslint-disable-next-line no-control-regex
-  return text.replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, '?');
+  return text.replace(
+    // eslint-disable-next-line no-control-regex, no-misleading-character-class
+    /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u061c\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/g,
+    '?'
+  );
 }
 
 const RETRY =

@@ -8,10 +8,10 @@ It replaces `docs/yellow-jules/contract-v1.md` once yellow-agy ships. Evidence:
 
 yellow-agy hands one coding task to the Antigravity CLI (`agy`) running on the
 owner's own machine, in an isolated git worktree, under the owner's Google AI
-Pro sign-in. It keeps yellow-jules' authority model (owner-typed grants,
-locked journal; v0 drops the controller epoch, see "Output envelope") and its
-verbs, so `/linear:delegate` keeps its
-shape. It replaces the vendor session API with local child processes.
+Pro sign-in. It keeps yellow-jules' authority model (owner-typed grants, locked
+journal; v0 drops the controller epoch, see "Output envelope") and its verbs, so
+`/linear:delegate` keeps its shape. It replaces the vendor session API with
+local child processes.
 
 Routing is an adapter-phase prerequisite, not part of v0: the delegate
 classifier gains `READY_AGY` and accepts `--provider agy`. `READY_JULES` and
@@ -143,9 +143,9 @@ in their own process group, and a timeout signals the group.
 5. `abandon` (terminal-gated, no live run): run `collect` first so nothing is
    lost, settle the journal, `git worktree remove --force` the worktree, and
    keep the branch.
-6. `status` / `list`: read from the journal alone. There's no
-   vendor polling. `supervise` does at most one `reply` or `approve` per pass,
-   the same as today.
+6. `status` / `list`: read from the journal alone. There's no vendor polling.
+   `supervise` does at most one `reply` or `approve` per pass, the same as
+   today.
 
 ## Reservations, retries and recovery
 
@@ -318,9 +318,12 @@ and after each turn.
 
 These are the same as yellow-jules contract-v1 (one JSON object on stdout, exit
 0/1/2, `requiresAttention` + `attention`, owner-only data dir, grants created
-only by `authorize` after a terminal confirmation). The changes are the
-`AGY_*` code prefix, the `YELLOW_AGY_*` env prefix, and a grant that names
-`--allow-command` patterns and `minQuotaPercent` instead of vendor sources.
+only by `authorize` after a terminal confirmation). The changes are the `AGY_*`
+code prefix, the `YELLOW_AGY_*` env prefix, and a grant that names
+`--allow-command` patterns and `minQuotaPercent` instead of vendor sources. On
+Windows the owner-only guarantee covers the per-user default under
+`%LOCALAPPDATA%`; a `YELLOW_AGY_DATA_DIR` override inherits whatever ACL its
+directory has, so point it only at a directory you alone can read.
 
 Grants live in the journal (`grants`), so a grant's check and its charge are
 part of the same locked write as the reservation they cover. A grant names the
@@ -350,13 +353,12 @@ The `/usage` shape is pinned to the output captured from agy 1.4.12 on the
 owner's WSL host (`plugins/yellow-agy/tests/fixtures/usage-1.4.12.json`):
 `status` is `"SUCCESS"`, `command.name` is `"usage"`, and
 `command.data.groups[]` each hold `buckets[]` with a 0-1 `remaining_fraction`
-(groups are model families, each with one or more buckets such as the weekly
-and 5-hour windows). The
-gate takes the lowest fraction across every bucket, because agy picks the
-model, multiplies it by 100, subtracts recent turns, and compares the result
-with `minQuotaPercent`. It refuses with `AGY_QUOTA_UNKNOWN` when the output has
-any other shape, a group has no buckets, a fraction is missing or outside 0-1,
-or the probe was killed or didn't exit 0.
+(groups are model families, each with one or more buckets such as the weekly and
+5-hour windows). The gate takes the lowest fraction across every bucket, because
+agy picks the model, multiplies it by 100, subtracts recent turns, and compares
+the result with `minQuotaPercent`. It refuses with `AGY_QUOTA_UNKNOWN` when the
+output has any other shape, a group has no buckets, a fraction is missing or
+outside 0-1, or the probe was killed or didn't exit 0.
 
 New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
 `AGY_AUTH_MODE`, `AGY_OVERAGES`, `AGY_AUTH_REQUIRED`, `AGY_BUSY`, `AGY_QUOTA`,
