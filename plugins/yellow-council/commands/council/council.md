@@ -310,7 +310,7 @@ council_cmr_read() {
 }
 CMR=auto
 CMR_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || CMR_ROOT=
-for CMR_FILE in ${CMR_ROOT:+"$CMR_ROOT/yellow-plugins.local.md"} "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md"; do
+for CMR_FILE in ${CMR_ROOT:+"$CMR_ROOT/yellow-plugins.local.md"} "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md"; do
   CMR_V=$(council_cmr_read "$CMR_FILE")
   case "$CMR_V" in
     '' | auto) ;;
