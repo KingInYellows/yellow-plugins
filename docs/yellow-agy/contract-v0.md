@@ -350,7 +350,8 @@ The `/usage` shape is pinned to the output captured from agy 1.4.12 on the
 owner's WSL host (`plugins/yellow-agy/tests/fixtures/usage-1.4.12.json`):
 `status` is `"SUCCESS"`, `command.name` is `"usage"`, and
 `command.data.groups[]` each hold `buckets[]` with a 0-1 `remaining_fraction`
-(groups are model families, buckets are the weekly and 5-hour windows). The
+(groups are model families, each with one or more buckets such as the weekly
+and 5-hour windows). The
 gate takes the lowest fraction across every bucket, because agy picks the
 model, multiplies it by 100, subtracts recent turns, and compares the result
 with `minQuotaPercent`. It refuses with `AGY_QUOTA_UNKNOWN` when the output has

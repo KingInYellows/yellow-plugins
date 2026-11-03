@@ -16,7 +16,7 @@ run is file edits only until agy's `--sandbox` is verified on a host.
 
 ## Prerequisites
 
-- agy 1.4.11 or later, on `PATH` or inside a WSL distro on Windows
+- agy 1.4.12 or later, on `PATH` or inside a WSL distro on Windows
   (`YELLOW_AGY_WSL_DISTRO` picks the distro; the default distro otherwise)
 - agy signed in once, interactively, with the Google account that holds the AI
   Pro plan

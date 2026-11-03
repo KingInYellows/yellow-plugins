@@ -128,7 +128,7 @@ export function detectHost(options: DetectOptions = {}): HostConfig {
     real = run(distro, [
       'sh',
       '-c',
-      'd="$HOME/.local/share/yellow-agy/worktrees" && mkdir -p -m 700 "$d" && chmod 700 "$d" && realpath -e -- "$d"',
+      'd="$HOME/.local/share/yellow-agy/worktrees" && mkdir -p -m 700 "$d" && r=$(realpath -e -- "$d") && case "$r" in /mnt/*) ;; *) chmod 700 "$r" ;; esac && printf "%s\\n" "$r"',
     ]);
   } catch {
     throw new AgyError(
