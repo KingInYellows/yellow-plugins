@@ -362,6 +362,10 @@ rule id in parentheses is what the failure message cites.
   command `name:` or `plugins/<namespace>/**/skills/<name>/SKILL.md` (RULE
   18); the prose placeholders `plugin:skill-name` and `yellow-X:skill-name`
   are exempt by exact match.
+- CE's durable-bar paragraph sits between `<!-- durable-bar:start -->` and
+  `<!-- durable-bar:end -->` in `knowledge-compounder` and `staging-scorer`.
+  RULE 22 requires every copy to be byte-identical and to match the upstream
+  text; edit all copies and `DURABLE_BAR_TEXT` together.
 - Write agent and skill bodies for the Claude 5 generation: task, inputs,
   output contract, and the project-specific facts Claude cannot infer, in
   brief imperative sentences. Omit ALL-CAPS rule lists, "be thorough"
