@@ -20,6 +20,7 @@ import {
 } from './classify';
 import type { AgyErrorCode } from './errors';
 import { AgyError } from './errors';
+import { authorizeRequest, putGrant, requireGrant } from './grants';
 import type { HostExec } from './host-exec';
 import type { Host, Invocation } from './invocation';
 import { buildInvocation } from './invocation';
@@ -27,7 +28,12 @@ import type { Plan } from './plan-schema';
 import { isPlan, PLAN_SCHEMA } from './plan-schema';
 import type { RunOptions } from './process';
 import type { TurnProfile } from './profiles';
-import { implementProfile, readOnlyProfile, turnArgs } from './profiles';
+import {
+  assertPromptText,
+  implementProfile,
+  readOnlyProfile,
+  turnArgs,
+} from './profiles';
 import { redact, scanSecretShapes, truncateRedacted } from './redact';
 import type {
   Claim,
@@ -82,6 +88,12 @@ export interface LifecycleDeps {
   /** Our own deadline; a little longer than printTimeoutSeconds. */
   readonly deadlineMs: number;
   readonly newId?: () => string;
+  /**
+   * The grant every mutating call is checked and charged against, inside
+   * the reservation's locked write. The CLI always sets it.
+   */
+  readonly grantId?: string;
+  readonly now?: () => Date;
   readonly ownerPid?: number;
   readonly isAlive?: (pid: number | undefined) => boolean;
 }
@@ -206,6 +218,14 @@ export class Lifecycle {
   }
 
   /** Settles a claim whose owner died. Runs under the lock. */
+  /** Settles a dead run's claim; every mutating call does this first. */
+  async recover(): Promise<void> {
+    await updateJournal(this.deps.dataDir, async (j) => ({
+      journal: await this.settleStale(j),
+      result: undefined,
+    }));
+  }
+
   private async settleStale(j: Journal): Promise<Journal> {
     const claim = j.activeRun;
     if (claim === undefined) return j;
@@ -248,8 +268,21 @@ export class Lifecycle {
     if (claim.op === 'delegate' && task === undefined) {
       const pending = own(j.requests, claim.requestId);
       const meta = pending?.outcome as
-        | { worktree?: string; branch?: string; repo?: string; base?: string }
+        | {
+            worktree?: string;
+            branch?: string;
+            repo?: string;
+            base?: string;
+            grantId?: string;
+          }
         | undefined;
+      // No turn ran, so the grant gets its task back.
+      const g =
+        claim.childPid === undefined && typeof meta?.grantId === 'string'
+          ? next.grants?.[meta.grantId]
+          : undefined;
+      if (g !== undefined && g.totalTasks > 0)
+        next = putGrant(next, { ...g, totalTasks: g.totalTasks - 1 });
       if (meta?.worktree !== undefined && meta.repo !== undefined) {
         // A crash between createWorktree and the journal write leaves no
         // base recorded. No turn has run then, so the worktree's HEAD, read
@@ -307,8 +340,21 @@ export class Lifecycle {
       return next;
     }
     if (task !== undefined) {
+      // A correction charged at reservation whose turn never started (no
+      // child pid) gets its round back, as release() would have done.
+      const pendingCorrection =
+        (
+          own(j.requests, claim.requestId)?.outcome as
+            | { correction?: unknown }
+            | undefined
+        )?.correction === '1';
+      const refund =
+        pendingCorrection &&
+        claim.childPid === undefined &&
+        task.correctiveRounds > 0;
       const settled: Task = {
         ...task,
+        ...(refund ? { correctiveRounds: task.correctiveRounds - 1 } : {}),
         state:
           task.state === 'PLAN_PENDING' && !task.approved
             ? 'PLAN_PENDING'
@@ -342,14 +388,13 @@ export class Lifecycle {
     op: Operation,
     localId: string,
     check: (j: Journal) => void,
-    meta?: Record<string, string>
+    meta?: Record<string, string>,
+    scope?: { readonly repo: string; readonly branch: string },
+    correction?: boolean
   ): Promise<{ replay?: Outcome; journal: Journal }> {
     // Settle a dead claim in its own write, so a refusal below can't discard
     // the settlement.
-    await updateJournal(this.deps.dataDir, async (j) => ({
-      journal: await this.settleStale(j),
-      result: undefined,
-    }));
+    await this.recover();
     return updateJournal<{ replay?: Outcome; journal: Journal }>(
       this.deps.dataDir,
       async (j0) => {
@@ -380,6 +425,16 @@ export class Lifecycle {
           );
         }
         check(j);
+        let charged = this.authorize(j, op, localId, scope, correction);
+        if (correction === true) {
+          // Charged with the reservation, so a turn killed before it settles
+          // still counts against the limit.
+          const t = getTask(charged, localId);
+          charged = putTask(charged, {
+            ...t,
+            correctiveRounds: t.correctiveRounds + 1,
+          });
+        }
         const claim: Claim = {
           requestId,
           op,
@@ -388,14 +443,21 @@ export class Lifecycle {
           startedAt: nowIso(),
         };
         const next = putRequest(
-          { ...j, activeRun: claim },
+          { ...charged, activeRun: claim },
           {
             requestId,
             op,
             localId,
             status: 'pending',
             at: claim.startedAt,
-            ...(meta === undefined ? {} : { outcome: meta }),
+            ...(meta === undefined && correction !== true
+              ? {}
+              : {
+                  outcome: {
+                    ...meta,
+                    ...(correction === true ? { correction: '1' } : {}),
+                  },
+                }),
           }
         );
         return { journal: next, result: { journal: next } };
@@ -403,12 +465,64 @@ export class Lifecycle {
     );
   }
 
-  /** Drops the claim and the pending request: a refusal with no turn. */
+  /** Checks the request against the grant and charges it. */
+  private authorize(
+    j: Journal,
+    op: Operation,
+    localId: string,
+    scope: { readonly repo: string; readonly branch: string } | undefined,
+    correction: boolean | undefined
+  ): Journal {
+    const grantId = this.deps.grantId;
+    // Abandon is owner-confirmed on the terminal instead, and must work
+    // after a grant expires.
+    if (grantId === undefined || op === 'abandon') return j;
+    const task = op === 'delegate' ? undefined : getTask(j, localId);
+    const repo = scope?.repo ?? task?.repo ?? '';
+    const branch = scope?.branch ?? task?.branch ?? '';
+    return authorizeRequest(
+      j,
+      grantId,
+      {
+        op,
+        repo,
+        branch,
+        ...(task === undefined ? {} : { task }),
+        ...(correction === undefined ? {} : { correction }),
+      },
+      (this.deps.now ?? (() => new Date()))()
+    );
+  }
+
+  /**
+   * Drops the claim and the pending request: a refusal with no turn. A
+   * delegate refused before its worktree existed gets its task back.
+   */
   private release(requestId: string): Promise<void> {
     return updateJournal(this.deps.dataDir, (j) => {
+      const rec = own(j.requests, requestId);
       const { [requestId]: _gone, ...requests } = j.requests;
       void _gone;
-      const next = j.activeRun?.requestId === requestId ? withoutClaim(j) : j;
+      let next = j.activeRun?.requestId === requestId ? withoutClaim(j) : j;
+      const grantId = this.deps.grantId;
+      if (rec?.op === 'delegate' && grantId !== undefined) {
+        const g = requireGrant(next, grantId);
+        if (g.totalTasks > 0)
+          next = putGrant(next, { ...g, totalTasks: g.totalTasks - 1 });
+      }
+      const t =
+        rec?.localId === undefined ? undefined : own(next.tasks, rec.localId);
+      if (
+        (rec?.outcome as { correction?: unknown } | undefined)?.correction ===
+          '1' &&
+        t !== undefined &&
+        t.correctiveRounds > 0
+      ) {
+        next = putTask(next, {
+          ...t,
+          correctiveRounds: t.correctiveRounds - 1,
+        });
+      }
       return { journal: { ...next, requests }, result: undefined };
     });
   }
@@ -530,7 +644,11 @@ export class Lifecycle {
         worktree,
         branch: input.branch,
         repo: input.repo,
-      }
+        ...(this.deps.grantId === undefined
+          ? {}
+          : { grantId: this.deps.grantId }),
+      },
+      { repo: input.repo, branch: input.branch }
     );
     if (res.replay !== undefined) return res.replay;
     // Build (and so validate) the turn's argv before any git side effect,
@@ -568,7 +686,7 @@ export class Lifecycle {
       return {
         journal: putRequest(j, {
           ...rec,
-          outcome: { worktree, branch: input.branch, repo: input.repo, base },
+          outcome: { ...(rec.outcome as object), base },
         }),
         result: undefined,
       };
@@ -584,6 +702,9 @@ export class Lifecycle {
       approved: false,
       correctiveRounds: 0,
       requiresAttention: true,
+      ...(this.deps.grantId === undefined
+        ? {}
+        : { grantId: this.deps.grantId }),
       createdAt: at,
       updatedAt: at,
     };
@@ -906,6 +1027,9 @@ export class Lifecycle {
     readonly keepPartial?: boolean;
     readonly resetPartial?: boolean;
   }): Promise<Outcome> {
+    // Checked before reserving, so a refused message never charges a
+    // corrective round or leaves a settled request behind.
+    assertPromptText(input.message);
     const res = await this.reserve(
       input.requestId,
       'reply',
@@ -922,13 +1046,41 @@ export class Lifecycle {
             `task ${t.localId} is ${t.state}; there is no conversation to reply to`
           );
         }
-      }
+        if (input.correction === true && t.approved) {
+          throw new AgyError(
+            'AGY_INVALID_INPUT',
+            `task ${t.localId} is approved; --correction asks for a new plan and only works before approval`
+          );
+        }
+      },
+      undefined,
+      undefined,
+      input.correction === true
     );
     if (res.replay !== undefined) return res.replay;
-    const approved = getTask(res.journal, input.localId).approved;
-    const profile = await this.prepare(input.requestId, () =>
-      approved ? this.implement() : this.readOnly()
-    );
+    const current = getTask(res.journal, input.localId);
+    const withSchema = input.correction === true;
+    const profile = await this.prepare(input.requestId, () => {
+      if (current.approved) return this.implement();
+      // Build (and so validate) the plan turn's argv while the reservation
+      // can still be released, so a message too long for the host's command
+      // line refunds its corrective round instead of spending it.
+      const p = this.readOnly();
+      buildInvocation(
+        this.deps.host,
+        turnArgs({
+          prompt: input.message,
+          profile: p,
+          printTimeoutSeconds: this.deps.printTimeoutSeconds,
+          ...(current.conversationId === undefined
+            ? {}
+            : { conversationId: current.conversationId }),
+          ...(withSchema ? { jsonSchemaPath: this.deps.schemaPath } : {}),
+        }),
+        { cwd: current.worktree, baseEnv: this.deps.baseEnv, filterDrivers: [] }
+      );
+      return p;
+    });
     let task: Task;
     try {
       task = await this.resolvePartial(
@@ -940,8 +1092,6 @@ export class Lifecycle {
       await this.release(input.requestId);
       throw err;
     }
-    if (input.correction === true)
-      task = { ...task, correctiveRounds: task.correctiveRounds + 1 };
     if (task.approved)
       return this.implementTurn(
         input.requestId,
@@ -950,7 +1100,6 @@ export class Lifecycle {
         input.message,
         profile
       );
-    const withSchema = input.correction === true;
     let cls: TurnClass;
     try {
       cls = await this.turn(

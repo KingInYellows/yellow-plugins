@@ -10,6 +10,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { AgyError } from './errors';
+import type { Grant } from './grants';
+import { isGrant } from './grants';
 
 export type TaskState =
   | 'PLAN_PENDING'
@@ -41,6 +43,8 @@ export interface Task {
   readonly correctiveRounds: number;
   readonly requiresAttention: boolean;
   readonly lastFinishedReason?: string;
+  /** The grant the task was created under. */
+  readonly grantId?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -87,6 +91,11 @@ export interface Journal {
   readonly requests: Readonly<Record<string, RequestRecord>>;
   readonly activeRun?: Claim;
   readonly usage: readonly UsageEntry[];
+  /**
+   * Created and revoked only by authorize; reservations charge and refund
+   * their counts. See grants.ts.
+   */
+  readonly grants?: Readonly<Record<string, Grant>>;
 }
 
 const EMPTY: Journal = { version: 1, tasks: {}, requests: {}, usage: [] };
@@ -311,6 +320,15 @@ export function readJournal(dir: string): Journal {
   if (j.usage !== undefined && !Array.isArray(j.usage)) {
     throw badJournal('usage');
   }
+  if (
+    j.grants !== undefined &&
+    !(
+      isRecord(j.grants) &&
+      Object.entries(j.grants).every(([k, g]) => isGrant(k, g))
+    )
+  ) {
+    throw badJournal('grants');
+  }
   const claim: unknown = j.activeRun;
   if (
     claim !== undefined &&
@@ -331,6 +349,7 @@ export function readJournal(dir: string): Journal {
     requests: j.requests,
     usage: (j.usage ?? []).filter(isRecord) as unknown as UsageEntry[],
     ...(j.activeRun === undefined ? {} : { activeRun: j.activeRun }),
+    ...(j.grants === undefined ? {} : { grants: j.grants }),
   };
 }
 

@@ -164,6 +164,8 @@ describe('state', () => {
       '{"version":1,"tasks":{},"requests":{"r":null}}',
       '{"version":1,"tasks":{},"requests":{},"activeRun":null}',
       '{"version":1,"tasks":{},"requests":{},"activeRun":{"requestId":"r"}}',
+      '{"version":1,"tasks":{},"requests":{},"grants":{"x":null}}',
+      '{"version":1,"tasks":{},"requests":{},"grants":[]}',
     ]) {
       fs.writeFileSync(file, body);
       expect(() => readJournal(dir), body).toThrow(

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { TurnOutcome } from '../src/classify';
 import { AgyError } from '../src/errors';
+import { buildGrant, putGrant } from '../src/grants';
 import { createHostExec } from '../src/host-exec';
 import type { Invocation } from '../src/invocation';
 import type { LifecycleDeps } from '../src/lifecycle';
@@ -616,6 +617,139 @@ describe('Lifecycle', () => {
     expect(h.calls).toHaveLength(2);
   });
 
+  it('charges a correction with its reservation and refunds a refused one', async () => {
+    let gates = 0;
+    const h = harness(
+      [
+        planTurn,
+        (inv) => {
+          // The round is already charged while the turn runs.
+          void inv;
+          expect(
+            readJournal(h.deps.dataDir).tasks['t1']?.correctiveRounds
+          ).toBe(1);
+          return {
+            json: {
+              status: 'SUCCESS',
+              conversation_id: 'c1',
+              structured_output: PLAN,
+            },
+          };
+        },
+      ],
+      {
+        quotaGate: async () => {
+          gates += 1;
+          if (gates === 2) throw new AgyError('AGY_QUOTA_LOW', 'low');
+        },
+      }
+    );
+    await h.lc.delegate(delegateInput(h.repo));
+    const redo = { localId: 't1', message: 'redo', correction: true };
+    await expect(
+      h.lc.reply({ ...redo, requestId: 'r2' })
+    ).rejects.toMatchObject({ code: 'AGY_QUOTA_LOW' });
+    expect(readJournal(h.deps.dataDir).tasks['t1']?.correctiveRounds).toBe(0);
+    await h.lc.reply({ ...redo, requestId: 'r3' });
+    expect(h.lc.status('t1')[0]?.correctiveRounds).toBe(1);
+  });
+
+  it('recovery refunds a correction whose turn never started', async () => {
+    for (const childPid of [undefined, 2222]) {
+      const h = harness([planTurn, editTurn('x\n')], {
+        isAlive: () => false,
+      });
+      await h.lc.delegate(delegateInput(h.repo));
+      const dir = h.deps.dataDir;
+      const j = readJournal(dir);
+      const t = j.tasks['t1'];
+      if (t === undefined) throw new Error('no task');
+      // A controller that died mid-correction: charged, claim left behind.
+      writeJournal(dir, {
+        ...j,
+        tasks: { ...j.tasks, t1: { ...t, correctiveRounds: 1 } },
+        requests: {
+          ...j.requests,
+          rc: {
+            requestId: 'rc',
+            op: 'reply',
+            localId: 't1',
+            status: 'pending',
+            outcome: { correction: '1' },
+            at: new Date().toISOString(),
+          },
+        },
+        activeRun: {
+          requestId: 'rc',
+          op: 'reply',
+          localId: 't1',
+          ownerPid: 1111,
+          ...(childPid === undefined ? {} : { childPid }),
+          startedAt: new Date().toISOString(),
+        },
+      } as typeof j);
+      await h.lc.approve({ requestId: 'r3', localId: 't1' });
+      expect(readJournal(dir).tasks['t1']?.correctiveRounds).toBe(
+        childPid === undefined ? 0 : 1
+      );
+    }
+  });
+
+  it('refuses a flag-shaped correction before charging a round', async () => {
+    const h = harness([planTurn]);
+    await h.lc.delegate(delegateInput(h.repo));
+    await expect(
+      h.lc.reply({
+        requestId: 'r2',
+        localId: 't1',
+        message: '--settings=x',
+        correction: true,
+      })
+    ).rejects.toMatchObject({ code: 'AGY_INVALID_INPUT' });
+    const j = readJournal(h.deps.dataDir);
+    expect(j.tasks['t1']?.correctiveRounds).toBe(0);
+    expect(j.requests['r2']).toBeUndefined();
+    expect(h.calls).toHaveLength(1);
+  });
+
+  it('refunds a correction too long for the Windows command line', async () => {
+    const h = harness([planTurn]);
+    await h.lc.delegate(delegateInput(h.repo));
+    // Same journal and worktree; only the argv limit check changes.
+    (h.deps as { host: LifecycleDeps['host'] }).host = {
+      kind: 'windows-native',
+    };
+    await expect(
+      h.lc.reply({
+        requestId: 'r2',
+        localId: 't1',
+        message: 'x'.repeat(40_000),
+        correction: true,
+      })
+    ).rejects.toMatchObject({ code: 'AGY_PROMPT_TOO_LONG' });
+    const j = readJournal(h.deps.dataDir);
+    expect(j.tasks['t1']?.correctiveRounds).toBe(0);
+    expect(j.requests['r2']).toBeUndefined();
+    expect(j.activeRun).toBeUndefined();
+    expect(h.calls).toHaveLength(1);
+  });
+
+  it('refuses a correction once the plan is approved', async () => {
+    const h = harness([planTurn, editTurn('x\n')]);
+    await h.lc.delegate(delegateInput(h.repo));
+    await h.lc.approve({ requestId: 'r2', localId: 't1' });
+    await expect(
+      h.lc.reply({
+        requestId: 'r3',
+        localId: 't1',
+        message: 'redo',
+        correction: true,
+      })
+    ).rejects.toMatchObject({ code: 'AGY_INVALID_INPUT' });
+    expect(h.calls).toHaveLength(2);
+    expect(h.lc.status('t1')[0]?.correctiveRounds).toBe(0);
+  });
+
   it('flags secret-shaped content in collected patches', async () => {
     const h = harness([
       planTurn,
@@ -655,5 +789,106 @@ describe('Lifecycle', () => {
     await expect(
       h.lc.approve({ requestId: 'r2', localId: 't1' })
     ).rejects.toMatchObject({ code: 'AGY_INVALID_INPUT' });
+  });
+
+  describe('under a grant', () => {
+    function granted(steps: Step[], extra: Partial<LifecycleDeps> = {}) {
+      const now = new Date();
+      const h0 = harness([]);
+      const g = buildGrant(
+        {
+          repo: h0.repo,
+          branchPattern: 'agy/*',
+          operations: 'create,approve,reply,collect',
+          maxTotalTasks: 1,
+        },
+        now
+      );
+      const h = harness(steps, { grantId: g.grantId, ...extra });
+      fs.mkdirSync(h.deps.dataDir, { recursive: true, mode: 0o700 });
+      writeJournal(
+        h.deps.dataDir,
+        putGrant(
+          { version: 1, tasks: {}, requests: {}, usage: [] },
+          { ...g, repo: h.repo }
+        )
+      );
+      return { h, g };
+    }
+
+    it('charges a task, records the grant, and refuses past the limit', async () => {
+      const { h, g } = granted([planTurn]);
+      await h.lc.delegate(delegateInput(h.repo));
+      const j = readJournal(h.deps.dataDir);
+      expect(j.grants?.[g.grantId]?.totalTasks).toBe(1);
+      expect(j.tasks['t1']?.grantId).toBe(g.grantId);
+      await expect(
+        h.lc.delegate({ ...delegateInput(h.repo), requestId: 'r9' })
+      ).rejects.toMatchObject({ code: 'AGY_GRANT_EXHAUSTED' });
+      await expect(
+        h.lc.delegate({
+          ...delegateInput(h.repo),
+          requestId: 'r8',
+          branch: 'main2',
+        })
+      ).rejects.toMatchObject({ code: 'AGY_AUTHORITY_DENIED' });
+    });
+
+    it('gives the task back when the quota gate refuses', async () => {
+      const { h, g } = granted([], {
+        quotaGate: async () => {
+          throw new AgyError('AGY_QUOTA_LOW', 'low');
+        },
+      });
+      await expect(h.lc.delegate(delegateInput(h.repo))).rejects.toMatchObject({
+        code: 'AGY_QUOTA_LOW',
+      });
+      const j = readJournal(h.deps.dataDir);
+      expect(j.grants?.[g.grantId]?.totalTasks).toBe(0);
+      expect(j.activeRun).toBeUndefined();
+    });
+
+    it('a delegate that died before its turn gives the task back', async () => {
+      const { h, g } = granted([], { isAlive: () => false });
+      const j = readJournal(h.deps.dataDir);
+      writeJournal(h.deps.dataDir, {
+        ...putGrant(j, { ...g, repo: h.repo, totalTasks: 1 }),
+        requests: {
+          x: {
+            requestId: 'x',
+            op: 'delegate',
+            localId: 'gone',
+            status: 'pending',
+            outcome: { grantId: g.grantId },
+            at: new Date().toISOString(),
+          },
+        },
+        activeRun: {
+          requestId: 'x',
+          op: 'delegate',
+          localId: 'gone',
+          ownerPid: 1111,
+          startedAt: new Date().toISOString(),
+        },
+      });
+      await h.lc.recover();
+      const after = readJournal(h.deps.dataDir);
+      expect(after.grants?.[g.grantId]?.totalTasks).toBe(0);
+      expect(after.activeRun).toBeUndefined();
+    });
+
+    it('abandon still works once the grant has expired', async () => {
+      const { h, g } = granted([planTurn]);
+      await h.lc.delegate(delegateInput(h.repo));
+      const later = new Lifecycle({
+        ...h.deps,
+        now: () => new Date(Date.parse(g.expiresAt) + 1),
+      });
+      await expect(
+        later.approve({ requestId: 'r2', localId: 't1' })
+      ).rejects.toMatchObject({ code: 'AGY_GRANT_EXPIRED' });
+      const out = await later.abandon({ requestId: 'r3', localId: 't1' });
+      expect(out.state).toBe('ABANDONED');
+    });
   });
 });

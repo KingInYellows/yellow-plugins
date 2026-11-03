@@ -11,6 +11,7 @@ exports.validateAllowCommand = validateAllowCommand;
 exports.readOnlyProfile = readOnlyProfile;
 exports.implementProfile = implementProfile;
 exports.assertSafeProfile = assertSafeProfile;
+exports.assertPromptText = assertPromptText;
 exports.turnArgs = turnArgs;
 exports.usageArgs = usageArgs;
 const errors_1 = require("./errors");
@@ -305,6 +306,16 @@ function assertSafeProfile(profile) {
 }
 exports.CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 /** The agy argv (without the binary) for one model turn. */
+/** Refuses a prompt agy can't take: empty, or starting with "-". */
+function assertPromptText(prompt) {
+    if (prompt.trim() === '') {
+        throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the prompt is empty');
+    }
+    // A prompt that starts with "-" could be read as a flag by agy's parser.
+    if (prompt.startsWith('-')) {
+        throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the prompt may not start with "-"');
+    }
+}
 function turnArgs(options) {
     assertSafeProfile(options.profile);
     const implementing = options.profile.flags.includes('accept-edits');
@@ -316,13 +327,7 @@ function turnArgs(options) {
             throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the first turn is a read-only plan turn with the plan schema');
         }
     }
-    if (options.prompt.trim() === '') {
-        throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the prompt is empty');
-    }
-    // A prompt that starts with "-" could be read as a flag by agy's parser.
-    if (options.prompt.startsWith('-')) {
-        throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the prompt may not start with "-"');
-    }
+    assertPromptText(options.prompt);
     if (!Number.isInteger(options.printTimeoutSeconds) ||
         options.printTimeoutSeconds < 1) {
         throw new errors_1.AgyError('AGY_INVALID_INPUT', 'printTimeoutSeconds must be a positive integer');
