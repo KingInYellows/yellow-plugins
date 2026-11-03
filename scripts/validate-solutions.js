@@ -213,7 +213,14 @@ function getChangedFiles() {
       // emitted verbatim (no quoting).
       raw = execFileSync(
         'git',
-        ['diff', '--name-status', '-z', `${BASE_REF}...HEAD`, '--', 'docs/solutions/'],
+        [
+          'diff',
+          '--name-status',
+          '-z',
+          `${BASE_REF}...HEAD`,
+          '--',
+          'docs/solutions/',
+        ],
         { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
       );
     } catch (err) {
@@ -272,7 +279,7 @@ function getChangedFiles() {
     const normalized = path.posix.normalize(relPath);
     if (
       normalized !== relPath ||
-      normalized.split('/').some(s => s === '..') ||
+      normalized.split('/').some((s) => s === '..') ||
       path.isAbsolute(normalized)
     ) {
       process.stderr.write(
@@ -336,10 +343,9 @@ function parseFrontmatter(text) {
   fields.__hasTags = Array.isArray(parsed.tags) && parsed.tags.length > 0;
   // YAML folds a block scalar (`|` / `>`, any indicator) and a plain or
   // quoted scalar continued on indented lines into one parsed line, so
-  // record whether the source spans lines for validateRetireWhen().
-  fields.__retireWhenMultiLine =
-    /^retire_when:[ \t]*[|>]/m.test(fmRaw) ||
-    /^retire_when:[ \t]*\S.*\r?\n[ \t]+\S/m.test(fmRaw);
+  // record from the value node whether the source spans lines for
+  // validateRetireWhen(). The node range excludes trailing comments.
+  fields.__retireWhenMultiLine = retireWhenSpansLines(fmRaw);
   return fields;
 }
 
@@ -377,6 +383,20 @@ function validateFrontmatter(file, fm) {
       `date "${fm.date}" is not ISO 8601 (YYYY-MM-DD)`
     );
   }
+}
+
+function retireWhenSpansLines(fmRaw) {
+  const doc = yaml.parseDocument(fmRaw);
+  const items = (doc.contents && doc.contents.items) || [];
+  const pair = items.find(
+    (i) => i.key && String(i.key.value) === 'retire_when'
+  );
+  const node = pair && pair.value;
+  if (!node || !node.range) return false;
+  if (node.type === 'BLOCK_LITERAL' || node.type === 'BLOCK_FOLDED') {
+    return true;
+  }
+  return /[\r\n]/.test(fmRaw.slice(node.range[0], node.range[1]));
 }
 
 // `retire_when` is optional. When present it names the change outside the

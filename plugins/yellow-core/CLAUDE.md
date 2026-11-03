@@ -55,6 +55,11 @@ it before editing a command, library or the staging pipeline.
   durable-bar counterfactual (ported from Compound Engineering). The paragraph
   between the `durable-bar` markers must stay byte-identical in both files;
   RULE 22 in `validate-agent-authoring.js` enforces it.
+- Solution docs may carry an optional single-line `retire_when` (the outside
+  change that retires them; `validate-solutions.js` blocks other shapes with
+  SOL-002). `compound-lifecycle` checks it read-only in Step 4a; a met
+  condition bypasses the citation gate, and autofix only marks it
+  `status: stale`.
 
 ### Commands (19)
 

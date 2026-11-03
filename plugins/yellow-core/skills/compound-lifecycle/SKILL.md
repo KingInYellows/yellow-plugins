@@ -166,7 +166,8 @@ doc body as the step before removal.
 
 - **Met:** classify in Step 6 as Update, Replace, or Delete-and-archive, with
   the evidence (`retire_when met: <issue closed in vX.Y>`) as the rationale.
-  Never Keep.
+  Never Keep. The Step 5 citation gate does not apply: inbound references show
+  the doc is cited, not that it is still true.
 - **Not met:** Keep, and report the check.
 - **Cannot check** (no network, private tracker, ambiguous wording): Keep, and
   report it as unverified with the reason.

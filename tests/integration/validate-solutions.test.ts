@@ -570,6 +570,11 @@ describe('validate-solutions — optional retire_when (SOL-002)', () => {
     expect(status).toBe(0);
   });
 
+  it('passes a single-line retire_when followed by an indented comment', () => {
+    const { status } = run('retire_when: upstream fix released\n  # note');
+    expect(status).toBe(0);
+  });
+
   it.each([
     ['a list', 'retire_when: [one, two]'],
     ['an empty value', 'retire_when:'],
@@ -587,6 +592,10 @@ describe('validate-solutions — optional retire_when (SOL-002)', () => {
     [
       'a quoted scalar continued on the next line',
       "retire_when: 'line one\n  and line two'",
+    ],
+    [
+      'a folded block scalar under a quoted key',
+      '"retire_when": >-\n  line one\n  line two',
     ],
   ])('blocks retire_when given %s', (_label, extra) => {
     const { status, stdout, stderr } = run(extra);
