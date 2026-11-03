@@ -375,7 +375,9 @@ async function run(ctx: Ctx, op: string, flags: Flags): Promise<unknown> {
       await lifecycleFor(ctx, config, undefined, ctx.dir).recover();
       const j = readJournal(ctx.dir);
       const task = getTask(j, localId);
-      const grant = taskGrant(j, localId);
+      // Abandon is confirmed on the terminal instead, so it works for a task
+      // whose grant is gone or that predates grants.
+      const grant = op === 'abandon' ? undefined : taskGrant(j, localId);
       const life = lifecycleFor(ctx, config, grant, task.worktree);
       const partial = {
         keepPartial: flags['keep-partial'] === true,

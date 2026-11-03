@@ -273,4 +273,45 @@ describe('cli', () => {
     });
     expect(JSON.parse(out[0] ?? '').error.code).toBe('AGY_NOT_INSTALLED');
   });
+  it('abandons a task with no grant after the terminal confirms', async () => {
+    let abandoned: unknown;
+    const tty = fakeTty();
+    const s = setup({
+      openTty: tty.open,
+      lifecycle: () =>
+        ({
+          recover: async () => undefined,
+          abandon: async (i: unknown) => {
+            abandoned = i;
+            return { ok: true, localId: 't1', state: 'ABANDONED' };
+          },
+        }) as unknown as Lifecycle,
+    });
+    writeJournal(s.data, {
+      version: 1,
+      tasks: {
+        t1: {
+          localId: 't1',
+          branch: 'agy/t1',
+          repo: s.repo,
+          worktree: path.join(s.root, 'worktrees', 't1'),
+          base: 'a'.repeat(40),
+          state: 'PLAN_PENDING',
+          approved: false,
+          correctiveRounds: 0,
+          requiresAttention: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      },
+      requests: {},
+      usage: [],
+    });
+    const r = await s.call('abandon', '--task', 't1');
+    expect(r).toMatchObject({
+      exit: 0,
+      json: { ok: true, state: 'ABANDONED' },
+    });
+    expect(abandoned).toMatchObject({ localId: 't1' });
+  });
 });
