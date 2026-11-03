@@ -580,6 +580,14 @@ describe('validate-solutions — optional retire_when (SOL-002)', () => {
       'a stripped folded block scalar',
       'retire_when: >-\n  line one\n  line two',
     ],
+    [
+      'a plain scalar continued on the next line',
+      'retire_when: line one\n  and line two',
+    ],
+    [
+      'a quoted scalar continued on the next line',
+      "retire_when: 'line one\n  and line two'",
+    ],
   ])('blocks retire_when given %s', (_label, extra) => {
     const { status, stdout, stderr } = run(extra);
     expect(status).toBe(1);

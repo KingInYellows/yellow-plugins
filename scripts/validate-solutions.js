@@ -334,10 +334,12 @@ function parseFrontmatter(text) {
   // tags can be inline (`tags: [a, b]`) or block-list. yaml.parse normalises
   // both forms to a JS array, so a simple Array.isArray check suffices.
   fields.__hasTags = Array.isArray(parsed.tags) && parsed.tags.length > 0;
-  // A block scalar (`|` or `>`, with any chomping/indent indicator) is
-  // multi-line in the source even when `>-` folds it to one parsed line, so
-  // record the source style for validateRetireWhen().
-  fields.__retireWhenBlockScalar = /^retire_when:[ \t]*[|>]/m.test(fmRaw);
+  // YAML folds a block scalar (`|` / `>`, any indicator) and a plain or
+  // quoted scalar continued on indented lines into one parsed line, so
+  // record whether the source spans lines for validateRetireWhen().
+  fields.__retireWhenMultiLine =
+    /^retire_when:[ \t]*[|>]/m.test(fmRaw) ||
+    /^retire_when:[ \t]*\S.*\r?\n[ \t]+\S/m.test(fmRaw);
   return fields;
 }
 
@@ -394,7 +396,7 @@ function validateRetireWhen(file, fm) {
     );
     return;
   }
-  if (fm.__retireWhenBlockScalar || /[\r\n]/.test(value)) {
+  if (fm.__retireWhenMultiLine || /[\r\n]/.test(value)) {
     emitError(
       file,
       SOL_FRONTMATTER,
