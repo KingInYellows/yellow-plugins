@@ -97,15 +97,18 @@ Generate a conventional commit message (`feat:`, `fix:`, `refactor:`,
 `docs:`, `test:`, `chore:`), concise subject line under 72 chars, with a
 body if the changes are complex.
 
-Then decide whether the body needs a `## New concepts` section. Compare the
-terms the diff adds (new state names, ledger or config fields, protocols,
-vocabulary that later code or docs refer to by name) against `docs/CONCEPTS.md`
-when it exists. A term qualifies only when it is new to the repo and
-load-bearing; renames, routine fixes and one-off helper names do not. For each
-qualifying term, add two or three sentences under `## New concepts` saying what
-it is and why it exists. When nothing qualifies, add no section, never an empty
-one. The section explains the term to reviewers; recording it in `CONCEPTS.md`
-stays with `knowledge-compounder`, so do not edit that file here.
+Then decide whether the body needs a `## New concepts` section. The catalog is
+`docs/CONCEPTS.md`, or `CONCEPTS.md` at the repo root when that is missing. Read
+it as of `HEAD` (`git show HEAD:docs/CONCEPTS.md`), not from the working tree,
+so a glossary entry this change adds still counts as new. Compare the terms the
+diff adds (new state names, ledger or config fields, protocols, vocabulary that
+later code or docs refer to by name) against that catalog; with no catalog,
+judge novelty from the diff alone. A term qualifies only when it is new to the
+repo and load-bearing; renames, routine fixes and one-off helper names do not.
+For each qualifying term, add two or three sentences under `## New concepts`
+saying what it is and why it exists. When nothing qualifies, add no section,
+never an empty one. The section explains the term to reviewers; recording it in
+`CONCEPTS.md` stays with `knowledge-compounder`, so do not edit that file here.
 
 ### Step 4: Commit
 
