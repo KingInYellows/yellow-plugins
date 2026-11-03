@@ -227,15 +227,19 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
   const docDir = path.dirname(docPath);
   const { body, bodyStart } = splitBody(text);
   const bodyLines = body.split('\n');
+  // Fenced blocks are examples, not citations: mask them (keeping lengths and
+  // line count) for every scan and for locating a finding's line.
+  const fenceLines = maskCode(bodyLines, { inline: false });
+  const fenceMasked = fenceLines.join('\n');
 
   // Prefer an occurrence not marked (historical), so one marked mention
   // does not excuse a later live one of the same citation.
   const lineOf = (needle) => {
-    const live = bodyLines.findIndex(
+    const live = fenceLines.findIndex(
       (l) => l.includes(needle) && !l.includes(HISTORICAL_MARK)
     );
     if (live !== -1) return live;
-    const i = bodyLines.findIndex((l) => l.includes(needle));
+    const i = fenceLines.findIndex((l) => l.includes(needle));
     return i === -1 ? null : i;
   };
   // A baseline match must be the whole citation, not a fragment of a longer
@@ -308,7 +312,6 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
   // 1. Cited repo paths.
   const seenPaths = new Set();
   // Fenced blocks are examples; inline spans outside them are citations.
-  const fenceMasked = maskCode(bodyLines, { inline: false }).join('\n');
   const lineAt = (offset) =>
     fenceMasked.slice(0, offset).split('\n').length - 1;
   for (const m of fenceMasked.matchAll(BACKTICK_RE)) {
@@ -440,7 +443,7 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
   for (const m of maskCode(bodyLines).join('\n').matchAll(MD_LINK_RE)) {
     const target = m[1];
     if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('#')) continue;
-    let bare = target.split('#')[0];
+    let bare = target.split('#')[0].split('?')[0];
     try {
       bare = decodeURIComponent(bare);
     } catch {

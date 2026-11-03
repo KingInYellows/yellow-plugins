@@ -885,6 +885,28 @@ describe('validate-solutions — claim grounding (SOL-003)', () => {
     expect(r.stdout + r.stderr).toMatch(/ERROR-SOL-003.*deadbeef1/);
   });
 
+  it('strips a query string from link targets', () => {
+    writeDoc(
+      solutions,
+      'workflow',
+      'query-doc',
+      validFrontmatter('query-doc'),
+      '\nx\n'
+    );
+    const r = runClaims('query-link', '\nSee [doc](./query-doc.md?plain=1).\n');
+    expect(r.stdout + r.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(r.status).toBe(0);
+  });
+
+  it('a fenced example does not decide a citation line', () => {
+    const r = runClaims(
+      'fence-then-historical',
+      '\n```markdown\nSee `plugins/foo/gone.md`.\n```\n\nOld `plugins/foo/gone.md` (historical).\n'
+    );
+    expect(r.status).toBe(0);
+    expect(r.stderr).toMatch(/warning: path `plugins\/foo\/gone\.md`/);
+  });
+
   it('warns for a path that existed in history but was deleted', () => {
     rmSync(join(repo, 'plugins', 'foo', 'real.md'));
     commitAll('delete');
