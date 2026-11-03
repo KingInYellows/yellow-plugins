@@ -900,18 +900,18 @@ own machine to plan and then edit one task in a new git worktree. See
   `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`,
   `GOOGLE_APPLICATION_CREDENTIALS` and the agy ADC switch), and each run's
   pinned settings profile sets `useG1Credits: false`. The plugin never reads,
-  copies or proxies agy's OAuth tokens or credential files; it reads only
-  agy's `settings.json`.
-- **Owner-confirmed authority.** Nothing runs without a grant naming the repo,
-  a branch pattern, the operations, a quota floor, task and correction limits
-  and an expiry (at most 24 hours). Only `authorize` creates a grant, and only
-  after the owner types a code shown on their own terminal (`/dev/tty`, or the
-  Windows console); a Claude session has no terminal and cannot do it.
+  copies or proxies agy's OAuth tokens or credential files; it reads only agy's
+  `settings.json`.
+- **Owner-confirmed authority.** Nothing runs without a grant naming the repo, a
+  branch pattern, the operations, a quota floor, task and correction limits and
+  an expiry (at most 24 hours). Only `authorize` creates a grant, and only after
+  the owner types a code shown on their own terminal (`/dev/tty`, or the Windows
+  console); a Claude session has no terminal and cannot do it.
   `authorize --list` and `--revoke` only read or narrow. `abandon`, which
   deletes a worktree, is confirmed the same way.
 - **What agy may do.** The plan turn is read-only. The implement turn is file
-  edits only, inside the task's worktree: no shell or git commands, no push,
-  and no `--dangerously-skip-permissions`. A grant's `--allow-command` list is
+  edits only, inside the task's worktree: no shell or git commands, no push, and
+  no `--dangerously-skip-permissions`. A grant's `--allow-command` list is
   ignored until the host's agy sandbox is verified, which no host is yet. agy
   children also run with `core.fsmonitor=false` and every configured git filter
   driver emptied. yellow-agy itself runs the git commands (worktree, collect)
