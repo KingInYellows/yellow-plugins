@@ -184,8 +184,9 @@ def run(work, claude, model, timeout):
         rc, stdout, stderr = 124, "", "timed out after %ss" % timeout
     except OSError as err:
         rc, stdout, stderr = 127, "", "could not start %s: %s" % (claude, err)
+    # Diagnostics only, never uploaded; redacted all the same.
     with open(os.path.join(work, "claude.err"), "w", encoding="utf-8") as handle:
-        handle.write(stderr or "")
+        handle.write(redact_strings([stderr or ""])[0])
     result = classify_run(ev, rc, stdout, stderr)
     result["reason"], result["workflow"] = redact([result["reason"], result["workflow"]])
     if result["status"] == "complete" and WITHHELD in json.dumps(result["workflow"]):

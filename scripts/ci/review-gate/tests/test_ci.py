@@ -236,6 +236,18 @@ class Flow(unittest.TestCase):
         # a trailing newline is not a schema key, so it goes through redaction
         self.assertIsNone(ci.SCHEMA_KEY.fullmatch("word\n"))
 
+    def test_stderr_is_redacted_before_it_is_saved(self):
+        self.prepare({"docs/a.md": "b\n"})
+        token = "ghp_" + "A1b2" * 9
+        noisy = os.path.join(self.tmp, "noisy-claude")
+        with open(noisy, "w", encoding="utf-8") as handle:
+            handle.write("#!/bin/sh\necho 'auth failed for %s' >&2\nexit 1\n" % token)
+        os.chmod(noisy, 0o755)
+        self.assertEqual(ci.run(self.work, noisy, "sonnet", 60), 1)
+        for name in ("claude.err", "result.json"):
+            with open(os.path.join(self.work, name), encoding="utf-8") as handle:
+                self.assertNotIn(token[4:], handle.read(), name)
+
     def test_render_makes_model_text_inert(self):
         self.prepare({"docs/a.md": "b\n"})
         finding = {"display": "Important", "severity": "P1", "file": "docs/a.md", "line": 1,
