@@ -1135,9 +1135,18 @@ function validateDurableBar(markdownFiles, errors) {
   // a test exercises, so absence is expected unless strict mode is forced.
   const fixtureRun = Boolean(process.env.VALIDATE_PLUGINS_DIR);
   const strict = !fixtureRun || process.env.VALIDATE_SENTINEL_STRICT === '1';
+  // Fixture trees built for other rules reuse these agent paths without the
+  // bar; in a non-strict fixture run, check only once some declared file
+  // opts in by carrying the start marker.
+  const optedIn = declaredPaths.some(
+    (p) =>
+      fs.existsSync(p) &&
+      fs.readFileSync(p, 'utf8').includes(DURABLE_BAR_START)
+  );
+  const checkDeclared = strict || optedIn;
   const copies = [];
 
-  for (const filePath of declaredPaths) {
+  for (const filePath of checkDeclared ? declaredPaths : []) {
     if (!fs.existsSync(filePath)) {
       if (strict) {
         errors.push(
