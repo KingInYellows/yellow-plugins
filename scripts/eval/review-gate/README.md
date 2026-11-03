@@ -26,8 +26,10 @@ the mean number of agents the workflow reports; the CLI's `total_cost_usd` is
 shown next to it but never decides (see the cost note below).
 `grade --baseline <old summary.json>` applies this rule and refuses a verdict
 while any run is missing or incomplete, or when the two runs graded different
-sets: different ids, or the same ids with different golden entries (each
-`summary.json` carries a `grading_set` hash of every id, kind and golden list).
+sets: different ids, or the same ids with different definitions (each
+`summary.json` carries a `grading_set` hash of every item's id, kind, repo,
+base, head, include/exclude and golden list; a synthetic control's head is the
+one `prepare` built, so an edited patch changes it).
 
 ## Cases and controls
 
@@ -67,6 +69,22 @@ A **control** (`controls/<id>.json`, schema `schema/control.schema.json`) is a
 merged PR with no later revert, fix, bot P1 or post-merge CI failure against it:
 `{id, repo, base, head, tier, source}`. Any Important finding on a control is a
 false positive; the FP rate is controls with at least one over controls graded.
+
+A **synthetic control** (`controls/synthetic/<id>.json`, schema
+`schema/synthetic.schema.json`, plus `controls/synthetic/<id>.patch`) is a clean
+change written for the eval, with no merged PR behind it:
+`{id, repo, base, tier, source}` and the unified diff next to it. `prepare`
+applies the patch to `base` in a scratch index (no checkout is touched) and
+commits it with a fixed identity and date, so the same base and patch give the
+same head commit, and the same fingerprint, on every machine. That commit is
+unreferenced, so `git gc` may prune it later; `prepare` rebuilds it. A synthetic
+control is graded exactly like a control and counts in the FP rate;
+`results-<date>.md` also shows how many of the false positives were synthetic.
+Three ship, all on `main` at `098fa5f`: a docs sentence, a test-only change and
+a behavior-preserving refactor. Write a new one by editing a detached worktree
+at `base`, then `git add -A && git diff --cached > <id>.patch` (plain `git diff`
+leaves out new files); a patch that no longer applies stops `prepare` with the
+row's id.
 
 `cases/examples/` holds two files marked `"example": true` that only show the
 format. Their SHAs are made up; `prepare` loads them only with `--examples` and
@@ -169,11 +187,14 @@ python3 scripts/eval/review-gate/eval.py grade "$W" --baseline <old>/summary.jso
 ### Incomplete runs
 
 In `claude -p` a usage limit fails the agent instead of pausing, so a run whose
-`coverage.failed` is non-empty, or whose result is not a version-1 workflow
-result with a `coverage.failed` list and an integer `agents` count, is
-**incomplete**: it is left out of recall and FP rate and listed separately,
-never graded as a miss. `run --retry-incomplete` reruns exactly the rows `grade`
-calls incomplete (both use one check).
+`coverage.failed` is non-empty, whose `coverage.empty` is true (no reviewer
+returned), or whose result is not a version-1 workflow result with
+`coverage.ran` and `coverage.failed` name lists, an integer `agents` count, and
+every finding carrying `display`, `severity`, `file`, a positive integer `line`,
+`title` and `suggested_fix` (a string or null), is **incomplete**: it is left
+out of recall and FP rate and listed separately, never graded as a miss.
+`run --retry-incomplete` reruns exactly the rows `grade` calls incomplete (both
+use one check).
 
 ### The headless command
 
@@ -211,7 +232,8 @@ python3 -m unittest discover scripts/eval/review-gate/tests
 ```
 
 They spend nothing and are not run by CI (no Python tests are). They cover
-schema validation, `prepare` on a throwaway repo, `--dry-run`, fingerprint
-skips, grading (recall, FP rate, incomplete runs, the keep/drop rule), and
-harvest parsing of fixture git history and fixture API JSON, hunk mapping onto
-target heads, reviewed-head tagging, and the CI-failure source.
+schema validation, `prepare` on a throwaway repo (synthetic controls included),
+`--dry-run`, fingerprint skips, grading (recall, FP rate, incomplete runs, the
+keep/drop rule), and harvest parsing of fixture git history and fixture API
+JSON, hunk mapping onto target heads, reviewed-head tagging, and the CI-failure
+source.
