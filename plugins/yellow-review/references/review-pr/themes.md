@@ -68,9 +68,9 @@ After Step 7 applies fixes and Step 8's simplifier findings are added:
 - when a group lost some findings, say so in its context line
   (`partly resolved: #3 applied`)
 - drop any group left with fewer than two findings
-- for each surviving group that lost a finding, rewrite its preferred
-  resolution and its "handle #n first" from the remaining findings; never
-  recommend an applied fix or cite an applied `#` there
+- for each surviving group that lost a finding, rewrite its preferred resolution
+  and its "handle #n first" from the remaining findings; never recommend an
+  applied fix or cite an applied `#` there
 - simplifier findings may join an existing group when they share its signal;
   they are numbered after the last existing `#`
 
