@@ -224,7 +224,9 @@ function lifecycleFor(
             minQuotaPercent: grant.minQuotaPercent,
             runTurn,
           }),
-    allowCommands: grant?.allowCommands ?? [],
+    // Until the host's sandbox is verified every run is file edits only, so a
+    // grant's commands are dropped instead of failing approve later.
+    allowCommands: config.sandboxVerified ? (grant?.allowCommands ?? []) : [],
     sandboxVerified: config.sandboxVerified,
     printTimeoutSeconds: printTimeout,
     deadlineMs: printTimeout * 1000 + DEADLINE_SLACK_MS,

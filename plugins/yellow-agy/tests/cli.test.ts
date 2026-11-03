@@ -148,7 +148,8 @@ describe('cli', () => {
     expect(ok.json).toMatchObject({ ok: true, operation: 'delegate' });
     expect(seen).toMatchObject({
       grantId: g.grantId,
-      allowCommands: ['pnpm test'],
+      // The grant names `pnpm test`, but this host's sandbox is unverified.
+      allowCommands: [],
       sandboxVerified: false,
     });
     expect(input).toMatchObject({
