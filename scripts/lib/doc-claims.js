@@ -228,9 +228,21 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
   const { body, bodyStart } = splitBody(text);
   const bodyLines = body.split('\n');
 
+  // Prefer an occurrence not marked (historical), so one marked mention
+  // does not excuse a later live one of the same citation.
   const lineOf = (needle) => {
+    const live = bodyLines.findIndex(
+      (l) => l.includes(needle) && !l.includes(HISTORICAL_MARK)
+    );
+    if (live !== -1) return live;
     const i = bodyLines.findIndex((l) => l.includes(needle));
     return i === -1 ? null : i;
+  };
+  // A baseline match must be the whole citation, not a fragment of a longer
+  // one: `README.md` inside `../../../README.md` does not count.
+  const inBaseline = (needle) => {
+    const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^\\w./-])${esc}($|[^\\w./-])`).test(baselineText);
   };
   // `needle` is the cited text. On a modified doc, an error whose needle
   // already appeared in the base version is pre-existing debt: report it as
@@ -242,7 +254,7 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
     const preExisting =
       typeof baselineText === 'string' &&
       typeof needle === 'string' &&
-      baselineText.includes(needle);
+      inBaseline(needle);
     let full = msg.replace('{loc}', loc);
     if (severity === 'error' && preExisting && !historical) {
       full += ' (pre-existing in the base version)';
@@ -422,7 +434,12 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
   for (const m of maskCode(bodyLines).join('\n').matchAll(MD_LINK_RE)) {
     const target = m[1];
     if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('#')) continue;
-    const bare = target.split('#')[0];
+    let bare = target.split('#')[0];
+    try {
+      bare = decodeURIComponent(bare);
+    } catch {
+      // Malformed escape: check the literal spelling.
+    }
     if (!bare || seenLinks.has(bare)) continue;
     if (PLACEHOLDER_CHARS.test(bare)) continue;
     if (PLACEHOLDER_SUBSTRINGS.some((x) => bare.includes(x))) continue;

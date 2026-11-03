@@ -815,6 +815,49 @@ describe('validate-solutions — claim grounding (SOL-003)', () => {
     expect(inline.stdout + inline.stderr).toMatch(/ERROR-SOL-003.*deadbeef1/);
   });
 
+  it('does not excuse a live mention after a (historical) one', () => {
+    const r = runClaims(
+      'historical-then-live',
+      '\nOld `plugins/foo/gone.md` (historical).\n\nNow use `plugins/foo/gone.md`.\n'
+    );
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(
+      /ERROR-SOL-003.*plugins\/foo\/gone\.md/
+    );
+  });
+
+  it('decodes percent-encoded link targets', () => {
+    writeDoc(
+      solutions,
+      'workflow',
+      'real-doc',
+      validFrontmatter('real-doc'),
+      '\nx\n'
+    );
+    const r = runClaims('encoded-link', '\nSee [doc](./real%2Ddoc.md).\n');
+    expect(r.stdout + r.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(r.status).toBe(0);
+  });
+
+  it('a baseline citation does not excuse a shorter new one inside it', () => {
+    writeDoc(
+      solutions,
+      'workflow',
+      'fragment',
+      validFrontmatter('fragment'),
+      '\nSee [a](../../missing/deep-doc.md).\n'
+    );
+    commitAll('add fragment');
+    git('checkout', '-q', '-b', 'feature');
+    const r = runClaims(
+      'fragment',
+      '\nSee [a](../../missing/deep-doc.md).\n\nAnd [b](deep-doc.md).\n',
+      { status: 'M' }
+    );
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/ERROR-SOL-003.*\(deep-doc\.md\)/);
+  });
+
   it('warns for a path that existed in history but was deleted', () => {
     rmSync(join(repo, 'plugins', 'foo', 'real.md'));
     commitAll('delete');

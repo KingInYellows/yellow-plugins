@@ -633,10 +633,21 @@ on `DOC_PATH=$AMEND_TARGET` after amending:
 
 ```bash
 GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-if [ -f "$GIT_ROOT/scripts/validate-solutions.js" ]; then
+BASE="$(git -C "$GIT_ROOT" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || printf 'origin/main')"
+TRUSTED=1
+for f in scripts/validate-solutions.js scripts/lib/doc-claims.js; do
+  git -C "$GIT_ROOT" cat-file -e "$BASE:$f" 2>/dev/null || TRUSTED=0
+done
+if [ "$TRUSTED" = 1 ] && git -C "$GIT_ROOT" diff --quiet "$BASE" -- scripts/validate-solutions.js scripts/lib/ 2>/dev/null; then
   node "$GIT_ROOT/scripts/validate-solutions.js" --doc "$GIT_ROOT/$DOC_PATH"
+else
+  printf '[knowledge-compounder] claim check skipped: validator missing or differs from %s\n' "$BASE"
 fi
 ```
+
+The check runs only the validator as it is on the default branch. A branch that
+changes `scripts/validate-solutions.js` or `scripts/lib/` skips it, so a
+checkout's own edits never execute here. Report a skip in the Success Output.
 
 `ERROR-SOL-003` means a cited path, commit or relative link does not exist, or a
 `{{...}}` placeholder leaked. Fix the citation with Edit, or mark its line
