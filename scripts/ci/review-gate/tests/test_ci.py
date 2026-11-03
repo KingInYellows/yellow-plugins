@@ -198,6 +198,17 @@ class Flow(unittest.TestCase):
             self.assertEqual(ci.redact(["a", {"b": ["c"]}, 3]),
                              [ci.WITHHELD, {"b": [ci.WITHHELD]}, 3])
 
+    def test_wrapped_tokens_keys_and_surrogates(self):
+        token = "ghp_" + "A1b2" * 9
+        wrapped = "see " + token[:20] + "\n" + token[20:]
+        out = ci.redact({"title": wrapped, token: "x", "ok": "plain text\nmore", "s": "a\ud800b"})
+        text = json.dumps(out)
+        self.assertNotIn(token[4:], text)
+        self.assertNotIn(token[4:20], text)
+        self.assertEqual(out["title"], ci.WITHHELD)
+        self.assertEqual(out["ok"], "plain text\nmore")
+        self.assertEqual(out["s"], "ab")
+
     def test_a_failed_redaction_is_incomplete_never_clean(self):
         self.prepare({"docs/a.md": "b\n"})
         with mock.patch.object(ci, "_redact_run", return_value=None):

@@ -231,42 +231,58 @@ def classify_run(ev, rc, stdout, stderr):
 # filter review-ledger.sh uses) before result.json, the job summary or the
 # comment exist. Fail closed: a string redaction cannot vouch for is withheld.
 
+SCHEMA_KEY = re.compile(r"^[a-z_]{1,32}$")
+
+
 def _scrub(text):
     # Invisible format characters inside a token defeat the patterns; the
-    # record separator and NUL would break the batch framing.
+    # record separator and NUL would break the batch framing; a lone
+    # surrogate cannot be encoded for the filter at all.
     return "".join(" " if ch in "\x1e\x00" else ch for ch in text
-                   if unicodedata.category(ch) != "Cf")
+                   if unicodedata.category(ch) not in ("Cf", "Cs"))
 
 
 def _redact_run(text):
     try:
         res = subprocess.run(["bash", "-c", 'source "$1" && cs_redact_secrets', "_", REDACT_LIB],
                              input=text, capture_output=True, text=True, timeout=60, check=False)
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, ValueError, subprocess.TimeoutExpired):
         return None
     if res.returncode != 0 or REDACT_FAILED in res.stdout:
         return None
     return res.stdout
 
 
+def _redact_batch(strings):
+    """One cs_redact_secrets run over all strings; None when framing breaks."""
+    out = _redact_run("".join(s + "\n\x1e\n" for s in strings))
+    parts = out.split("\n\x1e\n")[:-1] if out is not None else []
+    return parts if len(parts) == len(strings) else None
+
+
 def redact_strings(strings):
-    """Redacted copies in input order, one cs_redact_secrets run when it can."""
+    """Redacted copies in input order. The filter matches known credential
+    shapes line by line, so a string whose whitespace-folded text still
+    matches one (a token split across lines or spaces) is withheld."""
     if not strings:
         return []
     clean = [_scrub(s) for s in strings]
-    out = _redact_run("".join(s + "\n\x1e\n" for s in clean))
-    parts = out.split("\n\x1e\n")[:-1] if out is not None else []
-    if len(parts) == len(clean):
-        return parts
-    # A multi-line range (a PEM block) can swallow a separator: one at a time.
-    single = []
-    for s in clean:
-        one = _redact_run(s + "\n")
-        single.append(WITHHELD if one is None else one[:-1] if one.endswith("\n") else one)
-    return single
+    red = _redact_batch(clean)
+    if red is None:
+        # A multi-line range (a PEM block) can swallow a separator: one at a time.
+        red = []
+        for s in clean:
+            one = _redact_run(s + "\n")
+            red.append(WITHHELD if one is None else one[:-1] if one.endswith("\n") else one)
+    folded = [re.sub(r"\s+", "", s) for s in red]
+    again = _redact_batch(folded)
+    if again is None:
+        return [WITHHELD] * len(red)
+    return [r if a == f else WITHHELD for r, f, a in zip(red, folded, again)]
 
 
 def redact(value):
+    """Redact every string, keys included: a model can put text in a key."""
     found = []
 
     def collect(v):
@@ -276,7 +292,9 @@ def redact(value):
             for item in v:
                 collect(item)
         elif isinstance(v, dict):
-            for item in v.values():
+            for key, item in v.items():
+                if not SCHEMA_KEY.match(key):
+                    collect(key)
                 collect(item)
 
     collect(value)
@@ -288,9 +306,11 @@ def redact(value):
         if isinstance(v, list):
             return [rebuild(item) for item in v]
         if isinstance(v, dict):
-            # Keys are schema structure, not prose: kept so a failed
-            # redaction cannot collapse the result into something clean.
-            return {key: rebuild(item) for key, item in v.items()}
+            # Schema-shaped keys (lowercase words) carry no credential and
+            # are kept, so a failed redaction cannot collapse the structure;
+            # any other key is model text and redacted like a value.
+            return {key if SCHEMA_KEY.match(key) else rebuild(key): rebuild(item)
+                    for key, item in v.items()}
         return v
 
     return rebuild(value)
