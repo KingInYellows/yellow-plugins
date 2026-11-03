@@ -231,7 +231,7 @@ def classify_run(ev, rc, stdout, stderr):
 # filter review-ledger.sh uses) before result.json, the job summary or the
 # comment exist. Fail closed: a string redaction cannot vouch for is withheld.
 
-SCHEMA_KEY = re.compile(r"^[a-z_]{1,32}$")
+SCHEMA_KEY = re.compile(r"[a-z_]{1,32}\Z")
 
 
 def _scrub(text):
@@ -293,7 +293,7 @@ def redact(value):
                 collect(item)
         elif isinstance(v, dict):
             for key, item in v.items():
-                if not SCHEMA_KEY.match(key):
+                if not SCHEMA_KEY.fullmatch(key):
                     collect(key)
                 collect(item)
 
@@ -309,7 +309,7 @@ def redact(value):
             # Schema-shaped keys (lowercase words) carry no credential and
             # are kept, so a failed redaction cannot collapse the structure;
             # any other key is model text and redacted like a value.
-            return {key if SCHEMA_KEY.match(key) else rebuild(key): rebuild(item)
+            return {key if SCHEMA_KEY.fullmatch(key) else rebuild(key): rebuild(item)
                     for key, item in v.items()}
         return v
 

@@ -218,6 +218,24 @@ class Flow(unittest.TestCase):
         self.assertIn("redaction failed", result["reason"])
         self.assertIn("findings", result["workflow"])
 
+    def test_a_withheld_key_makes_the_run_incomplete(self):
+        self.prepare({"docs/a.md": "b\n"})
+        token = "ghp_" + "A1b2" * 9
+        wrapped = token[:20] + "\n" + token[20:]
+        os.makedirs(os.path.join(self.tmp, "resp"))
+        with open(os.path.join(self.tmp, "resp", "pr.json"), "w", encoding="utf-8") as handle:
+            json.dump({"version": 1, "tier": "low", "findings": [], "dropped": [], "agents": 2,
+                       "coverage": {"ran": ["correctness-reviewer", "project-compliance-reviewer"],
+                                    "failed": [], "skipped": []},
+                       wrapped: "x", "word\n": "y"}, handle)
+        ci.run(self.work, STANDIN, "sonnet", 60)
+        result = ci.read_json(os.path.join(self.work, "result.json"))
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIn(ci.WITHHELD, result["workflow"])
+        self.assertNotIn(token[4:20], json.dumps(result))
+        # a trailing newline is not a schema key, so it goes through redaction
+        self.assertIsNone(ci.SCHEMA_KEY.fullmatch("word\n"))
+
     def test_render_makes_model_text_inert(self):
         self.prepare({"docs/a.md": "b\n"})
         finding = {"display": "Important", "severity": "P1", "file": "docs/a.md", "line": 1,
