@@ -743,8 +743,26 @@ class Lifecycle {
         }, undefined, undefined, input.correction === true);
         if (res.replay !== undefined)
             return res.replay;
-        const approved = (0, state_1.getTask)(res.journal, input.localId).approved;
-        const profile = await this.prepare(input.requestId, () => approved ? this.implement() : this.readOnly());
+        const current = (0, state_1.getTask)(res.journal, input.localId);
+        const withSchema = input.correction === true;
+        const profile = await this.prepare(input.requestId, () => {
+            if (current.approved)
+                return this.implement();
+            // Build (and so validate) the plan turn's argv while the reservation
+            // can still be released, so a message too long for the host's command
+            // line refunds its corrective round instead of spending it.
+            const p = this.readOnly();
+            (0, invocation_1.buildInvocation)(this.deps.host, (0, profiles_1.turnArgs)({
+                prompt: input.message,
+                profile: p,
+                printTimeoutSeconds: this.deps.printTimeoutSeconds,
+                ...(current.conversationId === undefined
+                    ? {}
+                    : { conversationId: current.conversationId }),
+                ...(withSchema ? { jsonSchemaPath: this.deps.schemaPath } : {}),
+            }), { cwd: current.worktree, baseEnv: this.deps.baseEnv, filterDrivers: [] });
+            return p;
+        });
         let task;
         try {
             task = await this.resolvePartial((0, state_1.getTask)(res.journal, input.localId), input.keepPartial === true, input.resetPartial === true);
@@ -755,7 +773,6 @@ class Lifecycle {
         }
         if (task.approved)
             return this.implementTurn(input.requestId, 'reply', task, input.message, profile);
-        const withSchema = input.correction === true;
         let cls;
         try {
             cls = await this.turn(input.requestId, task.worktree, input.message, profile, task.conversationId, withSchema);

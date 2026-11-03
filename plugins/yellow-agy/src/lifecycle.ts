@@ -1058,10 +1058,29 @@ export class Lifecycle {
       input.correction === true
     );
     if (res.replay !== undefined) return res.replay;
-    const approved = getTask(res.journal, input.localId).approved;
-    const profile = await this.prepare(input.requestId, () =>
-      approved ? this.implement() : this.readOnly()
-    );
+    const current = getTask(res.journal, input.localId);
+    const withSchema = input.correction === true;
+    const profile = await this.prepare(input.requestId, () => {
+      if (current.approved) return this.implement();
+      // Build (and so validate) the plan turn's argv while the reservation
+      // can still be released, so a message too long for the host's command
+      // line refunds its corrective round instead of spending it.
+      const p = this.readOnly();
+      buildInvocation(
+        this.deps.host,
+        turnArgs({
+          prompt: input.message,
+          profile: p,
+          printTimeoutSeconds: this.deps.printTimeoutSeconds,
+          ...(current.conversationId === undefined
+            ? {}
+            : { conversationId: current.conversationId }),
+          ...(withSchema ? { jsonSchemaPath: this.deps.schemaPath } : {}),
+        }),
+        { cwd: current.worktree, baseEnv: this.deps.baseEnv, filterDrivers: [] }
+      );
+      return p;
+    });
     let task: Task;
     try {
       task = await this.resolvePartial(
@@ -1081,7 +1100,6 @@ export class Lifecycle {
         input.message,
         profile
       );
-    const withSchema = input.correction === true;
     let cls: TurnClass;
     try {
       cls = await this.turn(

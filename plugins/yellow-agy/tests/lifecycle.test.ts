@@ -712,6 +712,28 @@ describe('Lifecycle', () => {
     expect(h.calls).toHaveLength(1);
   });
 
+  it('refunds a correction too long for the Windows command line', async () => {
+    const h = harness([planTurn]);
+    await h.lc.delegate(delegateInput(h.repo));
+    // Same journal and worktree; only the argv limit check changes.
+    (h.deps as { host: LifecycleDeps['host'] }).host = {
+      kind: 'windows-native',
+    };
+    await expect(
+      h.lc.reply({
+        requestId: 'r2',
+        localId: 't1',
+        message: 'x'.repeat(40_000),
+        correction: true,
+      })
+    ).rejects.toMatchObject({ code: 'AGY_PROMPT_TOO_LONG' });
+    const j = readJournal(h.deps.dataDir);
+    expect(j.tasks['t1']?.correctiveRounds).toBe(0);
+    expect(j.requests['r2']).toBeUndefined();
+    expect(j.activeRun).toBeUndefined();
+    expect(h.calls).toHaveLength(1);
+  });
+
   it('refuses a correction once the plan is approved', async () => {
     const h = harness([planTurn, editTurn('x\n')]);
     await h.lc.delegate(delegateInput(h.repo));
