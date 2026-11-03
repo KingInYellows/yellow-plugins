@@ -188,6 +188,10 @@ def run(work, claude, model, timeout):
         handle.write(stderr or "")
     result = classify_run(ev, rc, stdout, stderr)
     result["reason"], result["workflow"] = redact([result["reason"], result["workflow"]])
+    if result["status"] == "complete" and WITHHELD in json.dumps(result["workflow"]):
+        # Withheld text is not a reviewed result: never let it read as clean.
+        result["status"] = "incomplete"
+        result["reason"] = "finding text withheld: credential redaction failed"
     write_json(os.path.join(work, "result.json"), result)
     print("review-gate: %s%s" % (result["status"], ": " + result["reason"] if result["reason"] else ""))
     # A run that never produced a result fails the step so the check shows it.
@@ -272,8 +276,7 @@ def redact(value):
             for item in v:
                 collect(item)
         elif isinstance(v, dict):
-            for key, item in v.items():
-                collect(key)
+            for item in v.values():
                 collect(item)
 
     collect(value)
@@ -285,7 +288,9 @@ def redact(value):
         if isinstance(v, list):
             return [rebuild(item) for item in v]
         if isinstance(v, dict):
-            return {rebuild(key): rebuild(item) for key, item in v.items()}
+            # Keys are schema structure, not prose: kept so a failed
+            # redaction cannot collapse the result into something clean.
+            return {key: rebuild(item) for key, item in v.items()}
         return v
 
     return rebuild(value)

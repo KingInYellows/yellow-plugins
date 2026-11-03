@@ -362,9 +362,10 @@ untrusted PR code with a credential, so its boundary is:
   mode), which runs no model and edits one marker-identified comment. Finding
   text is model output over untrusted code. Every model-authored string goes
   through yellow-core's `cs_redact_secrets` before `result.json` is written
-  (fail closed: unredactable text is withheld), so a quoted credential never
-  reaches the artifact, job summary or comment. Rendering then puts it on one
-  line with HTML, links, code spans, table pipes and `@` mentions escaped.
+  (fail closed: unredactable text is withheld and the result is incomplete), so
+  a quoted credential never reaches the artifact, job summary or comment.
+  Rendering then puts it on one line with HTML, links, code spans, table pipes
+  and `@` mentions escaped.
 
 ### Local Execution (yellow-ruvector, yellow-debt, yellow-review)
 

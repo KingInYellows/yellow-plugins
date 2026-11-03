@@ -196,7 +196,16 @@ class Flow(unittest.TestCase):
     def test_redaction_failure_withholds_the_text(self):
         with mock.patch.object(ci, "_redact_run", return_value=None):
             self.assertEqual(ci.redact(["a", {"b": ["c"]}, 3]),
-                             [ci.WITHHELD, {ci.WITHHELD: [ci.WITHHELD]}, 3])
+                             [ci.WITHHELD, {"b": [ci.WITHHELD]}, 3])
+
+    def test_a_failed_redaction_is_incomplete_never_clean(self):
+        self.prepare({"docs/a.md": "b\n"})
+        with mock.patch.object(ci, "_redact_run", return_value=None):
+            self.assertEqual(ci.run(self.work, STANDIN, "sonnet", 60), 0)
+        result = ci.read_json(os.path.join(self.work, "result.json"))
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIn("redaction failed", result["reason"])
+        self.assertIn("findings", result["workflow"])
 
     def test_render_makes_model_text_inert(self):
         self.prepare({"docs/a.md": "b\n"})
