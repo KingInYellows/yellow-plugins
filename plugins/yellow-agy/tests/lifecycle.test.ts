@@ -654,6 +654,47 @@ describe('Lifecycle', () => {
     expect(h.lc.status('t1')[0]?.correctiveRounds).toBe(1);
   });
 
+  it('recovery refunds a correction whose turn never started', async () => {
+    for (const childPid of [undefined, 2222]) {
+      const h = harness([planTurn, editTurn('x\n')], {
+        isAlive: () => false,
+      });
+      await h.lc.delegate(delegateInput(h.repo));
+      const dir = h.deps.dataDir;
+      const j = readJournal(dir);
+      const t = j.tasks['t1'];
+      if (t === undefined) throw new Error('no task');
+      // A controller that died mid-correction: charged, claim left behind.
+      writeJournal(dir, {
+        ...j,
+        tasks: { ...j.tasks, t1: { ...t, correctiveRounds: 1 } },
+        requests: {
+          ...j.requests,
+          rc: {
+            requestId: 'rc',
+            op: 'reply',
+            localId: 't1',
+            status: 'pending',
+            outcome: { correction: '1' },
+            at: new Date().toISOString(),
+          },
+        },
+        activeRun: {
+          requestId: 'rc',
+          op: 'reply',
+          localId: 't1',
+          ownerPid: 1111,
+          ...(childPid === undefined ? {} : { childPid }),
+          startedAt: new Date().toISOString(),
+        },
+      } as typeof j);
+      await h.lc.approve({ requestId: 'r3', localId: 't1' });
+      expect(readJournal(dir).tasks['t1']?.correctiveRounds).toBe(
+        childPid === undefined ? 0 : 1
+      );
+    }
+  });
+
   it('refuses a correction once the plan is approved', async () => {
     const h = harness([planTurn, editTurn('x\n')]);
     await h.lc.delegate(delegateInput(h.repo));

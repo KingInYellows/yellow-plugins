@@ -335,8 +335,21 @@ export class Lifecycle {
       return next;
     }
     if (task !== undefined) {
+      // A correction charged at reservation whose turn never started (no
+      // child pid) gets its round back, as release() would have done.
+      const pendingCorrection =
+        (
+          own(j.requests, claim.requestId)?.outcome as
+            | { correction?: unknown }
+            | undefined
+        )?.correction === '1';
+      const refund =
+        pendingCorrection &&
+        claim.childPid === undefined &&
+        task.correctiveRounds > 0;
       const settled: Task = {
         ...task,
+        ...(refund ? { correctiveRounds: task.correctiveRounds - 1 } : {}),
         state:
           task.state === 'PLAN_PENDING' && !task.approved
             ? 'PLAN_PENDING'
