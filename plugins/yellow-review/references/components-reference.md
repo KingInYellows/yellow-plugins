@@ -201,9 +201,10 @@ flags, exit codes, trust-boundary rules and library behavior.
   the PR's base repository (`origin` tried first, host, owner and repo compared
   case-insensitively), else `https://<host>/<owner>/<repo>.git`. The risk-tier
   blocks in `/review:pr` Step 3a2 and `/review:resolve` Step 9 fetch the base
-  branch, the default branch (the policy) and `refs/pull/<n>/head` from it,
-  because `origin` is the fork in a fork checkout. Local git only, no network;
-  exit 2 on a URL that is not `https://<host>/<owner>/<repo>/pull/<n>`
+  branch and the default branch (the policy) from it, and `/review:resolve` also
+  fetches `refs/pull/<n>/head` when the head is missing locally, because
+  `origin` is the fork in a fork checkout. Local git only, no network; exit 2 on
+  a URL that is not `https://<host>/<owner>/<repo>/pull/<n>`
 - `classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>`
   (or `--stdin [--numstat] [<base-ref>]` with paths, or
   `<added>\t<deleted>\t<path>` numstat rows, one per line on stdin) — Review

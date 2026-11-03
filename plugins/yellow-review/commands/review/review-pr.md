@@ -198,7 +198,7 @@ BASE_REPO=${BASE_REPO%/pull/*}
 DEFAULT_BRANCH=""
 [ -z "$BASE_REMOTE" ] ||
   DEFAULT_BRANCH=$(rr_net gh repo view "$BASE_REPO" --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
-BASE_BRANCH="<baseRefName>"
+BASE_BRANCH=$(rr_net gh pr view "<PR#>" --json baseRefName -q .baseRefName) || BASE_BRANCH=""
 RISK_OK=1
 for rr_b in "$DEFAULT_BRANCH" "$BASE_BRANCH"; do
   case "$rr_b" in '' | -* | *..* | *[!A-Za-z0-9._/-]*) RISK_OK=0 ;; esac
@@ -222,8 +222,7 @@ else
 fi
 ```
 
-Substitute the PR's `baseRefName`. When nothing is printed, record the tier
-as `unknown` and continue.
+When nothing is printed, record the tier as `unknown` and continue.
 
 ### Step 3b: Query institutional memory (optional)
 
