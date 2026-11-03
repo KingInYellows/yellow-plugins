@@ -7,6 +7,7 @@ import type { CliDeps } from '../src/cli';
 import { main } from '../src/cli';
 import { writeHostConfig } from '../src/host-config';
 import type { Lifecycle, LifecycleDeps } from '../src/lifecycle';
+import { readJournal, writeJournal } from '../src/state';
 import type { TtyHandle } from '../src/tty';
 
 import { makeRepo, tmpDir } from './helpers';
@@ -114,6 +115,7 @@ describe('cli', () => {
       lifecycle: (d) => {
         seen = d;
         return {
+          recover: async () => undefined,
           delegate: async (i: unknown) => {
             input = i;
             return { ok: true, localId: 't1', state: 'PLAN_PENDING' };
@@ -169,11 +171,57 @@ describe('cli', () => {
     ).toBe('AGY_AUTHORITY_DENIED');
   });
 
+  it('a finished delegate replays after its grant is spent or revoked', async () => {
+    const s = setup({
+      openTty: fakeTty().open,
+      lifecycle: () =>
+        ({
+          recover: async () => undefined,
+          delegate: async () => {
+            throw new Error('no new delegate expected');
+          },
+        }) as unknown as Lifecycle,
+    });
+    const g = (await s.call(...authorizeArgs(s.repo))).json.grant;
+    await s.call('authorize', '--revoke', g.grantId);
+    const j = readJournal(s.data);
+    writeJournal(s.data, {
+      ...j,
+      requests: {
+        r1: {
+          requestId: 'r1',
+          op: 'delegate',
+          localId: 't1',
+          status: 'done',
+          outcome: { ok: true, localId: 't1', state: 'PLAN_PENDING' },
+          at: new Date().toISOString(),
+        },
+      },
+    });
+    const prompt = path.join(s.root, 'p.txt');
+    fs.writeFileSync(prompt, 'x');
+    const r = await s.call(
+      'delegate',
+      '--repo',
+      s.repo,
+      '--branch',
+      'agy/x',
+      '--base',
+      'main',
+      '--prompt-file',
+      prompt,
+      '--request-id',
+      'r1'
+    );
+    expect(r).toMatchObject({ exit: 0, json: { ok: true, localId: 't1' } });
+  });
+
   it('a failed outcome exits with its catalog code', async () => {
     const s = setup({
       openTty: fakeTty().open,
       lifecycle: () =>
         ({
+          recover: async () => undefined,
           delegate: async () => ({
             ok: false,
             code: 'AGY_MODEL_ERROR',

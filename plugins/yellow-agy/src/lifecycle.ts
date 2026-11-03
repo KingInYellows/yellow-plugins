@@ -213,6 +213,14 @@ export class Lifecycle {
   }
 
   /** Settles a claim whose owner died. Runs under the lock. */
+  /** Settles a dead run's claim; every mutating call does this first. */
+  async recover(): Promise<void> {
+    await updateJournal(this.deps.dataDir, async (j) => ({
+      journal: await this.settleStale(j),
+      result: undefined,
+    }));
+  }
+
   private async settleStale(j: Journal): Promise<Journal> {
     const claim = j.activeRun;
     if (claim === undefined) return j;
@@ -255,8 +263,21 @@ export class Lifecycle {
     if (claim.op === 'delegate' && task === undefined) {
       const pending = own(j.requests, claim.requestId);
       const meta = pending?.outcome as
-        | { worktree?: string; branch?: string; repo?: string; base?: string }
+        | {
+            worktree?: string;
+            branch?: string;
+            repo?: string;
+            base?: string;
+            grantId?: string;
+          }
         | undefined;
+      // No turn ran, so the grant gets its task back.
+      const g =
+        claim.childPid === undefined && typeof meta?.grantId === 'string'
+          ? next.grants?.[meta.grantId]
+          : undefined;
+      if (g !== undefined && g.totalTasks > 0)
+        next = putGrant(next, { ...g, totalTasks: g.totalTasks - 1 });
       if (meta?.worktree !== undefined && meta.repo !== undefined) {
         // A crash between createWorktree and the journal write leaves no
         // base recorded. No turn has run then, so the worktree's HEAD, read
@@ -355,10 +376,7 @@ export class Lifecycle {
   ): Promise<{ replay?: Outcome; journal: Journal }> {
     // Settle a dead claim in its own write, so a refusal below can't discard
     // the settlement.
-    await updateJournal(this.deps.dataDir, async (j) => ({
-      journal: await this.settleStale(j),
-      result: undefined,
-    }));
+    await this.recover();
     return updateJournal<{ replay?: Outcome; journal: Journal }>(
       this.deps.dataDir,
       async (j0) => {
@@ -579,6 +597,9 @@ export class Lifecycle {
         worktree,
         branch: input.branch,
         repo: input.repo,
+        ...(this.deps.grantId === undefined
+          ? {}
+          : { grantId: this.deps.grantId }),
       },
       { repo: input.repo, branch: input.branch }
     );
@@ -618,7 +639,7 @@ export class Lifecycle {
       return {
         journal: putRequest(j, {
           ...rec,
-          outcome: { worktree, branch: input.branch, repo: input.repo, base },
+          outcome: { ...(rec.outcome as object), base },
         }),
         result: undefined,
       };

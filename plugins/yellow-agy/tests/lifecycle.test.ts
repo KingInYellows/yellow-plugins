@@ -715,6 +715,35 @@ describe('Lifecycle', () => {
       expect(j.activeRun).toBeUndefined();
     });
 
+    it('a delegate that died before its turn gives the task back', async () => {
+      const { h, g } = granted([], { isAlive: () => false });
+      const j = readJournal(h.deps.dataDir);
+      writeJournal(h.deps.dataDir, {
+        ...putGrant(j, { ...g, repo: h.repo, totalTasks: 1 }),
+        requests: {
+          x: {
+            requestId: 'x',
+            op: 'delegate',
+            localId: 'gone',
+            status: 'pending',
+            outcome: { grantId: g.grantId },
+            at: new Date().toISOString(),
+          },
+        },
+        activeRun: {
+          requestId: 'x',
+          op: 'delegate',
+          localId: 'gone',
+          ownerPid: 1111,
+          startedAt: new Date().toISOString(),
+        },
+      });
+      await h.lc.recover();
+      const after = readJournal(h.deps.dataDir);
+      expect(after.grants?.[g.grantId]?.totalTasks).toBe(0);
+      expect(after.activeRun).toBeUndefined();
+    });
+
     it('abandon still works once the grant has expired', async () => {
       const { h, g } = granted([planTurn]);
       await h.lc.delegate(delegateInput(h.repo));

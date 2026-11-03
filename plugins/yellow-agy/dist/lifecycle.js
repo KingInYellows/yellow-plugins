@@ -144,6 +144,13 @@ class Lifecycle {
         });
     }
     /** Settles a claim whose owner died. Runs under the lock. */
+    /** Settles a dead run's claim; every mutating call does this first. */
+    async recover() {
+        await (0, state_1.updateJournal)(this.deps.dataDir, async (j) => ({
+            journal: await this.settleStale(j),
+            result: undefined,
+        }));
+    }
     async settleStale(j) {
         const claim = j.activeRun;
         if (claim === undefined)
@@ -188,6 +195,12 @@ class Lifecycle {
         if (claim.op === 'delegate' && task === undefined) {
             const pending = (0, state_1.own)(j.requests, claim.requestId);
             const meta = pending?.outcome;
+            // No turn ran, so the grant gets its task back.
+            const g = claim.childPid === undefined && typeof meta?.grantId === 'string'
+                ? next.grants?.[meta.grantId]
+                : undefined;
+            if (g !== undefined && g.totalTasks > 0)
+                next = (0, grants_1.putGrant)(next, { ...g, totalTasks: g.totalTasks - 1 });
             if (meta?.worktree !== undefined && meta.repo !== undefined) {
                 // A crash between createWorktree and the journal write leaves no
                 // base recorded. No turn has run then, so the worktree's HEAD, read
@@ -261,10 +274,7 @@ class Lifecycle {
     async reserve(requestId, op, localId, check, meta, scope, correction) {
         // Settle a dead claim in its own write, so a refusal below can't discard
         // the settlement.
-        await (0, state_1.updateJournal)(this.deps.dataDir, async (j) => ({
-            journal: await this.settleStale(j),
-            result: undefined,
-        }));
+        await this.recover();
         return (0, state_1.updateJournal)(this.deps.dataDir, async (j0) => {
             const j = await this.settleStale(j0);
             const prior = (0, state_1.own)(j.requests, requestId);
@@ -424,6 +434,9 @@ class Lifecycle {
             worktree,
             branch: input.branch,
             repo: input.repo,
+            ...(this.deps.grantId === undefined
+                ? {}
+                : { grantId: this.deps.grantId }),
         }, { repo: input.repo, branch: input.branch });
         if (res.replay !== undefined)
             return res.replay;
@@ -460,7 +473,7 @@ class Lifecycle {
             return {
                 journal: (0, state_1.putRequest)(j, {
                     ...rec,
-                    outcome: { worktree, branch: input.branch, repo: input.repo, base },
+                    outcome: { ...rec.outcome, base },
                 }),
                 result: undefined,
             };

@@ -35,6 +35,7 @@ import {
   dataDir,
   ensureDataDir,
   getTask,
+  own,
   readJournal,
   updateJournal,
 } from './state';
@@ -191,7 +192,7 @@ interface Ctx {
 function lifecycleFor(
   ctx: Ctx,
   config: HostConfig,
-  grant: Grant,
+  grant: Grant | undefined,
   probeCwd: string
 ): Lifecycle {
   const exec = createHostExec(config.host, ctx.deps.env);
@@ -204,19 +205,26 @@ function lifecycleFor(
     schemaPath: config.schemaPath,
     baseEnv: ctx.deps.env,
     runTurn,
-    quotaGate: quotaGate({
-      host: config.host,
-      cwd: probeCwd,
-      baseEnv: ctx.deps.env,
-      filterDrivers: () => exec.filterDrivers(probeCwd),
-      minQuotaPercent: grant.minQuotaPercent,
-      runTurn,
-    }),
-    allowCommands: grant.allowCommands,
+    // Without a grant the Lifecycle only recovers a dead run; it never
+    // reaches a turn.
+    quotaGate:
+      grant === undefined
+        ? async (): Promise<void> => {
+            throw new AgyError('AGY_INTERNAL', 'no grant for a model turn');
+          }
+        : quotaGate({
+            host: config.host,
+            cwd: probeCwd,
+            baseEnv: ctx.deps.env,
+            filterDrivers: () => exec.filterDrivers(probeCwd),
+            minQuotaPercent: grant.minQuotaPercent,
+            runTurn,
+          }),
+    allowCommands: grant?.allowCommands ?? [],
     sandboxVerified: config.sandboxVerified,
     printTimeoutSeconds: printTimeout,
     deadlineMs: printTimeout * 1000 + DEADLINE_SLACK_MS,
-    grantId: grant.grantId,
+    ...(grant === undefined ? {} : { grantId: grant.grantId }),
     now: ctx.now,
   };
   return (ctx.deps.lifecycle ?? ((d) => new Lifecycle(d)))(deps);
@@ -330,15 +338,20 @@ async function run(ctx: Ctx, op: string, flags: Flags): Promise<unknown> {
       const remote = (flags['remote'] as string | undefined) ?? 'origin';
       if (!REMOTE_RE.test(remote)) throw usage('--remote is not a remote name');
       const prompt = readText(flags['prompt-file'], '--prompt-file');
-      const grant = coveringGrant(
-        readJournal(ctx.dir),
-        repo,
-        branch,
-        ctx.now()
-      );
+      const rid = requestId(flags['request-id']);
+      // A dead run may hold a task its grant should get back, and a retry
+      // of a finished delegate replays its outcome whatever the grant's
+      // state now; both come before a grant is chosen.
+      await lifecycleFor(ctx, config, undefined, repo).recover();
+      const j = readJournal(ctx.dir);
+      const prior = own(j.requests, rid);
+      if (prior?.op === 'delegate' && prior.status === 'done') {
+        return prior.outcome;
+      }
+      const grant = coveringGrant(j, repo, branch, ctx.now());
       if (grant === undefined) throw noGrant(repo, branch);
       return lifecycleFor(ctx, config, grant, repo).delegate({
-        requestId: requestId(flags['request-id']),
+        requestId: rid,
         branch,
         prompt,
         repo,
@@ -352,6 +365,7 @@ async function run(ctx: Ctx, op: string, flags: Flags): Promise<unknown> {
     case 'abandon': {
       const config = readHostConfig(ctx.dir);
       const localId = str(flags['task'], '--task');
+      await lifecycleFor(ctx, config, undefined, ctx.dir).recover();
       const j = readJournal(ctx.dir);
       const task = getTask(j, localId);
       const grant = taskGrant(j, localId);
