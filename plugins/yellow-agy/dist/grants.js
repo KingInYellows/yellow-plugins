@@ -128,6 +128,15 @@ function isIso(v) {
 function isCount(v) {
     return Number.isInteger(v) && v >= 0;
 }
+function validPattern(p) {
+    try {
+        validateBranchPattern(p);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
 /** A stored grant's shape check; anything else makes the journal unreadable. */
 function isGrant(key, v) {
     if (v === null || typeof v !== 'object' || Array.isArray(v))
@@ -147,7 +156,11 @@ function isGrant(key, v) {
         isCount(g['minQuotaPercent']) &&
         g['minQuotaPercent'] <= 100 &&
         isCount(g['maxTotalTasks']) &&
+        g['maxTotalTasks'] <= exports.GRANT_CEILINGS.maxTotalTasks &&
         isCount(g['maxCorrectiveRounds']) &&
+        g['maxCorrectiveRounds'] <=
+            exports.GRANT_CEILINGS.maxCorrectiveRounds &&
+        validPattern(g['branchPattern']) &&
         isCount(g['totalTasks']) &&
         isIso(g['createdAt']) &&
         isIso(g['expiresAt']) &&

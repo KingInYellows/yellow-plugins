@@ -24,8 +24,9 @@ const REMAINING_KEY = /remaining/i;
  * The lowest remaining fraction (0..1) of any bucket in `/usage` JSON, or
  * undefined when the output has none. Every numeric field whose key names a
  * remaining amount counts: a fraction as is, a 0-100 value under a key that
- * says percent as a percentage. Anything else is ignored, so an unknown
- * shape finds nothing and the gate fails closed.
+ * says percent as a percentage. A remaining value outside that range makes
+ * the whole output unknown, and an unknown shape finds nothing, so the gate
+ * fails closed either way.
  */
 function lowestRemaining(stdout) {
     let value;
@@ -36,6 +37,7 @@ function lowestRemaining(stdout) {
         return undefined;
     }
     let lowest;
+    let unreadable = false;
     const visit = (v, depth) => {
         if (depth > MAX_DEPTH || v === null || typeof v !== 'object')
             return;
@@ -45,6 +47,10 @@ function lowestRemaining(stdout) {
                 if (Number.isFinite(fraction) && fraction >= 0 && fraction <= 1) {
                     lowest = lowest === undefined ? fraction : Math.min(lowest, fraction);
                 }
+                else {
+                    // A bucket this version can't read could be the empty one.
+                    unreadable = true;
+                }
             }
             else {
                 visit(child, depth + 1);
@@ -52,11 +58,14 @@ function lowestRemaining(stdout) {
         }
     };
     visit(value, 0);
-    return lowest;
+    return unreadable ? undefined : lowest;
 }
 /** Percentage points the journal's recent turns are assumed to have used. */
 function recentCost(j, now = Date.now()) {
-    return (0, state_1.recentUsage)(j, exports.QUOTA_WINDOW_MS, now).reduce((sum, u) => sum + (u.cost ?? exports.UNKNOWN_TURN_COST), 0);
+    return (0, state_1.recentUsage)(j, exports.QUOTA_WINDOW_MS, now).reduce((sum, u) => sum +
+        (typeof u.cost === 'number' && Number.isFinite(u.cost) && u.cost >= 0
+            ? u.cost
+            : exports.UNKNOWN_TURN_COST), 0);
 }
 /** The Lifecycle `quotaGate` dep: refuses with AGY_QUOTA_LOW or AGY_QUOTA_UNKNOWN. */
 function quotaGate(deps) {
@@ -73,11 +82,19 @@ function quotaGate(deps) {
         catch (err) {
             throw new errors_1.AgyError('AGY_QUOTA_UNKNOWN', `agy -p /usage could not run: ${String(err)}`);
         }
-        const remaining = outcome.exitCode === 0 ? lowestRemaining(outcome.stdout) : undefined;
+        // Only a probe that exited 0 on its own counts; a killed one's output
+        // may be partial.
+        const clean = outcome.exitCode === 0 &&
+            outcome.signal === null &&
+            !outcome.killedByDeadline &&
+            !outcome.cancelled;
+        const remaining = clean ? lowestRemaining(outcome.stdout) : undefined;
         if (remaining === undefined) {
-            throw new errors_1.AgyError('AGY_QUOTA_UNKNOWN', outcome.exitCode === 0
+            throw new errors_1.AgyError('AGY_QUOTA_UNKNOWN', clean
                 ? 'agy -p /usage printed no remaining quota this version understands'
-                : `agy -p /usage exited ${String(outcome.exitCode)}`);
+                : outcome.killedByDeadline || outcome.cancelled
+                    ? 'agy -p /usage did not finish'
+                    : `agy -p /usage exited ${String(outcome.exitCode ?? outcome.signal)}`);
         }
         const percent = remaining * 100 - recentCost(journal, (deps.now ?? Date.now)());
         if (percent < deps.minQuotaPercent) {

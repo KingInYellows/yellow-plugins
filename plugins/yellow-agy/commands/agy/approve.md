@@ -65,6 +65,7 @@ printf -- '--- end untrusted-content %s ---\n' "$TAG"
   doesn't allow; reply with a narrower request or have the owner widen the
   grant.
 - `AGY_TIMEOUT` or `AGY_INTERRUPTED`: partial edits may be in the worktree.
-  The next approve or reply needs `--keep-partial` (build on them) or
-  `--reset-partial` (restore the pre-turn state); ask which.
+  The task is no longer `PLAN_PENDING`, so `/agy:approve` won't run again;
+  continue with `/agy:reply --task <id> --keep-partial` (build on them) or
+  `--reset-partial` (restore the pre-turn state) and a message. Ask which.
 - Any other code: report it with its recovery action.

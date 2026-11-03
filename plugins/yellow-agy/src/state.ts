@@ -91,7 +91,10 @@ export interface Journal {
   readonly requests: Readonly<Record<string, RequestRecord>>;
   readonly activeRun?: Claim;
   readonly usage: readonly UsageEntry[];
-  /** Written only by authorize; see grants.ts. */
+  /**
+   * Created and revoked only by authorize; reservations charge and refund
+   * their counts. See grants.ts.
+   */
   readonly grants?: Readonly<Record<string, Grant>>;
 }
 

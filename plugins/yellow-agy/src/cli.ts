@@ -46,9 +46,13 @@ import { validateBranchName } from './worktree';
 const REQUEST_ID_RE = /^[A-Za-z0-9._:-]{1,200}$/;
 const REMOTE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MAX_TEXT_BYTES = 100_000;
-/** The command wrappers' Bash timeout is 600 s; a turn must end well inside it. */
-const DEFAULT_PRINT_TIMEOUT_S = 480;
-const MAX_PRINT_TIMEOUT_S = 480;
+/**
+ * The command wrappers' Bash timeout is 600 s. The quota probe (60 s + 10 s
+ * kill grace) and the turn (print timeout + 30 s slack + 10 s grace) both run
+ * inside it, so 420 leaves about 70 s for git and node.
+ */
+const DEFAULT_PRINT_TIMEOUT_S = 420;
+const MAX_PRINT_TIMEOUT_S = 420;
 const DEADLINE_SLACK_MS = 30_000;
 
 export interface CliDeps {

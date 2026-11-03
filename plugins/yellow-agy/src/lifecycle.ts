@@ -407,7 +407,16 @@ export class Lifecycle {
           );
         }
         check(j);
-        const charged = this.authorize(j, op, localId, scope, correction);
+        let charged = this.authorize(j, op, localId, scope, correction);
+        if (correction === true) {
+          // Charged with the reservation, so a turn killed before it settles
+          // still counts against the limit.
+          const t = getTask(charged, localId);
+          charged = putTask(charged, {
+            ...t,
+            correctiveRounds: t.correctiveRounds + 1,
+          });
+        }
         const claim: Claim = {
           requestId,
           op,
@@ -423,7 +432,14 @@ export class Lifecycle {
             localId,
             status: 'pending',
             at: claim.startedAt,
-            ...(meta === undefined ? {} : { outcome: meta }),
+            ...(meta === undefined && correction !== true
+              ? {}
+              : {
+                  outcome: {
+                    ...meta,
+                    ...(correction === true ? { correction: '1' } : {}),
+                  },
+                }),
           }
         );
         return { journal: next, result: { journal: next } };
@@ -475,6 +491,19 @@ export class Lifecycle {
         const g = requireGrant(next, grantId);
         if (g.totalTasks > 0)
           next = putGrant(next, { ...g, totalTasks: g.totalTasks - 1 });
+      }
+      const t =
+        rec?.localId === undefined ? undefined : own(next.tasks, rec.localId);
+      if (
+        (rec?.outcome as { correction?: unknown } | undefined)?.correction ===
+          '1' &&
+        t !== undefined &&
+        t.correctiveRounds > 0
+      ) {
+        next = putTask(next, {
+          ...t,
+          correctiveRounds: t.correctiveRounds - 1,
+        });
       }
       return { journal: { ...next, requests }, result: undefined };
     });
@@ -996,6 +1025,12 @@ export class Lifecycle {
             `task ${t.localId} is ${t.state}; there is no conversation to reply to`
           );
         }
+        if (input.correction === true && t.approved) {
+          throw new AgyError(
+            'AGY_INVALID_INPUT',
+            `task ${t.localId} is approved; --correction asks for a new plan and only works before approval`
+          );
+        }
       },
       undefined,
       undefined,
@@ -1017,8 +1052,6 @@ export class Lifecycle {
       await this.release(input.requestId);
       throw err;
     }
-    if (input.correction === true)
-      task = { ...task, correctiveRounds: task.correctiveRounds + 1 };
     if (task.approved)
       return this.implementTurn(
         input.requestId,

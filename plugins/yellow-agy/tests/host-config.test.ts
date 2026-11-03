@@ -26,6 +26,14 @@ describe('host config', () => {
     expect(() =>
       detectHost({ env: {}, platform: 'linux', which: () => false })
     ).toThrow(expect.objectContaining({ code: 'AGY_NOT_INSTALLED' }));
+    // Native Windows spawns agy.exe, so a bare `agy` shim doesn't count.
+    expect(() =>
+      detectHost({
+        env: {},
+        platform: 'win32',
+        which: (cmd) => cmd === 'agy',
+      })
+    ).toThrow(expect.objectContaining({ code: 'AGY_NOT_INSTALLED' }));
     const data = tmpDir('yellow-agy-data-');
     writeHostConfig(data, c);
     expect(readHostConfig(data)).toEqual(c);
@@ -49,6 +57,7 @@ describe('host config', () => {
       '/home/u/.local/share/yellow-agy/plan.schema.json'
     );
     expect(calls[1]?.slice(0, 3)).toEqual(['Ubuntu', 'sh', '-c']);
+    expect(calls[1]?.[3]).toContain('realpath -e --');
     expect(() => bridge('/mnt/c/Users/u/worktrees')).toThrow(
       expect.objectContaining({ code: 'AGY_BRIDGE' })
     );

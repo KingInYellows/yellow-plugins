@@ -174,7 +174,14 @@ describe('grants', () => {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     writeJournal(dir, putGrant(EMPTY, g));
     expect(readJournal(dir).grants?.[g.grantId]).toEqual(g);
-    writeJournal(dir, putGrant(EMPTY, { ...g, operations: ['push' as never] }));
-    expect(code(() => readJournal(dir))).toBe('AGY_INTERNAL');
+    for (const bad of [
+      { operations: ['push' as never] },
+      { branchPattern: '*' },
+      { maxTotalTasks: 11 },
+      { maxCorrectiveRounds: 4 },
+    ]) {
+      writeJournal(dir, putGrant(EMPTY, { ...g, ...bad }));
+      expect(code(() => readJournal(dir))).toBe('AGY_INTERNAL');
+    }
   });
 });

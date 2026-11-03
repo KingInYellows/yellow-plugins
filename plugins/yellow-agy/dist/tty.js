@@ -46,6 +46,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CONFIRM_DEADLINE_MS = exports.CHALLENGE_LENGTH = void 0;
 exports.mintChallenge = mintChallenge;
 exports.defaultOpenTty = defaultOpenTty;
+exports.printable = printable;
 exports.confirmOnTty = confirmOnTty;
 const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
@@ -136,6 +137,14 @@ function defaultOpenTty(platform = process.platform) {
         },
     };
 }
+/**
+ * Replaces terminal control characters (C0 but newline, DEL, C1) so a crafted
+ * path in the summary can't move the cursor or rewrite what the owner reads.
+ */
+function printable(text) {
+    // eslint-disable-next-line no-control-regex
+    return text.replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, '?');
+}
 const RETRY = 'Nothing was changed. Run the command again in a terminal and type the code exactly as shown.';
 /**
  * Resolves only when the owner typed the code. No terminal throws
@@ -152,7 +161,7 @@ async function confirmOnTty(options) {
     }
     const code = mintChallenge();
     try {
-        handle.write(`\n${(0, redact_1.redact)(options.summary)}\n\nType ${code} to confirm, anything else to cancel: `);
+        handle.write(`\n${printable((0, redact_1.redact)(options.summary))}\n\nType ${code} to confirm, anything else to cancel: `);
         let answer;
         try {
             answer = await handle.readLine(options.deadlineMs ?? exports.CONFIRM_DEADLINE_MS);

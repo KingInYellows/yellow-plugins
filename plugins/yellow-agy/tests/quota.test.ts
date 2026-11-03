@@ -24,7 +24,12 @@ function journal(entries: { min: number; cost?: number }[]): Journal {
   };
 }
 
-function gate(stdout: string, exitCode = 0, minQuotaPercent = 10) {
+function gate(
+  stdout: string,
+  exitCode: number | null = 0,
+  minQuotaPercent = 10,
+  extra: Partial<TurnOutcome> = {}
+) {
   const calls: Invocation[] = [];
   const run = quotaGate({
     host: { kind: 'posix' },
@@ -42,6 +47,7 @@ function gate(stdout: string, exitCode = 0, minQuotaPercent = 10) {
         cancelled: false,
         stdout,
         stderr: '',
+        ...extra,
       };
     },
   });
@@ -75,6 +81,57 @@ describe('quota gate', () => {
     expect(lowestRemaining(JSON.stringify({ used: 0.5 }))).toBeUndefined();
     expect(lowestRemaining(JSON.stringify({ remaining: 7 }))).toBeUndefined();
     expect(lowestRemaining('not json')).toBeUndefined();
+    // One unreadable bucket makes the whole output unknown.
+    expect(
+      lowestRemaining(
+        JSON.stringify({
+          buckets: [{ remainingFraction: 0.8 }, { remainingFraction: -1 }],
+        })
+      )
+    ).toBeUndefined();
+  });
+
+  it('charges a malformed or negative cost as unknown', () => {
+    const j = journal([
+      { min: 1, cost: -50 },
+      { min: 2, cost: Number.NaN },
+    ]);
+    expect(recentCost(j, NOW)).toBe(4);
+  });
+
+  it('fails closed when the probe throws or is killed', async () => {
+    const profile = readOnlyProfile();
+    const good = JSON.stringify({ remainingFraction: 0.9 });
+    for (const extra of [
+      { killedByDeadline: true },
+      { cancelled: true },
+      { signal: 'SIGKILL' },
+    ]) {
+      expect(
+        await code(gate(good, 0, 10, extra).run(profile, journal([])))
+      ).toBe('AGY_QUOTA_UNKNOWN');
+    }
+    expect(
+      await code(
+        gate(good, null, 10, { killedByDeadline: true }).run(
+          profile,
+          journal([])
+        )
+      )
+    ).toBe('AGY_QUOTA_UNKNOWN');
+    const throwing = quotaGate({
+      host: { kind: 'posix' },
+      cwd: '/r',
+      baseEnv: {},
+      filterDrivers: async () => [],
+      minQuotaPercent: 10,
+      runTurn: async () => {
+        throw new Error('spawn failed');
+      },
+    });
+    expect(await code(throwing(profile, journal([])))).toBe(
+      'AGY_QUOTA_UNKNOWN'
+    );
   });
 
   it('subtracts recent turns, 2 points each when the cost is unknown', () => {

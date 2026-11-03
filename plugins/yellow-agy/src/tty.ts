@@ -116,6 +116,15 @@ export function defaultOpenTty(
   };
 }
 
+/**
+ * Replaces terminal control characters (C0 but newline, DEL, C1) so a crafted
+ * path in the summary can't move the cursor or rewrite what the owner reads.
+ */
+export function printable(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, '?');
+}
+
 const RETRY =
   'Nothing was changed. Run the command again in a terminal and type the code exactly as shown.';
 
@@ -141,7 +150,7 @@ export async function confirmOnTty(options: {
   const code = mintChallenge();
   try {
     handle.write(
-      `\n${redact(options.summary)}\n\nType ${code} to confirm, anything else to cancel: `
+      `\n${printable(redact(options.summary))}\n\nType ${code} to confirm, anything else to cancel: `
     );
     let answer: string | null;
     try {

@@ -9,7 +9,8 @@ It replaces `docs/yellow-jules/contract-v1.md` once yellow-agy ships. Evidence:
 yellow-agy hands one coding task to the Antigravity CLI (`agy`) running on the
 owner's own machine, in an isolated git worktree, under the owner's Google AI
 Pro sign-in. It keeps yellow-jules' authority model (owner-typed grants,
-controller epoch, locked journal) and its verbs, so `/linear:delegate` keeps its
+locked journal; v0 drops the controller epoch, see "Output envelope") and its
+verbs, so `/linear:delegate` keeps its
 shape. It replaces the vendor session API with local child processes.
 
 Routing is an adapter-phase prerequisite, not part of v0: the delegate
@@ -316,8 +317,8 @@ and after each turn.
 ## Output envelope, exit codes, error catalog, local state, grants
 
 These are the same as yellow-jules contract-v1 (one JSON object on stdout, exit
-0/1/2, `requiresAttention` + `attention`, owner-only data dir, grants written
-only by `authorize` on `/dev/tty`, controller epoch). The changes are the
+0/1/2, `requiresAttention` + `attention`, owner-only data dir, grants created
+only by `authorize` after a terminal confirmation). The changes are the
 `AGY_*` code prefix, the `YELLOW_AGY_*` env prefix, and a grant that names
 `--allow-command` patterns and `minQuotaPercent` instead of vendor sources.
 
@@ -339,13 +340,17 @@ until the real-Windows check. v0 has no controller epoch: there is one journal
 on one host, and the active-run claim already serializes runs.
 
 `setup` records the resolved host in `host.json` in the data dir, and every
-other call refuses until it exists. On the bridge it resolves the worktree root
+call that runs agy or git (`delegate`, `approve`, `reply`, `collect`,
+`abandon`, `authorize` when it creates a grant) refuses until it exists.
+`status`, `authorize --list` and `--revoke` only read or narrow the journal. On the bridge it resolves the worktree root
 with `realpath -e` inside WSL and refuses a result under `/mnt`.
 
 The `/usage` field names are unconfirmed. Until a captured output pins them, the
 gate reads the lowest numeric field whose key names a remaining amount (a 0-1
-fraction, or 0-100 under a key that says percent) and refuses with
-`AGY_QUOTA_UNKNOWN` when it finds none.
+fraction, or 0-100 under a key that says percent, divided by 100), multiplies
+it by 100, subtracts recent turns, and compares the result with
+`minQuotaPercent`. It refuses with `AGY_QUOTA_UNKNOWN` when it finds no such
+field, when one is out of range, or when the probe was killed or didn't exit 0.
 
 New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
 `AGY_AUTH_MODE`, `AGY_OVERAGES`, `AGY_AUTH_REQUIRED`, `AGY_BUSY`, `AGY_QUOTA`,

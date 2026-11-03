@@ -19,6 +19,8 @@ nothing is lost, and the branch is kept.
 ### Step 1: Validate Arguments
 
 Accept `--task <localId>` once, matching `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`.
+Refuse anything else, including a value with a quote, space or `$`: the
+printed command puts it inside single quotes.
 
 ### Step 2: Print the Command
 

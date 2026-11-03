@@ -82,15 +82,15 @@ exports.ERROR_CATALOG = {
     },
     AGY_AUTHORITY_DENIED: {
         exit: 2,
-        recoveryAction: 'Run /agy:authorize in a terminal for a grant that covers this repo, branch and operation.',
+        recoveryAction: 'Run /agy:authorize for a grant that covers this repo, branch and operation, then run the command it prints in your own terminal.',
     },
     AGY_GRANT_EXPIRED: {
         exit: 2,
-        recoveryAction: 'Run /agy:authorize in a terminal for a new grant.',
+        recoveryAction: 'Run /agy:authorize for a new grant, then run the command it prints in your own terminal.',
     },
     AGY_GRANT_EXHAUSTED: {
         exit: 2,
-        recoveryAction: 'Run /agy:authorize in a terminal for a new grant with room left.',
+        recoveryAction: 'Run /agy:authorize for a new grant with room left, then run the command it prints in your own terminal.',
     },
     AGY_CONFIRMATION_REQUIRED: {
         exit: 2,

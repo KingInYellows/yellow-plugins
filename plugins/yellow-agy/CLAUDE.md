@@ -50,5 +50,7 @@ plugins/yellow-agy/
   (contract-v0 "Output envelope" lists them).
 - Creating a grant and abandoning a task need the owner at a terminal. The
   commands print the line for the owner to run; never try to answer the code.
-- A turn must end inside the wrappers' 600 s Bash timeout:
-  `YELLOW_AGY_PRINT_TIMEOUT_SECONDS` is 60-480 (default 480).
+- A call must end inside the wrappers' 600 s Bash timeout. It runs the
+  `/usage` probe (60 s + 10 s kill grace) and then the turn (print timeout +
+  30 s slack + 10 s grace), so `YELLOW_AGY_PRINT_TIMEOUT_SECONDS` is 60-420
+  (default 420).

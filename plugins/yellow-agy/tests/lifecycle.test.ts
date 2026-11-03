@@ -617,6 +617,59 @@ describe('Lifecycle', () => {
     expect(h.calls).toHaveLength(2);
   });
 
+  it('charges a correction with its reservation and refunds a refused one', async () => {
+    let gates = 0;
+    const h = harness(
+      [
+        planTurn,
+        (inv) => {
+          // The round is already charged while the turn runs.
+          void inv;
+          expect(
+            readJournal(h.deps.dataDir).tasks['t1']?.correctiveRounds
+          ).toBe(1);
+          return {
+            json: {
+              status: 'SUCCESS',
+              conversation_id: 'c1',
+              structured_output: PLAN,
+            },
+          };
+        },
+      ],
+      {
+        quotaGate: async () => {
+          gates += 1;
+          if (gates === 2) throw new AgyError('AGY_QUOTA_LOW', 'low');
+        },
+      }
+    );
+    await h.lc.delegate(delegateInput(h.repo));
+    const redo = { localId: 't1', message: 'redo', correction: true };
+    await expect(
+      h.lc.reply({ ...redo, requestId: 'r2' })
+    ).rejects.toMatchObject({ code: 'AGY_QUOTA_LOW' });
+    expect(readJournal(h.deps.dataDir).tasks['t1']?.correctiveRounds).toBe(0);
+    await h.lc.reply({ ...redo, requestId: 'r3' });
+    expect(h.lc.status('t1')[0]?.correctiveRounds).toBe(1);
+  });
+
+  it('refuses a correction once the plan is approved', async () => {
+    const h = harness([planTurn, editTurn('x\n')]);
+    await h.lc.delegate(delegateInput(h.repo));
+    await h.lc.approve({ requestId: 'r2', localId: 't1' });
+    await expect(
+      h.lc.reply({
+        requestId: 'r3',
+        localId: 't1',
+        message: 'redo',
+        correction: true,
+      })
+    ).rejects.toMatchObject({ code: 'AGY_INVALID_INPUT' });
+    expect(h.calls).toHaveLength(2);
+    expect(h.lc.status('t1')[0]?.correctiveRounds).toBe(0);
+  });
+
   it('flags secret-shaped content in collected patches', async () => {
     const h = harness([
       planTurn,

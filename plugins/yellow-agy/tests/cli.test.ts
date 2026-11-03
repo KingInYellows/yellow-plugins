@@ -104,7 +104,11 @@ describe('cli', () => {
       },
     });
     const n = await none.call(...authorizeArgs(none.repo));
-    expect(n.json.error.code).toBe('AGY_CONFIRMATION_REQUIRED');
+    expect(n).toMatchObject({
+      exit: 2,
+      json: { ok: false, error: { code: 'AGY_CONFIRMATION_REQUIRED' } },
+    });
+    expect((await none.call('authorize', '--list')).json.grants).toEqual([]);
   });
 
   it('delegate needs a covering grant and runs under it', async () => {

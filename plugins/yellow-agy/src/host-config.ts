@@ -87,7 +87,8 @@ export function detectHost(options: DetectOptions = {}): HostConfig {
       sandboxVerified: false,
     };
   }
-  if (which('agy.exe') || which('agy')) {
+  // buildInvocation spawns agy.exe on this host; a bare `agy` shim isn't it.
+  if (which('agy.exe')) {
     const base =
       set('LOCALAPPDATA') ?? path.join(os.homedir(), 'AppData', 'Local');
     const root = path.join(base, 'yellow-agy', 'worktrees');
