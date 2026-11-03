@@ -331,6 +331,43 @@ ephemeral `GITHUB_TOKEN`.
 - **Revocation**: revoke the PAT in the owner's settings and run
   `gh secret delete RELEASE_PR_TOKEN`; the workflow reverts to `GITHUB_TOKEN`.
 
+### Headless review-gate CI job (`review-gate.yml`)
+
+`.github/workflows/review-gate.yml` runs yellow-review's `review-gate` workflow
+on non-draft pull requests (`scripts/ci/review-gate/README.md`). It reads
+untrusted PR code with a credential, so its boundary is:
+
+- **Who runs it**: same-repository, human-authored, non-draft PRs only. Fork PRs
+  (no secrets) and bot PRs are skipped. `REVIEW_GATE_MODE=off` disables it.
+- **Trusted code**: the reviewer (plugins, `scripts/ci/review-gate/ci.py`,
+  `.github/review-risk.json`, `REVIEW.md`) is checked out from the default
+  branch, so a PR cannot change those or its tier (its own `CLAUDE.md` still
+  loads; see the known gap below). The PR head is a separate checkout that is
+  read, never executed.
+- **Workflow definition**: the job uses `pull_request`, so its steps come from
+  the PR. Only same-repository branches run it, and anyone who can push one can
+  already reach repository secrets through any `pull_request` workflow
+  (`claude-code-review.yml` does the same), so `pull_request_target` would add
+  its fork-checkout risk without narrowing who can read the token.
+- **`CLAUDE_CODE_OAUTH_TOKEN`**: passed only to the `claude -p` step. That run
+  has no GitHub token, no setting sources or MCP servers, Bash and every write
+  tool denied, and only Read/Grep/Glob plus
+  `Workflow(yellow-review:review-gate)` allowed. Exposure is limited to the
+  subscription's usage limits.
+- **Known gap**: the PR's own `CLAUDE.md` files load as project memory because
+  the PR checkout is the working directory. With read-only tools, injected text
+  can mislead the review but cannot act or write.
+- **`GITHUB_TOKEN`**: the review job has `contents: read` only.
+  `pull-requests: write` goes only to the separate `comment` job (advisory
+  mode), which runs no model and edits one marker-identified comment. Finding
+  text is model output over untrusted code. Every model-authored string goes
+  through yellow-core's `cs_redact_secrets` before `result.json` is written, so
+  a credential matching its known patterns is redacted before it reaches the
+  artifact, job summary or comment; an unrecognized shape can still pass. Text
+  redaction cannot vouch for (including a token split across lines) is withheld,
+  and a complete result then counts as incomplete. Rendering then puts it on one
+  line with HTML, links, code spans, table pipes and `@` mentions escaped.
+
 ### Local Execution (yellow-ruvector, yellow-debt, yellow-review)
 
 - All processing happens locally on user's machine

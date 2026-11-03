@@ -125,22 +125,24 @@ user-invocable.
 ### Workflows (1)
 
 `workflows/review-gate.js` runs as `/yellow-review:review-gate` (Claude Code
-2.1.316 loads `workflows/` without a manifest field; not yet checked on CI's
-pinned 2.1.293, which gates Phase 3). It is the Hunt → Vote → Rank core of the
-risk-tiered pipeline: one persona agent per `args.include` name, a plain-code
-dedup barrier, 1 or 3 votes per finding by severity and tier from the read-only
-`review-gate-verifier` agent, then Important / Nit / Pre-existing display with
-the REVIEW.md Nit cap. Its `args` and return shape are a fixed contract the eval
-runner builds against; a hunter that returns `null`, or an unknown persona name,
-lands in `coverage.failed`, and `coverage.empty` marks a run in which no hunter
-returned; neither counts as clean. Today only `/review:pr` under
-`review_pipeline: workflow` calls it, in shadow mode
-(`references/review-pr/workflow-shadow.md`): agents read a detached checkout of
-the head commit under the git common dir (removed on every exit path), Coverage
-gets a comparison line, and its findings are never applied or written to the
-ledger. `tests/integration/review-gate-workflow.test.ts` runs the body in
-`node:vm` with stub agents; ESLint ignores `plugins/*/workflows/` because no
-parser accepts top-level `return` beside `export`.
+2.1.316 loads `workflows/` without a manifest field; `claude-code-action`'s
+2.1.293 is unchecked, so the CI job installs 2.1.316 itself). It is the Hunt →
+Vote → Rank core of the risk-tiered pipeline: one persona agent per
+`args.include` name, a plain-code dedup barrier, 1 or 3 votes per finding by
+severity and tier from the read-only `review-gate-verifier` agent, then
+Important / Nit / Pre-existing display with the REVIEW.md Nit cap. Its `args`
+and return shape are a fixed contract the eval runner builds against; a hunter
+that returns `null`, or an unknown persona name, lands in `coverage.failed`, and
+`coverage.empty` marks a run in which no hunter returned; neither counts as
+clean. Two callers: the repo's `.github/workflows/review-gate.yml` runs it
+headless on non-draft PRs (`scripts/ci/review-gate/README.md`; shadow by
+default, never blocks), and `/review:pr` under `review_pipeline: workflow` runs
+it in shadow mode (`references/review-pr/workflow-shadow.md`): agents read a
+detached checkout of the head commit under the git common dir (removed on every
+exit path), Coverage gets a comparison line, and its findings are never applied
+or written to the ledger. `tests/integration/review-gate-workflow.test.ts` runs
+the body in `node:vm` with stub agents; ESLint ignores `plugins/*/workflows/`
+because no parser accepts top-level `return` beside `export`.
 
 ### Scripts (21)
 
