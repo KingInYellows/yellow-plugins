@@ -52,10 +52,11 @@ Coverage gets `- Mode: report-only (<mode>)`.
 
 ## Cleanup
 
-In `worktree` mode, run this once before Step 10 and on every other path that
-ends the review after `open` succeeded. Run the workflow shadow's own Cleanup
-first when it ran, because its checkout was made from this one's HEAD. Run it
-from the directory the review started in, not from `<review_root>`:
+In `worktree` mode, run this once after Step 10's last Bash call (its ledger
+`fold` still runs from `<review_root>`) and on every other path that ends the
+review after `open` succeeded. Run the workflow shadow's own Cleanup first when
+it ran, because its checkout was made from this one's HEAD. Run it from the
+directory the review started in, not from `<review_root>`:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/report-only-root" close '<review_root>'
