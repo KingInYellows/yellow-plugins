@@ -751,6 +751,20 @@ describe('validate-solutions — claim grounding (SOL-003)', () => {
     expect(r.status).toBe(0);
   });
 
+  it('skips model ids and scheme-relative links', () => {
+    const r = runClaims(
+      'model-ids',
+      [
+        '',
+        'Models `openai/gpt-5.4` and `openrouter/anthropic/claude-sonnet-4.5`.',
+        'See [repo](//github.com/KingInYellows/yellow-plugins).',
+        '',
+      ].join('\n')
+    );
+    expect(r.stdout + r.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(r.status).toBe(0);
+  });
+
   it('checks repo-owned dot-directories but skips machine-local ones', () => {
     mkdirSync(join(repo, '.claude-plugin'), { recursive: true });
     mkdirSync(join(repo, '.github'), { recursive: true });

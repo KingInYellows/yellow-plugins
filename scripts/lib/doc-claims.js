@@ -118,7 +118,8 @@ function isPathShaped(token, repoRoot) {
   const segments = token.split('/');
   const last = segments[segments.length - 1];
   if (/^v?\d+(\.\d+)+$/.test(last)) return false; // name/1.2.3 version pin
-  if (/\.[A-Za-z0-9]{1,8}$/.test(last)) return true;
+  // An extension starts with a letter, so `gpt-5.4` is a model id, not a file.
+  if (/\.[A-Za-z][A-Za-z0-9]{0,7}$/.test(last)) return true;
   if (token.endsWith('/') && segments.length > 2) return true;
   try {
     return fs.statSync(path.join(repoRoot, segments[0])).isDirectory();
@@ -461,7 +462,9 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
   // Code spans and fences are masked so `handlers[type](event)` is not a link.
   for (const m of maskCode(bodyLines).join('\n').matchAll(MD_LINK_RE)) {
     const target = m[1];
-    if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('#')) continue;
+    // Skip URLs, scheme-relative `//host/...` links and in-page anchors.
+    if (/^[a-z][a-z0-9+.-]*:/i.test(target) || /^(#|\/\/)/.test(target))
+      continue;
     let bare = target.split('#')[0].split('?')[0];
     try {
       bare = decodeURIComponent(bare);
