@@ -406,7 +406,8 @@ overrides documented in that schema:
 
 - `review_pipeline: legacy` → fall back to the pre-Wave-2 adaptive
   selection (see "Legacy fallback" at the bottom of this section). Skip
-  the rest of this step.
+  the rest of this step except the cross-model egress switch, which
+  still applies.
 - `review_pipeline: workflow` → run this step and Step 5 exactly as for
   `persona`, plus the `review-gate` shadow run (see "Workflow shadow" at
   the bottom of this section).
@@ -583,7 +584,8 @@ differs from the persona set in membership, aggregation (it skips Step
 an improvised set silently changes what the rollback escape hatch means.
 If the Read fails (file missing, path unresolved), stop and report the
 exact path — do not fall back to the default persona pipeline, which
-would silently ignore the user's `legacy` setting.
+would silently ignore the user's `legacy` setting. The cross-model egress
+switch above still gates `codex-reviewer` on this path.
 When `review_pipeline` is unset, `persona` (the default) or `workflow`, skip
 the load and continue with the dispatch table above.
 
