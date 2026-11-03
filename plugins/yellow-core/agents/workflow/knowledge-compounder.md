@@ -336,6 +336,12 @@ substitute a fallback.
 
 ## M3 Confirmation
 
+Ground the draft first: every backticked repo path, relative link and commit SHA
+it cites must exist (Glob, Read, `git cat-file -e <sha>^{commit}`). Fix or drop
+each one that does not, or mark the line `(historical)` when the fix being
+documented removed it. Cite PR numbers rather than branch commit SHAs, which a
+squash merge rewrites.
+
 Use AskUserQuestion before any writes. The question body MUST include all of
 the following so the user can review the actual content (not just file
 paths) before approving:
@@ -620,6 +626,22 @@ After Write, verify:
 ```
 
 If the above exits non-zero, stop. Do not proceed.
+
+When the repo ships `scripts/validate-solutions.js` (yellow-plugins does), run
+it on the written doc (`DOC_PATH=docs/solutions/$CATEGORY/$FINAL_SLUG.md`), or
+on `DOC_PATH=$AMEND_TARGET` after amending:
+
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+if [ -f "$GIT_ROOT/scripts/validate-solutions.js" ]; then
+  node "$GIT_ROOT/scripts/validate-solutions.js" --doc "$GIT_ROOT/$DOC_PATH"
+fi
+```
+
+`ERROR-SOL-003` means a cited path, commit or relative link does not exist, or a
+`{{...}}` placeholder leaked. Fix the citation with Edit, or mark its line
+`(historical)`, and re-run until it exits 0. List remaining warnings in the
+Success Output.
 
 ### MEMORY.md Update (MEMORY_ONLY or BOTH)
 

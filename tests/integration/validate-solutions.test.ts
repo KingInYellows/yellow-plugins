@@ -604,3 +604,201 @@ describe('validate-solutions — optional retire_when (SOL-002)', () => {
     expect(stdout + stderr).toMatch(/retire_when/);
   });
 });
+
+// Claim grounding (SOL-003) runs against a throwaway git repo so path and
+// commit checks have a real tree, history and base ref to resolve against.
+describe('validate-solutions — claim grounding (SOL-003)', () => {
+  let repo: string;
+  let solutions: string;
+  let realSha: string;
+
+  const git = (...args: string[]) =>
+    spawnSync('git', args, { cwd: repo, encoding: 'utf8' }).stdout.trim();
+
+  const commitAll = (msg: string) => {
+    git('add', '-A');
+    git(
+      '-c',
+      'user.name=t',
+      '-c',
+      'user.email=t@example.com',
+      'commit',
+      '-q',
+      '-m',
+      msg
+    );
+  };
+
+  const runClaims = (
+    slug: string,
+    body: string,
+    opts: { status?: 'A' | 'M'; docMode?: boolean } = {}
+  ): RunResult => {
+    writeDoc(solutions, 'workflow', slug, validFrontmatter(slug), body);
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      SOLUTIONS_DIR: solutions,
+      VALIDATE_SOLUTIONS_REPO_ROOT: repo,
+      VALIDATE_SOLUTIONS_BASE_REF: 'main',
+    };
+    delete env.GITHUB_ACTIONS;
+    const docPath = join(solutions, 'workflow', `${slug}.md`);
+    const args = [SCRIPT];
+    if (opts.docMode) args.push('--doc', docPath);
+    else
+      env.VALIDATE_SOLUTIONS_DIFF = `${opts.status ?? 'A'}\tdocs/solutions/workflow/${slug}.md`;
+    const r = spawnSync('node', args, { env, encoding: 'utf8', cwd: repo });
+    return {
+      status: r.status ?? -1,
+      stdout: r.stdout ?? '',
+      stderr: r.stderr ?? '',
+    };
+  };
+
+  beforeEach(() => {
+    repo = mkdtempSync(join(tmpdir(), 'yellow-vs-claims-'));
+    solutions = join(repo, 'docs', 'solutions');
+    spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+    mkdirSync(join(repo, 'plugins', 'foo', 'lib'), { recursive: true });
+    writeFileSync(join(repo, 'plugins', 'foo', 'real.md'), 'x\n');
+    writeFileSync(join(repo, 'plugins', 'foo', 'lib', 'real.sh'), 'x\n');
+    writeDoc(solutions, 'workflow', 'existing-doc', validFrontmatter());
+    mkdirSync(join(solutions, 'archived', 'workflow'), { recursive: true });
+    writeFileSync(
+      join(solutions, 'archived', 'workflow', 'old-doc.md'),
+      '---\ntitle: old\n---\n'
+    );
+    commitAll('seed');
+    realSha = git('rev-parse', '--short=9', 'HEAD');
+  });
+  afterEach(() => {
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it('blocks a cited repo path that exists nowhere', () => {
+    const r = runClaims(
+      'bad-path',
+      '\nSee `plugins/foo/bar.md` for the fix.\n'
+    );
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/ERROR-SOL-003.*plugins\/foo\/bar\.md/);
+  });
+
+  it('blocks a fabricated commit citation', () => {
+    const r = runClaims('bad-sha', '\nThis was fixed in commit deadbeef1.\n');
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/ERROR-SOL-003.*deadbeef1/);
+  });
+
+  it('passes real paths, real commits, and doc-relative ../ paths', () => {
+    const r = runClaims(
+      'good-claims',
+      [
+        '',
+        'See `plugins/foo/real.md` and `plugins/foo/real.md:12-20`.',
+        `Landed in ${realSha}.`,
+        'Relative: `../../../plugins/foo/real.md`.',
+        'Plugin-relative: `lib/real.sh`.',
+        '',
+      ].join('\n')
+    );
+    expect(r.stdout + r.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(r.status).toBe(0);
+  });
+
+  it('skips placeholders, identifiers and other repos', () => {
+    const r = runClaims(
+      'placeholders',
+      [
+        '',
+        'Template: `path/to/file.md`, `<plugin>/agents/x.md`, `$ROOT/a/b.sh`.',
+        'Branch `feat/` and model `anthropic/claude-sonnet`.',
+        'Upstream pin EveryInc/compound-engineering-plugin@b405537 is external.',
+        'Runtime `.claude/agents/foo.md` lives outside the repo.',
+        '',
+      ].join('\n')
+    );
+    expect(r.stdout + r.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(r.status).toBe(0);
+  });
+
+  it('treats an uncued hex word as a note, not an error', () => {
+    const r = runClaims(
+      'hex-note',
+      '\nThe digest 9f86d081884c and session a1b2c3d4e5 are ids.\n'
+    );
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/note: hex 9f86d081884c/);
+  });
+
+  it('masks code spans and fences before the scaffold check', () => {
+    const ok = runClaims(
+      'scaffold-ok',
+      '\nUse `{{ secrets.TOKEN }}` here.\n\n```yaml\nx: {{ y }}\n```\n'
+    );
+    expect(ok.status).toBe(0);
+    const bad = runClaims('scaffold-bad', '\nThe fix lives in {{FIX_PATH}}.\n');
+    expect(bad.status).toBe(1);
+    expect(bad.stdout + bad.stderr).toMatch(/ERROR-SOL-003.*\{\{FIX_PATH\}\}/);
+  });
+
+  it('downgrades a line marked (historical) to a warning', () => {
+    const r = runClaims(
+      'historical',
+      '\nThe old `plugins/foo/gone.md` (historical) was removed by this fix.\n'
+    );
+    expect(r.status).toBe(0);
+    expect(r.stderr).toMatch(/warning: path `plugins\/foo\/gone\.md`/);
+  });
+
+  it('blocks a broken relative link but only warns for an archived target', () => {
+    const bad = runClaims('bad-link', '\nSee [x](./missing-doc.md).\n');
+    expect(bad.status).toBe(1);
+    expect(bad.stdout + bad.stderr).toMatch(/ERROR-SOL-003.*missing-doc/);
+    const archived = runClaims('archived-link', '\nSee [old](./old-doc.md).\n');
+    expect(archived.status).toBe(0);
+    expect(archived.stderr).toMatch(/warning: link/);
+  });
+
+  it('warns for a path that existed in history but was deleted', () => {
+    rmSync(join(repo, 'plugins', 'foo', 'real.md'));
+    commitAll('delete');
+    const r = runClaims('deleted', '\nThe old `plugins/foo/real.md` file.\n');
+    expect(r.status).toBe(0);
+    expect(r.stderr).toMatch(/existed in git history/);
+  });
+
+  it('on a modified doc, only new ungrounded citations block', () => {
+    writeDoc(
+      solutions,
+      'workflow',
+      'amended',
+      validFrontmatter('amended'),
+      '\nOld stale `plugins/foo/stale.md`.\n'
+    );
+    commitAll('add amended');
+    git('checkout', '-q', '-b', 'feature');
+    const preExisting = runClaims(
+      'amended',
+      '\nOld stale `plugins/foo/stale.md`.\n\nNew section.\n',
+      { status: 'M' }
+    );
+    expect(preExisting.status).toBe(0);
+    expect(preExisting.stderr).toMatch(/pre-existing/);
+    const added = runClaims(
+      'amended',
+      '\nOld stale `plugins/foo/stale.md`.\n\nNew `plugins/foo/new-bad.md`.\n',
+      { status: 'M' }
+    );
+    expect(added.status).toBe(1);
+    expect(added.stdout + added.stderr).toMatch(/new-bad\.md/);
+  });
+
+  it('--doc validates one doc without a diff', () => {
+    const r = runClaims('doc-mode', '\nSee `plugins/foo/nope.md`.\n', {
+      docMode: true,
+    });
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/ERROR-SOL-003.*nope\.md/);
+  });
+});
