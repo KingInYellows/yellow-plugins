@@ -136,6 +136,14 @@ describe('bridge Linux process group', () => {
     const miss = splitPgidMarker(flood);
     expect(miss?.pgid).toBeUndefined();
     expect(miss?.rest.equals(flood)).toBe(true);
+    // A marker past the limit is not scanned for, even in one buffer.
+    const past = Buffer.concat([
+      flood,
+      Buffer.from(`${BRIDGE_PGID_MARKER}56\n`),
+    ]);
+    const skipped = splitPgidMarker(past);
+    expect(skipped?.pgid).toBeUndefined();
+    expect(skipped?.rest.equals(past)).toBe(true);
   });
 
   // setsid(1) is util-linux; macOS has no such command.

@@ -32,7 +32,7 @@ function splitPgidMarker(stderr) {
     let start = 0;
     for (;;) {
         const nl = stderr.indexOf(0x0a, start);
-        if (nl < 0)
+        if (nl < 0 || nl >= MARKER_SCAN_BYTES)
             break;
         const line = stderr
             .subarray(start, nl)
