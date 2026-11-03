@@ -489,9 +489,9 @@ Same directory. Not GraphQL; they read only the local repository:
   more than 500 changed files. Consumed by `review-pr.md` Step 5 item 6 for the
   `thermonuclear-reviewer` size rule; `review-all.md` delegates to that item
   rather than calling the script itself.
-- **classify-risk** — Review risk tier of a change from its paths; flags, output
-  and policy rules are in the script header and
-  `../../references/components-reference.md`
+- **classify-risk** — Review risk tier of a change from its paths (flags, output
+  and policy rules: script header, `../../references/components-reference.md`);
+  **pr-base-remote** names the base repository's remote to fetch the policy from
 
 ## Verification Loop
 

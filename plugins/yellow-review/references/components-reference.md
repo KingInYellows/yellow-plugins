@@ -197,6 +197,14 @@ flags, exit codes, trust-boundary rules and library behavior.
   moved by the final re-read leaves the approval unknown), the high-tier
   cross-lineage review on the head, and `missing` tokens, which block only under
   `enforce`
+- `pr-base-remote <pr-url>` — prints the configured remote whose fetch URL names
+  the PR's base repository (`origin` tried first, host, owner and repo compared
+  case-insensitively), else `https://<host>/<owner>/<repo>.git`. The risk-tier
+  blocks in `/review:pr` Step 3a2 and `/review:resolve` Step 9 fetch the base
+  branch and the default branch (the policy) from it, and `/review:resolve` also
+  fetches `refs/pull/<n>/head` when the head is missing locally, because
+  `origin` is the fork in a fork checkout. Local git only, no network; exit 2 on
+  a URL that is not `https://<host>/<owner>/<repo>/pull/<n>`
 - `classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>`
   (or `--stdin [--numstat] [<base-ref>]` with paths, or
   `<added>\t<deleted>\t<path>` numstat rows, one per line on stdin) — Review
@@ -830,6 +838,9 @@ in the transcript (Ctrl-O) on a second `/review:pr` run within the hour.
   committed on `main`; covers base-ref and `--policy-ref` policy reads,
   first-match order, the size rule with binary files, literal glob dots and
   fail-closed policies
+- `pr-base-remote.bats` — a throwaway repository with fork-style remotes; covers
+  origin first, the base remote in a fork, the https fallback, URL forms and
+  rejected input
 - `file-line-counts.bats` — pins the thermonuclear line-count invariant
   alongside `skills/pr-review-workflow/scripts/file-line-counts`
 - `review-ledger.bats` — throwaway repositories with a bare origin, built by

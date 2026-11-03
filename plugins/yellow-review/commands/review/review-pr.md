@@ -173,7 +173,9 @@ does not change which reviewers run yet. The policy comes from the default
 branch, not the PR's base: in a stack the base is the parent PR's unmerged
 branch. Only the tier, the policy source and the policy's own rule names are
 printed; the changed paths are PR-controlled text and stay out of context.
-The policy is read at the commit this fetch returned (`FETCH_HEAD`), never a
+The policy and the base branch are fetched from the PR's base repository
+(`pr-base-remote`), not `origin`, which is the fork in a fork checkout. Each
+is read at the commit its fetch returned (`FETCH_HEAD`), never a
 remote-tracking ref that a failed fetch would leave stale, and each network
 call is bounded at 30 s (then killed 5 s later) when a `timeout` or `gtimeout`
 with `--kill-after` is installed.
@@ -189,25 +191,38 @@ rr_net() {
   done
   "$@"
 }
-DEFAULT_BRANCH=$(rr_net gh repo view --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
-case "$DEFAULT_BRANCH" in
-  '' | -* | *..* | *[!A-Za-z0-9._/-]*) printf '[review:pr] Warning: no usable default branch; risk tier unknown\n' >&2 ;;
-  *)
-    if ! rr_net git fetch --no-tags --quiet origin "refs/heads/$DEFAULT_BRANCH"; then
-      printf '[review:pr] Warning: default branch fetch failed; risk tier unknown\n' >&2
-    elif ! POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
-      printf '[review:pr] Warning: fetched default branch unreadable; risk tier unknown\n' >&2
-    else
-      "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
-        --policy-ref "$POLICY_SHA" "<DIFF_BASE>" HEAD |
-        jq -r '"tier=\(.tier) policy=\(.policy) rules=\([.reasons[].rule] | unique | join("; "))"'
-    fi
-    ;;
-esac
+PR_URL=$(rr_net gh pr view "<PR#>" --json url -q .url) || PR_URL=""
+BASE_REMOTE=$("${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/pr-base-remote" "$PR_URL") || BASE_REMOTE=""
+BASE_REPO=${PR_URL#https://}
+BASE_REPO=${BASE_REPO%/pull/*}
+DEFAULT_BRANCH=""
+[ -z "$BASE_REMOTE" ] ||
+  DEFAULT_BRANCH=$(rr_net gh repo view "$BASE_REPO" --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
+BASE_BRANCH=$(rr_net gh pr view "<PR#>" --json baseRefName -q .baseRefName) || BASE_BRANCH=""
+RISK_OK=1
+for rr_b in "$DEFAULT_BRANCH" "$BASE_BRANCH"; do
+  case "$rr_b" in '' | -* | *..* | *[!A-Za-z0-9._/-]*) RISK_OK=0 ;; esac
+done
+if [ "$RISK_OK" != 1 ]; then
+  printf '[review:pr] Warning: no usable default or base branch; risk tier unknown\n' >&2
+elif [ -z "$BASE_REMOTE" ]; then
+  printf '[review:pr] Warning: no usable base repository; risk tier unknown\n' >&2
+elif ! rr_net git fetch --no-tags --quiet "$BASE_REMOTE" "refs/heads/$BASE_BRANCH"; then
+  printf '[review:pr] Warning: base branch fetch failed; risk tier unknown\n' >&2
+elif ! BASE_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
+  printf '[review:pr] Warning: fetched base branch unreadable; risk tier unknown\n' >&2
+elif ! rr_net git fetch --no-tags --quiet "$BASE_REMOTE" "refs/heads/$DEFAULT_BRANCH"; then
+  printf '[review:pr] Warning: default branch fetch failed; risk tier unknown\n' >&2
+elif ! POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
+  printf '[review:pr] Warning: fetched default branch unreadable; risk tier unknown\n' >&2
+else
+  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
+    --policy-ref "$POLICY_SHA" "$BASE_SHA" HEAD |
+    jq -r '"tier=\(.tier) policy=\(.policy) rules=\([.reasons[].rule] | unique | join("; "))"'
+fi
 ```
 
-Substitute the `DIFF_BASE` value chosen above. When nothing is printed,
-record the tier as `unknown` and continue.
+When nothing is printed, record the tier as `unknown` and continue.
 
 ### Step 3b: Query institutional memory (optional)
 
