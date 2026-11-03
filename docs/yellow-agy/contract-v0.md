@@ -346,12 +346,16 @@ that runs agy or git (`delegate`, `approve`, `reply`, `collect`, `abandon`,
 it resolves the worktree root with `realpath -e` inside WSL and refuses a result
 under `/mnt`.
 
-The `/usage` field names are unconfirmed. Until a captured output pins them, the
-gate reads the lowest numeric field whose key names a remaining amount (a 0-1
-fraction, or 0-100 under a key that says percent, divided by 100), multiplies
-it by 100, subtracts recent turns, and compares the result with
-`minQuotaPercent`. It refuses with `AGY_QUOTA_UNKNOWN` when it finds no such
-field, when one is out of range, or when the probe was killed or didn't exit 0.
+The `/usage` shape is pinned to the output captured from agy 1.4.12 on the
+owner's WSL host (`plugins/yellow-agy/tests/fixtures/usage-1.4.12.json`):
+`status` is `"SUCCESS"`, `command.name` is `"usage"`, and
+`command.data.groups[]` each hold `buckets[]` with a 0-1 `remaining_fraction`
+(groups are model families, buckets are the weekly and 5-hour windows). The
+gate takes the lowest fraction across every bucket, because agy picks the
+model, multiplies it by 100, subtracts recent turns, and compares the result
+with `minQuotaPercent`. It refuses with `AGY_QUOTA_UNKNOWN` when the output has
+any other shape, a group has no buckets, a fraction is missing or outside 0-1,
+or the probe was killed or didn't exit 0.
 
 New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
 `AGY_AUTH_MODE`, `AGY_OVERAGES`, `AGY_AUTH_REQUIRED`, `AGY_BUSY`, `AGY_QUOTA`,

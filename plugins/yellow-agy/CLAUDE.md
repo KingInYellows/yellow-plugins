@@ -7,9 +7,10 @@ Pro sign-in.
 ## Status
 
 Experimental, built to `docs/yellow-agy/contract-v0.md`. Commands under
-`commands/agy/` call `node dist/cli.js <operation>`. The `/usage` field names
-the quota gate reads are unconfirmed, so it fails closed (`AGY_QUOTA_UNKNOWN`)
-on any shape it doesn't recognize. The evidence for every flag it uses is in
+`commands/agy/` call `node dist/cli.js <operation>`. The quota gate reads the
+`/usage` shape captured from agy 1.4.12 (`tests/fixtures/usage-1.4.12.json`)
+and fails closed (`AGY_QUOTA_UNKNOWN`) on any other shape; recapture it when
+the agy version floor moves. The evidence for every flag it uses is in
 `docs/spikes/antigravity-cli-delegate-2026-10.md` and
 `docs/spikes/antigravity-cli-adapter-probe-2026-11.md`.
 

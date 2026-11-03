@@ -18,15 +18,14 @@ exports.QUOTA_WINDOW_MS = 15 * 60 * 1000;
 /** Percentage points charged for a recent turn whose cost is unknown. */
 exports.UNKNOWN_TURN_COST = 2;
 const PROBE_DEADLINE_MS = 60_000;
-const MAX_DEPTH = 6;
-const REMAINING_KEY = /remaining/i;
 /**
- * The lowest remaining fraction (0..1) of any bucket in `/usage` JSON, or
- * undefined when the output has none. Every numeric field whose key names a
- * remaining amount counts: a fraction as is, a 0-100 value under a key that
- * says percent as a percentage. A remaining value outside that range makes
- * the whole output unknown, and an unknown shape finds nothing, so the gate
- * fails closed either way.
+ * The lowest `remaining_fraction` (0..1) across every bucket of every group in
+ * agy's `/usage` JSON (shape captured from agy 1.4.12:
+ * `{status:"SUCCESS", command:{name:"usage", data:{groups:[{buckets:[
+ * {remaining_fraction}]}]}}}`), or undefined when the output doesn't have that
+ * shape. A group with no buckets, or a bucket whose fraction is missing or
+ * outside 0..1, makes the whole output unknown, so the gate fails closed. The
+ * lowest bucket counts whichever model the turn uses, because agy picks it.
  */
 function lowestRemaining(stdout) {
     let value;
@@ -36,34 +35,32 @@ function lowestRemaining(stdout) {
     catch {
         return undefined;
     }
-    let lowest;
-    let unreadable = false;
-    const visit = (v, depth) => {
-        if (depth > MAX_DEPTH || v === null || typeof v !== 'object')
-            return;
-        for (const [key, child] of Object.entries(v)) {
-            if (typeof child === 'number' && REMAINING_KEY.test(key)) {
-                const fraction = /percent|pct/i.test(key) ? child / 100 : child;
-                if (Number.isFinite(fraction) && fraction >= 0 && fraction <= 1) {
-                    lowest = lowest === undefined ? fraction : Math.min(lowest, fraction);
-                }
-                else {
-                    // A bucket this version can't read could be the empty one.
-                    unreadable = true;
-                }
+    const obj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
+        ? v
+        : undefined;
+    const root = obj(value);
+    const command = obj(root?.['command']);
+    const groups = obj(command?.['data'])?.['groups'];
+    if (root?.['status'] !== 'SUCCESS' ||
+        command?.['name'] !== 'usage' ||
+        !Array.isArray(groups) ||
+        groups.length === 0) {
+        return undefined;
+    }
+    let lowest = Infinity;
+    for (const group of groups) {
+        const buckets = obj(group)?.['buckets'];
+        if (!Array.isArray(buckets) || buckets.length === 0)
+            return undefined;
+        for (const bucket of buckets) {
+            const f = obj(bucket)?.['remaining_fraction'];
+            if (typeof f !== 'number' || !Number.isFinite(f) || f < 0 || f > 1) {
+                return undefined;
             }
-            else if (REMAINING_KEY.test(key) &&
-                (child === null || typeof child !== 'object')) {
-                // null, a string or a boolean where a remaining amount belongs.
-                unreadable = true;
-            }
-            else {
-                visit(child, depth + 1);
-            }
+            lowest = Math.min(lowest, f);
         }
-    };
-    visit(value, 0);
-    return unreadable ? undefined : lowest;
+    }
+    return lowest;
 }
 /** Percentage points the journal's recent turns are assumed to have used. */
 function recentCost(j, now = Date.now()) {
