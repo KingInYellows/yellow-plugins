@@ -1,0 +1,20 @@
+diff --git a/scripts/eval/review-gate/tests/test_review_gate.py b/scripts/eval/review-gate/tests/test_review_gate.py
+index 025ad57..715c14f 100644
+--- a/scripts/eval/review-gate/tests/test_review_gate.py
++++ b/scripts/eval/review-gate/tests/test_review_gate.py
+@@ -428,6 +428,15 @@ class GradeMathTest(unittest.TestCase):
+         self.assertEqual(rg.md_table(["a", "long head"], [["x|y", 1]]),
+                          "| a    | long head |\n| ---- | --------- |\n| x\\|y | 1         |")
+ 
++    def test_md_table_flattens_newlines_and_keeps_header_only_tables(self):
++        self.assertEqual(rg.md_table(["a"], [["x\ny"]]), "| a   |\n| --- |\n| x y |")
++        self.assertEqual(rg.md_table(["ab"], []), "| ab  |\n| --- |")
++
++    def test_pct_rounds_and_handles_none(self):
++        self.assertEqual(rg.pct(None), "n/a")
++        self.assertEqual(rg.pct(0.5), "50%")
++        self.assertEqual(rg.pct(2 / 3), "67%")
++
+ 
+ class HarvestGitTest(Tmp):
+     def test_reverts_and_fixes_that_reference_a_pr(self):

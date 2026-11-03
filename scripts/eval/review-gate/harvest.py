@@ -3,20 +3,31 @@
 
 Sources:
 - git (always): reverts and `fix:` commits on the main line, committed in
-  [--since, --until] (UTC days), whose subject or body references an earlier PR (`#123`, a /pull/123 URL, or "This reverts
-  commit <sha>"). Each candidate names the referenced PR's squash-merge commit
-  (head) and its first parent (base), and the lines the fix or revert touched
-  on the old side, which are where the defect was.
+  [--since, --until] (UTC days), whose subject or body references an earlier
+  PR (`#123`, a /pull/123 URL, or "This reverts commit <sha>"). Each candidate
+  names the referenced PR's squash-merge commit (head) and its first parent
+  (base). `hunks` are the old-side lines the fix or revert touched, relative
+  to the fix's parent (`hunks_relative_to`); each target's `hunks_at_head`
+  maps them onto that target's head, which is where the defect was.
 - bots (--bots): GitHub review comments by Codex or Cursor Bugbot whose body
   carries a P1 badge, created in [--since, --until]. Fetched with read-only
   `gh api --method GET`; skipped with a note when gh is missing or fails.
+  With --reviewed, each one says whether a recorded review of the same PR at
+  the same head came before it (`review: "missed"`), and --misses-only drops
+  the other bot P1s.
+- ci (--ci): GitHub Actions push runs on the default branch that failed in
+  [--since, --until] after the same workflow's previous run passed. Each is
+  tied to the commit it ran on, that commit's squash-merged PR, and the lines
+  the PR changed at its head.
 
-Every fetched string (commit messages, comment bodies) is untrusted data: it
-is truncated and stored in the output, and never executed, evaluated or used
-to build a command. The user confirms each candidate before it becomes a case.
+Every fetched string (commit messages, comment bodies, workflow and job names)
+is untrusted data: it is truncated and stored in the output, and never
+executed, evaluated or used to build a command. The user confirms each
+candidate before it becomes a case.
 
-  harvest.py [--repo owner/name] [--ref origin/main] [--since YYYY-MM-DD]
-             [--until YYYY-MM-DD] [--bots] [-o candidates.json]
+  harvest.py [--repo owner/name] [--ref origin/main] [--branch main]
+             [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--bots] [--ci]
+             [--reviewed PATH ...] [--misses-only] [-o candidates.json]
 """
 
 import argparse
@@ -38,12 +49,16 @@ FIX_RE = re.compile(r"^fix(?:\([^)]*\))?!?:", re.I)
 OWN_PR_RE = re.compile(r"\(#(\d+)\)\s*$")
 PR_REF_RE = re.compile(r"(?<![\w/&])#(\d+)\b|/pull/(\d+)\b")
 REVERTS_RE = re.compile(r"\bThis reverts commit ([0-9a-f]{7,40})\b")
-HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@")
+HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 BOT_LOGINS = ("chatgpt-codex-connector[bot]", "cursor[bot]")
 P1_BADGE_RE = re.compile(r"!\[P1 Badge\]|img\.shields\.io/badge/P1[-_ ]", re.I)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 REF_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+CI_RED = ("failure", "timed_out")
+CI_GREEN = ("success",)
+CI_LOOKBACK_DAYS = 7
 
 
 def excerpt(text, limit=EXCERPT):
@@ -93,6 +108,42 @@ def referenced_prs(commit):
     return found
 
 
+GIT_ESCAPES = {"a": 7, "b": 8, "t": 9, "n": 10, "v": 11, "f": 12, "r": 13, '"': 34, "\\": 92}
+
+
+def git_path(text):
+    """A path as git prints it in a diff header: plain, or double-quoted with
+    C escapes and octal-escaped UTF-8 when it holds tabs, quotes or non-ASCII
+    characters (core.quotePath)."""
+    if not (len(text) >= 2 and text[0] == '"' and text[-1] == '"'):
+        return text
+    body, out, i = text[1:-1], bytearray(), 0
+    while i < len(body):
+        ch = body[i]
+        if ch == "\\" and i + 1 < len(body):
+            nxt = body[i + 1]
+            if nxt in "01234567" and re.match(r"[0-7]{3}", body[i + 1:i + 4]):
+                out.append(int(body[i + 1:i + 4], 8) & 0xFF)
+                i += 4
+                continue
+            if nxt in GIT_ESCAPES:
+                out.append(GIT_ESCAPES[nxt])
+                i += 2
+                continue
+        out += ch.encode("utf-8")
+        i += 1
+    return out.decode("utf-8", "replace")
+
+
+def header_path(rest, prefix):
+    """`rest` of a `--- `/`+++ ` line without its a/ or b/ prefix, or None
+    for /dev/null. Git ends the line with a tab when the name has a space;
+    a name that itself holds a tab is quoted, so one trailing tab is never
+    part of it."""
+    path = git_path(rest[:-1] if rest.endswith("\t") else rest)
+    return path[len(prefix):] if path.startswith(prefix) else None
+
+
 def old_side_hunks(diff):
     """[{file, line}] for each hunk's first old-side line: where the defect was."""
     hunks, path, header = [], None, False
@@ -103,7 +154,7 @@ def old_side_hunks(diff):
             path, header = None, True
             continue
         if header and line.startswith("--- "):
-            path = line[6:] if line.startswith("--- a/") else None
+            path = header_path(line[4:], "a/")
             continue
         m = HUNK_RE.match(line)
         if m:
@@ -113,10 +164,96 @@ def old_side_hunks(diff):
     return hunks
 
 
-def git_candidates(commits, repo, show, since=None, until=None):
+def parse_diff(diff):
+    """Per-file entries of a -U0 diff: [{old, new, hunks: [(old_start,
+    old_count, new_start, new_count)]}]. `old` is None for an added file and
+    `new` None for a deleted one; renames carry both paths."""
+    entries, cur, header = [], None, False
+    for line in diff.splitlines():
+        if line.startswith("diff --git "):
+            # The ---/+++ or rename lines below set the real names; these are
+            # only a fallback for a header with neither (a mode change).
+            m = re.match(r"^diff --git a/(.+) b/(.+)$", line)
+            cur = {"old": m.group(1) if m else None, "new": m.group(2) if m else None, "hunks": []}
+            entries.append(cur)
+            header = True
+            continue
+        if cur is None:
+            continue
+        if header:
+            # File names come from these lines only before the first @@: in a
+            # hunk, `--- x` is a removed line such as `-- comment`.
+            if line.startswith("--- "):
+                cur["old"] = header_path(line[4:], "a/")
+                continue
+            if line.startswith("+++ "):
+                cur["new"] = header_path(line[4:], "b/")
+                continue
+            if line.startswith("rename from "):
+                cur["old"] = git_path(line[len("rename from "):])
+                continue
+            if line.startswith("rename to "):
+                cur["new"] = git_path(line[len("rename to "):])
+                continue
+        m = HUNK_RE.match(line)
+        if m:
+            header = False
+            cur["hunks"].append((int(m.group(1)), int(m.group(2) or 1), int(m.group(3)), int(m.group(4) or 1)))
+    return entries
+
+
+def new_side_hunks(diff):
+    """[{file, line}] for each hunk's first new-side line: the lines a commit
+    changed, at that commit. A pure deletion names the line after the gap."""
+    hunks = []
+    for entry in parse_diff(diff):
+        if not entry["new"]:
+            continue
+        for _, _, new_start, new_count in entry["hunks"]:
+            if len(hunks) < MAX_HUNKS:
+                hunks.append({"file": entry["new"], "line": max(1, new_start + (0 if new_count else 1))})
+    return hunks
+
+
+def map_back(entries, path, line):
+    """Map `line` of `path` on the new side of a diff to its old side.
+    Returns (old_path, old_line, note); old_line is None when the line itself
+    changed or the file did not exist on the old side."""
+    entry = next((e for e in entries if e["new"] == path), None)
+    if entry is None:
+        return path, line, None
+    if entry["old"] is None:
+        return None, None, "file not at target head"
+    shift = 0
+    for old_start, old_count, new_start, new_count in entry["hunks"]:
+        if new_count and new_start <= line < new_start + new_count:
+            return entry["old"], None, "line changed between target head and fix parent"
+        if (new_count and new_start + new_count <= line) or (not new_count and new_start < line):
+            shift += old_count - new_count
+    return entry["old"], line + shift, None
+
+
+def hunks_at(hunks, between, head, parent):
+    """Map old-side `hunks` (lines at the fix's parent) onto `head`.
+    `between(a, b)` returns the -U0 rename-aware diff from a to b."""
+    if not head or not parent:
+        return None
+    entries = parse_diff(between(head, parent)) if head != parent else []
+    out = []
+    for h in hunks:
+        path, line, note = map_back(entries, h["file"], h["line"])
+        item = {"file": path or h["file"], "line": line}
+        if note:
+            item["note"] = note
+        out.append(item)
+    return out
+
+
+def git_candidates(commits, repo, show, since=None, until=None, between=None):
     """Candidates from parsed commits. `show(sha)` returns a commit's -U0 diff.
     The PR and revert lookups use every commit; only the fix or revert itself
-    must fall in [since, until], so a recent fix to an old PR keeps its SHAs."""
+    must fall in [since, until], so a recent fix to an old PR keeps its SHAs.
+    With `between`, each target also gets `hunks_at_head`."""
     by_pr = {}
     by_sha = {}
     for c in commits:
@@ -140,16 +277,21 @@ def git_candidates(commits, repo, show, since=None, until=None):
                 prs.insert(0, own_pr(target["subject"]))
         if not prs and not reverted:
             continue
+        hunks = old_side_hunks(show(c["sha"]))
+        parent = c["parents"][0] if c["parents"] else None
         targets = []
         for n in prs:
             merged = by_pr.get(n)
-            targets.append({
+            target = {
                 "pr": n,
                 "pr_url": "https://github.com/%s/pull/%d" % (repo, n) if repo else None,
                 "head": merged["sha"] if merged else None,
                 "base": merged["parents"][0] if merged and merged["parents"] else None,
                 "note": None if merged else "PR not found on this ref; look up its SHAs by hand",
-            })
+            }
+            if between is not None:
+                target["hunks_at_head"] = hunks_at(hunks, between, target["head"], parent)
+            targets.append(target)
         out.append({
             "kind": "revert" if revert else "fix",
             "commit": c["sha"],
@@ -157,19 +299,32 @@ def git_candidates(commits, repo, show, since=None, until=None):
             "own_pr": own_pr(c["subject"]),
             "reverted_commit": reverted,
             "targets": targets,
-            "hunks": old_side_hunks(show(c["sha"])),
+            "hunks": hunks,
+            "hunks_relative_to": parent,
             "subject": excerpt(c["subject"], 200),
             "body_excerpt": excerpt(c["body"]),
         })
     return out
 
 
-def harvest_git(repo_dir, ref, repo, since=None, until=None):
-    # The whole first-parent history: the dates filter candidates, not the
-    # merged PRs they point back to.
+def read_history(repo_dir, ref):
+    """(commits, show, between) for a checkout. The whole first-parent
+    history: the dates filter candidates, not the merged PRs they point to."""
     commits = parse_log(git(repo_dir, "log", "--first-parent", "--format=" + LOG_FORMAT, ref, "--"))
     show = lambda sha: git(repo_dir, "show", "--no-color", "--no-ext-diff", "--format=", "-U0", sha)
-    return git_candidates(commits, repo, show, since, until)
+    cache = {}
+
+    def between(a, b):
+        if (a, b) not in cache:
+            cache[(a, b)] = git(repo_dir, "diff", "--no-color", "--no-ext-diff", "-M", "-U0", a, b, "--")
+        return cache[(a, b)]
+
+    return commits, show, between
+
+
+def harvest_git(repo_dir, ref, repo, since=None, until=None, history=None):
+    commits, show, between = history or read_history(repo_dir, ref)
+    return git_candidates(commits, repo, show, since, until, between)
 
 
 # --- bot source -----------------------------------------------------------------
@@ -242,6 +397,192 @@ def harvest_bots(repo, since, until, max_pages=50, get=gh_get):
     return bot_candidates(comments, pulls, since, until), truncated
 
 
+# --- reviewed heads ------------------------------------------------------------
+
+def epoch(stamp):
+    """UTC epoch seconds of an ISO-8601 time, or None. A time with no zone is
+    read as UTC."""
+    try:
+        t = datetime.datetime.fromisoformat(str(stamp).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=datetime.timezone.utc)
+    return t.timestamp()
+
+
+def review_record(pr, head, at):
+    """A validated {pr, head, at} or None."""
+    try:
+        pr = int(pr)
+    except (TypeError, ValueError):
+        return None
+    head = str(head or "").lower()
+    when = epoch(at)
+    if pr <= 0 or not SHA_RE.match(head) or when is None:
+        return None
+    return {"pr": pr, "head": head, "at": when}
+
+
+def load_reviewed(path):
+    """Recorded reviews as [{pr, head, at}]. `path` is either a JSON list of
+    {pr, head, at} records, or a review-ledger findings directory
+    (`<git-common-dir>/yellow-review/findings`), whose `observation` records
+    carry the PR, the head the review ran on, and when. Bad records are
+    skipped."""
+    raw = []
+    if os.path.isdir(path):
+        for name in sorted(os.listdir(path)):
+            if not name.endswith(".jsonl"):
+                continue
+            with open(os.path.join(path, name), encoding="utf-8") as handle:
+                for line in handle:
+                    try:
+                        rec = json.loads(line)
+                    except ValueError:
+                        continue
+                    if isinstance(rec, dict) and rec.get("type") == "observation":
+                        raw.append((rec.get("pr"), rec.get("head_sha"), rec.get("at")))
+    else:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        if not isinstance(data, list):
+            raise ValueError("%s: expected a JSON list of {pr, head, at}" % path)
+        raw = [(r.get("pr"), r.get("head"), r.get("at")) for r in data if isinstance(r, dict)]
+    out = [review_record(*r) for r in raw]
+    return [r for r in out if r]
+
+
+def tag_reviewed(candidates, reviews):
+    """Set `review` on each bot-p1 candidate: "missed" when a recorded review
+    of the same PR at the same head came at or before the comment (the
+    reviewer saw that code and the bot still found a P1), "reviewed-later"
+    when the only reviews of that head came after, and "no-record" when none
+    is recorded. `reviewed_at` is the earliest review of that head."""
+    by_key = {}
+    for r in reviews:
+        by_key.setdefault((r["pr"], r["head"]), []).append(r["at"])
+    for c in candidates:
+        if c.get("kind") != "bot-p1":
+            continue
+        times = sorted(by_key.get((c.get("pr"), str(c.get("head") or "").lower()), []))
+        posted = epoch(c.get("created_at"))
+        if not times:
+            c["review"], c["reviewed_at"] = "no-record", None
+            continue
+        c["reviewed_at"] = datetime.datetime.fromtimestamp(times[0], datetime.timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ")
+        c["review"] = "missed" if posted is not None and times[0] <= posted else "reviewed-later"
+    return candidates
+
+
+# --- ci source --------------------------------------------------------------------
+
+def ci_candidates(runs, commits, repo, show, branch, since=None, until=None, jobs=None):
+    """Candidates from Actions runs (the /actions/runs `workflow_runs` shape):
+    push runs on `branch` that failed in [since, until] after the same
+    workflow's previous decided run passed. A failure with no earlier run in
+    the list has `previous: "unknown"`; one after another failure is dropped,
+    since the break came earlier. `jobs` maps a run id to its failed jobs."""
+    by_sha = {c["sha"]: c for c in commits}
+    groups = {}
+    for r in runs:
+        if not isinstance(r, dict) or r.get("event") != "push" or r.get("head_branch") != branch:
+            continue
+        if r.get("status") != "completed":
+            continue
+        groups.setdefault(r.get("workflow_id"), []).append(r)
+    out = []
+    for group in groups.values():
+        group.sort(key=lambda r: (int(r.get("run_number") or 0), str(r.get("created_at") or "")))
+        previous = None
+        for r in group:
+            conclusion = r.get("conclusion")
+            if conclusion not in CI_RED + CI_GREEN:
+                continue
+            before, previous = previous, conclusion
+            if conclusion not in CI_RED or before in CI_RED:
+                continue
+            day = str(r.get("created_at") or "")[:10]
+            if (since and day < since) or (until and day > until):
+                continue
+            sha = str(r.get("head_sha") or "")
+            commit = by_sha.get(sha)
+            n = own_pr(commit["subject"]) if commit else None
+            out.append({
+                "kind": "ci-failure",
+                "workflow": excerpt(r.get("name"), 100),
+                "run_url": r.get("html_url"),
+                "run_id": r.get("id"),
+                "created_at": r.get("created_at"),
+                "conclusion": conclusion,
+                "previous": "success" if before else "unknown",
+                "commit": sha,
+                "commit_url": "https://github.com/%s/commit/%s" % (repo, sha) if repo and sha else None,
+                "pr": n,
+                "pr_url": "https://github.com/%s/pull/%d" % (repo, n) if repo and n else None,
+                "head": sha if commit else None,
+                "base": commit["parents"][0] if commit and commit["parents"] else None,
+                "hunks": new_side_hunks(show(sha)) if commit else [],
+                "failed_jobs": (jobs or {}).get(r.get("id"), []),
+                "note": None if commit else "commit not on this ref's first-parent history",
+            })
+    out.sort(key=lambda c: str(c["created_at"] or ""), reverse=True)
+    return out
+
+
+def failed_jobs(payload):
+    """[{job, steps}] for the failed jobs in an /actions/runs/<id>/jobs reply."""
+    out = []
+    for j in (payload or {}).get("jobs") or []:
+        if isinstance(j, dict) and j.get("conclusion") in CI_RED:
+            steps = [excerpt(s.get("name"), 100) for s in j.get("steps") or []
+                     if isinstance(s, dict) and s.get("conclusion") in CI_RED]
+            out.append({"job": excerpt(j.get("name"), 100), "steps": steps[:5]})
+    return out[:10]
+
+
+def harvest_ci(repo, branch, since, until, commits, show, max_pages=20, get=gh_get):
+    """(candidates, truncated). Reads push runs on `branch` from
+    CI_LOOKBACK_DAYS before --since, so the first failure in range can see
+    the run before it, then fetches the failed jobs of each candidate."""
+    created = None
+    if since:
+        start = (datetime.date.fromisoformat(since) - datetime.timedelta(days=CI_LOOKBACK_DAYS)).isoformat()
+        created = "%s..%s" % (start, until) if until else ">=" + start
+    elif until:
+        created = "<=" + until
+    runs, truncated = [], False
+    for page in range(1, max_pages + 1):
+        params = {"branch": branch, "event": "push", "status": "completed", "per_page": 100, "page": page}
+        if created:
+            params["created"] = created
+        batch = (get("repos/%s/actions/runs" % repo, params) or {}).get("workflow_runs") or []
+        runs += batch
+        if len(batch) < 100:
+            break
+    else:
+        truncated = True
+    found = ci_candidates(runs, commits, repo, show, branch, since, until)
+    for c in found:
+        if isinstance(c["run_id"], int):
+            c["failed_jobs"] = run_failed_jobs(repo, c["run_id"], get)
+    return found, truncated
+
+
+def run_failed_jobs(repo, run_id, get, max_pages=10):
+    """Failed jobs of one run, reading every page of its jobs (a matrix can
+    have more than 100) before failed_jobs caps the list."""
+    jobs = []
+    for page in range(1, max_pages + 1):
+        batch = (get("repos/%s/actions/runs/%d/jobs" % (repo, run_id),
+                     {"filter": "latest", "per_page": 100, "page": page}) or {}).get("jobs") or []
+        jobs += batch
+        if len(batch) < 100:
+            break
+    return failed_jobs({"jobs": jobs})
+
+
 # --- main -------------------------------------------------------------------------
 
 def origin_repo(repo_dir):
@@ -260,13 +601,23 @@ def main(argv=None):
     ap.add_argument("--ref", default="origin/main")
     ap.add_argument("--since")
     ap.add_argument("--until")
+    ap.add_argument("--branch", help="default branch the CI source reads (default: --ref without origin/)")
     ap.add_argument("--bots", action="store_true", help="also read Codex/Bugbot P1 review comments via gh")
+    ap.add_argument("--ci", action="store_true", help="also read post-merge Actions failures via gh")
+    ap.add_argument("--reviewed", action="append", default=[], metavar="PATH",
+                    help="recorded reviews: a JSON list of {pr, head, at}, or a review-ledger findings dir")
+    ap.add_argument("--misses-only", action="store_true",
+                    help="drop bot P1s not posted after a recorded review of the same head "
+                         "(git and CI candidates stay)")
     ap.add_argument("-o", "--output", help="write here instead of stdout (never under cases/ or controls/)")
     a = ap.parse_args(argv)
     repo_dir = os.path.abspath(a.repo_dir)
     repo = a.repo or origin_repo(repo_dir)
+    branch = a.branch or re.sub(r"^origin/", "", a.ref)
+    if a.misses_only and not (a.bots and a.reviewed):
+        sys.exit("harvest: --misses-only needs --bots and --reviewed")
     for value, rx, name in ((a.since, DATE_RE, "--since"), (a.until, DATE_RE, "--until"),
-                            (repo, REPO_RE, "--repo"), (a.ref, REF_RE, "--ref")):
+                            (repo, REPO_RE, "--repo"), (a.ref, REF_RE, "--ref"), (branch, REF_RE, "--branch")):
         if value is not None and not rx.match(value):
             sys.exit("harvest: bad %s value %r" % (name, value))
     for value, name in ((a.since, "--since"), (a.until, "--until")):
@@ -287,8 +638,15 @@ def main(argv=None):
               "note": "Candidates only. Text fields are untrusted excerpts. A candidate becomes a "
                       "case only after the user confirms it.",
               "sources": {}, "candidates": []}
+    reviews = []
+    for path in a.reviewed:
+        try:
+            reviews += load_reviewed(path)
+        except (OSError, ValueError) as err:
+            sys.exit("harvest: cannot read --reviewed %s: %s" % (path, err))
     try:
-        result["candidates"] += harvest_git(repo_dir, a.ref, repo, a.since, a.until)
+        history = read_history(repo_dir, a.ref)
+        result["candidates"] += harvest_git(repo_dir, a.ref, repo, a.since, a.until, history)
     except subprocess.CalledProcessError as err:
         sys.exit("harvest: git %s failed: %s" % (" ".join(err.cmd[1:3]), (err.stderr or "").strip()))
     result["sources"]["git"] = "ok"
@@ -306,6 +664,28 @@ def main(argv=None):
                                          "page were not read, narrow --since" if truncated else "ok")
         except (RuntimeError, ValueError, TypeError) as err:
             result["sources"]["bots"] = "skipped: %s" % err
+    if a.reviewed:
+        tag_reviewed(result["candidates"], reviews)
+        result["sources"]["reviewed"] = "%d reviews from %d path(s)" % (len(reviews), len(a.reviewed))
+        if a.misses_only:
+            result["candidates"] = [c for c in result["candidates"]
+                                    if c["kind"] != "bot-p1" or c.get("review") == "missed"]
+    if not a.ci:
+        result["sources"]["ci"] = "off (pass --ci)"
+    elif not repo:
+        result["sources"]["ci"] = "skipped: no owner/name; pass --repo"
+    elif not shutil.which("gh"):
+        result["sources"]["ci"] = "skipped: gh not found"
+    else:
+        try:
+            found, truncated = harvest_ci(repo, branch, a.since, a.until, history[0], history[1])
+            result["candidates"] += found
+            result["sources"]["ci"] = ("truncated: hit the page cap; older runs were not read, "
+                                       "narrow --since" if truncated else "ok")
+        except (RuntimeError, ValueError, TypeError, AttributeError) as err:
+            result["sources"]["ci"] = "skipped: %s" % err
+        except subprocess.CalledProcessError as err:
+            result["sources"]["ci"] = "skipped: git %s failed" % " ".join(err.cmd[1:3])
     text = json.dumps(result, indent=1) + "\n"
     if a.output:
         with open(a.output, "w", encoding="utf-8") as handle:
@@ -313,8 +693,9 @@ def main(argv=None):
         print("harvest: %d candidates -> %s" % (len(result["candidates"]), a.output), file=sys.stderr)
     else:
         sys.stdout.write(text)
-    if result["sources"]["bots"].startswith(("skipped", "truncated")):
-        print("harvest: bot source %s" % result["sources"]["bots"], file=sys.stderr)
+    for name in ("bots", "ci"):
+        if result["sources"][name].startswith(("skipped", "truncated")):
+            print("harvest: %s source %s" % (name, result["sources"][name]), file=sys.stderr)
     return 0
 
 

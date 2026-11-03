@@ -19,6 +19,7 @@ export const meta = {
 // builds against them, so change them only with a version bump. Additive,
 // optional fields: args.repo_root (absolute path of a checkout at head that
 // agents read from), dismissed[].rule ("category/rule"; title is optional),
+// dismissed[].scope (the ledger's verified enclosing scope; see scopesMatch),
 // args.file_line_counts (the file-line-counts script's header and rows, for
 // thermonuclear-reviewer's size rule) and coverage.empty (true when no hunter
 // returned a result).
@@ -267,7 +268,7 @@ function validateArgs(raw) {
     if (d === null || typeof d !== 'object' || typeof d.file !== 'string') {
       fail(`dismissed[${i}] must be an object with a file string`);
     }
-    for (const key of ['title', 'rule']) {
+    for (const key of ['title', 'rule', 'scope']) {
       if (
         d[key] !== undefined &&
         d[key] !== null &&
@@ -625,17 +626,58 @@ function verifierPrompt(a, f, lens) {
   ].join('\n');
 }
 
-// A dismissal matches a finding on file, line within LINE_WINDOW, and at
-// least one of the full rule ("category/rule", as the ledger's
+// Mirrors RL_GENERIC_SCOPES in lib/review-ledger.sh: these name no scope, and
+// the ledger stores "unscoped" for them.
+const GENERIC_SCOPES = [
+  'module',
+  'file',
+  'global',
+  'top-level',
+  'toplevel',
+  'unscoped',
+  'none',
+  'null',
+];
+
+// A scope reduced the way rl_verify_scope reduces a claim (no leading "#",
+// "::" and "#" as ".", no trailing "()", no whitespace), lowercased. Empty
+// when it names no scope.
+function normScope(s) {
+  if (typeof s !== 'string') return '';
+  const t = s.replace(/^[#\s]+/, '').trim();
+  if (!t || GENERIC_SCOPES.includes(t.toLowerCase())) return '';
+  return t
+    .replace(/::|#/g, '.')
+    .replace(/\(\)$/, '')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
+// Two scopes are the same when they are equal or one is a trailing segment
+// path of the other: the ledger stores the full dotted path ("Cache.get") or
+// markdown heading path ("Setup > Install"), a hunter may name only "get".
+function scopesMatch(a, b) {
+  if (a === b) return true;
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  return long.endsWith(`.${short}`) || long.endsWith(`>${short}`);
+}
+
+// A dismissal matches a finding on file, line within LINE_WINDOW, scope, and
+// at least one of the full rule ("category/rule", as the ledger's
 // dismissed-context block prints it; category and slug must both match) or
-// title.
+// title. A dismissal with a scope never matches a finding in another scope,
+// and its rule matches only a finding that names the same scope: a rule alone
+// must not drop a new finding in the next function down.
 function dismissalMatches(d, f) {
   if (d.file !== f.file || Math.abs(d.line - f.line) > LINE_WINDOW) {
     return false;
   }
+  const ds = normScope(d.scope);
+  const fs = normScope(f.scope);
+  if (ds && fs && !scopesMatch(ds, fs)) return false;
   // Category alone is too broad: one dismissed nit must not suppress a new
   // P0 in the same category nearby. Match the full category/slug, or the title.
-  if (d.rule) {
+  if (d.rule && (!ds || fs)) {
     const [cat, slug] = d.rule.split('/');
     if (
       slug &&
@@ -815,6 +857,7 @@ for (const d of input.dismissed) {
     line: d.line,
     title: d.title || null,
     rule: d.rule || null,
+    scope: d.scope || null,
   });
 }
 
@@ -894,6 +937,7 @@ hunters.forEach((name, i) => {
       severity: SEVERITIES.includes(f.severity) ? f.severity : 'P3',
       category: normCategory(f.category),
       rule: normRule(normCategory(f.category), f.rule),
+      scope: typeof f.scope === 'string' ? f.scope : null,
       file: cleanPath(f.file),
       line: f.line,
       confidence: typeof f.confidence === 'number' ? f.confidence : 0,

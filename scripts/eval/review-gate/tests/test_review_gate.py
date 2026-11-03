@@ -115,6 +115,35 @@ class SchemaTest(unittest.TestCase):
         control = self.example("example-control.json")
         self.assertTrue(rg.validate_item({**control, "golden": []}, "control"))
 
+    def test_shipped_synthetic_controls_validate_and_have_patches(self):
+        folder = os.path.join(ROOT, "controls", "synthetic")
+        names = [n for n in os.listdir(folder) if n.endswith(".json")] if os.path.isdir(folder) else []
+        for name in names:
+            with open(os.path.join(folder, name), encoding="utf-8") as handle:
+                doc = json.load(handle)
+            self.assertEqual(rg.validate_item(doc, "synthetic"), [], name)
+            self.assertEqual(name, doc["id"] + ".json")
+            self.assertGreater(os.path.getsize(rg.patch_path(os.path.join(folder, name), doc)), 0, name)
+        loaded = [d["id"] for k, d, _ in rg.load_items(os.path.join(ROOT, "none"), os.path.join(ROOT, "controls"))
+                  if k == "synthetic"]
+        self.assertEqual(sorted(loaded), sorted(n[:-5] for n in names))
+
+    def test_invalid_synthetic_controls_are_rejected(self):
+        good = {"id": "syn", "repo": "o/r", "base": "a" * 40, "tier": "low", "source": "test"}
+        self.assertEqual(rg.validate_item(good, "synthetic"), [])
+        for doc, why in (({**good, "head": "b" * 40}, "unknown key head"),
+                         ({**good, "golden": []}, "unknown key golden"),
+                         ({k: v for k, v in good.items() if k != "base"}, "missing base")):
+            self.assertTrue(any(why in e for e in rg.validate_item(doc, "synthetic")), why)
+        with tempfile.TemporaryDirectory() as tmp:
+            write(os.path.join(tmp, "synthetic", "syn.json"), json.dumps(good))
+            with self.assertRaises(SystemExit) as ctx:  # no syn.patch next to it
+                rg.load_items(os.path.join(tmp, "none"), tmp)
+            self.assertIn("syn.patch", str(ctx.exception))
+            write(os.path.join(tmp, "synthetic", "syn.patch"), "")
+            with self.assertRaises(SystemExit):  # an empty patch is no change
+                rg.load_items(os.path.join(tmp, "none"), tmp)
+
     def test_examples_never_load_as_real_cases(self):
         with tempfile.TemporaryDirectory() as tmp:
             shutil.copy(os.path.join(ROOT, "cases", "examples", "example-unquoted-path.json"), tmp)
@@ -186,6 +215,57 @@ class PipelineTest(Tmp):
         self.assertTrue(os.path.isabs(args["diff_path"]))
         with open(args["diff_path"], encoding="utf-8") as handle:
             self.assertIn("+cp $path /tmp", handle.read())
+
+    def add_synthetic(self, sid, patch):
+        write(os.path.join(self.controls, "synthetic", sid + ".json"), json.dumps({
+            "id": sid, "repo": "test/demo", "base": self.base, "tier": "low", "source": "test"}))
+        write(os.path.join(self.controls, "synthetic", sid + ".patch"), patch)
+
+    CLEAN_PATCH = ("diff --git a/lib/x.sh b/lib/x.sh\n--- a/lib/x.sh\n+++ b/lib/x.sh\n"
+                   "@@ -1,3 +1,3 @@\n line 1\n-line 2\n+line two\n line 3\n")
+
+    def test_synthetic_control_is_built_from_base_plus_patch(self):
+        self.add_synthetic("syn-clean", self.CLEAN_PATCH)
+        before = git(self.repo, "status", "--porcelain")
+        self.prepare()
+        rows = {r["id"]: r for r in rg.read_matrix(self.work)}
+        row = rows["syn-clean"]
+        self.assertEqual(row["kind"], "synthetic")
+        head = git(row["wt"], "rev-parse", "HEAD")
+        self.assertEqual(git(self.repo, "rev-parse", head + "^"), self.base)
+        self.assertEqual(git(row["wt"], "show", "HEAD:lib/x.sh").splitlines()[1], "line two")
+        # The checkout and its index are untouched; no scratch index is left.
+        self.assertEqual(git(self.repo, "status", "--porcelain"), before)
+        self.assertEqual([n for n in os.listdir(os.path.join(self.repo, ".git")) if "synthetic" in n], [])
+        with open(row["args"], encoding="utf-8") as handle:
+            args = json.load(handle)
+        self.assertEqual((args["base"], args["head"], args["pr"]), (self.base, head, None))
+        self.assertEqual(args["changed_files"], ["lib/x.sh"])
+        self.assertEqual(args["review_md"], "# Review rules at base\n")
+        with open(os.path.join(self.work, "items.json"), encoding="utf-8") as handle:
+            self.assertEqual(json.load(handle)["syn-clean"]["head"], head)
+        # Same base and patch give the same head and fingerprint on a rerun.
+        self.prepare()
+        again = {r["id"]: r for r in rg.read_matrix(self.work)}["syn-clean"]
+        self.assertEqual((git(again["wt"], "rev-parse", "HEAD"), again["fingerprint"]),
+                         (head, row["fingerprint"]))
+        # Graded as a control: the stand-in's clean answer is no false positive.
+        self.cli("run", self.work)
+        s = rg.summarize(self.work)
+        self.assertEqual((s["synthetic_complete"], s["synthetic_with_fp"]), (1, 0))
+        self.assertEqual((s["controls_with_fp"], s["controls_complete"]), (1, 3))
+        self.cli("grade", self.work, "--date", "2026-11-02", "--results-dir", self.results)
+        with open(os.path.join(self.results, "results-2026-11-02.md"), encoding="utf-8") as handle:
+            md = handle.read()
+        self.assertIn("| of which synthetic", md)
+        self.assertIn("| syn-clean ", md)
+
+    def test_synthetic_patch_that_does_not_apply_stops_prepare(self):
+        self.add_synthetic("syn-bad", self.CLEAN_PATCH.replace("-line 2", "-no such line"))
+        res = self.cli("prepare", self.work, "--cases", self.cases, "--controls", self.controls,
+                       "--repo-dir", "test/demo=" + self.repo)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("syn-bad: syn-bad.patch does not apply at %s" % self.base, res.stderr)
 
     def test_fingerprint_ignores_grading_fields_and_cwd(self):
         self.prepare()
@@ -380,9 +460,15 @@ class GradeMathTest(unittest.TestCase):
                           "agents is missing or not a non-negative integer"])
 
     def test_missing_coverage_failed_or_agents_is_incomplete(self):
-        ok = {"version": 1, "findings": [], "coverage": {"failed": []}, "agents": 3}
+        ok = {"version": 1, "findings": [], "coverage": {"ran": ["a"], "failed": []}, "agents": 3}
         self.assertIsNone(rg.ungradable(ok))
         for wf, why in (({**ok, "coverage": {}}, "coverage.failed is missing"),
+                        ({**ok, "coverage": {"failed": []}}, "coverage.ran is missing"),
+                        ({**ok, "coverage": {"ran": [], "failed": [], "empty": True}},
+                         "coverage.empty is true"),
+                        ({**ok, "coverage": {"ran": None, "failed": []}}, "coverage.ran is missing"),
+                        ({**ok, "coverage": {"ran": [1], "failed": []}}, "coverage.ran is missing"),
+                        ({**ok, "coverage": {"ran": [], "failed": [None]}}, "coverage.failed is missing"),
                         ({**ok, "coverage": {"failed": None}}, "coverage.failed is missing"),
                         ({**ok, "coverage": {"failed": "x"}}, "coverage.failed is missing"),
                         ({k: v for k, v in ok.items() if k != "agents"}, "agents is missing"),
@@ -391,6 +477,22 @@ class GradeMathTest(unittest.TestCase):
                         ({**ok, "agents": True}, "agents is missing"),
                         ({**ok, "agents": -1}, "agents is missing")):
             self.assertIn(why, rg.ungradable(wf) or "", wf)
+
+    def test_findings_missing_grading_fields_are_incomplete(self):
+        f = {"severity": "P1", "display": "Important", "file": "lib/x.sh", "line": 5, "title": "t",
+             "suggested_fix": None}
+        ok = {"version": 1, "findings": [f], "coverage": {"ran": ["a"], "failed": []}, "agents": 3}
+        self.assertIsNone(rg.ungradable(ok))
+        self.assertIsNone(rg.ungradable({**ok, "findings": [{**f, "suggested_fix": "quote it"}]}))
+        for key in ("severity", "display", "file", "line", "title", "suggested_fix"):
+            gone = {k: v for k, v in f.items() if k != key}
+            self.assertIn("findings[0].%s is missing" % key, rg.ungradable({**ok, "findings": [gone]}))
+        for key, value in (("display", "Blocker"), ("severity", "P5"), ("file", ""), ("line", 0),
+                           ("line", "5"), ("line", True), ("title", ""), ("title", None),
+                           ("suggested_fix", 3)):
+            why = rg.ungradable({**ok, "findings": [f, {**f, key: value}]})
+            self.assertIn("findings[1].%s is not" % key, why or "", (key, value))
+            self.assertNotIn("findings[0]", why)
 
     def summary(self, recall, fp, agents, cost=1.0, ids=("a", "b")):
         return {"recall": recall, "fp_rate": fp, "mean_cost_usd": cost, "mean_agents": agents,
@@ -416,6 +518,10 @@ class GradeMathTest(unittest.TestCase):
         a = {"x": {"kind": "case", "golden": [{"file": "f", "line": 1, "match": ["a"]}]}}
         b = {"x": {"kind": "case", "golden": [{"file": "f", "line": 1, "match": ["b"]}]}}
         self.assertNotEqual(rg.grading_set(a), rg.grading_set(b))
+        moved = {"x": {**a["x"], "head": "c" * 40}}
+        self.assertNotEqual(rg.grading_set(a), rg.grading_set(moved))
+        prose = {"x": {**a["x"], "notes": "edited", "source": "s", "tier": "high"}}
+        self.assertEqual(rg.grading_set(a), rg.grading_set(prose))
         self.assertEqual(rg.grading_set(a), rg.grading_set(json.loads(json.dumps(a))))
 
     def test_cost_usd_never_decides(self):
@@ -575,12 +681,189 @@ class HarvestBotsTest(Tmp):
         os.makedirs(bin_dir)
         os.symlink(shutil.which("git"), os.path.join(bin_dir, "git"))
         res = subprocess.run([sys.executable, HARVEST, "--repo-dir", repo, "--repo", "test/demo",
-                              "--ref", "main", "--bots"], capture_output=True, text=True, check=False,
+                              "--ref", "main", "--bots", "--ci"], capture_output=True, text=True, check=False,
                              env={**os.environ, **GIT_ENV, "PATH": bin_dir})
         self.assertEqual(res.returncode, 0, res.stderr)
         out = json.loads(res.stdout)
-        self.assertEqual(out["sources"], {"git": "ok", "bots": "skipped: gh not found"})
+        self.assertEqual(out["sources"], {"git": "ok", "bots": "skipped: gh not found",
+                                          "ci": "skipped: gh not found"})
         self.assertEqual(out["candidates"], [])
+
+
+class HarvestHeadMappingTest(Tmp):
+    def test_fix_hunks_map_onto_each_target_head(self):
+        repo = self.tmp
+        git(repo, "init", "-q", "-b", "main")
+        commit(repo, "chore: init", {"README.md": "x\n"})
+        head = commit(repo, "feat: add helpers (#10)", {"lib/h.sh": lines(10), "lib/k.sh": lines(10)})
+        # Between #10 and the fix: three lines land at the top of h.sh, line 5
+        # of k.sh is rewritten, and k.sh is renamed.
+        commit(repo, "feat: header (#11)", {"lib/h.sh": "a\nb\nc\n" + lines(10)})
+        commit(repo, "feat: tweak k (#12)", {"lib/k.sh": lines(10, {5: "five"})})
+        git(repo, "mv", "lib/k.sh", "lib/m.sh")
+        git(repo, "commit", "-q", "-m", "refactor: rename k (#13)")
+        parent = git(repo, "rev-parse", "HEAD")
+        fix = commit(repo, "fix: follow-up to #10 (#14)", {
+            "lib/h.sh": "a\nb\nc\n" + lines(10, {6: "six"}),
+            "lib/m.sh": lines(10, {5: "FIVE", 8: "eight"}),
+        })
+        found = {c["commit"]: c for c in hv.harvest_git(repo, "main", "test/demo")}
+        cand = found[fix]
+        self.assertEqual(cand["hunks_relative_to"], parent)
+        self.assertEqual(sorted((h["file"], h["line"]) for h in cand["hunks"]),
+                         [("lib/h.sh", 9), ("lib/m.sh", 5), ("lib/m.sh", 8)])
+        target = cand["targets"][0]
+        self.assertEqual(target["head"], head)
+        at_head = sorted(target["hunks_at_head"], key=lambda h: (h["file"], h["line"] or 0))
+        self.assertEqual(at_head, [
+            {"file": "lib/h.sh", "line": 6},
+            {"file": "lib/k.sh", "line": None, "note": "line changed between target head and fix parent"},
+            {"file": "lib/k.sh", "line": 8},
+        ])
+
+    def test_map_back_shifts_and_new_files(self):
+        diff = ("diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -2,0 +3,2 @@\n+x\n+y\n@@ -10 +11,0 @@\n-z\n"
+                "diff --git a/n b/n\nnew file mode 100644\n--- /dev/null\n+++ b/n\n@@ -0,0 +1 @@\n+q\n")
+        entries = hv.parse_diff(diff)
+        self.assertEqual(hv.map_back(entries, "f", 2), ("f", 2, None))
+        self.assertEqual(hv.map_back(entries, "f", 3)[1], None)  # inserted after head
+        self.assertEqual(hv.map_back(entries, "f", 5), ("f", 3, None))
+        self.assertEqual(hv.map_back(entries, "f", 11), ("f", 9, None))
+        self.assertEqual(hv.map_back(entries, "f", 12), ("f", 11, None))  # past head's deleted line 10
+        self.assertEqual(hv.map_back(entries, "n", 1), (None, None, "file not at target head"))
+        self.assertEqual(hv.map_back(entries, "other", 7), ("other", 7, None))
+        self.assertEqual(hv.new_side_hunks(diff), [{"file": "f", "line": 3}, {"file": "f", "line": 12},
+                                                   {"file": "n", "line": 1}])
+
+
+    def test_quoted_paths_from_real_git(self):
+        repo = self.tmp
+        git(repo, "init", "-q", "-b", "main")
+        commit(repo, "chore: init", {"caf\u00e9.py": lines(3), 'say "hi".sh': lines(3), "a b.sh": lines(3)})
+        sha = commit(repo, "fix: edit", {"caf\u00e9.py": lines(3, {2: "x"}), 'say "hi".sh': lines(3, {3: "y"}),
+                                         "a b.sh": lines(3, {1: "z"})})
+        git(repo, "mv", "caf\u00e9.py", "th\u00e9.py")
+        git(repo, "commit", "-q", "-m", "refactor: rename")
+        diff = git(repo, "show", "--format=", "-U0", sha)
+        self.assertIn('"', diff)  # git quoted both names
+        self.assertEqual(sorted((h["file"], h["line"]) for h in hv.new_side_hunks(diff)),
+                         [("a b.sh", 1), ("caf\u00e9.py", 2), ('say "hi".sh', 3)])
+        self.assertEqual(sorted((h["file"], h["line"]) for h in hv.old_side_hunks(diff)),
+                         [("a b.sh", 1), ("caf\u00e9.py", 2), ('say "hi".sh', 3)])
+        renamed = hv.parse_diff(git(repo, "diff", "-M", "-U0", sha, "HEAD"))
+        self.assertEqual([(e["old"], e["new"]) for e in renamed], [("caf\u00e9.py", "th\u00e9.py")])
+
+
+class HarvestReviewedTest(Tmp):
+    H = "a" * 40
+
+    def bot(self, pr, head, created):
+        return {"kind": "bot-p1", "pr": pr, "head": head, "created_at": created}
+
+    def test_tag_reviewed_compares_heads_and_utc_times(self):
+        reviews = [hv.review_record(7, self.H, "2026-10-05T10:00:00Z"),
+                   hv.review_record(7, self.H, "2026-10-06T10:00:00+02:00")]
+        cands = [self.bot(7, self.H, "2026-10-05T10:00:00Z"),        # same second: reviewed first
+                 self.bot(7, self.H.upper(), "2026-10-05T09:00:00Z"),  # before every review
+                 self.bot(7, "b" * 40, "2026-10-07T00:00:00Z"),       # head never reviewed
+                 self.bot(8, self.H, "2026-10-07T00:00:00Z"),         # other PR
+                 {"kind": "fix"}]
+        hv.tag_reviewed(cands, reviews)
+        self.assertEqual([c.get("review") for c in cands],
+                         ["missed", "reviewed-later", "no-record", "no-record", None])
+        self.assertEqual(cands[0]["reviewed_at"], "2026-10-05T10:00:00Z")
+
+    def test_load_reviewed_from_ledger_dir_and_json(self):
+        ledger = os.path.join(self.tmp, "findings")
+        write(os.path.join(ledger, "7.jsonl"), "\n".join([
+            json.dumps({"v": 1, "type": "observation", "pr": 7, "head_sha": self.H, "at": "2026-10-05T10:00:00Z"}),
+            json.dumps({"v": 1, "type": "transition", "head_sha": self.H, "at": "2026-10-05T11:00:00Z"}),
+            json.dumps({"v": 1, "type": "observation", "pr": 7, "head_sha": "short", "at": "2026-10-05T10:00:00Z"}),
+            "not json",
+        ]) + "\n")
+        write(os.path.join(ledger, "7.state"), "x\n")
+        self.assertEqual([(r["pr"], r["head"]) for r in hv.load_reviewed(ledger)], [(7, self.H)])
+        runs = os.path.join(self.tmp, "runs.json")
+        write(runs, json.dumps([{"pr": "9", "head": self.H, "at": "2026-10-05T10:00:00"},
+                                {"pr": 9, "head": self.H, "at": "yesterday"}]))
+        self.assertEqual([(r["pr"], r["at"]) for r in hv.load_reviewed(runs)],
+                         [(9, hv.epoch("2026-10-05T10:00:00Z"))])
+
+    def test_cli_misses_only_needs_reviewed(self):
+        res = subprocess.run([sys.executable, HARVEST, "--repo-dir", ROOT, "--repo", "test/demo",
+                              "--bots", "--misses-only"], capture_output=True, text=True, check=False)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("--misses-only needs", res.stderr)
+
+
+class HarvestCiTest(Tmp):
+    def run_(self, rid, wf, num, conclusion, sha, day, branch="main", event="push"):
+        return {"id": rid, "workflow_id": wf, "name": "CI %d" % wf, "run_number": num, "status": "completed",
+                "conclusion": conclusion, "head_sha": sha, "head_branch": branch, "event": event,
+                "created_at": day + "T12:00:00Z", "html_url": "https://github.com/t/d/actions/runs/%d" % rid}
+
+    def history(self):
+        repo = self.tmp
+        git(repo, "init", "-q", "-b", "main")
+        commit(repo, "chore: init", {"README.md": "x\n"})
+        good = commit(repo, "feat: a (#20)", {"lib/a.sh": lines(5)})
+        bad = commit(repo, "feat: b (#21)", {"lib/a.sh": lines(5, {4: "broken"})})
+        later = commit(repo, "docs: c (#22)", {"README.md": "y\n"})
+        return hv.read_history(repo, "main"), good, bad, later
+
+    def test_red_after_green_is_tied_to_the_pr_and_its_lines(self):
+        (commits, show, _), good, bad, later = self.history()
+        runs = [self.run_(1, 1, 1, "success", good, "2026-10-02"),
+                self.run_(2, 1, 2, "failure", bad, "2026-10-03"),
+                self.run_(3, 1, 3, "failure", later, "2026-10-04"),     # still red: not a new break
+                self.run_(4, 2, 1, "timed_out", good, "2026-10-02"),    # nothing earlier: unknown
+                self.run_(5, 2, 2, "cancelled", bad, "2026-10-03"),     # undecided, skipped
+                self.run_(6, 2, 3, "success", later, "2026-10-04"),
+                self.run_(7, 3, 1, "failure", bad, "2026-10-03", branch="feature"),
+                self.run_(8, 3, 2, "failure", bad, "2026-10-03", event="pull_request"),
+                self.run_(9, 4, 1, "failure", "f" * 40, "2026-10-03")]  # not on this ref
+        found = hv.ci_candidates(runs, commits, "t/d", show, "main", "2026-10-01", "2026-10-31",
+                                 jobs={2: [{"job": "test", "steps": ["bats"]}]})
+        by_id = {c["run_id"]: c for c in found}
+        self.assertEqual(sorted(by_id), [2, 4, 9])
+        hit = by_id[2]
+        self.assertEqual((hit["pr"], hit["head"], hit["previous"]), (21, bad, "success"))
+        self.assertEqual(hit["base"], good)
+        self.assertEqual(hit["hunks"], [{"file": "lib/a.sh", "line": 4}])
+        self.assertEqual(hit["failed_jobs"], [{"job": "test", "steps": ["bats"]}])
+        self.assertEqual(by_id[4]["previous"], "unknown")
+        self.assertEqual((by_id[9]["pr"], by_id[9]["hunks"]), (None, []))
+        self.assertIn("not on this ref", by_id[9]["note"])
+        # The lookback run before --since gives `previous`; it is not a candidate itself.
+        found = hv.ci_candidates(runs, commits, "t/d", show, "main", "2026-10-03", "2026-10-03")
+        self.assertEqual([c["run_id"] for c in found], [2, 9])
+
+    def test_harvest_ci_queries_with_lookback_and_fetches_failed_jobs(self):
+        (commits, show, _), good, bad, _ = self.history()
+        calls = []
+        runs = [self.run_(2, 1, 2, "failure", bad, "2026-10-03"), self.run_(1, 1, 1, "success", good, "2026-09-28")]
+        jobs = {"jobs": [{"name": "lint", "conclusion": "success", "steps": []},
+                         {"name": "test", "conclusion": "failure",
+                          "steps": [{"name": "setup", "conclusion": "success"},
+                                    {"name": "bats", "conclusion": "failure"}]}]}
+
+        filler = [{"name": "matrix %d" % i, "conclusion": "success", "steps": []} for i in range(100)]
+
+        def get(path, params=None):
+            calls.append((path, params))
+            if path.endswith("/actions/runs"):
+                return {"workflow_runs": runs}
+            return {"jobs": filler} if params["page"] == 1 else jobs  # the failure is on page 2
+
+        found, truncated = hv.harvest_ci("t/d", "main", "2026-10-01", "2026-10-31", commits, show, get=get)
+        self.assertFalse(truncated)
+        self.assertEqual(calls[0][1]["created"], "2026-09-24..2026-10-31")
+        self.assertEqual((calls[0][1]["branch"], calls[0][1]["event"]), ("main", "push"))
+        self.assertEqual([(c[0], c[1]["page"]) for c in calls[1:]],
+                         [("repos/t/d/actions/runs/2/jobs", 1), ("repos/t/d/actions/runs/2/jobs", 2)])
+        self.assertEqual([c["run_id"] for c in found], [2])
+        self.assertEqual(found[0]["previous"], "success")
+        self.assertEqual(found[0]["failed_jobs"], [{"job": "test", "steps": ["bats"]}])
 
 
 if __name__ == "__main__":
