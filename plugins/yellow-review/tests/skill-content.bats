@@ -1754,3 +1754,14 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   [[ "$empty" == *'then the Step 5 outcome line with zeros'* ]]
   [[ "$sweep" == *'print the Step 5 outcome line (`not_attempted=<N>`, `exit=0`)'* ]]
 }
+
+@test "review-pr: theme grouping loads themes.md, renders above P0, and never changes findings" {
+  themes="$BATS_TEST_DIRNAME/../references/review-pr/themes.md"
+  pr=$(flat "$REVIEW_PR")
+  [[ "$pr" == *'references/review-pr/themes.md'* ]]
+  [[ "$pr" == *'### Themes (Only when Step 6 sub-step 11 built groups'*'### P0 — Critical'* ]]
+  t=$(flat "$themes")
+  [[ "$t" == *'**Grouping is not deduplication.**'* ]]
+  [[ "$t" == *'`off`: never group'* ]]
+  [[ "$t" == *'drop any group left with fewer than two findings'* ]]
+}

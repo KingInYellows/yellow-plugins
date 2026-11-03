@@ -1097,6 +1097,13 @@ Apply the aggregation steps from
    - report-only queue: `advisory` + `human`/`release`
 10. **Sort.** severity (P0 first) → anchor descending → file path → line
     number.
+11. **Number and group.** Read
+    `${CLAUDE_PLUGIN_ROOT}/references/review-pr/themes.md` and follow it:
+    number the findings in this order (the stable `#` used everywhere after
+    this) and build theme groups per `review_grouping`. Grouping never changes
+    a finding's severity, route, owner or ledger record. If the Read fails,
+    number the findings, skip grouping and note "themes: not built" in
+    Coverage.
 
 #### Quality gates (intent verification)
 
@@ -1199,6 +1206,9 @@ helper); the default routing is human review.
 Persist the simplifier's findings with ledger.md's "After Step 8" section
 (`--step 8 --anchor-source worktree`).
 
+Then re-partition the theme groups as `themes.md` says: drop applied findings,
+drop groups left with fewer than two.
+
 ### Step 9: Commit and Push
 
 If any changes were made:
@@ -1287,6 +1297,9 @@ findings, grouped by severity:
 
 ```
 ## Review Summary — PR #<num>
+
+### Themes
+(Only when Step 6 sub-step 11 built groups; see themes.md "Render".)
 
 ### P0 — Critical
 | # | File | Issue | Reviewer(s) | Confidence | Route |
