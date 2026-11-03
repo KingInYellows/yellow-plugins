@@ -670,6 +670,32 @@ it, and it changes no staging behaviour.
   (whole-string matches, no repeated paths) and every judged review row before
   printing or writing anything.
 
+### Cross-Model Review Switch (yellow-review / yellow-council)
+
+`cross_model_review: auto | off` in `yellow-plugins.local.md` controls whether
+review sends diff or code content to a non-Anthropic model.
+
+- **What leaves the machine under `auto`.** `/review:pr` auto-selects
+  `codex-reviewer` (yellow-codex) on diffs over 100 lines, which sends the diff
+  to OpenAI through the Codex CLI. `/council` sends its pack to Codex (OpenAI),
+  Gemini (Google, via Antigravity) and OpenCode (its configured provider,
+  OpenRouter by default).
+- **`off`.** `/review:pr` never selects `codex-reviewer`, even from
+  `reviewer_set.include`, and Coverage says
+  `Cross-model review: disabled by config (<source>)`. `/council` runs only the
+  in-process Claude reviewer unless the user's own message for that run names
+  the external reviewers, and says so before the fan-out.
+- **Precedence.** `off` in either the repo file or the user-level
+  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md` wins.
+  `/review:pr` reads the repo file from the checked-out PR head, so a PR can add
+  an `off` but cannot lift a user-level `off` by writing `auto`. An unrecognized
+  value counts as `off`. yellow-review resolves it with
+  `skills/pr-review-workflow/scripts/cross-model-mode`; `/council` Step 2b
+  applies the same rule inline.
+- **Not covered.** The Jev persona-selection shadow log below has its own opt-in
+  (`reviewer_selection` plus `reviewer_selection_private_repos`) and is not
+  gated by this switch.
+
 ### Persona Selection Shadow Log (yellow-review)
 
 Off by default. When `yellow-plugins.local.md` sets `reviewer_selection: shadow`
