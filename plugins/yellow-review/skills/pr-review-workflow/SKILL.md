@@ -414,10 +414,10 @@ Located at `skills/pr-review-workflow/scripts/`:
   detail behind each; `commands/review/merge-ready.md` defines every token.
   Exits 0 ready, 1 blocked, 3 unknown, 2 usage; give it a Bash `timeout` of
   420000 ms
-- **sync-blocking-comment** `[--reasons <file>] <owner/repo> <pr> <resolution>`
-  — Keeps one sticky PR comment (marker line, edited in place) listing every
-  unresolved thread with a link and status, unless `<resolution>` is `enforced`;
-  exit codes as `handback-pr-thread` (contract "Blocking-threads comment")
+- **sync-blocking-comment**
+  `[--reasons <file>] [--risk <file>] <owner/repo> <pr> <resolution>` — Sticky
+  comment of open threads plus the `--risk` tier and source, unless `enforced`;
+  exits as `handback-pr-thread` (contract "Blocking-threads comment")
 - **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with an
   idempotency marker; skips when our latest recent comment carries a marker for
   this thread and only bot comments follow it, and reports that disposition. An

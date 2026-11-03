@@ -168,7 +168,8 @@ the resolve scripts: `references/resolve/dispositions.md`.
   only, no network
 - `sync-blocking-comment` — Step 9's sticky "blocking threads" PR comment for
   repos that do not enforce conversation resolution; one comment per PR, found
-  by its marker and edited in place
+  by its marker and edited in place; `--risk` adds the `classify-risk` tier and
+  policy source
 - `apply-thread-actions` — the Step 7 write phase in one call: runs the three
   scripts below (plus `handback-pr-thread`) per thread from a JSONL plan; exit 4
   stops, exit 5 resumes

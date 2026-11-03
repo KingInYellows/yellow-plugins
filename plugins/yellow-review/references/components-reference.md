@@ -215,11 +215,12 @@ flags, exit codes, trust-boundary rules and library behavior.
   (the script header has the jq filter). Paths are repository-root relative.
   Needs `jq` and `git`; no network calls. Design:
   `plans/risk-tiered-review-pipeline.md` at the repository root
-- `sync-blocking-comment [--reasons <file>] <owner/repo> <pr> <resolution>` —
-  `/review:resolve` Step 9: where conversation resolution is not enforced, keep
-  one sticky PR comment (marker line, edited in place) listing the unresolved
-  threads with links and the run's status for each; no reviewer prose, logins in
-  backticks. Worst case about 370 s (contract "Blocking-threads comment")
+- `sync-blocking-comment [--reasons <file>] [--risk <file>] <owner/repo> <pr> <resolution>`
+  — `/review:resolve` Step 9: where conversation resolution is not enforced,
+  keep one sticky PR comment (marker line, edited in place) listing the
+  unresolved threads with links and the run's status for each; no reviewer
+  prose, logins in backticks. `--risk` takes `classify-risk` output and adds a
+  tier line. Worst case about 370 s (contract "Blocking-threads comment")
 - `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a thread with
   an idempotency marker (skips when our latest recent comment has a marker for
   the thread, any disposition, and only bot comments follow it). Which prior
