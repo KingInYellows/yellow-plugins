@@ -876,6 +876,15 @@ describe('validate-solutions — claim grounding (SOL-003)', () => {
     expect(r.status).toBe(0);
   });
 
+  it('does not let a (historical) commit excuse a later live one', () => {
+    const r = runClaims(
+      'historical-sha',
+      '\nOld commit deadbeef1 (historical).\n\nNow fixed in commit deadbeef1.\n'
+    );
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/ERROR-SOL-003.*deadbeef1/);
+  });
+
   it('warns for a path that existed in history but was deleted', () => {
     rmSync(join(repo, 'plugins', 'foo', 'real.md'));
     commitAll('delete');

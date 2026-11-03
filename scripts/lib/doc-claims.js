@@ -377,8 +377,11 @@ function checkDocClaims({ text, docPath, repoRoot, baseRef, baselineText }) {
       const cue = commitCue(body.slice(lineStart, m.index), thisRepo);
       const lineIdx = body.slice(0, m.index).split('\n').length - 1;
       const prev = seen.get(sha);
-      if (!prev || (cue === 'commit' && prev.cue !== 'commit')) {
-        seen.set(sha, { lineIdx, cue });
+      // Prefer a commit cue, then an occurrence not marked (historical).
+      const live = !bodyLines[lineIdx].includes(HISTORICAL_MARK);
+      const rank = (cue === 'commit' ? 2 : 0) + (live ? 1 : 0);
+      if (!prev || rank > prev.rank) {
+        seen.set(sha, { lineIdx, cue, rank });
       }
     }
     for (const [sha, { lineIdx, cue }] of seen) {
