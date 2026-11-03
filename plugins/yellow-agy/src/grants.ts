@@ -239,6 +239,7 @@ export function isGrant(key: string, v: unknown): v is Grant {
     isCount(g['minQuotaPercent']) &&
     (g['minQuotaPercent'] as number) <= 100 &&
     isCount(g['maxTotalTasks']) &&
+    (g['maxTotalTasks'] as number) >= 1 &&
     (g['maxTotalTasks'] as number) <= GRANT_CEILINGS.maxTotalTasks &&
     isCount(g['maxCorrectiveRounds']) &&
     (g['maxCorrectiveRounds'] as number) <=
@@ -247,6 +248,9 @@ export function isGrant(key: string, v: unknown): v is Grant {
     isCount(g['totalTasks']) &&
     isIso(g['createdAt']) &&
     isIso(g['expiresAt']) &&
+    Date.parse(g['expiresAt'] as string) -
+      Date.parse(g['createdAt'] as string) <=
+      GRANT_CEILINGS.ttlMinutes * 60_000 &&
     (g['revokedAt'] === undefined || isIso(g['revokedAt']))
   );
 }

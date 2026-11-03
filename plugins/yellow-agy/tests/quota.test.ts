@@ -89,6 +89,15 @@ describe('quota gate', () => {
         })
       )
     ).toBeUndefined();
+    for (const bad of [null, '0.5', true]) {
+      expect(
+        lowestRemaining(
+          JSON.stringify({
+            buckets: [{ remainingFraction: 0.8 }, { remainingFraction: bad }],
+          })
+        )
+      ).toBeUndefined();
+    }
   });
 
   it('charges a malformed or negative cost as unknown', () => {

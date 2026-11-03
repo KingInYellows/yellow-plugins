@@ -113,7 +113,7 @@ function detectHost(options = {}) {
         };
     }
     if (!which('wsl.exe')) {
-        throw new errors_1.AgyError('AGY_NOT_INSTALLED', 'agy is not on PATH and wsl.exe is not available');
+        throw new errors_1.AgyError('AGY_NOT_INSTALLED', 'neither agy.exe nor wsl.exe is on PATH', 'Install agy so agy.exe is on PATH, or install it inside WSL.');
     }
     const distro = set('YELLOW_AGY_WSL_DISTRO');
     if (distro !== undefined && !DISTRO_RE.test(distro)) {

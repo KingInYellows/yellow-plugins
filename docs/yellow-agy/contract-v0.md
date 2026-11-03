@@ -143,7 +143,7 @@ in their own process group, and a timeout signals the group.
 5. `abandon` (terminal-gated, no live run): run `collect` first so nothing is
    lost, settle the journal, `git worktree remove --force` the worktree, and
    keep the branch.
-6. `status` / `list`: built from the journal and worktree git state. There's no
+6. `status` / `list`: read from the journal alone. There's no
    vendor polling. `supervise` does at most one `reply` or `approve` per pass,
    the same as today.
 
@@ -339,11 +339,12 @@ one expires, and is confirmed on the terminal instead. The confirmation opens
 until the real-Windows check. v0 has no controller epoch: there is one journal
 on one host, and the active-run claim already serializes runs.
 
-`setup` records the resolved host in `host.json` in the data dir, and every
-call that runs agy or git (`delegate`, `approve`, `reply`, `collect`,
-`abandon`, `authorize` when it creates a grant) refuses until it exists.
-`status`, `authorize --list` and `--revoke` only read or narrow the journal. On the bridge it resolves the worktree root
-with `realpath -e` inside WSL and refuses a result under `/mnt`.
+`setup` records the resolved host in `host.json` in the data dir, and every call
+that runs agy or git (`delegate`, `approve`, `reply`, `collect`, `abandon`,
+`authorize` when it creates a grant) refuses until it exists. `status`,
+`authorize --list` and `--revoke` only read or narrow the journal. On the bridge
+it resolves the worktree root with `realpath -e` inside WSL and refuses a result
+under `/mnt`.
 
 The `/usage` field names are unconfirmed. Until a captured output pins them, the
 gate reads the lowest numeric field whose key names a remaining amount (a 0-1

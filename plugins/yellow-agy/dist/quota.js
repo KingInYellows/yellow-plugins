@@ -52,6 +52,11 @@ function lowestRemaining(stdout) {
                     unreadable = true;
                 }
             }
+            else if (REMAINING_KEY.test(key) &&
+                (child === null || typeof child !== 'object')) {
+                // null, a string or a boolean where a remaining amount belongs.
+                unreadable = true;
+            }
             else {
                 visit(child, depth + 1);
             }

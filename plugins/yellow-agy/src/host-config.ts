@@ -107,7 +107,8 @@ export function detectHost(options: DetectOptions = {}): HostConfig {
   if (!which('wsl.exe')) {
     throw new AgyError(
       'AGY_NOT_INSTALLED',
-      'agy is not on PATH and wsl.exe is not available'
+      'neither agy.exe nor wsl.exe is on PATH',
+      'Install agy so agy.exe is on PATH, or install it inside WSL.'
     );
   }
   const distro = set('YELLOW_AGY_WSL_DISTRO');

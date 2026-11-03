@@ -156,6 +156,7 @@ function isGrant(key, v) {
         isCount(g['minQuotaPercent']) &&
         g['minQuotaPercent'] <= 100 &&
         isCount(g['maxTotalTasks']) &&
+        g['maxTotalTasks'] >= 1 &&
         g['maxTotalTasks'] <= exports.GRANT_CEILINGS.maxTotalTasks &&
         isCount(g['maxCorrectiveRounds']) &&
         g['maxCorrectiveRounds'] <=
@@ -164,6 +165,9 @@ function isGrant(key, v) {
         isCount(g['totalTasks']) &&
         isIso(g['createdAt']) &&
         isIso(g['expiresAt']) &&
+        Date.parse(g['expiresAt']) -
+            Date.parse(g['createdAt']) <=
+            exports.GRANT_CEILINGS.ttlMinutes * 60_000 &&
         (g['revokedAt'] === undefined || isIso(g['revokedAt'])));
 }
 function own(rec, key) {

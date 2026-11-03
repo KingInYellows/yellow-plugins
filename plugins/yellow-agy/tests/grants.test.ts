@@ -179,6 +179,8 @@ describe('grants', () => {
       { branchPattern: '*' },
       { maxTotalTasks: 11 },
       { maxCorrectiveRounds: 4 },
+      { maxTotalTasks: 0 },
+      { expiresAt: new Date(NOW.getTime() + 25 * 3600_000).toISOString() },
     ]) {
       writeJournal(dir, putGrant(EMPTY, { ...g, ...bad }));
       expect(code(() => readJournal(dir))).toBe('AGY_INTERNAL');

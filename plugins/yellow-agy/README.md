@@ -42,9 +42,9 @@ run is file edits only until agy's `--sandbox` is verified on a host.
 | `/agy:abandon`   | Prints the terminal command that collects, removes the worktree, keeps the branch               |
 
 A grant is the owner's written permission: repo, branch pattern, operations, the
-allowed test and lint commands, the AI Pro quota floor, task and correction limits, and an expiry. Only the owner
-creates one, by typing a code shown in their own terminal; abandon is confirmed
-the same way.
+allowed test and lint commands, the AI Pro quota floor, task and correction
+limits, and an expiry. Only the owner creates one, by typing a code shown in
+their own terminal; abandon is confirmed the same way.
 
 ## Rules it keeps
 
