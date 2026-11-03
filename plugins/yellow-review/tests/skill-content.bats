@@ -1759,7 +1759,9 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   themes="$BATS_TEST_DIRNAME/../references/review-pr/themes.md"
   pr=$(flat "$REVIEW_PR")
   [[ "$pr" == *'references/review-pr/themes.md'* ]]
-  [[ "$pr" == *'### Themes (Only when Step 6 sub-step 11 built groups'*'### P0 — Critical'* ]]
+  [[ "$pr" == *'### Themes (Only when Step 6 "Number and group" built groups'*'### P0 — Critical'* ]]
+  # Grouping runs on the findings that survived the gates and the ledger drop.
+  [[ "$pr" == *'#### Quality gates (intent verification)'*'#### Ledger write (after partition)'*'#### Number and group (after the gates and the ledger write)'*'### Step 7: Apply Fixes'* ]]
   t=$(flat "$themes")
   [[ "$t" == *'**Grouping is not deduplication.**'* ]]
   [[ "$t" == *'`off`: never group'* ]]

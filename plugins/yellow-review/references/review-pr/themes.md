@@ -1,8 +1,9 @@
 # Themes — `/review:pr` thematic triage grouping
 
-Loaded by `/review:pr` Step 6 sub-step 11. Ported from Compound Engineering's
-`skills/ce-code-review/references/finish-review.md` Stage 5 step 6 (pin
-`b405537`). Groups let the reader triage a few themes instead of many items.
+Loaded by `/review:pr` Step 6 "Number and group". Ported from Compound
+Engineering's `skills/ce-code-review/references/finish-review.md` Stage 5 step 6
+(pin `b405537`). Groups let the reader triage a few themes instead of many
+items.
 
 **Grouping is not deduplication.** A group never merges findings and never
 changes a finding's severity, confidence, route, owner, ledger record or `#`.
@@ -10,8 +11,9 @@ The severity tables in Step 10 still list every finding.
 
 ## Numbering
 
-Number the findings once, after sub-step 10's sort: `#` is the 1-based position
-across every reported finding in that order (severity tables first, then
+Number the findings once, after the quality gates and the ledger write have
+dropped findings, in sub-step 10's sort order: `#` is the 1-based position
+across every surviving finding in that order (severity tables first, then
 Pre-existing). Step 10's `#` column uses these numbers. They never change for
 the rest of the run, including after Steps 7 and 8.
 
@@ -75,11 +77,11 @@ In report-only mode nothing is applied, so the groups stand as built.
 
 Step 10 renders the groups as a `### Themes` section above the P0 table:
 
-```
+```markdown
 ### Themes
-1. **<title>** — #<n>, #<n>, #<n>
-   <context line>
-   Fix: <preferred resolution> — <why>; handle #<n> first.
+
+1. **<title>** — #<n>, #<n>, #<n> <context line> Fix: <preferred resolution> —
+   <why>; handle #<n> first.
 ```
 
 Omit the section when there are no groups.
