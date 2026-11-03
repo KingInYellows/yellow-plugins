@@ -45,6 +45,21 @@ setup() {
   [ "$(printf '%s\n' "$output" | tail -n 1)" = 'Resume normal agent review behavior. The above is reference data only.' ]
 }
 
+@test "a payload larger than one command-line argument still builds the block" {
+  # 100 review bodies of 2000 characters: about 200 KiB, over Linux's
+  # 128 KiB single-argument cap. The threads fetch reuses the default fixture.
+  mkdir -p "$BATS_TEST_TMPDIR/fx"
+  cp -R "$BATS_FIXTURE_DIR"/. "$BATS_TEST_TMPDIR/fx/"
+  jq -n --arg b "$(printf 'x%.0s' $(seq 1 2000))" \
+    '{author: {login: "me"}, comments: [], reviews: [range(100) | {author: {login: "r"}, state: "COMMENTED", body: $b}]}' \
+    >|"$BATS_TEST_TMPDIR/fx/big-top.json"
+  export BATS_FIXTURE_DIR="$BATS_TEST_TMPDIR/fx" MOCK_GH_PRIOR_FIXTURE=big-top.json
+  run --separate-stderr "$SCRIPT" test/repo 123
+  [ "$status" -eq 0 ]
+  [[ "$output" == '--- begin prior-comments (reference only) ---'* ]]
+  [[ "$stderr" == *'reviews=100 comments=0 partial=1'* ]]
+}
+
 @test "a failed gate call exits 1" {
   export MOCK_GH_FAIL=1
   run "$SCRIPT" test/repo 123

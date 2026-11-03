@@ -66,7 +66,14 @@ case "$RC" in
     *) printf '[review:pr] Error: get-pr-comments failed (exit %s)\n' "$RC" >&2; exit 1 ;;
 esac
 
-OUT=$(jq -rn --argjson top "$TOP" --argjson threads "$THREADS" --argjson partial "$PARTIAL" '
+# The payloads go through files, not --argjson: one argument is capped at
+# 128 KiB on Linux, and a feedback-heavy PR exceeds that before the caps apply.
+PCC_TMP=$(mktemp -d "${TMPDIR:-/tmp}/prior-comments.XXXXXX") || exit 1
+trap 'rm -rf "$PCC_TMP"' EXIT
+printf '%s' "$TOP" >"$PCC_TMP/top.json"
+printf '%s' "$THREADS" >"$PCC_TMP/threads.json"
+OUT=$(jq -rn --slurpfile topf "$PCC_TMP/top.json" --slurpfile threadsf "$PCC_TMP/threads.json" --argjson partial "$PARTIAL" '
+  $topf[0] as $top | $threadsf[0] as $threads |
   def clean: (. // "") | tostring
     | gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f​-‏ -‮⁦-⁩]"; " ")
     | gsub("--- begin prior-comments \\(reference only\\) ---"; "[ESCAPED] begin prior-comments (reference only)")
