@@ -80,8 +80,9 @@ Persona-specific guidance:
   abstraction boundaries, or coupling severity. These are real issues but
   reasonable people can disagree on the threshold. Surfaces only as P0
   escape or via mode-aware demotion to `residual_risks`.
-- **Anchor 25 or below — suppress** — the finding is primarily a style
-  preference or the "better" approach is debatable.
+- **Anchor 25 or below — report at that anchor; the orchestrator suppresses it
+  from every user-visible section, including Pre-existing** — the finding is
+  primarily a style preference or the "better" approach is debatable.
 
 ## What you don't flag
 

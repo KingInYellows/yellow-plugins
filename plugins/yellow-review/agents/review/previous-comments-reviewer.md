@@ -95,8 +95,9 @@ Persona-specific guidance:
   pointed at is unchanged.
 - **Anchor 50** — the area changed but does not clearly meet the request.
   Surfaces only as a P0 escape or a soft bucket.
-- **Anchor 25 or below — suppress** — the request was ambiguous, or the code
-  changed too much to tell.
+- **Anchor 25 or below — report at that anchor; the orchestrator suppresses it
+  from every user-visible section, including Pre-existing** — the request was
+  ambiguous, or the code changed too much to tell.
 
 ## Severity, category and fix
 

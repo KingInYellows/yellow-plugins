@@ -327,7 +327,9 @@ report-only:
 Provide each reviewer with the PR diff, PR metadata, changed file list, and
 relevant `CLAUDE.md` context. Collect findings sorted by severity
 (P0 → P1 → P2 → P3) — P0 was added to the scale in the Wave 2 keystone for
-critical breakage and exploitable vulnerabilities.
+critical breakage and exploitable vulnerabilities. Personas return low-anchor
+findings instead of dropping them: after collecting, suppress findings below
+anchor 75 except P0 at anchor 50+, the same gate as `/review:pr`.
 
 **Do not invoke `/review:pr` or `/review:resolve` directly in this phase.**
 Those commands may commit and push before the user chooses a remediation path.

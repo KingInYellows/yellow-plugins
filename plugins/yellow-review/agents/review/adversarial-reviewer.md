@@ -148,9 +148,10 @@ Persona-specific guidance:
   external API actually returns the format you're assuming, or whether a
   race condition has a practical timing window. Surfaces only as P0
   escape or soft buckets.
-- **Anchor 25 or below — suppress** — the scenario requires conditions
-  you have no evidence for: pure speculation about runtime state,
-  theoretical cascades without traceable steps, or failure modes
+- **Anchor 25 or below — report at that anchor; the orchestrator suppresses it
+  from every user-visible section, including Pre-existing** — the scenario
+  requires conditions you have no evidence for: pure speculation about runtime
+  state, theoretical cascades without traceable steps, or failure modes
   requiring multiple unlikely conditions simultaneously.
 
 ## What you don't flag

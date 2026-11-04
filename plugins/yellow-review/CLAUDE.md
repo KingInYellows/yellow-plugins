@@ -20,16 +20,17 @@ resolution, and sequential stack review. Graphite-native workflow.
   `cli-readiness-reviewer`, and `thermonuclear-reviewer` report every in-scope
   finding with a confidence anchor and severity — no persona-side `< 75` filter.
   They cap at 40 findings; overflow is dropped silently and is not
-  orchestrator-suppressed. Other persona reviewers still apply their own anchor
-  floors before Step 6 (including `plugin-contract-reviewer`). `/review:pr` Step
-  6 and `/review:all` Step 8 item 9 (the Aggregate-findings confidence gate) are
-  the sole gates for those four (suppress below 75 except P0 at 50+; count only
-  findings the gate actually removes as `suppressed` — surviving P0-at-50+
-  exceptions are not suppressed). Pre-existing findings are gated before the
-  Pre-existing section. If a recall persona would exceed 40 findings, rank
-  gate-surviving items first (anchors 75/100, plus P0 at 50+) by severity then
-  confidence, then remaining findings, and drop the lowest-ranked overflow —
-  never emit partial JSON.
+  orchestrator-suppressed. Every other persona also returns its anchor-25 and
+  below findings at that anchor instead of dropping them (CLAUDE-256), though
+  `performance-reviewer` still drops non-P0 anchor-50 findings. `/review:pr`
+  Step 6 and `/review:all` Step 8 item 9 (the Aggregate-findings confidence
+  gate) are the confidence gate for every persona (suppress below 75 except P0
+  at 50+; count only findings the gate actually removes as `suppressed` —
+  surviving P0-at-50+ exceptions are not suppressed). Pre-existing findings are
+  gated before the Pre-existing section. If a recall persona would exceed 40
+  findings, rank gate-surviving items first (anchors 75/100, plus P0 at 50+) by
+  severity then confidence, then remaining findings, and drop the lowest-ranked
+  overflow — never emit partial JSON.
 - **The compact-return schema has one source.**
   `skills/pr-review-workflow/references/compact-return-schema.md` holds it
   between `compact-return-schema` markers, plus the persona notes between

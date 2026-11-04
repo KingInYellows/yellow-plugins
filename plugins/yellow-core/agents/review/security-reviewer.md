@@ -106,8 +106,9 @@ aggregation gate via the P0 exception.
   be validated in middleware you can't see, or the ORM *might* parameterize
   automatically. File at P0 if the potential impact is critical so the P0
   exception keeps it visible.
-- **Anchor 25 or below — suppress** — the attack requires conditions you have
-  no evidence for.
+- **Anchor 25 or below — report at that anchor; the orchestrator suppresses it
+  from every user-visible section, including Pre-existing** — the attack
+  requires conditions you have no evidence for.
 
 ## What you don't flag
 
