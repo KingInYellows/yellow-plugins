@@ -239,3 +239,43 @@ gh_calls() {
   [ "$(gh_calls)" = 3 ]
   [ ! -e "${BATS_TEST_TMPDIR}/mutation" ]
 }
+
+@test "a risk file adds the tier and policy source line" {
+  SBC_THREADS="[$(thread PRRT_a a 1 u)]"
+  export SBC_THREADS
+  printf '{"tier":"high","policy":"ref","files":2,"reasons":[{"path":"x`<y>","tier":"high","rule":"r"}]}' >"${BATS_TEST_TMPDIR}/risk.json"
+  printf '{}' >"${BATS_TEST_TMPDIR}/r.json"
+  run --separate-stderr "$SCRIPT" --risk "${BATS_TEST_TMPDIR}/risk.json" --reasons "${BATS_TEST_TMPDIR}/r.json" test/repo 7 unknown
+  [ "$status" -eq 0 ]
+  body="${BATS_TEST_TMPDIR}/posted_body"
+  grep -qxF '**Risk tier:** `high` (policy from the default branch)' "$body"
+  run -1 grep -q 'x`' "$body"
+  printf '{"tier":"low","policy":"none"}' >"${BATS_TEST_TMPDIR}/risk.json"
+  run --separate-stderr "$SCRIPT" --risk "${BATS_TEST_TMPDIR}/risk.json" test/repo 7 unknown
+  [ "$status" -eq 0 ]
+  grep -qxF '**Risk tier:** `low` (no policy file, so the default tier)' "$body"
+}
+
+@test "without a risk file the comment has no tier line" {
+  SBC_THREADS="[$(thread PRRT_a a 1 u)]" run --separate-stderr "$SCRIPT" test/repo 7 unknown
+  [ "$status" -eq 0 ]
+  run -1 grep -q 'Risk tier' "${BATS_TEST_TMPDIR}/posted_body"
+}
+
+@test "a risk file that is not classify-risk output is a usage error" {
+  for bad in '[]' '{"tier":"unknown","policy":"ref"}' '{"tier":"high","policy":"default_branch"}' '{"tier":"high"}' 'nope' \
+    '{"tier":"low","policy":"base"} {"tier":"high","policy":"ref"}'; do
+    printf '%s' "$bad" >"${BATS_TEST_TMPDIR}/risk.json"
+    run --separate-stderr "$SCRIPT" --risk "${BATS_TEST_TMPDIR}/risk.json" test/repo 7 unknown
+    [ "$status" -eq 2 ]
+  done
+  run --separate-stderr "$SCRIPT" --risk "${BATS_TEST_TMPDIR}/missing.json" test/repo 7 unknown
+  [ "$status" -eq 2 ]
+  printf '{"tier":"low","policy":"base"}' >"${BATS_TEST_TMPDIR}/ok.json"
+  ln -s "${BATS_TEST_TMPDIR}/ok.json" "${BATS_TEST_TMPDIR}/risk-link.json"
+  run --separate-stderr "$SCRIPT" --risk "${BATS_TEST_TMPDIR}/risk-link.json" test/repo 7 unknown
+  [ "$status" -eq 2 ]
+  run --separate-stderr "$SCRIPT" --risk "${BATS_TEST_TMPDIR}/ok.json" --risk "${BATS_TEST_TMPDIR}/ok.json" test/repo 7 unknown
+  [ "$status" -eq 2 ]
+  [ "$(gh_calls)" = 0 ]
+}

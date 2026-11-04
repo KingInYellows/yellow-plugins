@@ -168,9 +168,11 @@ doc body as the step before removal.
   the evidence (`retire_when met: <issue closed in vX.Y>`) as the rationale.
   Never Keep. The Step 5 citation gate does not apply: inbound references show
   the doc is cited, not that it is still true.
-- **Not met:** Keep, and report the check.
-- **Cannot check** (no network, private tracker, ambiguous wording): Keep, and
-  report it as unverified with the reason.
+- **Not met:** no retirement action. Score and classify the doc in Steps 5-6
+  as usual, and report the check separately.
+- **Cannot check** (no network, private tracker, ambiguous wording): no
+  retirement action. Score and classify as usual, and report the check as
+  unverified with the reason.
 
 ### Step 5 — Compute staleness and overlap
 
@@ -186,8 +188,8 @@ reclassifies entries, and the citation gate MUST run before the score
 
 ### Step 6 — Classify
 
-For each stale or overlapping candidate (or cluster), classify into one
-of five outcomes. The classification is a recommendation; the user has
+For each stale or overlapping candidate (or cluster), and each candidate with
+a met `retire_when` (Step 4a), classify into one of five outcomes. The classification is a recommendation; the user has
 final say in interactive mode.
 
 | Outcome | When | Action |
@@ -274,7 +276,15 @@ Same as the archive step in Consolidate (move + `superseded_by`
 frontmatter), but skip the `knowledge-compounder` dispatch since
 there's no successor entry.
 
-### Step 9 — Report
+### Step 9 — Discoverability check
+
+Read `references/discoverability.md` and run it. It checks that the repo's
+agent-instruction file still tells agents without these plugins about
+`docs/solutions/`, and proposes one informational line when it does not. In
+autofix mode it only reports; it never edits an instruction file. Add its result
+to the report's Coverage section.
+
+### Step 10 — Report
 
 Present a synthesized summary, regardless of mode. Before writing it,
 Read `references/report-template.md` and emit the report exactly in the
@@ -310,6 +320,8 @@ brings them into context.
   `archived/` and `README.md`)
 - **Writes** `docs/solutions/<category>/<slug>.md` (in-place Updates) and
   `docs/solutions/archived/<category>/<slug>.md` (archive moves)
+- **May edit** one line of the repo's agent-instruction file (Step 9,
+  interactive mode and only with approval)
 - **Dispatches** `knowledge-compounder` via `Agent` for Consolidate and
   Replace classifications
 

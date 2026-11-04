@@ -94,6 +94,58 @@ export interface Invocation {
   /** Host-side cwd for the spawn; undefined on the bridge, which uses --cd. */
   readonly cwd: string | undefined;
   readonly env: Readonly<Record<string, string>>;
+  /**
+   * Set on the bridge: agy leads its own Linux process group, the first
+   * stderr line is `BRIDGE_PGID_MARKER<pgid>`, and a deadline or cancel
+   * signals that group through `bridgeKillCommand` (killing wsl.exe alone
+   * leaves the Linux processes running).
+   */
+  readonly linuxGroup?: { readonly distro?: string };
+}
+
+/** Prefix of the first stderr line a bridge turn prints: its Linux pgid. */
+export const BRIDGE_PGID_MARKER = 'yellow-agy-pgid:';
+
+// Fixed script, arguments passed positionally: no shell re-parses argv.
+export const BRIDGE_GROUP_SCRIPT = `printf '${BRIDGE_PGID_MARKER}%s\\n' "$$" >&2; exec "$@"`;
+
+/** `wsl.exe … kill -s <sig> -- -<pgid>`: signals a bridge turn's Linux group. */
+export function bridgeKillCommand(
+  distro: string | undefined,
+  pgid: number,
+  sig: 'TERM' | 'KILL'
+): { readonly file: string; readonly args: readonly string[] } {
+  if (!Number.isInteger(pgid) || pgid <= 1) {
+    throw new AgyError('AGY_INTERNAL', `invalid Linux pgid ${pgid}`);
+  }
+  const args: string[] = [];
+  if (distro !== undefined) args.push('-d', distro);
+  args.push('-e', 'kill', '-s', sig, '--', `-${pgid}`);
+  return { file: 'wsl.exe', args };
+}
+
+/**
+ * Throws unless `wslPath` is absolute, inside the WSL filesystem (not /mnt
+ * or below), and free of `.`, `..` and empty segments, so the string check
+ * sees the real path. A symlink into /mnt can't be seen from here; setup
+ * checks the worktree root with realpath inside WSL.
+ */
+export function assertWslPath(wslPath: string, what: string): void {
+  const segments = wslPath.split('/');
+  if (
+    !wslPath.startsWith('/') ||
+    wslPath === '/mnt' ||
+    wslPath.startsWith('/mnt/') ||
+    segments.some(
+      (seg, i) =>
+        seg === '.' || seg === '..' || (seg === '' && i > 0 && wslPath !== '/')
+    )
+  ) {
+    throw new AgyError(
+      'AGY_BRIDGE',
+      `${what} must be an absolute path inside the WSL filesystem, not ${JSON.stringify(wslPath)}`
+    );
+  }
 }
 
 export interface InvocationOptions {
@@ -279,22 +331,9 @@ export function buildInvocation(
   }
 
   const wslCwd = options.cwd;
-  // Reject . and .. segments so the string check below sees the real path.
-  // A symlink into /mnt can't be seen from here; the worktree root is the
-  // adapter's own directory and setup checks it with realpath inside WSL.
-  const segments = wslCwd.split('/');
-  if (
-    !wslCwd.startsWith('/') ||
-    wslCwd === '/mnt' ||
-    wslCwd.startsWith('/mnt/') ||
-    segments.some(
-      (seg, i) => seg === '.' || seg === '..' || (seg === '' && i > 0)
-    )
-  ) {
-    throw new AgyError(
-      'AGY_BRIDGE',
-      `the bridge worktree must be an absolute path inside the WSL filesystem, not ${JSON.stringify(wslCwd)}`
-    );
+  assertWslPath(wslCwd, 'the bridge worktree');
+  if (wslCwd === '/') {
+    throw new AgyError('AGY_BRIDGE', 'the bridge worktree cannot be /');
   }
   const args: string[] = [];
   if (host.distro !== undefined) {
@@ -314,8 +353,16 @@ export function buildInvocation(
   )) {
     args.push(`${key}=${value}`);
   }
+  // setsid makes the shell (then agy, via exec) lead a new Linux group.
+  args.push('setsid', '-w', 'sh', '-c', BRIDGE_GROUP_SCRIPT, 'sh');
   args.push('agy', ...agyArgs);
-  const inv: Invocation = { file: 'wsl.exe', args, cwd: undefined, env };
+  const inv: Invocation = {
+    file: 'wsl.exe',
+    args,
+    cwd: undefined,
+    env,
+    linuxGroup: host.distro === undefined ? {} : { distro: host.distro },
+  };
   checkWindowsLength(inv);
   return inv;
 }

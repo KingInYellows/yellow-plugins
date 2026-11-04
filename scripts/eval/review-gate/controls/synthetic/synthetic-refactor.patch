@@ -1,0 +1,21 @@
+diff --git a/scripts/eval/review-gate/eval.py b/scripts/eval/review-gate/eval.py
+index 470bfc9..ccd1b2f 100755
+--- a/scripts/eval/review-gate/eval.py
++++ b/scripts/eval/review-gate/eval.py
+@@ -509,11 +509,13 @@ def finding_matches(golden, f):
+     return all(re.search(rx, text, re.I) for rx in golden["match"])
+ 
+ 
++TOKEN_KEYS = ("inputTokens", "cacheReadInputTokens", "cacheCreationInputTokens", "outputTokens")
++
++
+ def tokens_in(cli):
++    """Every token the CLI reports, summed over its models."""
+     mu = (cli or {}).get("modelUsage") or {}
+-    return sum(v.get("inputTokens", 0) + v.get("cacheReadInputTokens", 0)
+-               + v.get("cacheCreationInputTokens", 0) + v.get("outputTokens", 0)
+-               for v in mu.values() if isinstance(v, dict))
++    return sum(v.get(key, 0) for v in mu.values() if isinstance(v, dict) for key in TOKEN_KEYS)
+ 
+ 
+ def grading_set(items):

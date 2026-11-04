@@ -1,0 +1,14 @@
+diff --git a/docs/architecture-overview.md b/docs/architecture-overview.md
+index be06f20..d76b961 100644
+--- a/docs/architecture-overview.md
++++ b/docs/architecture-overview.md
+@@ -14,7 +14,8 @@ in the workflows under `.github/workflows/` — a workflow-level `NODE_VERSION`
+ env in `validate-schemas.yml` and `validate-schemas-fork.yml`, and literal
+ `actions/setup-node` `node-version` values elsewhere (`version-packages.yml`,
+ `upstream-pins-advisory.yml`, and the `goal-engine-compat` job). The fork-PR
+-workflow and `goal-engine-compat` pin a newer Node patch than the rest of CI.
++workflow and `goal-engine-compat` pin a newer Node patch than the rest of CI, so
++bump those pins together when the Node patch changes.
+ 
+ ---
+ 

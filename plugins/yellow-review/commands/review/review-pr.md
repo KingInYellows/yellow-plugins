@@ -1,7 +1,7 @@
 ---
 name: review:pr
 description: 'Adaptive multi-agent review of a single PR with a tiered persona pipeline, learnings pre-pass, and confidence-rubric aggregation. Use when you want comprehensive code review with automatic agent selection based on PR size and content.'
-argument-hint: '[PR# | URL | branch] [--non-interactive]'
+argument-hint: '[PR# | URL | branch] [--non-interactive] [--report-only]'
 allowed-tools:
   - Bash
   - Read
@@ -24,7 +24,8 @@ allowed-tools:
 # Multi-Agent PR Review (Wave 2 persona pipeline)
 
 Run a tiered multi-agent persona review on a single PR, apply P0/P1 fixes,
-and push via the active stacked-PR provider. The pipeline includes a learnings
+and push via the active stacked-PR provider (`--report-only` reports the
+findings and changes nothing). The pipeline includes a learnings
 pre-pass against `docs/solutions/`, structured compact-return findings per
 reviewer, cross-reviewer agreement promotion, and a confidence gate before any
 finding is surfaced.
@@ -33,17 +34,18 @@ finding is surfaced.
 
 ### Step 1: Resolve PR and Parse Flags
 
-The `--non-interactive` flag contract below conforms to Interface 1 of
-`docs/plugin-scope-mode-protocol.md` (this file is a definition site);
-update that doc in the same PR if this contract changes.
+The `--non-interactive` and `--report-only` flag contracts below conform to
+Interfaces 1 and 6 of `docs/plugin-scope-mode-protocol.md` (this file is a
+definition site); update that doc in the same PR if either contract changes.
 
 Split `$ARGUMENTS` on whitespace into tokens.
 
-1. **Flag token**: if any token is exactly `--non-interactive`, set
-   non-interactive mode ON and remove it from the token list. Any token
-   beginning with `--` that is not `--non-interactive` is an error — report
-   `[review:pr] Error: unknown flag <token>.` and stop. Non-interactive mode
-   is OFF by default.
+1. **Flag tokens**: if any token is exactly `--non-interactive`, set
+   non-interactive mode ON and remove it from the token list. If any token is
+   exactly `--report-only`, set report-only mode ON and remove it. Any other
+   token beginning with `--` is an error — report
+   `[review:pr] Error: unknown flag <token>.` and stop. Both modes are OFF by
+   default and may be combined.
 2. **PR target token**: from the remaining tokens:
    - **If more than one token remains**: report
      `[review:pr] Error: too many arguments — expected at most one PR target.`
@@ -72,7 +74,20 @@ so the command runs unattended. It is set automatically when `/review:sweep`
 invokes this command; an interactive user can also pass `--non-interactive`
 explicitly. When the flag is absent, every gate behaves exactly as before.
 
+**Report-only mode** produces the same findings and changes nothing: no
+checkout or branch switch, no edits, no commit or push, no knowledge
+compounding. It runs Steps 1, 3a to 6 and 10, writes the ledger at Step 6 as
+usual (so `/review:sweep` still sees pending findings), and skips Steps 2, 3's
+checkout, 7, 8, 9, 9a and 9b. Read
+`${CLAUDE_PLUGIN_ROOT}/references/review-pr/report-only.md` now and follow it
+in place of Steps 2 and 3's checkout; if the Read fails, stop and report the
+exact path. Pass the flag when this review is a step inside a workflow that
+does not own the tree, such as `/flow:work` Phase 5. A direct
+`/review:pr <PR>` keeps applying fixes.
+
 ### Step 2: Check Working Directory
+
+Skipped in report-only mode.
 
 ```bash
 git status --porcelain
@@ -95,6 +110,9 @@ substituting it into any Bash command runs its `$(...)` before a check can
 reject it. Capture it from `gh` into a variable and validate the variable
 against `^[A-Za-z0-9._/-]+$` with no leading `-`, before any other command
 sees it, in the same Bash call as the checkout.
+
+In report-only mode, run the `gh pr view` above, then skip the rest of this
+step: `report-only.md` replaces the router and the checkout.
 
 Resolve the active stacked-PR provider before checking out: invoke the
 `Skill` tool with `skill: "stack-provider-router"` and keep `state` from its
@@ -173,7 +191,9 @@ does not change which reviewers run yet. The policy comes from the default
 branch, not the PR's base: in a stack the base is the parent PR's unmerged
 branch. Only the tier, the policy source and the policy's own rule names are
 printed; the changed paths are PR-controlled text and stay out of context.
-The policy is read at the commit this fetch returned (`FETCH_HEAD`), never a
+The policy and the base branch are fetched from the PR's base repository
+(`pr-base-remote`), not `origin`, which is the fork in a fork checkout. Each
+is read at the commit its fetch returned (`FETCH_HEAD`), never a
 remote-tracking ref that a failed fetch would leave stale, and each network
 call is bounded at 30 s (then killed 5 s later) when a `timeout` or `gtimeout`
 with `--kill-after` is installed.
@@ -189,25 +209,38 @@ rr_net() {
   done
   "$@"
 }
-DEFAULT_BRANCH=$(rr_net gh repo view --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
-case "$DEFAULT_BRANCH" in
-  '' | -* | *..* | *[!A-Za-z0-9._/-]*) printf '[review:pr] Warning: no usable default branch; risk tier unknown\n' >&2 ;;
-  *)
-    if ! rr_net git fetch --no-tags --quiet origin "refs/heads/$DEFAULT_BRANCH"; then
-      printf '[review:pr] Warning: default branch fetch failed; risk tier unknown\n' >&2
-    elif ! POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
-      printf '[review:pr] Warning: fetched default branch unreadable; risk tier unknown\n' >&2
-    else
-      "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
-        --policy-ref "$POLICY_SHA" "<DIFF_BASE>" HEAD |
-        jq -r '"tier=\(.tier) policy=\(.policy) rules=\([.reasons[].rule] | unique | join("; "))"'
-    fi
-    ;;
-esac
+PR_URL=$(rr_net gh pr view "<PR#>" --json url -q .url) || PR_URL=""
+BASE_REMOTE=$("${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/pr-base-remote" "$PR_URL") || BASE_REMOTE=""
+BASE_REPO=${PR_URL#https://}
+BASE_REPO=${BASE_REPO%/pull/*}
+DEFAULT_BRANCH=""
+[ -z "$BASE_REMOTE" ] ||
+  DEFAULT_BRANCH=$(rr_net gh repo view "$BASE_REPO" --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
+BASE_BRANCH=$(rr_net gh pr view "<PR#>" --json baseRefName -q .baseRefName) || BASE_BRANCH=""
+RISK_OK=1
+for rr_b in "$DEFAULT_BRANCH" "$BASE_BRANCH"; do
+  case "$rr_b" in '' | -* | *..* | *[!A-Za-z0-9._/-]*) RISK_OK=0 ;; esac
+done
+if [ "$RISK_OK" != 1 ]; then
+  printf '[review:pr] Warning: no usable default or base branch; risk tier unknown\n' >&2
+elif [ -z "$BASE_REMOTE" ]; then
+  printf '[review:pr] Warning: no usable base repository; risk tier unknown\n' >&2
+elif ! rr_net git fetch --no-tags --quiet "$BASE_REMOTE" "refs/heads/$BASE_BRANCH"; then
+  printf '[review:pr] Warning: base branch fetch failed; risk tier unknown\n' >&2
+elif ! BASE_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
+  printf '[review:pr] Warning: fetched base branch unreadable; risk tier unknown\n' >&2
+elif ! rr_net git fetch --no-tags --quiet "$BASE_REMOTE" "refs/heads/$DEFAULT_BRANCH"; then
+  printf '[review:pr] Warning: default branch fetch failed; risk tier unknown\n' >&2
+elif ! POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
+  printf '[review:pr] Warning: fetched default branch unreadable; risk tier unknown\n' >&2
+else
+  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
+    --policy-ref "$POLICY_SHA" "$BASE_SHA" HEAD |
+    jq -r '"tier=\(.tier) policy=\(.policy) rules=\([.reasons[].rule] | unique | join("; "))"'
+fi
 ```
 
-Substitute the `DIFF_BASE` value chosen above. When nothing is printed,
-record the tier as `unknown` and continue.
+When nothing is printed, record the tier as `unknown` and continue.
 
 ### Step 3b: Query institutional memory (optional)
 
@@ -1106,7 +1139,19 @@ finding in the three queues goes to `review-ledger.sh observe --step 6`
 (not pre-existing or suppressed findings), and the returned `finding_id`s
 are kept for Steps 7 and 9.
 
+#### Number and group (after the gates and the ledger write)
+
+Number and group only the findings that survived the quality gates and the
+ledger write's suppressed drop, so no theme cites a dropped finding. Read
+`${CLAUDE_PLUGIN_ROOT}/references/review-pr/themes.md` and follow it: number
+the survivors in sub-step 10's order (the stable `#` used everywhere after
+this) and build theme groups per `review_grouping`. Grouping never changes a
+finding's severity, route, owner or ledger record. If the Read fails, number
+the findings, skip grouping and note "themes: not built" in Coverage.
+
 ### Step 7: Apply Fixes
+
+Steps 7 to 9b are skipped in report-only mode; go to Step 10.
 
 For surviving P0/P1 findings with `autofix_class: safe_auto` and a
 non-null `suggested_fix`: apply sequentially using Edit tool. Review each
@@ -1178,6 +1223,10 @@ helper); the default routing is human review.
 
 Persist the simplifier's findings with ledger.md's "After Step 8" section
 (`--step 8 --anchor-source worktree`).
+
+Then re-partition the theme groups as `themes.md` says: number the
+simplifier's findings after the last `#` and add each one that shares a
+group's signal, drop applied findings, and drop groups left with fewer than two.
 
 ### Step 9: Commit and Push
 
@@ -1268,6 +1317,9 @@ findings, grouped by severity:
 ```
 ## Review Summary — PR #<num>
 
+### Themes
+(Only when groups remain after Step 8's re-partition; see themes.md "Render".)
+
 ### P0 — Critical
 | # | File | Issue | Reviewer(s) | Confidence | Route |
 |---|------|-------|-------------|------------|-------|
@@ -1292,6 +1344,7 @@ NO_PRIOR_LEARNINGS.)
 
 ### Applied Fixes
 - <file:line> — <title> (<reviewer>)
+(report-only mode: the single line "report-only: none applied")
 
 ### Residual Actionable Work
 - <file:line> — <title> — <route>
@@ -1311,10 +1364,12 @@ reader can distinguish "no contract changes detected" from "contract
 findings were produced but extension classification was malformed."
 
 ### Coverage
+- Mode: <apply | report-only (in-place | worktree)>
 - Risk tier: <low | medium | high | unknown> (<policy>; <distinct reason rules>)
 - Reviewers run: <list>
 - Reviewers skipped (graceful degradation): <list with reasons>
 - Findings suppressed at confidence < 75: <count>
+- Themes: <group count | not built (themes.md unreadable)>
 - Findings demoted to soft-bucket: <count>
 - Compact-return validation drops (base schema): <count>
 - Findings defaulted (missing rule/scope): <count or omit when zero> — update yellow-core / yellow-codex

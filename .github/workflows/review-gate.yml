@@ -1,0 +1,168 @@
+name: Review Gate
+
+# Phase 3 of plans/risk-tiered-review-pipeline.md (CLAUDE-235): run the
+# yellow-review:review-gate workflow (Hunt -> Vote -> Rank) headless on every
+# non-draft PR. It sits beside claude-code-review.yml, whose upstream
+# code-review job stays as an independent lineage. It never approves or
+# blocks on findings: the job fails only when the run produced no result at
+# all, and it is not a required check. Driver and rationale: scripts/ci/review-gate/README.md.
+#
+# repository variable REVIEW_GATE_MODE:
+#   shadow (default when unset) - result in the job summary and artifact only
+#   advisory                    - also one sticky PR comment, edited per push
+#   off                         - the job is skipped
+# Each run draws on the CLAUDE_CODE_OAUTH_TOKEN subscription's usage limits
+# (3-6 agents at the low tier, up to about 30 at high).
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+concurrency:
+  group: review-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  review-gate:
+    # Same-repo, human-authored, non-draft PRs only. Fork PRs get no secret,
+    # and bot PRs (version packages, Graphite MQ drafts) are not reviewed.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.type != 'Bot' &&
+      vars.REVIEW_GATE_MODE != 'off'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Read-only: the run that reads untrusted PR code holds no write scope.
+    # The advisory comment is posted by the separate `comment` job below.
+    permissions:
+      contents: read
+    outputs:
+      ran: ${{ steps.gate.outputs.run }}
+    env:
+      MODE: ${{ vars.REVIEW_GATE_MODE == 'advisory' && 'advisory' || 'shadow' }}
+    steps:
+      # The reviewer (plugins, driver, risk policy, REVIEW.md) comes from the
+      # default branch, so a PR cannot weaken its own review.
+      - name: Check out the reviewer (default branch)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: reviewer
+          persist-credentials: false
+
+      - name: Check out the PR head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Decide whether to run
+        id: gate
+        env:
+          HAS_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+        run: |
+          if [ ! -f reviewer/scripts/ci/review-gate/ci.py ]; then
+            echo "::notice::review-gate CI driver is not on the default branch yet; skipping"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_TOKEN" != true ]; then
+            echo "::notice::CLAUDE_CODE_OAUTH_TOKEN is not set; skipping"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      # Pinned CLI: 2.1.316 is the release yellow-review's CLAUDE.md records
+      # loading plugin workflows/ (claude-code-action's 2.1.293 is unverified).
+      - name: Install Claude Code
+        if: steps.gate.outputs.run == 'true'
+        run: npm install -g --no-fund --no-audit @anthropic-ai/claude-code@2.1.316
+
+      - name: Prepare args
+        if: steps.gate.outputs.run == 'true'
+        env:
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          POLICY_REF=$(git -C reviewer rev-parse HEAD)
+          git -C pr cat-file -e "$POLICY_REF^{commit}" 2>/dev/null ||
+            git -C pr fetch --no-tags --quiet origin "$POLICY_REF"
+          python3 reviewer/scripts/ci/review-gate/ci.py prepare --work "$RUNNER_TEMP/review-gate" \
+            --pr-dir pr --repo "$REPO" --pr "$PR" --base "$BASE" --head "$HEAD" \
+            --policy-ref "$POLICY_REF"
+
+      # The headless run gets the subscription token and nothing else: no
+      # GitHub token, Bash denied, Read/Grep/Glob plus the one Workflow allow
+      # rule (the eval's argv).
+      - name: Run review-gate
+        if: steps.gate.outputs.run == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_DEFAULT_OPUS_MODEL: claude-opus-5-5
+          ANTHROPIC_DEFAULT_SONNET_MODEL: claude-sonnet-5-5
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: claude-haiku-5-5
+        run: python3 reviewer/scripts/ci/review-gate/ci.py run --work "$RUNNER_TEMP/review-gate"
+
+      - name: Render the result
+        if: always() && steps.gate.outputs.run == 'true'
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 reviewer/scripts/ci/review-gate/ci.py render --work "$RUNNER_TEMP/review-gate" \
+            --mode "$MODE" --run-url "$RUN_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the result
+        if: always() && steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: review-gate
+          path: |
+            ${{ runner.temp }}/review-gate/meta.json
+            ${{ runner.temp }}/review-gate/result.json
+            ${{ runner.temp }}/review-gate/comment.md
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # advisory only: edit the one sticky comment. This job runs no model and
+  # reads only the rendered comment and meta from the artifact.
+  comment:
+    needs: review-gate
+    if: >-
+      always() && needs.review-gate.outputs.ran == 'true' &&
+      vars.REVIEW_GATE_MODE == 'advisory'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out the driver (default branch)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: reviewer
+          persist-credentials: false
+          sparse-checkout: scripts/ci/review-gate
+
+      - name: Download the result
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: review-gate
+          path: ${{ runner.temp }}/review-gate
+
+      - name: Post the sticky comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 reviewer/scripts/ci/review-gate/ci.py post --work "$RUNNER_TEMP/review-gate"

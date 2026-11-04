@@ -8,6 +8,8 @@ model judge (plans/risk-tiered-review-pipeline.md section 7).
   golden regex matches the finding's title plus suggested_fix.
 - control: a merged PR with no later incident (controls/<id>.json). Any
   Important finding on it is a false positive.
+- synthetic: a clean change written for the eval (controls/synthetic/<id>.json
+  plus <id>.patch), applied on top of its base. Graded like a control.
 - incomplete: a run whose coverage.failed is non-empty (in `claude -p` a
   usage limit fails the agent instead of pausing) or whose result is
   malformed. It is left out of recall and FP rate, never counted as a miss.
@@ -62,7 +64,14 @@ REVIEWER_PATHS = tuple("plugins/%s" % name for name in PLUGINS)
 DENIED_TOOLS = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch"
 COST_KEYS = ("total_cost_usd", "num_turns", "duration_ms", "duration_api_ms", "usage", "modelUsage",
              "session_id")
-SCHEMAS = {kind: os.path.join(HERE, "schema", "%s.schema.json" % kind) for kind in ("case", "control")}
+KINDS = ("case", "control", "synthetic")
+SCHEMAS = {kind: os.path.join(HERE, "schema", "%s.schema.json" % kind) for kind in KINDS}
+# A synthetic head is a commit prepare writes, so its sha must not depend on
+# who runs prepare or when: fixed identity and dates, no signing.
+SYNTHETIC_ENV = {"GIT_AUTHOR_NAME": "review-gate eval", "GIT_AUTHOR_EMAIL": "review-gate-eval@invalid",
+                 "GIT_COMMITTER_NAME": "review-gate eval", "GIT_COMMITTER_EMAIL": "review-gate-eval@invalid",
+                 "GIT_AUTHOR_DATE": "2000-01-01T00:00:00+0000",
+                 "GIT_COMMITTER_DATE": "2000-01-01T00:00:00+0000"}
 
 PROMPT = """Run the {workflow} workflow once, with the Workflow tool, passing the args object below unchanged as its args. Do not review the change yourself and do not start any other agent. Wait for the run to finish, then print only the workflow's JSON result: no prose and no code fence. If the workflow cannot start or ends with an error, print {{"error": "<one-line reason>"}} instead.
 
@@ -134,14 +143,28 @@ def validate_item(doc, kind):
     return errors
 
 
+def item_kind_of(doc):
+    """The kind of an examples/ file, which holds every kind in one folder."""
+    if "golden" in doc:
+        return "case"
+    return "control" if "head" in doc else "synthetic"
+
+
+def patch_path(path, doc):
+    """A synthetic control's patch: <id>.patch next to its JSON file."""
+    return os.path.join(os.path.dirname(path), doc["id"] + ".patch")
+
+
 def load_items(cases_dir, controls_dir, examples=False):
-    """Cases and controls as [(kind, doc, path)], validated. Only top-level
-    *.json files load, so cases/examples/ never mixes into a real run."""
+    """Cases, controls and synthetic controls as [(kind, doc, path)],
+    validated. Only top-level *.json files of each folder load, so
+    cases/examples/ never mixes into a real run."""
     items = []
     if examples:
         sources = [(None, os.path.join(HERE, "cases", "examples"))]
     else:
-        sources = [("case", cases_dir), ("control", controls_dir)]
+        sources = [("case", cases_dir), ("control", controls_dir),
+                   ("synthetic", os.path.join(controls_dir, "synthetic"))]
     for kind, folder in sources:
         if not os.path.isdir(folder):
             continue
@@ -151,8 +174,12 @@ def load_items(cases_dir, controls_dir, examples=False):
                 continue
             with open(path, encoding="utf-8") as handle:
                 doc = json.load(handle)
-            item_kind = kind or ("case" if "golden" in doc else "control")
+            item_kind = kind or item_kind_of(doc)
             errors = validate_item(doc, item_kind)
+            if not errors and item_kind == "synthetic":
+                patch = patch_path(path, doc)
+                if not os.path.isfile(patch) or os.path.getsize(patch) == 0:
+                    errors.append("$: no non-empty %s next to it" % os.path.basename(patch))
             if errors:
                 sys.exit("prepare: %s is not a valid %s:\n  %s" % (path, item_kind, "\n  ".join(errors)))
             if doc.get("example") and not examples:
@@ -200,6 +227,34 @@ def review_md_at(repo_dir, base):
         return None
 
 
+def synthetic_head(repo_dir, doc, patch):
+    """Commit base plus the patch without touching any checkout (a scratch
+    index), and return its sha. Same base and patch give the same sha on
+    every machine, so the row's fingerprint is stable."""
+    git_dir = ms.git("rev-parse", "--path-format=absolute", "--git-dir", cwd=repo_dir).strip()
+    index = os.path.join(git_dir, "review-gate-synthetic-%s.index" % doc["id"])
+    env = {**os.environ, **SYNTHETIC_ENV, "GIT_INDEX_FILE": index}
+
+    def run_git(*args):
+        return subprocess.run(["git", "-c", "commit.gpgsign=false", *args], cwd=repo_dir, env=env,
+                              capture_output=True, text=True, check=True).stdout.strip()
+
+    try:
+        run_git("read-tree", doc["base"])
+        try:
+            run_git("apply", "--cached", "--whitespace=nowarn", os.path.abspath(patch))
+        except subprocess.CalledProcessError as err:
+            sys.exit("prepare: %s: %s does not apply at %s: %s"
+                     % (doc["id"], os.path.basename(patch), doc["base"], err.stderr.strip()))
+        tree = run_git("write-tree")
+        if tree == run_git("rev-parse", doc["base"] + "^{tree}"):
+            sys.exit("prepare: %s: the patch changes nothing at %s" % (doc["id"], doc["base"]))
+        return run_git("commit-tree", tree, "-p", doc["base"], "-m", "synthetic control %s" % doc["id"])
+    finally:
+        if os.path.exists(index):
+            os.remove(index)
+
+
 def reviewer_hash():
     return ms.fixture_parts({"fixtures": list(REVIEWER_PATHS)})[0]
 
@@ -231,17 +286,21 @@ def prepare(work, items, dirs, model, only=None):
         os.makedirs(os.path.join(work, sub), exist_ok=True)
     reviewer = reviewer_hash()
     rows = []
-    for kind, doc, _ in items:
+    heads = {}
+    for kind, doc, path in items:
         if only and doc["id"] not in only:
             continue
         repo_dir = dirs.get(doc["repo"])
         if not repo_dir:
             sys.exit("prepare: no checkout for %s; pass --repo-dir %s=PATH" % (doc["repo"], doc["repo"]))
-        for sha in (doc["base"], doc["head"]):
+        for sha in (doc["base"], doc.get("head") or doc["base"]):
             try:
                 ms.git("cat-file", "-e", sha + "^{commit}", cwd=repo_dir)
             except subprocess.CalledProcessError:
                 sys.exit("prepare: %s: commit %s is not in %s; fetch it first" % (doc["id"], sha, repo_dir))
+        if kind == "synthetic":
+            doc = {**doc, "head": synthetic_head(repo_dir, doc, patch_path(path, doc))}
+            heads[doc["id"]] = doc["head"]
         rid = doc["id"]
         wt = os.path.join(work, "wt", rid)
         ms.fresh_worktree(wt, doc["head"], cwd=repo_dir)
@@ -276,7 +335,8 @@ def prepare(work, items, dirs, model, only=None):
     with open(os.path.join(work, "matrix.json"), "w", encoding="utf-8") as handle:
         json.dump(rows, handle, indent=1)
     with open(os.path.join(work, "items.json"), "w", encoding="utf-8") as handle:
-        json.dump({doc["id"]: {"kind": kind, **doc} for kind, doc, _ in items}, handle, indent=1)
+        json.dump({doc["id"]: {"kind": kind, **doc, **({"head": heads[doc["id"]]} if doc["id"] in heads else {})}
+                   for kind, doc, _ in items}, handle, indent=1)
     print("prepared %d runs in %s" % (len(rows), os.path.join(work, "matrix.json")))
 
 
@@ -328,23 +388,59 @@ def parse_workflow(text):
     return None
 
 
+DISPLAYS = ("Important", "Nit", "Pre-existing")
+SEVERITIES = ("P0", "P1", "P2", "P3")
+
+
+def is_count(value, low=0):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= low
+
+
+def finding_problems(f):
+    """Why one finding cannot be graded: the fields finding_matches and the
+    Important count read, as review-gate.js returns them."""
+    checks = (
+        ("display", f.get("display") in DISPLAYS, "not one of %s" % "/".join(DISPLAYS)),
+        ("severity", f.get("severity") in SEVERITIES, "not one of %s" % "/".join(SEVERITIES)),
+        ("file", isinstance(f.get("file"), str) and f["file"] != "", "not a non-empty string"),
+        ("line", is_count(f.get("line"), 1), "not a positive integer"),
+        ("title", isinstance(f.get("title"), str) and f["title"] != "", "not a non-empty string"),
+        ("suggested_fix", "suggested_fix" in f and (f["suggested_fix"] is None
+                                                    or isinstance(f["suggested_fix"], str)),
+         "not a string or null"),
+    )
+    return ["%s is %s" % (key, "missing" if key not in f else why)
+            for key, ok, why in checks if not ok]
+
+
 def shape_problems(wf):
-    """Why a workflow result cannot be graded, or [] when it can."""
+    """Why a workflow result cannot be graded, or [] when it can. A field
+    grading reads is never defaulted: a missing one makes the run incomplete,
+    so run --retry-incomplete reruns it instead of grading a guess."""
     if not isinstance(wf, dict):
         return ["no workflow result"]
     problems = []
     if wf.get("version") != 1:
         problems.append("version is %r, not 1" % wf.get("version"))
-    if not isinstance(wf.get("findings"), list) or not all(isinstance(f, dict) for f in wf["findings"]):
+    findings = wf.get("findings")
+    if not isinstance(findings, list) or not all(isinstance(f, dict) for f in findings):
         problems.append("findings is not a list of objects")
+    else:
+        for i, f in enumerate(findings):
+            problems += ["findings[%d].%s" % (i, p) for p in finding_problems(f)]
     cov = wf.get("coverage")
     if not isinstance(cov, dict):
         problems.append("coverage is missing")
-    elif not isinstance(cov.get("failed"), list):
-        # Without coverage.failed nobody knows which agents ran.
-        problems.append("coverage.failed is missing or not a list")
-    agents = wf.get("agents")
-    if not isinstance(agents, int) or isinstance(agents, bool) or agents < 0:
+    else:
+        # Without coverage.ran and coverage.failed nobody knows which agents ran.
+        for key in ("ran", "failed"):
+            names = cov.get(key)
+            if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+                problems.append("coverage.%s is missing or not a list of names" % key)
+        if cov.get("empty") is True:
+            # No hunter returned: a clean result here means nobody looked.
+            problems.append("coverage.empty is true (no reviewer returned a result)")
+    if not is_count(wf.get("agents")):
         problems.append("agents is missing or not a non-negative integer")
     return problems
 
@@ -381,6 +477,12 @@ def run_env():
                  "CLAUDE_MEMORY_STORES", "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD",
                  "CLAUDE_ADDITIONAL_DIRECTORIES"):
         env.pop(name, None)
+    # `claude -p` stops a background task once the session has sat idle for
+    # CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS (default 10 minutes). The Workflow
+    # tool always runs in the background, so a high-tier review was killed
+    # mid-run. 0 lifts the ceiling; the caller's subprocess timeout is the
+    # deadline.
+    env["CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS"] = "0"
     return env
 
 
@@ -516,11 +618,18 @@ def tokens_in(cli):
                for v in mu.values() if isinstance(v, dict))
 
 
+GRADING_KEYS = ("kind", "repo", "base", "head", "golden", "include", "exclude")
+
+
 def grading_set(items):
-    """Hash of what grading reads from each item: its id, kind and golden
-    entries. Two summaries compare only when it matches, since an edited
-    golden regex changes recall without changing any id."""
-    graded = sorted([i, d.get("kind"), d.get("golden")] for i, d in items.items())
+    """Hash of each item's definition: id, kind, the commits it runs on (for a
+    synthetic control, the head prepare built, so an edited patch counts),
+    persona filters and golden entries. Two summaries compare only when it
+    matches, since an edited golden regex or a moved head changes recall or
+    FP rate without changing any id. Prose fields (notes, source,
+    confirmed_*) and the file's tier (prepare uses classify-risk's) are left
+    out."""
+    graded = sorted([i, *[d.get(k) for k in GRADING_KEYS]] for i, d in items.items())
     return hashlib.sha256(json.dumps(graded, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 
 
@@ -529,6 +638,7 @@ def summarize(work):
         items = json.load(handle)
     s = {"golden_total": 0, "golden_hit": 0, "cases_complete": 0, "cases_found": 0,
          "controls_complete": 0, "controls_with_fp": 0, "control_important": 0,
+         "synthetic_complete": 0, "synthetic_with_fp": 0,
          "agents": 0, "cost_usd": 0.0, "wall_s": 0.0, "tokens": 0, "complete": 0,
          "incomplete": [], "missing": [], "rows": []}
     for row in read_matrix(work):
@@ -560,6 +670,9 @@ def summarize(work):
             s["controls_complete"] += 1
             s["controls_with_fp"] += bool(important)
             s["control_important"] += len(important)
+            if row["kind"] == "synthetic":
+                s["synthetic_complete"] += 1
+                s["synthetic_with_fp"] += bool(important)
             r["unmatched"] = important
         s["complete"] += 1
         for key in ("agents", "cost_usd", "wall_s", "tokens"):
@@ -620,6 +733,7 @@ def results_md(s, date, decision=None):
                ["cases fully found", "%d/%d" % (s["cases_found"], s["cases_complete"])],
                ["control FP rate", "%s (%d/%d controls)" % (pct(s["fp_rate"]), s["controls_with_fp"],
                                                             s["controls_complete"])],
+               ["of which synthetic", "%d/%d" % (s["synthetic_with_fp"], s["synthetic_complete"])],
                ["incomplete runs", str(len(s["incomplete"]))],
                ["missing runs", str(len(s["missing"]))],
                ["agents (total, mean)", "%d, %.1f" % (s["agents"], s["mean_agents"])],
