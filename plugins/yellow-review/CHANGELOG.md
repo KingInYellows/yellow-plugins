@@ -1,5 +1,135 @@
 # Changelog
 
+## 3.14.0
+
+### Minor Changes
+
+- [#1626](https://github.com/KingInYellows/yellow-plugins/pull/1626)
+  [`098fa5f`](https://github.com/KingInYellows/yellow-plugins/commit/098fa5f804b4ace62b95dc5fd0a8f1172485bc3d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:merge-ready` and `check-merge-ready` report approval by risk tier
+  (CLAUDE-234). The tier comes from `classify-risk` over the PR's files with
+  `.github/review-risk.json` read at the default branch tip. Low needs no human;
+  medium and high need a listed human's approval of the head SHA (never a bot):
+  an approving review on it, or adding `graphite-queue` after the head arrived,
+  since GitHub will not let the owner approve their own PR; high also needs a
+  cross-lineage bot review on the head. The new `yellow-plugins.local.md` keys
+  `review_approval_gate` (`off`, `advisory` default, `enforce`),
+  `review_approval_humans` and `review_cross_lineage_bots` are documented in
+  yellow-core's local-config skill.
+
+- [#1629](https://github.com/KingInYellows/yellow-plugins/pull/1629)
+  [`371faf3`](https://github.com/KingInYellows/yellow-plugins/commit/371faf3c5aa056d47a0f7f707eba181ebbe08bab)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `sync-blocking-comment` takes `--risk <file>` (`classify-risk` output) and
+  shows the PR's risk tier and policy source on a "Risk tier" line in the sticky
+  blocking-threads comment. `/review:resolve` Step 9 classifies the PR with the
+  policy read at the default branch's tip and passes the result; when the
+  classification fails the comment is written without the line.
+
+- [#1540](https://github.com/KingInYellows/yellow-plugins/pull/1540)
+  [`fbaf323`](https://github.com/KingInYellows/yellow-plugins/commit/fbaf3236495b7b363e2c59726c660e57656df0cc)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add a sticky
+  "blocking threads" PR comment for repositories that do not enforce
+  conversation resolution (CLAUDE-55). `/review:resolve` Step 9 runs the new
+  `sync-blocking-comment` script when `get-pr-blockers` reports
+  `conversationResolution` as `not_enforced` or `unknown`: it keeps one comment,
+  found by a marker line among the viewer's own comments and edited in place,
+  listing every unresolved thread (outdated included) with a link, `path:line`,
+  the opener's login and the run's status for it. It carries no reviewer prose,
+  never creates a comment when nothing blocks, and is off with
+  `YELLOW_REVIEW_BLOCKING_COMMENT=0`. `get-pr-comments` now also returns each
+  comment's `url`.
+
+- [#1647](https://github.com/KingInYellows/yellow-plugins/pull/1647)
+  [`6c10f10`](https://github.com/KingInYellows/yellow-plugins/commit/6c10f10b37f9501875b7fdb44cde8c6eb361fd16)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `previous-comments-reviewer`, a conditional `/review:pr` persona that checks
+  earlier review feedback (bot and human, resolved threads included) was
+  actually addressed in the code, and flags threads marked resolved without the
+  requested change. It runs only when the PR has prior reviews or comments. New
+  `prior-comments-context` script builds its fenced, sanitized input, and
+  `get-pr-comments` gains `--include-resolved` (CLAUDE-219).
+
+- [#1644](https://github.com/KingInYellows/yellow-plugins/pull/1644)
+  [`6fdb716`](https://github.com/KingInYellows/yellow-plugins/commit/6fdb716a726c812747a79261afdc7bbb2f33fc7e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `/review:pr --report-only`: the same findings and ledger write as a normal
+  run, with no checkout, edits, commit, push or knowledge compounding. It reads
+  the current checkout when that is the clean PR head, and otherwise a detached
+  worktree of the PR head that a new `report-only-root` script adds and removes,
+  so `git status`, HEAD and the branch stay as they were. `/flow:work` Phase 5
+  now passes it; direct `/review:pr` and `/review:sweep` still apply fixes
+  (CLAUDE-213).
+
+- [#1612](https://github.com/KingInYellows/yellow-plugins/pull/1612)
+  [`8c283de`](https://github.com/KingInYellows/yellow-plugins/commit/8c283de91496686e598899a3afc959eddbe530db)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add the
+  `review-gate` dynamic workflow (`/yellow-review:review-gate`), the Hunt → Vote
+  → Rank core of the risk-tiered review pipeline: one persona agent per included
+  reviewer, a plain-code dedup, one or three verifier votes per finding by
+  severity and risk tier, then Important / Nit / Pre-existing ranking with the
+  REVIEW.md Nit cap. A reviewer that fails is reported in `coverage.failed`,
+  never as a clean review. `/review:pr` runs it in shadow mode when
+  `yellow-plugins.local.md` sets `review_pipeline: workflow`: the persona review
+  is unchanged and Coverage adds a one-line comparison; the workflow's findings
+  are not applied or recorded. yellow-core's `local-config` skill documents the
+  new `review_pipeline` value.
+
+- [#1610](https://github.com/KingInYellows/yellow-plugins/pull/1610)
+  [`6e10f65`](https://github.com/KingInYellows/yellow-plugins/commit/6e10f6531c53ae53e590d218c808e51d2676b1c1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `classify-risk`, which sorts a change into a review risk tier (`low`,
+  `medium`, `high`) from its changed paths and the repository's
+  `.github/review-risk.json`, read from a trusted ref: the base ref by default,
+  or the default branch when called with `--policy-ref` as `/review:pr` does, so
+  a pull request (or the parent PR in a stack) cannot lower its own tier.
+  `/review:pr` reports the tier in its Coverage section; it does not change
+  reviewer selection yet. Also adds a root `REVIEW.md` with the repository's
+  review rules and the seed risk policy. First step of the risk-tiered review
+  pipeline in `plans/risk-tiered-review-pipeline.md`.
+
+- [#1646](https://github.com/KingInYellows/yellow-plugins/pull/1646)
+  [`16198c2`](https://github.com/KingInYellows/yellow-plugins/commit/16198c2de842a17769efc54876681fea2302ff6a)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/review:pr`
+  now numbers findings once and, when related findings form groups, opens its
+  report with a `### Themes` section that groups them by shared root cause,
+  subsystem, failure mode or fix path, with a preferred fix per group. Grouping
+  never changes a finding's severity, route or ledger record, and groups are
+  re-partitioned after fixes are applied. New
+  `review_grouping: auto | off | always` key in `yellow-plugins.local.md`
+  (CLAUDE-218).
+
+### Patch Changes
+
+- [#1645](https://github.com/KingInYellows/yellow-plugins/pull/1645)
+  [`1f9055b`](https://github.com/KingInYellows/yellow-plugins/commit/1f9055b23cc425925439260552ee71b2ee49e10a)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document the
+  new `review-gate.yml` CI job, which runs the `review-gate` workflow headless
+  with the default branch's reviewer on non-draft, same-repository,
+  human-authored PRs when `CLAUDE_CODE_OAUTH_TOKEN` is set (shadow by default,
+  advisory comment opt-in; findings never block).
+
+- [#1632](https://github.com/KingInYellows/yellow-plugins/pull/1632)
+  [`98fca15`](https://github.com/KingInYellows/yellow-plugins/commit/98fca159bb00e5ff146480f36cdab280bc5ee092)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - review-gate
+  shadow: match ledger dismissals where they sit at the head commit and within
+  their enclosing scope (CLAUDE-243). `review-ledger.sh dismissed-context` now
+  reports each dismissal's head-mapped location (`head_file`/`head_line` in
+  JSON, and in the fenced block's `<where>`), so a repeat is still dropped after
+  lines are inserted above it. The shadow adapter passes the ledger's `<scope>`,
+  and the workflow no longer lets a rule-only match drop a finding in a
+  different function.
+
+- [#1652](https://github.com/KingInYellows/yellow-plugins/pull/1652)
+  [`5c98e4f`](https://github.com/KingInYellows/yellow-plugins/commit/5c98e4f73db47b18e9ebfd6dc93d8b3ac9f21fd6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Read the risk
+  policy and base branch from the PR's base repository, not `origin`, in
+  `/review:pr` and `/review:resolve`. In a fork checkout `origin` is the fork,
+  so its owner could set the displayed tier. A new `pr-base-remote` helper picks
+  the configured remote that points at the base repository, or its https URL
+  when none does.
+
 ## 3.13.0
 
 ### Minor Changes

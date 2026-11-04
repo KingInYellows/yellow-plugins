@@ -1,5 +1,16 @@
 # yellow-council
 
+## 0.6.4
+
+### Patch Changes
+
+- [#1528](https://github.com/KingInYellows/yellow-plugins/pull/1528)
+  [`855ec61`](https://github.com/KingInYellows/yellow-plugins/commit/855ec61515fcf848473a7527017d16d646d6013d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document that
+  `opencode run --format json` text events are completed parts, not streaming
+  deltas, so the newline-joined extraction ahead of credential redaction cannot
+  split a key (CLAUDE-205).
+
 ## 0.6.3
 
 ### Patch Changes

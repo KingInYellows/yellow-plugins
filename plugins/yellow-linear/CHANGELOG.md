@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.2
+
+### Patch Changes
+
+- [#1527](https://github.com/KingInYellows/yellow-plugins/pull/1527)
+  [`d6e961f`](https://github.com/KingInYellows/yellow-plugins/commit/d6e961ff124a1b04cf084ef9532529f230c486d3)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Mark
+  yellow-jules deprecated. Google is winding Jules down: sessions can be
+  finished until 2026-11-11, Jules is read-only after that, and it shuts down
+  2026-12-31. The README, CLAUDE.md, marketplace description, catalog lifecycle
+  status, and the `setup` and `delegate` commands now tell the user, with the
+  Jules Tools export steps. `/jules:delegate` and the Jules branch of
+  `/linear:delegate` stop before launching after 2026-11-11.
+
 ## 2.2.1
 
 ### Patch Changes

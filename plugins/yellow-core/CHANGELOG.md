@@ -1,5 +1,118 @@
 # Changelog
 
+## 2.12.0
+
+### Minor Changes
+
+- [#1654](https://github.com/KingInYellows/yellow-plugins/pull/1654)
+  [`e53a765`](https://github.com/KingInYellows/yellow-plugins/commit/e53a76579d21c25807ea3692a356f0a54d79eaa8)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `compound-lifecycle` (new Step 9) and `knowledge-compounder` check that the
+  repo's agent-instruction file still points agents at `docs/solutions/`, and
+  propose one informational line when it does not. Non-interactive runs only
+  report the recommendation (CLAUDE-221).
+
+- [#1649](https://github.com/KingInYellows/yellow-plugins/pull/1649)
+  [`95bd69a`](https://github.com/KingInYellows/yellow-plugins/commit/95bd69a339e114aad848639f2392d1b31bef2787)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Ground
+  solution-doc citations before they land. `validate-solutions` now checks each
+  new or modified doc's body for repo paths, commit SHAs and relative links that
+  exist nowhere, and for leftover `{{...}}` placeholders (`ERROR-SOL-003`),
+  ported from Compound Engineering's validate-doc-claims. `knowledge-compounder`
+  grounds its draft before M3 and runs `validate-solutions.js --doc` on the
+  written doc when the repo ships it.
+
+- [#1642](https://github.com/KingInYellows/yellow-plugins/pull/1642)
+  [`246bea9`](https://github.com/KingInYellows/yellow-plugins/commit/246bea9fbd98ce8e4fb84d2167e3021255b9d45b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Gate every new
+  learning on Compound Engineering's durable-bar counterfactual.
+  `knowledge-compounder` applies the bar on every path before M3 (explicit
+  `/flow:compound` runs no longer lower it), amends stale learnings instead of
+  duplicating them, and writes one learning per run. `staging-scorer` emits SKIP
+  for excerpts whose lesson is recoverable from the code, tests or docs. RULE 22
+  in `validate-agent-authoring.js` keeps the copies byte-identical.
+
+- [#1643](https://github.com/KingInYellows/yellow-plugins/pull/1643)
+  [`4af3eeb`](https://github.com/KingInYellows/yellow-plugins/commit/4af3eebaccea1984e410d3ff9fe871d75b9dd709)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add an optional
+  `retire_when` frontmatter field to `docs/solutions/` docs, ported from
+  Compound Engineering's ce-compound schema. `knowledge-compounder` sets it only
+  when a learning holds just while something outside the repo holds (an upstream
+  bug, a tool version, a dependency's behavior). `compound-lifecycle` lists
+  those docs as their own triage group, checks each condition read-only, and
+  routes a met condition to Update, Replace or Delete-and-archive.
+  `validate-solutions` rejects a present but empty, non-string or multi-line
+  value.
+
+### Patch Changes
+
+- [#1523](https://github.com/KingInYellows/yellow-plugins/pull/1523)
+  [`772104d`](https://github.com/KingInYellows/yellow-plugins/commit/772104d9d246623e009d8aafa305a7e41efc0fe0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop capture
+  stages nothing when the jq dialogue filter fails, instead of an unfiltered raw
+  tail that could carry attachment records such as the prompt snapshot and
+  memory files. Documented under Known Limitations in yellow-core CLAUDE.md.
+
+- [#1561](https://github.com/KingInYellows/yellow-plugins/pull/1561)
+  [`a47f03a`](https://github.com/KingInYellows/yellow-plugins/commit/a47f03ae593a467bded4abfb0451711739081efd)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add yellow-agy,
+  the experimental successor to yellow-jules: a local supervised delegate on the
+  Antigravity CLI (`agy`) under the owner's Google AI Pro sign-in. This scaffold
+  ships `/agy:setup`, a read-only check of where agy lives (on `PATH` or through
+  an exec-only WSL bridge), its version, any API-key or Vertex variables in the
+  caller's env or inside WSL, and whether overages are pinned off. `/setup:all`
+  now lists yellow-agy and probes `wsl.exe`.
+
+- [#1626](https://github.com/KingInYellows/yellow-plugins/pull/1626)
+  [`098fa5f`](https://github.com/KingInYellows/yellow-plugins/commit/098fa5f804b4ace62b95dc5fd0a8f1172485bc3d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:merge-ready` and `check-merge-ready` report approval by risk tier
+  (CLAUDE-234). The tier comes from `classify-risk` over the PR's files with
+  `.github/review-risk.json` read at the default branch tip. Low needs no human;
+  medium and high need a listed human's approval of the head SHA (never a bot):
+  an approving review on it, or adding `graphite-queue` after the head arrived,
+  since GitHub will not let the owner approve their own PR; high also needs a
+  cross-lineage bot review on the head. The new `yellow-plugins.local.md` keys
+  `review_approval_gate` (`off`, `advisory` default, `enforce`),
+  `review_approval_humans` and `review_cross_lineage_bots` are documented in
+  yellow-core's local-config skill.
+
+- [#1644](https://github.com/KingInYellows/yellow-plugins/pull/1644)
+  [`6fdb716`](https://github.com/KingInYellows/yellow-plugins/commit/6fdb716a726c812747a79261afdc7bbb2f33fc7e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `/review:pr --report-only`: the same findings and ledger write as a normal
+  run, with no checkout, edits, commit, push or knowledge compounding. It reads
+  the current checkout when that is the clean PR head, and otherwise a detached
+  worktree of the PR head that a new `report-only-root` script adds and removes,
+  so `git status`, HEAD and the branch stay as they were. `/flow:work` Phase 5
+  now passes it; direct `/review:pr` and `/review:sweep` still apply fixes
+  (CLAUDE-213).
+
+- [#1612](https://github.com/KingInYellows/yellow-plugins/pull/1612)
+  [`8c283de`](https://github.com/KingInYellows/yellow-plugins/commit/8c283de91496686e598899a3afc959eddbe530db)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add the
+  `review-gate` dynamic workflow (`/yellow-review:review-gate`), the Hunt → Vote
+  → Rank core of the risk-tiered review pipeline: one persona agent per included
+  reviewer, a plain-code dedup, one or three verifier votes per finding by
+  severity and risk tier, then Important / Nit / Pre-existing ranking with the
+  REVIEW.md Nit cap. A reviewer that fails is reported in `coverage.failed`,
+  never as a clean review. `/review:pr` runs it in shadow mode when
+  `yellow-plugins.local.md` sets `review_pipeline: workflow`: the persona review
+  is unchanged and Coverage adds a one-line comparison; the workflow's findings
+  are not applied or recorded. yellow-core's `local-config` skill documents the
+  new `review_pipeline` value.
+
+- [#1646](https://github.com/KingInYellows/yellow-plugins/pull/1646)
+  [`16198c2`](https://github.com/KingInYellows/yellow-plugins/commit/16198c2de842a17769efc54876681fea2302ff6a)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/review:pr`
+  now numbers findings once and, when related findings form groups, opens its
+  report with a `### Themes` section that groups them by shared root cause,
+  subsystem, failure mode or fix path, with a preferred fix per group. Grouping
+  never changes a finding's severity, route or ledger record, and groups are
+  re-partitioned after fixes are applied. New
+  `review_grouping: auto | off | always` key in `yellow-plugins.local.md`
+  (CLAUDE-218).
+
 ## 2.11.7
 
 ### Patch Changes

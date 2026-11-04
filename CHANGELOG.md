@@ -13,6 +13,61 @@ and this project adheres to
 
 ---
 
+## [2.1.30] - 2026-11-04
+
+### Added
+
+- **yellow-agy 0.2.0** — New experimental plugin, the successor to yellow-jules:
+  a local supervised delegate on the Antigravity CLI (`agy`) under the owner's
+  Google AI Pro sign-in. Ships `/agy:setup` (read-only host check, #1561), the
+  adapter core and permission profiles (#1607), the delegate lifecycle with
+  worktrees, snapshots and a local journal (#1624), and the `/agy:*` commands
+  (authorize, delegate, approve, reply, status, collect, abandon) with owner
+  grants and a `/usage` quota gate (#1651). `/setup:all` now lists yellow-agy.
+- **yellow-review 3.14.0** — Risk-tiered review: `classify-risk` and a root
+  `REVIEW.md` with the seed risk policy (#1610); the `review-gate` dynamic
+  workflow in shadow mode (#1612); `/review:merge-ready` approval by risk tier
+  (CLAUDE-234, #1626) and a "Risk tier" line in the sticky blocking-threads
+  comment (#1629). Also a sticky blocking-threads PR comment for repos that do
+  not enforce conversation resolution (CLAUDE-55, #1540), the
+  `previous-comments-reviewer` persona (CLAUDE-219, #1647),
+  `/review:pr --report-only` (CLAUDE-213, #1644), and a `### Themes` section
+  that groups related findings (CLAUDE-218, #1646).
+- **yellow-core 2.12.0** — Learning quality gates ported from Compound
+  Engineering: the durable-bar counterfactual for every new learning
+  (CLAUDE-208, #1642), optional `retire_when` frontmatter for solution docs
+  (CLAUDE-209, #1643), solution-doc citation grounding in `validate-solutions`
+  (CLAUDE-210, #1649), and a check that the agent-instruction file still points
+  at `docs/solutions/` (CLAUDE-221, #1654).
+- **gt-workflow 2.1.0, github-workflow 0.4.0** — `smart-submit` and
+  `github-stack-submit` add a `## New concepts` section to the commit body when
+  a change introduces a load-bearing term not yet in `CONCEPTS.md` (CLAUDE-220,
+  #1641).
+
+### Changed
+
+- **yellow-review 3.14.0** — Documents the `review-gate.yml` CI job, which runs
+  the workflow headless in shadow mode on human-authored PRs (#1645).
+- **yellow-council 0.6.4** — Documents that `opencode run --format json` text
+  events are completed parts, so credential redaction cannot split a key
+  (CLAUDE-205, #1528).
+
+### Deprecated
+
+- **yellow-jules 0.4.2, yellow-linear 2.2.2** — yellow-jules is deprecated:
+  Jules is read-only after 2026-11-11 and shuts down 2026-12-31.
+  `/jules:delegate` and the Jules branch of `/linear:delegate` stop before
+  launching after 2026-11-11 (#1527).
+
+### Fixed
+
+- **yellow-core 2.12.0** — Stop capture stages nothing when the jq dialogue
+  filter fails, instead of an unfiltered raw tail (#1523).
+- **yellow-review 3.14.0** — review-gate shadow matches ledger dismissals at
+  their head-mapped location and enclosing scope (CLAUDE-243, #1632), and
+  `/review:pr` and `/review:resolve` read the risk policy from the PR's base
+  repository, not `origin`, so a fork cannot set its own tier (#1652).
+
 ## [2.1.29] - 2026-10-29
 
 ### Added
