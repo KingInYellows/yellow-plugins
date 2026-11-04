@@ -121,7 +121,10 @@ export function hostCommand(
 export function runSpawn(
   spec: SpawnSpec,
   stdin: string | undefined,
-  timeoutMs: number
+  timeoutMs: number,
+  // AGY_BUDGET when the budget cut the timeout: the command did not fail,
+  // it ran out of time, so callers must not read the result as an answer.
+  timeoutCode: 'AGY_INTERNAL' | 'AGY_BUDGET' = 'AGY_INTERNAL'
 ): Promise<ExecResult> {
   // Own process group on POSIX, so a timeout also reaches what git started
   // (a credential helper, ssh).
@@ -175,7 +178,7 @@ export function runSpawn(
       if (timedOut) {
         reject(
           new AgyError(
-            'AGY_INTERNAL',
+            timeoutCode,
             `${spec.file} did not finish within ${timeoutMs} ms`
           )
         );
@@ -218,10 +221,13 @@ export function createHostExec(
     filterDrivers: readonly string[] = []
   ): Promise<ExecResult> => {
     const wanted = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs =
+      budget === undefined ? wanted : budget.hostTimeoutMs(wanted);
     return runSpawn(
       hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv),
       options.stdin,
-      budget === undefined ? wanted : budget.hostTimeoutMs(wanted)
+      timeoutMs,
+      timeoutMs < wanted ? 'AGY_BUDGET' : 'AGY_INTERNAL'
     );
   };
   // Reading config runs no filter, so discovery itself needs none turned off.

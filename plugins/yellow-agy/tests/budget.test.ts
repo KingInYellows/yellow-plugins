@@ -1,6 +1,11 @@
+import * as os from 'node:os';
+
 import { describe, expect, it } from 'vitest';
 
 import { Budget, MIN_TURN_SECONDS, SETTLE_MS } from '../src/budget';
+import { createHostExec } from '../src/host-exec';
+
+import { testEnv } from './helpers';
 
 describe('Budget', () => {
   const at = (ms: number): Budget => new Budget(() => ms);
@@ -42,5 +47,28 @@ describe('Budget', () => {
     );
     b.reserveMs = 0;
     expect(at(0).hostTimeoutMs(120_000)).toBe(120_000);
+  });
+
+  it('reports a host command cut short by the budget as AGY_BUDGET, not a failure', async () => {
+    // 1.5 s left: discovery fits, then the slow command times out early.
+    const b = new Budget(() => 600_000 - SETTLE_MS - 1_500);
+    const exec = createHostExec({ kind: 'posix' }, testEnv, b);
+    await expect(
+      exec.git(['-c', 'alias.slow=!sleep 5', 'slow'], { cwd: os.tmpdir() })
+    ).rejects.toMatchObject({ code: 'AGY_BUDGET' });
+  });
+
+  it('keeps AGY_INTERNAL for a timeout the budget did not cut', async () => {
+    const exec = createHostExec(
+      { kind: 'posix' },
+      testEnv,
+      new Budget(() => 0)
+    );
+    await expect(
+      exec.git(['-c', 'alias.slow=!sleep 5', 'slow'], {
+        cwd: os.tmpdir(),
+        timeoutMs: 1_000,
+      })
+    ).rejects.toMatchObject({ code: 'AGY_INTERNAL' });
   });
 });

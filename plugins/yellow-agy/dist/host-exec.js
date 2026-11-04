@@ -89,7 +89,10 @@ function hostCommand(host, cmd, args, options, baseEnv) {
         env: (0, invocation_1.scrubEnv)(baseEnv),
     };
 }
-function runSpawn(spec, stdin, timeoutMs) {
+function runSpawn(spec, stdin, timeoutMs, 
+// AGY_BUDGET when the budget cut the timeout: the command did not fail,
+// it ran out of time, so callers must not read the result as an answer.
+timeoutCode = 'AGY_INTERNAL') {
     // Own process group on POSIX, so a timeout also reaches what git started
     // (a credential helper, ssh).
     const group = process.platform !== 'win32';
@@ -144,7 +147,7 @@ function runSpawn(spec, stdin, timeoutMs) {
             killAll();
             closed = true;
             if (timedOut) {
-                reject(new errors_1.AgyError('AGY_INTERNAL', `${spec.file} did not finish within ${timeoutMs} ms`));
+                reject(new errors_1.AgyError(timeoutCode, `${spec.file} did not finish within ${timeoutMs} ms`));
                 return;
             }
             if (size > MAX_OUTPUT_BYTES) {
@@ -170,7 +173,8 @@ function createHostExec(host, baseEnv = process.env, budget) {
     // wrapper's Bash timeout.
     const run = async (cmd, args, options, filterDrivers = []) => {
         const wanted = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-        return runSpawn(hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv), options.stdin, budget === undefined ? wanted : budget.hostTimeoutMs(wanted));
+        const timeoutMs = budget === undefined ? wanted : budget.hostTimeoutMs(wanted);
+        return runSpawn(hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv), options.stdin, timeoutMs, timeoutMs < wanted ? 'AGY_BUDGET' : 'AGY_INTERNAL');
     };
     // Reading config runs no filter, so discovery itself needs none turned off.
     const discover = async (cwd) => {
