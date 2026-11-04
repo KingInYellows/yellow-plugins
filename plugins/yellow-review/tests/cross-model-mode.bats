@@ -80,6 +80,15 @@ cfg() { # <file> <value-line>
   fi
 }
 
+@test "a quoted key is honoured like the plain one" {
+  cfg "$CLAUDE_CONFIG_DIR/yellow-plugins.local.md" '"cross_model_review": off'
+  run -0 "$SCRIPT"
+  [ "$output" = 'cross_model_review=off source=user' ]
+  cfg "$CLAUDE_CONFIG_DIR/yellow-plugins.local.md" "'cross_model_review': off"
+  run -0 "$SCRIPT"
+  [ "$output" = 'cross_model_review=off source=user' ]
+}
+
 @test "only top-level frontmatter counts, not the body or nested keys" {
   printf -- '---\nreviewer_set:\n  cross_model_review: off\n---\ncross_model_review: off\n' >|yellow-plugins.local.md
   run -0 "$SCRIPT"

@@ -307,7 +307,7 @@ council_cmr_read() {
   if [ ! -f "$1" ] || [ ! -r "$1" ]; then printf '(unreadable)\n'; return 0; fi
   CMR_OUT=$(awk 'NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; next }
        /^---[ \t\r]*$/ { exit }
-       /^cross_model_review[ \t]*:/ { v = $0; sub(/^cross_model_review[ \t]*:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); sub(/[ \t\r]+$/, "", v)
+       /^(cross_model_review|"cross_model_review"|\047cross_model_review\047)[ \t]*:/ { v = $0; sub(/^[^:]*:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); sub(/[ \t\r]+$/, "", v)
          if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2); if (v == "") v = "(empty)"; print tolower(v); exit }' "$1" 2>/dev/null) || CMR_OUT='(unreadable)'
   printf '%s\n' "$CMR_OUT"
 }
