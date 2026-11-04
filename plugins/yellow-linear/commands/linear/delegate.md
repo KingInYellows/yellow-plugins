@@ -1281,7 +1281,7 @@ revision; offer no `/agy:*` next step. Otherwise report `localId`, the
 `branch=` value, the returned state (`PLAN_PENDING`), and the plan's summary
 from the fence. Next steps:
 `/agy:approve --task <localId>` implements the plan, `/agy:reply --task
-<localId>` asks for changes first, and `/agy:collect --task <localId>` gathers
+<localId> --correction -- <message>` asks for a revised plan first, and `/agy:collect --task <localId>` gathers
 the diff once it is done; the PR then goes through the enabled stack
 provider (`/stack:status`). If no grant covered the issue, report the printed
 `authorize` line and that nothing ran and the Linear issue was left unchanged.
