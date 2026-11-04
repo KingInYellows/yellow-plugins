@@ -58,7 +58,7 @@ VOCAB="$BATS_TEST_DIRNAME/../lib/review-ledger-vocab.json"
 
 producers() {
   local n
-  for n in project-compliance correctness maintainability project-standards reliability adversarial plugin-contract cli-readiness agent-cli-readiness agent-native thermonuclear; do
+  for n in project-compliance correctness maintainability project-standards reliability adversarial plugin-contract cli-readiness agent-cli-readiness agent-native thermonuclear previous-comments; do
     printf '%s\n' "$YR_AGENTS/$n-reviewer.md"
   done
   printf '%s\n' "$YC_AGENTS/security-reviewer.md" "$YC_AGENTS/performance-reviewer.md"

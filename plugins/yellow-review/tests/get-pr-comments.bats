@@ -442,3 +442,22 @@ EOS
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq 'length')" -eq 2 ]
 }
+
+@test "--include-resolved returns every thread with isResolved appended last" {
+  run "$SCRIPT" --include-resolved "test/repo" "123"
+  [ "$status" -eq 0 ]
+  ids=$(printf '%s' "$output" | jq -r '.[].threadId')
+  [[ "$ids" == *"PRRT_thread1"* ]]
+  [[ "$ids" == *"PRRT_thread2"* ]]
+  [[ "$ids" == *"PRRT_thread3"* ]]
+  [[ "$ids" == *"PRRT_thread4"* ]]
+  [ "$(printf '%s' "$output" | jq -r '.[] | select(.threadId == "PRRT_thread2") | .isResolved')" = true ]
+  [ "$(printf '%s' "$output" | jq -r '.[] | select(.threadId == "PRRT_thread1") | .isResolved')" = false ]
+  [ "$(printf '%s' "$output" | jq -c '.[0] | keys_unsorted[-1:]')" = '["isResolved"]' ]
+}
+
+@test "without --include-resolved there is no isResolved field" {
+  run "$SCRIPT" "test/repo" "123"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq '[.[] | has("isResolved")] | any')" = false ]
+}

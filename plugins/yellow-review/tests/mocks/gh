@@ -36,6 +36,8 @@
 #                                        MOCK_GH_PROTECTION_MAIN and
 #                                        MOCK_GH_RULES_MAIN override them for
 #                                        the branch named main
+#   pr view --json author,reviews,comments
+#                                        MOCK_GH_PRIOR_FIXTURE, MOCK_GH_FAIL
 #   pr view                              MOCK_GH_{FAIL,PR_STATE,HEAD_OID,
 #                                        BASE_OID}
 #   */compare/*, repos/.../pulls/<n>     MOCK_GH_COMPARE_{FAIL,FIXTURE},
@@ -855,6 +857,16 @@ case "$ALL_ARGS" in
   *"PRRT_resolved"*)
     printf 'already resolved' >&2
     exit 1
+    ;;
+  *"pr view "*"--json author,reviews,comments"*)
+    # prior-comments-context gate: MOCK_GH_PRIOR_FIXTURE names the fixture
+    # (default: no reviews and no comments); MOCK_GH_FAIL=1 fails it.
+    [ "${MOCK_GH_FAIL:-0}" = 1 ] && { printf 'mock gh: pr view failed\n' >&2; exit 1; }
+    if [ -n "${MOCK_GH_PRIOR_FIXTURE:-}" ]; then
+      cat "$FIXTURE_DIR/$MOCK_GH_PRIOR_FIXTURE"
+    else
+      printf '{"author":{"login":"me"},"reviews":[],"comments":[]}\n'
+    fi
     ;;
   *"pr view "*)
     # Review-ledger PR metadata. MOCK_GH_FAIL=1 simulates an unreachable
