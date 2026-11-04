@@ -50,6 +50,11 @@ export interface HostExec {
   filterDrivers(cwd: string): Promise<string[]>;
   writeFile(filePath: string, content: string): Promise<void>;
   removeFile(filePath: string): Promise<void>;
+  /**
+   * Gives back the time held for a turn that will not run now, so rollback
+   * after a failed pre-turn step is not starved by it.
+   */
+  releaseTurnReserve?(): void;
 }
 
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
@@ -238,6 +243,9 @@ export function createHostExec(
   };
   return {
     host,
+    releaseTurnReserve: () => {
+      if (budget !== undefined) budget.reserveMs = 0;
+    },
     async git(args, options) {
       return run('git', args, options, await discover(options.cwd));
     },

@@ -185,6 +185,10 @@ function createHostExec(host, baseEnv = process.env, budget) {
     };
     return {
         host,
+        releaseTurnReserve: () => {
+            if (budget !== undefined)
+                budget.reserveMs = 0;
+        },
         async git(args, options) {
             return run('git', args, options, await discover(options.cwd));
         },

@@ -970,6 +970,37 @@ describe('Lifecycle', () => {
         expect(j.activeRun).toBeUndefined();
         expect(h.calls).toHaveLength(0);
       });
+
+      it('still rolls back the new branch when a failed worktree add used up the time outside the reserve', async () => {
+        let clock = 0;
+        const budget = new Budget(() => clock);
+        const real = createHostExec({ kind: 'posix' }, testEnv, budget);
+        const exec: HostExec = {
+          ...real,
+          async git(args, options) {
+            if (args[0] === 'worktree' && args[1] === 'add') {
+              // A slow add that fails, leaving 95 s: under the 100 s reserve.
+              clock += 490_000;
+              return { code: 128, stdout: '', stderr: 'timed out' };
+            }
+            return real.git(args, options);
+          },
+        };
+        const { h, g } = granted([planTurn], {
+          exec,
+          budget,
+          printTimeoutSeconds: 420,
+          deadlineMs: 450_000,
+        });
+        await expect(
+          h.lc.delegate(delegateInput(h.repo))
+        ).rejects.toMatchObject({ code: 'AGY_WORKTREE' });
+        const branch = delegateInput(h.repo).branch;
+        expect(git(h.repo, 'branch', '--list', branch)).toBe('');
+        const j = readJournal(h.deps.dataDir);
+        expect(j.grants?.[g.grantId]?.totalTasks).toBe(0);
+        expect(h.calls).toHaveLength(0);
+      });
     });
   });
 });

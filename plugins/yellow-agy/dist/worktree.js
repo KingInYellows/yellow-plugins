@@ -124,7 +124,9 @@ async function createWorktree(exec, options) {
         }
         catch (err) {
             // Without the rollback, the branch would block every retry with no
-            // task left to abandon.
+            // task left to abandon. The turn will not run, so its reserved time
+            // goes to the rollback.
+            exec.releaseTurnReserve?.();
             await dropUnusedBranch(exec, options.repo, options.branch, base);
             throw err;
         }
