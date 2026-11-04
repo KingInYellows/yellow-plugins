@@ -1139,6 +1139,16 @@ finding in the three queues goes to `review-ledger.sh observe --step 6`
 (not pre-existing or suppressed findings), and the returned `finding_id`s
 are kept for Steps 7 and 9.
 
+#### Number and group (after the gates and the ledger write)
+
+Number and group only the findings that survived the quality gates and the
+ledger write's suppressed drop, so no theme cites a dropped finding. Read
+`${CLAUDE_PLUGIN_ROOT}/references/review-pr/themes.md` and follow it: number
+the survivors in sub-step 10's order (the stable `#` used everywhere after
+this) and build theme groups per `review_grouping`. Grouping never changes a
+finding's severity, route, owner or ledger record. If the Read fails, number
+the findings, skip grouping and note "themes: not built" in Coverage.
+
 ### Step 7: Apply Fixes
 
 Steps 7 to 9b are skipped in report-only mode; go to Step 10.
@@ -1213,6 +1223,9 @@ helper); the default routing is human review.
 
 Persist the simplifier's findings with ledger.md's "After Step 8" section
 (`--step 8 --anchor-source worktree`).
+
+Then re-partition the theme groups as `themes.md` says: drop applied findings,
+drop groups left with fewer than two.
 
 ### Step 9: Commit and Push
 
@@ -1302,6 +1315,9 @@ findings, grouped by severity:
 
 ```
 ## Review Summary — PR #<num>
+
+### Themes
+(Only when Step 6 "Number and group" built groups; see themes.md "Render".)
 
 ### P0 — Critical
 | # | File | Issue | Reviewer(s) | Confidence | Route |
