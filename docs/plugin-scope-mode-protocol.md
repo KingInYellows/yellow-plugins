@@ -156,6 +156,32 @@ always live). Its `scope=stack` traversal follows the shared `stack-traversal`
 skill, while the `scope=all` and `scope=PR#` branches are review-all-specific
 (per the command file's own inline comment).
 
+## Interface 6: `--report-only` flag (`/review:pr`)
+
+Reports findings without changing the tree. For callers that run review as a
+step inside a workflow that does not own the checkout.
+
+### Contract
+
+| Property | Value                                                                                                                                                                                                                                           |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Token    | exactly `--report-only`, whitespace-separated in `$ARGUMENTS`                                                                                                                                                                                   |
+| Parsing  | same as Interface 1; combines with `--non-interactive`                                                                                                                                                                                          |
+| Default  | OFF: a direct `/review:pr <PR>` applies fixes                                                                                                                                                                                                   |
+| Effect   | runs Steps 1, 3a–6 and 10 and the Step 6 ledger write; skips the clean-tree check, checkout, fix application, simplifier pass, commit/push and knowledge compounding. `git status`, HEAD and the current branch are unchanged                   |
+| Tree     | reviews in place when HEAD is already the verified PR head and the tree is clean; otherwise reads a detached worktree of the PR head under the git common dir (`skills/pr-review-workflow/scripts/report-only-root`), removed before the report |
+
+Defined in `plugins/yellow-review/commands/review/review-pr.md` Step 1 and
+`plugins/yellow-review/references/review-pr/report-only.md`.
+
+### Callers
+
+| Caller                                       | Passes `--report-only` | Why                                                                                        |
+| -------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------ |
+| direct `/review:pr`, `/flow:review` redirect | no                     | the user's own review loop fixes every P1                                                  |
+| `/review:sweep`, `/review:sweep-all`         | no                     | their job is a merge-ready PR; `/review:resolve` then settles the threads the fixes answer |
+| `/flow:work` Phase 5                         | yes                    | the review is a step inside the work run; findings go back to the user to act on           |
+
 ## RECOMMENDED (not yet uniform): diff-scope vs file-scope
 
 turbo's skill conventions define a scope interface worth adopting for FUTURE
@@ -173,7 +199,7 @@ adopting it on existing surfaces is out of scope (see the non-goal at the top).
 
 ## Adding a new scope/mode surface
 
-1. Prefer one of the five interfaces above over inventing a new flag grammar;
+1. Prefer one of the six interfaces above over inventing a new flag grammar;
    `--non-interactive` parsing (Interface 1) is the template for any new boolean
    mode flag (exact token, whitespace split, unknown-flag hard error, OFF
    default).
