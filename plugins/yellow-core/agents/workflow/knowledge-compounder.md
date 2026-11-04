@@ -53,6 +53,44 @@ MEMORY_PATH="$HOME/.claude/projects/$PROJECT_SLUG/memory/MEMORY.md"
 
 If the above exits non-zero, stop. Do not proceed.
 
+## Durable Bar (gates every write)
+
+<!-- Verbatim from EveryInc/compound-engineering-plugin skills/ce-compound/SKILL.md
+     @ b405537 (ce-durable-bar block). RULE 22 in validate-agent-authoring.js keeps
+     every copy byte-identical; edit all copies together. -->
+
+<!-- durable-bar:start -->
+
+A learning earns its place only when it holds durable project reasoning that is
+not readily recoverable from the final code, tests, types, comments, or existing
+documentation, and losing it would plausibly cause recurrence, material risk, or
+substantial rediscovery. Apply this counterfactual: if the learning document
+disappeared, would a future engineer reading the final implementation still be
+likely to repeat the mistake or redo substantial investigation? Completion,
+effort, and diff size do not establish eligibility.
+
+<!-- durable-bar:end -->
+
+Judge this from the session, never by asking the user. An explicit
+`/flow:compound` invocation asks for the judgment now; it does not lower the
+bar. Apply the bar on every path (normal, review-findings, in-PR) before M3. The
+skip-eligibility heuristics below stay as a cheaper fast path that can skip
+earlier; passing them does not clear the bar.
+
+- If the counterfactual fails, write nothing. Print the SKIP line from the
+  skip-eligibility check with the counterfactual as its reason (for example "the
+  rename is self-explanatory from the diff"), then exit without reaching M3.
+- An existing learning that became materially inaccurate or incomplete
+  qualifies, because leaving it would mislead. Route it to AMEND_EXISTING
+  instead of creating a duplicate.
+- A `<consolidation-context>` handoff from `compound-lifecycle` (Consolidate or
+  Replace) merges or supersedes docs the caller will archive. Judge the
+  counterfactual with those source docs excluded, since they are about to
+  disappear; their being recoverable today is not a reason to skip.
+- Write one learning per run. When the session holds several, document the
+  strongest and name the rest in the Success Output so the caller can run again
+  for each; batching blurs the per-learning judgment.
+
 ## Phase 1: Parallel Extraction (6 Subagents)
 
 **Fast path (structured findings):** If spawned with `--- begin review-findings ---`
@@ -106,9 +144,9 @@ would derive from raw conversation transcript. Use them directly:
    "Prevention" / "Testing" sections; if absent, leave the section as a
    placeholder for the M3 reviewer to fill in.
 
-Skip-eligibility check (run BEFORE jumping to Compounding Rules): if all of
-the following are true, emit a `SKIP` signal and exit cleanly without
-reaching M3:
+Skip-eligibility check (a fast path ahead of the Durable Bar; run BEFORE jumping
+to Compounding Rules): if all of the following are true, emit a `SKIP` signal
+and exit cleanly without reaching M3:
 
 - PR title matches `(typo|whitespace|formatting|version bump|dep bump|chore: bump)`
 - PR body contains no failure-mode narrative (no "Problem", "Symptom",
@@ -255,8 +293,11 @@ When spawned after a PR review, apply severity-based filtering:
 - **Never compound (P3)**: Style suggestions and minor improvements are not worth
   persisting.
 
-When spawned by `/flow:compound`, all findings are worthy (user explicitly
-requested compounding) — apply Routing Decision directly without severity filter.
+When spawned by `/flow:compound`, skip the severity filter (the user explicitly
+requested compounding) and apply Routing Decision directly.
+
+Severity only selects candidates. Every candidate must still clear the Durable
+Bar above before it reaches M3.
 
 ## Routing Decision
 

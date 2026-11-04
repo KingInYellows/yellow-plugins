@@ -51,6 +51,10 @@ it before editing a command, library or the staging pipeline.
 - Background compounding: `staging-reviewer` (drain orchestrator),
   `staging-scorer` (Haiku), `staging-promoter` (non-interactive writer; its
   `disallowedTools: [AskUserQuestion]` is load-bearing, enforced by RULE 14)
+- `knowledge-compounder` and `staging-scorer` both gate writes on the
+  durable-bar counterfactual (ported from Compound Engineering). The paragraph
+  between the `durable-bar` markers must stay byte-identical in both files;
+  RULE 22 in `validate-agent-authoring.js` enforces it.
 
 ### Commands (19)
 

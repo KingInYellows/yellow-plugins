@@ -65,6 +65,30 @@ You will receive a prompt with three sections:
 3. The current `## Session Notes` section of MEMORY.md (so you can spot
    already-recorded content and skip duplicates).
 
+## Durable bar
+
+<!-- Verbatim from EveryInc/compound-engineering-plugin skills/ce-compound/SKILL.md
+     @ b405537 (ce-durable-bar block). RULE 22 in validate-agent-authoring.js keeps
+     every copy byte-identical; edit all copies together. -->
+
+<!-- durable-bar:start -->
+
+A learning earns its place only when it holds durable project reasoning that is
+not readily recoverable from the final code, tests, types, comments, or existing
+documentation, and losing it would plausibly cause recurrence, material risk, or
+substantial rediscovery. Apply this counterfactual: if the learning document
+disappeared, would a future engineer reading the final implementation still be
+likely to repeat the mistake or redo substantial investigation? Completion,
+effort, and diff size do not establish eligibility.
+
+<!-- durable-bar:end -->
+
+Apply the bar before the rubric. If the excerpt's lesson is recoverable from the
+final diff, tests, types, comments, or existing docs, emit SKIP with the
+counterfactual as the reason, whatever its concrete markers. An excerpt that
+shows an existing learning is now materially wrong or incomplete still clears
+the bar. Only an excerpt that clears the bar gets a rubric score of 0.5 or more.
+
 ## Scoring rubric
 
 You assign a `priority` between 0.0 and 1.0 using this discrete rubric.
