@@ -672,6 +672,11 @@ export class Lifecycle {
           'too little of the 600 s command budget is left for the quota probe and a turn; nothing was changed'
         );
       }
+      // Host commands inside the gate (filter discovery) must leave the
+      // probe and a minimum turn their time.
+      if (budget !== undefined) {
+        budget.reserveMs = PROBE_DEADLINE_MS + DEFAULT_GRACE_MS + reserveMs;
+      }
       await this.deps.quotaGate(profile, readJournal(this.deps.dataDir));
       if (budget !== undefined) {
         if (budget.remainingMs() < reserveMs) {

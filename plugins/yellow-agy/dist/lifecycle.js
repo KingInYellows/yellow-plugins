@@ -486,6 +486,11 @@ class Lifecycle {
                 budget.remainingMs() < quota_1.PROBE_DEADLINE_MS + process_1.DEFAULT_GRACE_MS + reserveMs) {
                 throw new errors_1.AgyError('AGY_BUDGET', 'too little of the 600 s command budget is left for the quota probe and a turn; nothing was changed');
             }
+            // Host commands inside the gate (filter discovery) must leave the
+            // probe and a minimum turn their time.
+            if (budget !== undefined) {
+                budget.reserveMs = quota_1.PROBE_DEADLINE_MS + process_1.DEFAULT_GRACE_MS + reserveMs;
+            }
             await this.deps.quotaGate(profile, (0, state_1.readJournal)(this.deps.dataDir));
             if (budget !== undefined) {
                 if (budget.remainingMs() < reserveMs) {

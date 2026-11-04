@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -900,7 +901,12 @@ describe('Lifecycle', () => {
        */
       function budgeted(
         steps: Step[],
-        opts: { startMs?: number; firstGitMs?: number; probeMs?: number } = {}
+        opts: {
+          startMs?: number;
+          firstGitMs?: number;
+          probeMs?: number;
+          probeGit?: boolean;
+        } = {}
       ) {
         let clock = opts.startMs ?? 0;
         const probe = { calls: 0 };
@@ -925,6 +931,12 @@ describe('Lifecycle', () => {
           quotaGate: async () => {
             probe.calls += 1;
             clock += opts.probeMs ?? 0;
+            // Filter discovery runs a host command before the real probe.
+            if (opts.probeGit === true) {
+              await real.git(['config', '--get-regexp', '^filter\\.'], {
+                cwd: os.tmpdir(),
+              });
+            }
           },
         });
         return { ...g, budget, probe };
@@ -940,6 +952,22 @@ describe('Lifecycle', () => {
         const j = readJournal(h.deps.dataDir);
         expect(j.grants?.[g.grantId]?.totalTasks).toBe(0);
         expect(j.activeRun).toBeUndefined();
+        expect(h.calls).toHaveLength(0);
+      });
+
+      it('keeps the probe and a minimum turn free while the gate discovers filters', async () => {
+        // 300 s gone passes the pre-probe check; 120 s of discovery leaves
+        // 165 s, under the 170 s the probe and a minimum turn need.
+        const { h, g } = budgeted([planTurn], {
+          startMs: 300_000,
+          probeMs: 120_000,
+          probeGit: true,
+        });
+        await expect(
+          h.lc.delegate(delegateInput(h.repo))
+        ).rejects.toMatchObject({ code: 'AGY_BUDGET' });
+        const j = readJournal(h.deps.dataDir);
+        expect(j.grants?.[g.grantId]?.totalTasks).toBe(0);
         expect(h.calls).toHaveLength(0);
       });
 
