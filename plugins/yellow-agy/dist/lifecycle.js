@@ -829,7 +829,18 @@ class Lifecycle {
         }
         catch (err) {
             const code = err instanceof errors_1.AgyError ? err.code : 'AGY_INTERNAL';
-            return this.settle(input.requestId, 'reply', task, outcomeOf(task, { code, attention: [(0, redact_1.truncateRedacted)(String(err))] }));
+            // A correction that failed before agy spawned (the pre-turn host
+            // commands ran out of budget, say) gets its round back.
+            const refund = withSchema &&
+                !this.spawned.has(input.requestId) &&
+                task.correctiveRounds > 0;
+            const settled = refund
+                ? { ...task, correctiveRounds: task.correctiveRounds - 1 }
+                : task;
+            return this.settle(input.requestId, 'reply', settled, outcomeOf(settled, {
+                code,
+                attention: [(0, redact_1.truncateRedacted)(String(err))],
+            }));
         }
         return this.settlePlanTurn(input.requestId, 'reply', task, cls, withSchema);
     }

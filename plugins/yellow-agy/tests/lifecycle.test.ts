@@ -973,6 +973,8 @@ describe('Lifecycle', () => {
       ) {
         let clock = opts.startMs ?? 0;
         const probe = { calls: 0 };
+        // Time each filter discovery takes; tests raise it mid-run.
+        const knobs = { filterMs: 0 };
         const budget = new Budget(() => clock);
         const real = createHostExec({ kind: 'posix' }, testEnv, budget);
         let first = true;
@@ -984,6 +986,10 @@ describe('Lifecycle', () => {
               clock += opts.firstGitMs ?? 0;
             }
             return real.git(args, options);
+          },
+          async filterDrivers(cwd) {
+            clock += knobs.filterMs;
+            return real.filterDrivers(cwd);
           },
         };
         const g = granted(steps, {
@@ -1002,7 +1008,7 @@ describe('Lifecycle', () => {
             }
           },
         });
-        return { ...g, budget, probe };
+        return { ...g, budget, probe, knobs };
       }
 
       it('refuses before the quota probe when the probe and a minimum turn no longer fit', async () => {
@@ -1050,6 +1056,24 @@ describe('Lifecycle', () => {
         expect(j.activeRun).toBeUndefined();
         expect(fs.existsSync(path.join(h.deps.worktreeRoot, 't1'))).toBe(false);
         expect(h.calls).toHaveLength(0);
+      });
+
+      it('refunds a correction whose pre-turn host commands ran out of budget', async () => {
+        const { h, knobs } = budgeted([planTurn]);
+        await h.lc.delegate(delegateInput(h.repo));
+        // Slow filter discovery leaves 95 s: under the 100 s turn reserve.
+        knobs.filterMs = 490_000;
+        const out = await h.lc.reply({
+          requestId: 'r2',
+          localId: 't1',
+          message: 'redo',
+          correction: true,
+        });
+        expect(out).toMatchObject({ ok: false, code: 'AGY_BUDGET' });
+        expect(h.calls).toHaveLength(1);
+        const j = readJournal(h.deps.dataDir);
+        expect(j.tasks['t1']?.correctiveRounds).toBe(0);
+        expect(j.activeRun).toBeUndefined();
       });
 
       it('shortens the turn to what slow git left', async () => {
