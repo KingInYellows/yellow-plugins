@@ -301,6 +301,24 @@ JS
   [[ "$output" == *"not an allocated packet path"* ]]
 }
 
+@test "agy block: a WSL UNC clone path becomes the WSL path, a drive path never reaches the CLI" {
+  agy_block_script
+  cat > "$BATS_TEST_TMPDIR/agy/dist/cli.js" <<'JS'
+require('fs').writeFileSync(process.env.ARGV_OUT, JSON.stringify(process.argv.slice(2)));
+process.stdout.write(JSON.stringify({ ok: true, operation: 'delegate', localId: 'at-2', state: 'PLAN_PENDING' }) + '\n');
+JS
+  cd "$repo"
+  sed "s|^repo_root=\$(git rev-parse.*|repo_root='//wsl.localhost/Ubuntu-24.04/home/k/proj'|" "$script" > "$BATS_TEST_TMPDIR/unc.sh"
+  ARGV_OUT="$BATS_TEST_TMPDIR/argv.json" PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$BATS_TEST_TMPDIR/unc.sh"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$BATS_TEST_TMPDIR/argv.json")" == '["delegate","--repo","/home/k/proj",'* ]]
+  sed "s|^repo_root=\$(git rev-parse.*|repo_root='C:/Users/k/proj'|" "$script" > "$BATS_TEST_TMPDIR/drive.sh"
+  rm -f "$BATS_TEST_TMPDIR/argv.json"
+  ARGV_OUT="$BATS_TEST_TMPDIR/argv.json" PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$BATS_TEST_TMPDIR/drive.sh"
+  [ "$status" -ne 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/argv.json" ]
+}
+
 @test "READY_JULES maps to the jules provider inside the marked decision list" {
   providers_block=$(awk '/<!-- linear-delegate-providers:start -->/,/<!-- linear-delegate-providers:end -->/' "$DELEGATE_MD")
   printf '%s\n' "$providers_block" | grep -qF '**`READY_JULES`** → provider = `jules`'

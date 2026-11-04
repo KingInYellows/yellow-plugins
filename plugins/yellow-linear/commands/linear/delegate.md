@@ -1131,22 +1131,20 @@ if ! printf '%s' "$BASE" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$' \
 fi
 case "$repo_root" in
   '') printf 'ERROR: not inside a git repository.\n' >&2; exit 1 ;;
+  //wsl.localhost/*/*|//wsl\$/*/*)
+    # Windows Claude Code with agy behind the WSL bridge: a clone inside WSL
+    # shows up as a UNC path. Strip //<host>/<distro> to get the WSL path the
+    # CLI expects (it refuses /mnt/* drive mounts on the bridge).
+    AGY_REPO="/${repo_root#//*/*/}" ;;
   [A-Za-z]:/*)
-    # Windows host: agy runs in WSL (the wsl-bridge host /agy:setup records),
-    # so it needs the WSL path of this clone. Exec-only, like the bridge.
-    command -v wsl.exe >/dev/null 2>&1 || { printf 'ERROR: %s is a Windows path and wsl.exe is not available.\n' "$repo_root" >&2; exit 1; }
-    if [ -n "${YELLOW_AGY_WSL_DISTRO:-}" ]; then
-      AGY_REPO=$(wsl.exe -d "$YELLOW_AGY_WSL_DISTRO" -e wslpath -a -u "$repo_root" 2>/dev/null | tr -d '\r')
-    else
-      AGY_REPO=$(wsl.exe -e wslpath -a -u "$repo_root" 2>/dev/null | tr -d '\r')
-    fi
-    ;;
+    printf 'ERROR: %s is a Windows drive path. With agy behind the WSL bridge, the clone must live inside WSL (open it as \\\\wsl.localhost\\<distro>\\...).\n' "$repo_root" >&2
+    exit 1 ;;
   /*) AGY_REPO="$repo_root" ;;
   *) printf 'ERROR: could not resolve an absolute repository path (got "%s").\n' "$repo_root" >&2; exit 1 ;;
 esac
 case "${AGY_REPO:-}" in
-  /*) ;;
-  *) printf 'ERROR: could not translate %s to a WSL path.\n' "$repo_root" >&2; exit 1 ;;
+  /?*) ;;
+  *) printf 'ERROR: could not resolve %s to a path agy can use.\n' "$repo_root" >&2; exit 1 ;;
 esac
 
 NEW_BRANCH="agy/${ISSUE_ID}-r${DELEGATION_REV}"

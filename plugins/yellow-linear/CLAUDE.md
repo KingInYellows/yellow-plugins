@@ -135,8 +135,10 @@ going through commands. Bundled-server tool names carry the plugin prefix:
   branch, and a request id derived from the issue and revision, so a retry
   replays instead of creating a second task. The CLI enforces the owner's
   grant and the quota gate; with no grant the command prints the owner's
-  `authorize` line and posts nothing. On a Windows host the clone's path is
-  translated with `wslpath` because agy runs in WSL.
+  `authorize` line and posts nothing. On Windows with agy behind the WSL
+  bridge, the clone must live inside WSL: its `//wsl.localhost/<distro>/...`
+  path is reduced to the WSL path, and a drive path (`C:/...`) is refused
+  because the CLI rejects `/mnt/*` on the bridge.
 
 ## Testing
 
