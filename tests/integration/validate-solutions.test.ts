@@ -780,6 +780,23 @@ describe('validate-solutions — claim grounding (SOL-003)', () => {
     expect(r.stdout + r.stderr).toMatch(/ERROR-SOL-003.*\{\{FIX_PATH\}\}/);
   });
 
+  it('does not pair backticks across a heading or list item', () => {
+    const r = runClaims(
+      'span-blocks',
+      [
+        '',
+        '## A stray ` tick',
+        'The fix lives in {{FIX_PATH}} `x`.',
+        '- item with ` tick',
+        '- then {{OTHER}} `y`.',
+        '',
+      ].join('\n')
+    );
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/\{\{FIX_PATH\}\}/);
+    expect(r.stdout + r.stderr).toMatch(/\{\{OTHER\}\}/);
+  });
+
   it('skips model ids and scheme-relative links', () => {
     const r = runClaims(
       'model-ids',

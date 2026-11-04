@@ -64,6 +64,8 @@ const MD_LINK_RE =
   /\[[^\]]*\]\(([^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\)/g;
 const FENCE_RE = /^\s*(`{3,}|~{3,})(.*)$/;
 const HISTORICAL_MARK = '(historical)';
+const HEADING_RE = /^ {0,3}#{1,6}(\s|$)/;
+const BLOCK_START_RE = /^\s*(?:[-*+]\s|\d{1,9}[.)]\s|>|\|)/;
 
 function git(args, cwd) {
   try {
@@ -197,6 +199,15 @@ function maskCode(lines, { inline = true } = {}) {
       masked.push(line);
       continue;
     }
+    // A heading is a block of its own; a list item, quote or table row
+    // starts a new block, so a span cannot reach back across it.
+    if (HEADING_RE.test(line)) {
+      flush();
+      para.push(line);
+      flush();
+      continue;
+    }
+    if (BLOCK_START_RE.test(line)) flush();
     para.push(line);
   }
   flush();
