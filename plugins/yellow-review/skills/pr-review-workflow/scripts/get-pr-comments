@@ -1,8 +1,11 @@
 #!/bin/bash
 # Fetch unresolved PR review threads via GitHub GraphQL API. Outdated threads
 # are excluded unless --include-outdated is passed.
-# Usage: get-pr-comments [--include-outdated] <owner/repo> <pr-number>
+# Usage: get-pr-comments [--include-outdated] [--include-resolved] <owner/repo> <pr-number>
 #   --include-outdated  also return unresolved threads whose anchor is outdated
+#   --include-resolved  return every thread, resolved and outdated included,
+#                       each with an `isResolved` field appended last (used by
+#                       /review:pr's previous-comments-reviewer)
 # Output: JSON array of thread objects to stdout. Each thread has threadId,
 #   path, line, startLine, comments[] (author, body, id, createdAt,
 #   viewerDidAuthor, authorType, url), commentCount, commentsTruncated (true
@@ -43,10 +46,12 @@ command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found. Install from htt
 
 # --- Input validation ---
 INCLUDE_OUTDATED=false
+INCLUDE_RESOLVED=false
 POSITIONAL=()
 for arg in "$@"; do
     case "$arg" in
         --include-outdated) INCLUDE_OUTDATED=true ;;
+        --include-resolved) INCLUDE_RESOLVED=true ;;
         --*)
             printf 'Error: Unknown flag: %s\n' "$arg" >&2
             exit 1
@@ -56,7 +61,7 @@ for arg in "$@"; do
 done
 
 if [ "${#POSITIONAL[@]}" -ne 2 ]; then
-    printf 'Usage: get-pr-comments [--include-outdated] <owner/repo> <pr-number>\n' >&2
+    printf 'Usage: get-pr-comments [--include-outdated] [--include-resolved] <owner/repo> <pr-number>\n' >&2
     exit 1
 fi
 
@@ -294,10 +299,11 @@ ALL_THREADS=$(printf '%s\n' "${ALL_PAGES[@]}" | jq -s 'add // []') || {
 
 # --- Filter and transform ---
 # Existing fields keep their order; new fields are appended after them.
-OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUTDATED" '
+OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUTDATED" --argjson includeResolved "$INCLUDE_RESOLVED" '
   [
     .[]
-    | select(.isResolved == false and ($includeOutdated or .isOutdated == false))
+    | select($includeResolved or (.isResolved == false and ($includeOutdated or .isOutdated == false)))
+    | . as $t
     | {
         threadId: .id,
         path: .path,
@@ -324,6 +330,7 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUT
         originalStartLine: (.originalStartLine // null),
         diffHunk: ((.comments.nodes[0].diffHunk // null) | if type == "string" then .[0:2000] else null end)
       }
+    | if $includeResolved then . + {isResolved: ($t.isResolved == true)} else . end
   ]') || {
     printf 'Error: Failed to transform GraphQL response.\n' >&2
     exit 1
