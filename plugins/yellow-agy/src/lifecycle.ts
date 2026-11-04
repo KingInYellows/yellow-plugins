@@ -158,7 +158,9 @@ async function isWorktree(exec: HostExec, worktree: string): Promise<boolean> {
       cwd: worktree,
     });
     return res.code === 0 && res.stdout.trim() === 'true';
-  } catch {
+  } catch (err) {
+    // An unrun check is not a confirmed absence: recovery must keep the claim.
+    if (err instanceof AgyError && err.code === 'AGY_BUDGET') throw err;
     return false;
   }
 }

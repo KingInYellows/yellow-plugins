@@ -407,6 +407,69 @@ describe('Lifecycle', () => {
     });
   });
 
+  it('keeps an interrupted delegate claim when the budget runs out before the orphan check', async () => {
+    let clock = 0;
+    const budget = new Budget(() => clock);
+    const real = createHostExec({ kind: 'posix' }, testEnv, budget);
+    const exec: HostExec = {
+      ...real,
+      async git(args, options) {
+        if (args[0] === 'worktree' && args[1] === 'remove') {
+          // A slow removal that fails and uses up the budget.
+          clock = 585_000;
+          return {
+            code: 128,
+            stdout: '',
+            stdoutBytes: Buffer.alloc(0),
+            stderr: 'timed out',
+          };
+        }
+        return real.git(args, options);
+      },
+    };
+    const h = harness([], { isAlive: () => false, exec, budget });
+    const dir = h.deps.dataDir;
+    fs.mkdirSync(dir, { recursive: true });
+    const worktree = path.join(h.deps.worktreeRoot, 't0');
+    await createWorktree(real, {
+      repo: h.repo,
+      worktree,
+      branch: 'agy/t0',
+      remote: 'origin',
+      baseBranch: 'main',
+    });
+    const at = new Date().toISOString();
+    writeJournal(dir, {
+      version: 1,
+      tasks: {},
+      requests: {
+        r0: {
+          requestId: 'r0',
+          op: 'delegate',
+          localId: 't0',
+          status: 'pending',
+          outcome: { worktree, branch: 'agy/t0', repo: h.repo },
+          at,
+        },
+      },
+      usage: [],
+      activeRun: {
+        requestId: 'r0',
+        op: 'delegate',
+        localId: 't0',
+        ownerPid: 1111,
+        startedAt: at,
+      },
+    });
+    await expect(h.lc.recover()).rejects.toMatchObject({
+      code: 'AGY_BUDGET',
+    });
+    const j = readJournal(dir);
+    expect(j.activeRun?.requestId).toBe('r0');
+    expect(j.requests['r0']?.status).toBe('pending');
+    expect(fs.existsSync(worktree)).toBe(true);
+  });
+
   it('a refused implement profile releases the claim', async () => {
     const h = harness([planTurn], {
       allowCommands: ['pnpm test'],

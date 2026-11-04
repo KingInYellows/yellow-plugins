@@ -88,7 +88,10 @@ async function isWorktree(exec, worktree) {
         });
         return res.code === 0 && res.stdout.trim() === 'true';
     }
-    catch {
+    catch (err) {
+        // An unrun check is not a confirmed absence: recovery must keep the claim.
+        if (err instanceof errors_1.AgyError && err.code === 'AGY_BUDGET')
+            throw err;
         return false;
     }
 }
