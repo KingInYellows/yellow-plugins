@@ -1,0 +1,77 @@
+#!/bin/sh
+# Resolve the `cross_model_review` switch (auto | off) for /review:pr: may the
+# review send diff or code content to a non-Anthropic model (codex-reviewer
+# via the Codex CLI, or any later external-CLI persona)?
+#
+# Usage: cross-model-mode [<repo-file>]
+#   <repo-file> defaults to yellow-plugins.local.md at the top of the current
+#   repository. The user-level file is
+#   ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md.
+# stdout: one line, `cross_model_review=<auto|off> source=<default|repo|user|both>`
+#   source names the file(s) that set `off`; `default` means neither did.
+# stderr: a warning per unrecognized value.
+# Exit: 0 always. A missing file reads as unset; a path that exists but
+#   cannot be read (not a regular file, no read permission, awk read error)
+#   counts as `off` (fail closed) and warns.
+#
+# Precedence: restricting is the safe direction, so `off` in EITHER file wins.
+# /review:pr reads config from the checked-out PR head, so a PR can add an
+# `off` to the repo file but can never lift a user-level `off` by writing
+# `auto` there. An unrecognized value, or a key with no inline value, counts
+# as `off` (fail closed) and warns.
+# Only the YAML frontmatter is read: the first line must be `---`, and the
+# key must sit at the top level of that block.
+
+cmr_read() {
+    { [ -e "$1" ] || [ -L "$1" ]; } || return 0
+    if [ ! -f "$1" ] || [ ! -r "$1" ]; then printf '(unreadable)\n'; return 0; fi
+    cmr_out=$(awk '
+        NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; next }
+        /^---[ \t\r]*$/ { exit }
+        /^(cross_model_review|"cross_model_review"|\047cross_model_review\047)[ \t]*:/ {
+            v = $0
+            sub(/^[^:]*:[ \t]*/, "", v)
+            sub(/[ \t]+#.*$/, "", v)
+            sub(/[ \t\r]+$/, "", v)
+            if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2)
+            # A present key with no inline value (empty, or a block value on
+            # the next line) is not `auto`: report it so cmr_judge fails closed.
+            if (v == "") v = "(empty)"
+            print tolower(v)
+            exit
+        }' "$1" 2>/dev/null) || cmr_out='(unreadable)'
+    printf '%s\n' "$cmr_out"
+}
+
+cmr_judge() { # <label> <value>  -> prints "off" when the value restricts
+    case "$2" in
+        '' | auto) ;;
+        off | false | no) printf 'off\n' ;;
+        '(unreadable)')
+            printf '[review:pr] Warning: the %s config file exists but cannot be read; treating cross_model_review as off\n' "$1" >&2
+            printf 'off\n' ;;
+        *)
+            printf '[review:pr] Warning: cross_model_review in the %s file is not auto or off; treating it as off\n' "$1" >&2
+            printf 'off\n' ;;
+    esac
+}
+
+if [ $# -ge 1 ]; then
+    REPO_FILE=$1
+else
+    TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=''
+    REPO_FILE=${TOP:+$TOP/yellow-plugins.local.md}
+fi
+USER_FILE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md"
+
+R=''
+[ -n "$REPO_FILE" ] && R=$(cmr_judge repo "$(cmr_read "$REPO_FILE")")
+U=$(cmr_judge user-level "$(cmr_read "$USER_FILE")")
+
+case "$R:$U" in
+    off:off) printf 'cross_model_review=off source=both\n' ;;
+    off:) printf 'cross_model_review=off source=repo\n' ;;
+    :off) printf 'cross_model_review=off source=user\n' ;;
+    *) printf 'cross_model_review=auto source=default\n' ;;
+esac
+exit 0

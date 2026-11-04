@@ -182,6 +182,7 @@ stays an ordinary error.
 | `COUNCIL_OPENCODE_VARIANT` | `high` | OpenCode reasoning effort |
 | `COUNCIL_PATH_CHAR_CAP` | `8000` | Per-file content cap for `--paths` |
 | `COUNCIL_PATH_MAX_FILES` | `3` | Max `--paths` files per invocation |
+| `cross_model_review` (key in `yellow-plugins.local.md`, not an env var) | `auto` | `off` in the repo's or your user-level file stops Codex, Gemini and OpenCode from receiving the pack; only the Claude reviewer runs unless your message for that run asks for the others by name |
 | `COUNCIL_DOUBLE_PASS_SYNTHESIS` | `1` | `0` skips the order-swapped second synthesis pass (same as `--single-pass`) |
 
 ## What yellow-council does NOT do

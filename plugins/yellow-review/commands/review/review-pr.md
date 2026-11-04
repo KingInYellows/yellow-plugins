@@ -421,7 +421,8 @@ overrides documented in that schema:
 
 - `review_pipeline: legacy` → fall back to the pre-Wave-2 adaptive
   selection (see "Legacy fallback" at the bottom of this section). Skip
-  the rest of this step.
+  the rest of this step except the cross-model egress switch, which
+  still applies.
 - `review_pipeline: workflow` → run this step and Step 5 exactly as for
   `persona`, plus the `review-gate` shadow run (see "Workflow shadow" at
   the bottom of this section).
@@ -499,7 +500,25 @@ any other trigger path in the diff, selects those reviewers as usual.
 
 | Agent | subagent_type | Trigger |
 |-------|---------------|---------|
-| `codex-reviewer` | `yellow-codex:review:codex-reviewer` | yellow-codex installed AND gross line count > 100 |
+| `codex-reviewer` | `yellow-codex:review:codex-reviewer` | yellow-codex installed AND gross line count > 100 AND cross-model review is `auto` (below) |
+
+#### Cross-model egress switch (`cross_model_review`)
+
+`codex-reviewer` sends diff content to OpenAI through the Codex CLI. Before
+selecting it, or any other persona that runs an external model CLI, resolve
+the switch (from the directory the review started in, in report-only mode):
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/cross-model-mode"
+```
+
+It prints `cross_model_review=<auto|off> source=<default|repo|user|both>`.
+`off` in either the repo or the user-level `yellow-plugins.local.md` wins, so
+a PR head cannot lift a user's `off`; an unrecognized value counts as `off`.
+On `off`, drop `codex-reviewer` from the selection even when
+`reviewer_set.include` names it, and add
+`Cross-model review: disabled by config (<source>)` to Coverage. If the script
+cannot run, treat the switch as `off` and say `disabled (switch unreadable)`.
 
 #### Opt-in only (never auto-selected)
 
@@ -580,7 +599,8 @@ differs from the persona set in membership, aggregation (it skips Step
 an improvised set silently changes what the rollback escape hatch means.
 If the Read fails (file missing, path unresolved), stop and report the
 exact path — do not fall back to the default persona pipeline, which
-would silently ignore the user's `legacy` setting.
+would silently ignore the user's `legacy` setting. The cross-model egress
+switch above still gates `codex-reviewer` on this path.
 When `review_pipeline` is unset, `persona` (the default) or `workflow`, skip
 the load and continue with the dispatch table above.
 
@@ -1384,6 +1404,7 @@ findings were produced but extension classification was malformed."
 - Plugin-contract extension strips (malformed `breaking_change_class`): <count or omit when zero>
 - Past learnings: <"none found" | "N injected">
 - Previous comments: <the previous-comments.md line>
+- Cross-model review: <omit when `auto`; "disabled by config (<source>)" when `off`>
 - Persona shadow: <the persona-shadow line, or omit when `reviewer_selection` is unset or `off`>
 - Workflow shadow (review-gate): <the workflow-shadow.md line, or omit unless `review_pipeline: workflow`>
 - Ledger: <new> new, <merged> carried over, <reopened> reopened, <pending> pending, <attention> need attention (plus dismissed-context counts, rejected ordinals and write failures — ledger.md "Step 10")
