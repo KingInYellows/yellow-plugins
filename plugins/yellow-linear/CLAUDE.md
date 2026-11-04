@@ -137,8 +137,9 @@ going through commands. Bundled-server tool names carry the plugin prefix:
   grant and the quota gate; with no grant the command prints the owner's
   `authorize` line and posts nothing. On Windows with agy behind the WSL
   bridge, the clone must live inside WSL: its `//wsl.localhost/<distro>/...`
-  path is reduced to the WSL path, and a drive path (`C:/...`) is refused
-  because the CLI rejects `/mnt/*` on the bridge.
+  path is reduced to the WSL path once `<distro>` matches the one agy runs in
+  (`WSL_DISTRO_NAME`, via `YELLOW_AGY_WSL_DISTRO` when set), and a drive
+  path (`C:/...`) is refused because the CLI rejects `/mnt/*` on the bridge.
 
 ## Testing
 

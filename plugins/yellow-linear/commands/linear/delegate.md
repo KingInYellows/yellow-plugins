@@ -1134,7 +1134,18 @@ case "$repo_root" in
   //wsl.localhost/*/*|//wsl\$/*/*)
     # Windows Claude Code with agy behind the WSL bridge: a clone inside WSL
     # shows up as a UNC path. Strip //<host>/<distro> to get the WSL path the
-    # CLI expects (it refuses /mnt/* drive mounts on the bridge).
+    # CLI expects (it refuses /mnt/* drive mounts on the bridge). The clone's
+    # distro must be the one agy runs in, or the path names another clone.
+    _unc_distro=${repo_root#//*/}; _unc_distro=${_unc_distro%%/*}
+    if [ -n "${YELLOW_AGY_WSL_DISTRO:-}" ]; then
+      _agy_distro=$(MSYS_NO_PATHCONV=1 wsl.exe -d "$YELLOW_AGY_WSL_DISTRO" -e printenv WSL_DISTRO_NAME 2>/dev/null | tr -d '\r')
+    else
+      _agy_distro=$(MSYS_NO_PATHCONV=1 wsl.exe -e printenv WSL_DISTRO_NAME 2>/dev/null | tr -d '\r')
+    fi
+    if [ -z "$_agy_distro" ] || [ "$(printf '%s' "$_unc_distro" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$_agy_distro" | tr '[:upper:]' '[:lower:]')" ]; then
+      printf 'ERROR: this clone is in WSL distro "%s" but agy runs in "%s". Set YELLOW_AGY_WSL_DISTRO to the distro agy runs in and rerun /agy:setup, or delegate from a clone in that distro.\n' "$_unc_distro" "${_agy_distro:-unknown}" >&2
+      exit 1
+    fi
     AGY_REPO="/${repo_root#//*/*/}" ;;
   [A-Za-z]:/*)
     printf 'ERROR: %s is a Windows drive path. With agy behind the WSL bridge, the clone must live inside WSL (open it as \\\\wsl.localhost\\<distro>\\...).\n' "$repo_root" >&2

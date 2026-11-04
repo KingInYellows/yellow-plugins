@@ -319,10 +319,19 @@ require('fs').writeFileSync(process.env.ARGV_OUT, JSON.stringify(process.argv.sl
 process.stdout.write(JSON.stringify({ ok: true, operation: 'delegate', localId: 'at-2', state: 'PLAN_PENDING' }) + '\n');
 JS
   cd "$repo"
+  printf '#!/bin/sh\nprintf "%%s\\r\\n" "${FAKE_DISTRO:-Ubuntu-24.04}"\n' > "$BATS_TEST_TMPDIR/bin/wsl.exe"
+  chmod +x "$BATS_TEST_TMPDIR/bin/wsl.exe"
   sed "s|^repo_root=\$(git rev-parse.*|repo_root='//wsl.localhost/Ubuntu-24.04/home/k/proj'|" "$script" > "$BATS_TEST_TMPDIR/unc.sh"
   ARGV_OUT="$BATS_TEST_TMPDIR/argv.json" PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$BATS_TEST_TMPDIR/unc.sh"
   [ "$status" -eq 0 ]
   [[ "$(cat "$BATS_TEST_TMPDIR/argv.json")" == '["delegate","--repo","/home/k/proj",'* ]]
+  # A clone in another distro than agy's is refused before the CLI runs.
+  rm -f "$BATS_TEST_TMPDIR/argv.json"
+  mkdir -p "$packet_dir" && printf 'packet body\n' > "$packet_dir/packet.txt"
+  FAKE_DISTRO=Debian ARGV_OUT="$BATS_TEST_TMPDIR/argv.json" PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$BATS_TEST_TMPDIR/unc.sh"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'is in WSL distro "Ubuntu-24.04" but agy runs in "Debian"'* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/argv.json" ]
   sed "s|^repo_root=\$(git rev-parse.*|repo_root='C:/Users/k/proj'|" "$script" > "$BATS_TEST_TMPDIR/drive.sh"
   rm -f "$BATS_TEST_TMPDIR/argv.json"
   ARGV_OUT="$BATS_TEST_TMPDIR/argv.json" PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$BATS_TEST_TMPDIR/drive.sh"
