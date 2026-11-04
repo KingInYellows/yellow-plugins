@@ -203,6 +203,8 @@ then `clear` only on exit `0` or `3`).
 
 Invoke the `Skill` tool with `skill: "review:pr"` and the args string
 `<PR#> --non-interactive` (substitute the PR number). Wait for it to complete.
+Do not add `--report-only`: a sweep's job is a merge-ready PR, so it applies the
+fixes, and Step 3's `/review:resolve` then settles the threads they answer.
 
 ### Step 2a: Verify branch alignment
 

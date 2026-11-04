@@ -73,7 +73,9 @@ it before editing a script, library or command.
   the Graphite CLI is reported but needed only with gt-workflow
 - `/review:pr` — adaptive multi-agent review of one PR with auto-applied safe
   fixes; persists unapplied findings to the ledger; `--non-interactive`
-  suppresses push and learnings prompts
+  suppresses push and learnings prompts; `--report-only` (used by `/flow:work`
+  Phase 5) reports without checkout, edits or push, reading a detached worktree
+  of the PR head when the checkout is elsewhere
 - `/review:resolve` — parallel resolution of unresolved PR threads via GraphQL;
   every thread gets a disposition (`fixed`, `addressed`, `oos`,
   `disagree`/`unclear`); ends with the `Resolve:` contract line;
@@ -201,6 +203,9 @@ the resolve scripts: `references/resolve/dispositions.md`.
   config in prose
 - `check-addressed-evidence` — the Step 5 `addressed` evidence rules
 - `file-line-counts` — base/head line counts for `thermonuclear-reviewer`
+- `report-only-root open` | `close` — the tree `/review:pr --report-only` reads:
+  the current checkout when it is the clean PR head, else a detached worktree
+  under the git common dir; never checks out or switches branches
 
 ### Resolve references
 
