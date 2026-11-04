@@ -17,7 +17,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
-      "version": "2.0.9",
+      "version": "2.1.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -27,7 +27,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "github-workflow",
       "description": "GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)",
-      "version": "0.3.7",
+      "version": "0.4.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -37,7 +37,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.11.7",
+      "version": "2.12.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -47,7 +47,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-linear",
       "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
-      "version": "2.2.1",
+      "version": "2.2.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -77,7 +77,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-jules",
       "description": "Google Jules integration (deprecated: Jules is read-only from 2026-11-11 and shuts down 2026-12-31) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
-      "version": "0.4.1",
+      "version": "0.4.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -87,7 +87,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-agy",
       "description": "Local supervised delegate on the Antigravity CLI (agy) under the owner's Google AI Pro sign-in — successor to yellow-jules",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -97,7 +97,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.13.0",
+      "version": "3.14.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -207,7 +207,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-council",
       "description": "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
-      "version": "0.6.3",
+      "version": "0.6.4",
       "author": {
         "name": "KingInYellows"
       },
@@ -270,7 +270,7 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "github-workflow",
-  "version": "0.3.7",
+  "version": "0.4.0",
   "description": "GitHub-native stacked-PR provider. Creates, submits, amends, syncs, navigates, cleans up, and merges stacks through a validated CLI adapter over the official github/gh-stack extension.",
   "author": {
     "name": "KingInYellows",
@@ -325,7 +325,7 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "gt-workflow",
-  "version": "2.0.9",
+  "version": "2.1.0",
   "description": "Graphite-native workflow commands for stacked PR development. Provides smart commit-and-submit with parallel audit agents, stack planning, sync, and navigation — all through the gt CLI.",
   "author": {
     "name": "KingInYellows",
@@ -385,7 +385,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-agy/.claude-plugin/plu
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-agy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local supervised delegate on the Antigravity CLI (agy) under the owner's Google AI Pro sign-in — successor to yellow-jules",
   "author": {
     "name": "KingInYellows",
@@ -572,7 +572,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "2.11.7",
+  "version": "2.12.0",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
@@ -635,7 +635,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-council/.claude-plugin
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-council",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
   "author": {
     "name": "KingInYellows",
@@ -844,7 +844,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-jules/.claude-plugin/p
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-jules",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Google Jules integration (deprecated: Jules is read-only from 2026-11-11 and shuts down 2026-12-31) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
   "author": {
     "name": "KingInYellows",
@@ -869,7 +869,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-linear/.claude-plugin/
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-linear",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
   "author": {
     "name": "KingInYellows",
@@ -1068,7 +1068,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-review/.claude-plugin/
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-review",
-  "version": "3.13.0",
+  "version": "3.14.0",
   "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
   "author": {
     "name": "KingInYellows",

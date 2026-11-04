@@ -1,5 +1,18 @@
 # github-workflow
 
+## 0.4.0
+
+### Minor Changes
+
+- [#1641](https://github.com/KingInYellows/yellow-plugins/pull/1641)
+  [`6dbd1aa`](https://github.com/KingInYellows/yellow-plugins/commit/6dbd1aa12ef0f2d89424614577360212eb380ca2)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `smart-submit`
+  and `github-stack-submit` add a `## New concepts` section to the commit body
+  (and so the PR description) when a change introduces a new, load-bearing term
+  not already in the repo's `CONCEPTS.md` as of `HEAD`, and add nothing for a
+  routine change (CLAUDE-220). `smart-submit` now passes the commit message to
+  `gt` from a temp file and fences the staged diff as untrusted content.
+
 ## 0.3.7
 
 ### Patch Changes
