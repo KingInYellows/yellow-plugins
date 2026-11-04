@@ -74,6 +74,7 @@ const PRODUCERS = [
   'plugins/yellow-review/agents/review/correctness-reviewer.md',
   'plugins/yellow-review/agents/review/maintainability-reviewer.md',
   'plugins/yellow-review/agents/review/plugin-contract-reviewer.md',
+  'plugins/yellow-review/agents/review/previous-comments-reviewer.md',
   'plugins/yellow-review/agents/review/project-compliance-reviewer.md',
   'plugins/yellow-review/agents/review/project-standards-reviewer.md',
   'plugins/yellow-review/agents/review/reliability-reviewer.md',
