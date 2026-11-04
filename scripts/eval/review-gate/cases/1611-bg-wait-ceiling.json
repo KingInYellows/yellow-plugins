@@ -1,15 +1,15 @@
 {
-  "id": "1644-bg-wait-ceiling",
+  "id": "1611-bg-wait-ceiling",
   "repo": "KingInYellows/yellow-plugins",
-  "pr": 1644,
-  "base": "3be47eabea4dde43559373851039746413dd361f",
-  "head": "6fdb716a726c812747a79261afdc7bbb2f33fc7e",
+  "pr": 1611,
+  "base": "8c283de91496686e598899a3afc959eddbe530db",
+  "head": "58b6ef7c5e562441044dc97e27d9031005f9dfac",
   "lane": "correctness",
-  "tier": "high",
+  "tier": "medium",
   "golden": [
     {
       "file": "scripts/eval/review-gate/eval.py",
-      "line": 479,
+      "line": 383,
       "match": [
         "background|idle|ceiling|10.?min|BG_WAIT",
         "kill|abort|stop|timeout|ceiling"
@@ -19,5 +19,5 @@
   "source": "fix #1659 (b3b49cd): claude -p stopped the background Workflow after 10 idle minutes, so long review-gate runs died",
   "confirmed_by": "KingInYellow18",
   "confirmed_at": "2026-11-04",
-  "notes": "run_env() never set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0."
+  "notes": "run_env() never set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0. The shortlist named #1644, which does not touch eval.py; run_env() came from #1611 (58b6ef7)."
 }
