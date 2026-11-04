@@ -487,10 +487,10 @@ Four conditional personas (`agent-native-reviewer`,
 `thermonuclear-reviewer`) report every in-scope finding with a `confidence`
 anchor (`0`, `25`, `50`, `75`, `100`) and severity — they no longer pre-filter
 below 75. They do cap at 40 findings: overflow is dropped at the persona and is
-not counted in the orchestrator's suppressed total. Other persona reviewers
-still apply their own anchor floors (for example, `correctness-reviewer`
-suppresses anchor-25 items and `plugin-contract-reviewer` suppresses anchor-25
-items before Step 6).
+not counted in the orchestrator's suppressed total. Every other persona returns
+its anchor-25-and-below findings at that anchor rather than dropping them, so
+the orchestrator suppresses and counts them; `performance-reviewer` alone still
+drops non-P0 anchor-50 findings itself.
 
 `/review:pr` Step 6 and `/review:all` Step 8 item 9 (the Aggregate-findings
 confidence gate) apply the **single** confidence gate: suppress findings below

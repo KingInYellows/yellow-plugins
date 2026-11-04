@@ -152,9 +152,10 @@ Persona-specific guidance:
   out-of-tree consumers you can't enumerate (downstream installs of an
   earlier marketplace version). Surfaces only as P0 escape (rare for
   this reviewer) or via soft-bucket routing.
-- **Anchor 25 or below — suppress** — the change is a semantic refinement
-  of a description field, a frontmatter cosmetic edit, or a test-fixture
-  change. Not a contract issue.
+- **Anchor 25 or below — report at that anchor; the orchestrator suppresses it
+  from every user-visible section, including Pre-existing** — the change is a
+  semantic refinement of a description field, a frontmatter cosmetic edit, or
+  a test-fixture change. Not a contract issue.
 
 ## What you don't flag
 

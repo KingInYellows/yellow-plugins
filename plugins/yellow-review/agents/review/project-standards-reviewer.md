@@ -118,9 +118,10 @@ Persona-specific guidance:
   adequately "describes what it does and when to use it," or whether a
   file is small enough to qualify for `@` inclusion. Surfaces only as P0
   escape or soft buckets.
-- **Anchor 25 or below — suppress** — the standards file is ambiguous
-  about whether this constitutes a violation, or the rule might not
-  apply to this file type.
+- **Anchor 25 or below — report at that anchor; the orchestrator suppresses it
+  from every user-visible section, including Pre-existing** — the standards
+  file is ambiguous about whether this constitutes a violation, or the rule
+  might not apply to this file type.
 
 ## What you don't flag
 

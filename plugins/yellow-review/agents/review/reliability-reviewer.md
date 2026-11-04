@@ -74,8 +74,9 @@ Persona-specific guidance:
   by framework defaults or middleware you can't see — e.g., the HTTP
   client *might* have a default timeout configured elsewhere. Surfaces only
   as P0 escape or soft buckets.
-- **Anchor 25 or below — suppress** — the reliability concern is
-  architectural and can't be confirmed from the diff alone.
+- **Anchor 25 or below — report at that anchor; the orchestrator suppresses it
+  from every user-visible section, including Pre-existing** — the reliability
+  concern is architectural and can't be confirmed from the diff alone.
 
 ## What you don't flag
 

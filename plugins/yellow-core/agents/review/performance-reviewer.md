@@ -83,8 +83,9 @@ same rule the anchor-50 bullet below states).
   load you can't confirm — e.g., a query without LIMIT on a table whose size
   is unknown. Performance at this confidence level is usually noise; prefer
   to suppress unless P0 severity.
-- **Anchor 25 or below — suppress** — the issue is speculative or the
-  optimization would only matter at extreme scale.
+- **Anchor 25 or below — report at that anchor; the orchestrator suppresses it
+  from every user-visible section, including Pre-existing** — the issue is
+  speculative or the optimization would only matter at extreme scale.
 
 ## What you don't flag
 

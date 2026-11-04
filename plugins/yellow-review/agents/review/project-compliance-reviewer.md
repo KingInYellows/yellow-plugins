@@ -95,8 +95,10 @@ Persona-specific guidance:
   but not documented in `CLAUDE.md`) or applying it requires judgment.
   Surfaces only as P0 escape or via mode-aware demotion to
   `residual_risks`.
-- **Anchor 25 or below — suppress** — the "convention" is a personal
-  preference not demonstrated by the codebase or documented anywhere.
+- **Anchor 25 or below — report at that anchor; the orchestrator suppresses it
+  from every user-visible section, including Pre-existing** — the "convention"
+  is a personal preference not demonstrated by the codebase or documented
+  anywhere.
 
 ## What you don't flag
 

@@ -1107,12 +1107,11 @@ Apply the aggregation steps from
    the findings this gate actually removes — a P0 that survives the
    exception is never counted under `suppressed`, so the report's "Findings
    suppressed at confidence < 75" line stays accurate.
-   `agent-native-reviewer`, `agent-cli-readiness-reviewer`,
-   `cli-readiness-reviewer` and `thermonuclear-reviewer` do not pre-filter
-   (they are told to report everything with a confidence score) while the
-   other personas keep their own anchor floors, so sub-75 findings in the
-   input are expected — gate them here, do not treat them as a persona
-   defect.
+   Personas do not pre-filter: they return anchor-25-and-below findings
+   at their anchor (`thermonuclear-reviewer` reports everything with a
+   confidence score), so sub-75 findings in the input are expected — gate
+   them here and count them under `suppressed`, do not treat them as a
+   persona defect.
 9. **Partition the work.** Build three sets:
    - in-skill fixer queue: `safe_auto → review-fixer`
    - residual actionable queue: `gated_auto`/`manual` owned by

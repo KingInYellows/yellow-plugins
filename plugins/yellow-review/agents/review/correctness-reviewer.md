@@ -76,9 +76,10 @@ guidance:
   fully confirm — e.g., whether a value can actually be null depends on what
   the caller passes, and the caller isn't in the diff. Surfaces only as P0
   escape or via soft-bucket routing.
-- **Anchor 25 or below — suppress** — the bug requires runtime conditions
-  you have no evidence for: specific timing, specific input shapes, specific
-  external state.
+- **Anchor 25 or below — report at that anchor; the orchestrator suppresses it
+  from every user-visible section, including Pre-existing** — the bug requires
+  runtime conditions you have no evidence for: specific timing, specific input
+  shapes, specific external state.
 
 ## What you don't flag
 
