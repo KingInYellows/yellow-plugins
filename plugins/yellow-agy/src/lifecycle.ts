@@ -29,6 +29,7 @@ import { buildInvocation } from './invocation';
 import type { Plan } from './plan-schema';
 import { isPlan, PLAN_SCHEMA } from './plan-schema';
 import type { RunOptions } from './process';
+import { DEFAULT_GRACE_MS } from './process';
 import type { TurnProfile } from './profiles';
 import {
   assertPromptText,
@@ -36,6 +37,7 @@ import {
   readOnlyProfile,
   turnArgs,
 } from './profiles';
+import { PROBE_DEADLINE_MS } from './quota';
 import { redact, scanSecretShapes, truncateRedacted } from './redact';
 import type {
   Claim,
@@ -654,12 +656,24 @@ export class Lifecycle {
   ): Promise<TurnProfile> {
     try {
       const profile = build();
-      await this.deps.quotaGate(profile, readJournal(this.deps.dataDir));
       const budget = this.deps.budget;
+      const slackMs =
+        this.deps.deadlineMs - this.deps.printTimeoutSeconds * 1000;
+      const reserveMs = Budget.minTurnMs(slackMs);
+      // The probe can take its full deadline and kill grace; start it only
+      // when that and a minimum turn still fit, so a slow probe can't push
+      // the refund and the envelope past the wrapper's timeout.
+      if (
+        budget !== undefined &&
+        budget.remainingMs() < PROBE_DEADLINE_MS + DEFAULT_GRACE_MS + reserveMs
+      ) {
+        throw new AgyError(
+          'AGY_BUDGET',
+          'too little of the 600 s command budget is left for the quota probe and a turn; nothing was changed'
+        );
+      }
+      await this.deps.quotaGate(profile, readJournal(this.deps.dataDir));
       if (budget !== undefined) {
-        const slackMs =
-          this.deps.deadlineMs - this.deps.printTimeoutSeconds * 1000;
-        const reserveMs = Budget.minTurnMs(slackMs);
         if (budget.remainingMs() < reserveMs) {
           throw new AgyError(
             'AGY_BUDGET',

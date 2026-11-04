@@ -900,9 +900,10 @@ describe('Lifecycle', () => {
        */
       function budgeted(
         steps: Step[],
-        opts: { startMs?: number; firstGitMs?: number } = {}
+        opts: { startMs?: number; firstGitMs?: number; probeMs?: number } = {}
       ) {
         let clock = opts.startMs ?? 0;
+        const probe = { calls: 0 };
         const budget = new Budget(() => clock);
         const real = createHostExec({ kind: 'posix' }, testEnv, budget);
         let first = true;
@@ -921,16 +922,38 @@ describe('Lifecycle', () => {
           budget,
           printTimeoutSeconds: 420,
           deadlineMs: 450_000,
+          quotaGate: async () => {
+            probe.calls += 1;
+            clock += opts.probeMs ?? 0;
+          },
         });
-        return { ...g, budget };
+        return { ...g, budget, probe };
       }
 
-      it('refunds the task when a minimum turn no longer fits after the quota probe', async () => {
-        // 585 s usable; 486 s gone leaves 99 s, under the 100 s a 60 s turn needs.
-        const { h, g } = budgeted([planTurn], { startMs: 486_000 });
+      it('refuses before the quota probe when the probe and a minimum turn no longer fit', async () => {
+        // 585 s usable; 420 s gone leaves 165 s, under 70 s probe + 100 s turn.
+        const { h, g, probe } = budgeted([planTurn], { startMs: 420_000 });
         await expect(
           h.lc.delegate(delegateInput(h.repo))
         ).rejects.toMatchObject({ code: 'AGY_BUDGET' });
+        expect(probe.calls).toBe(0);
+        const j = readJournal(h.deps.dataDir);
+        expect(j.grants?.[g.grantId]?.totalTasks).toBe(0);
+        expect(j.activeRun).toBeUndefined();
+        expect(h.calls).toHaveLength(0);
+      });
+
+      it('refunds the task when a minimum turn no longer fits after the quota probe', async () => {
+        // 585 s usable; 400 s gone, then a 86 s probe leaves 99 s, under the
+        // 100 s a 60 s turn needs.
+        const { h, g, probe } = budgeted([planTurn], {
+          startMs: 400_000,
+          probeMs: 86_000,
+        });
+        await expect(
+          h.lc.delegate(delegateInput(h.repo))
+        ).rejects.toMatchObject({ code: 'AGY_BUDGET' });
+        expect(probe.calls).toBe(1);
         const j = readJournal(h.deps.dataDir);
         expect(j.grants?.[g.grantId]?.totalTasks).toBe(0);
         expect(j.activeRun).toBeUndefined();

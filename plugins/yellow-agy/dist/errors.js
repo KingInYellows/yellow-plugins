@@ -50,7 +50,7 @@ exports.ERROR_CATALOG = {
     },
     AGY_BUDGET: {
         exit: 1,
-        recoveryAction: "Retry with a new request id. A slow git call or quota probe used up the command's 600 s budget; a refusal before the turn ran refunded the task or corrective round.",
+        recoveryAction: "Retry with a new request id. A slow git call or quota probe used up the command's 600 s budget; a refusal before the turn ran refunded the task or corrective round. If a FAILED delegate task came back, its branch exists: abandon it and delegate again on a new branch.",
     },
     AGY_INTERRUPTED: {
         exit: 1,

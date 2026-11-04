@@ -18,7 +18,7 @@ import { recentUsage } from './state';
 export const QUOTA_WINDOW_MS = 15 * 60 * 1000;
 /** Percentage points charged for a recent turn whose cost is unknown. */
 export const UNKNOWN_TURN_COST = 2;
-const PROBE_DEADLINE_MS = 60_000;
+export const PROBE_DEADLINE_MS = 60_000;
 /**
  * The lowest `remaining_fraction` (0..1) across every bucket of every group in
  * agy's `/usage` JSON (shape captured from agy 1.4.12:

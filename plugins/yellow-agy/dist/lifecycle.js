@@ -51,7 +51,9 @@ const errors_1 = require("./errors");
 const grants_1 = require("./grants");
 const invocation_1 = require("./invocation");
 const plan_schema_1 = require("./plan-schema");
+const process_1 = require("./process");
 const profiles_1 = require("./profiles");
+const quota_1 = require("./quota");
 const redact_1 = require("./redact");
 const state_1 = require("./state");
 const worktree_1 = require("./worktree");
@@ -474,11 +476,18 @@ class Lifecycle {
     async prepare(requestId, build) {
         try {
             const profile = build();
-            await this.deps.quotaGate(profile, (0, state_1.readJournal)(this.deps.dataDir));
             const budget = this.deps.budget;
+            const slackMs = this.deps.deadlineMs - this.deps.printTimeoutSeconds * 1000;
+            const reserveMs = budget_1.Budget.minTurnMs(slackMs);
+            // The probe can take its full deadline and kill grace; start it only
+            // when that and a minimum turn still fit, so a slow probe can't push
+            // the refund and the envelope past the wrapper's timeout.
+            if (budget !== undefined &&
+                budget.remainingMs() < quota_1.PROBE_DEADLINE_MS + process_1.DEFAULT_GRACE_MS + reserveMs) {
+                throw new errors_1.AgyError('AGY_BUDGET', 'too little of the 600 s command budget is left for the quota probe and a turn; nothing was changed');
+            }
+            await this.deps.quotaGate(profile, (0, state_1.readJournal)(this.deps.dataDir));
             if (budget !== undefined) {
-                const slackMs = this.deps.deadlineMs - this.deps.printTimeoutSeconds * 1000;
-                const reserveMs = budget_1.Budget.minTurnMs(slackMs);
                 if (budget.remainingMs() < reserveMs) {
                     throw new errors_1.AgyError('AGY_BUDGET', 'too little of the 600 s command budget is left for a turn after the quota probe; nothing was changed');
                 }
