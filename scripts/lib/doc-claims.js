@@ -140,29 +140,42 @@ function isRuntimePath(rel, repoRoot) {
 }
 
 // Blank inline code spans. A span opens and closes on backtick runs of the
-// same length (CommonMark), so ``a `b` c`` is masked whole.
-function maskInlineCode(line) {
-  const runs = [...line.matchAll(/`+/g)];
-  const out = line.split('');
+// same length (CommonMark), so ``a `b` c`` is masked whole. `text` may hold
+// several lines of one paragraph: a span can wrap, and newlines are kept.
+function maskInlineCode(text) {
+  const runs = [...text.matchAll(/`+/g)];
+  const out = text.split('');
   for (let i = 0; i < runs.length; i += 1) {
     const open = runs[i];
     const j = runs.findIndex((r, k) => k > i && r[0].length === open[0].length);
     if (j === -1) continue; // unmatched run is literal text
     const end = runs[j].index + runs[j][0].length;
-    for (let c = open.index; c < end; c += 1) out[c] = ' ';
+    for (let c = open.index; c < end; c += 1) {
+      if (out[c] !== '\n') out[c] = ' ';
+    }
     i = j;
   }
   return out.join('');
 }
 
 // Blank fenced blocks, and inline code spans unless `inline` is false,
-// keeping line count and length.
+// keeping line count and length. Spans are paired across the lines of a
+// paragraph, since a blank line or a fence is the only thing that ends one.
 function maskCode(lines, { inline = true } = {}) {
   const masked = [];
+  let para = [];
+  const flush = () => {
+    if (!para.length) return;
+    masked.push(
+      ...(inline ? maskInlineCode(para.join('\n')).split('\n') : para)
+    );
+    para = [];
+  };
   let fence = null;
   for (const line of lines) {
     const m = line.match(FENCE_RE);
     if (fence === null && m) {
+      flush();
       fence = m[1];
       masked.push(' '.repeat(line.length));
       continue;
@@ -179,8 +192,14 @@ function maskCode(lines, { inline = true } = {}) {
       masked.push(' '.repeat(line.length));
       continue;
     }
-    masked.push(inline ? maskInlineCode(line) : line);
+    if (!line.trim()) {
+      flush();
+      masked.push(line);
+      continue;
+    }
+    para.push(line);
   }
+  flush();
   return masked;
 }
 
