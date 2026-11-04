@@ -64,6 +64,22 @@ cfg() { # <file> <value-line>
   [ "$output" = 'cross_model_review=off source=user' ]
 }
 
+@test "a config path that exists but cannot be read fails closed" {
+  mkdir "$CLAUDE_CONFIG_DIR/yellow-plugins.local.md"
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'cross_model_review=off source=user'* ]]
+  [[ "$output" == *'cannot be read'* ]]
+  rmdir "$CLAUDE_CONFIG_DIR/yellow-plugins.local.md"
+  if [ "$(id -u)" -ne 0 ]; then
+    cfg "$CLAUDE_CONFIG_DIR/yellow-plugins.local.md" 'cross_model_review: off'
+    chmod 000 "$CLAUDE_CONFIG_DIR/yellow-plugins.local.md"
+    run "$SCRIPT"
+    chmod 600 "$CLAUDE_CONFIG_DIR/yellow-plugins.local.md"
+    [[ "$output" == *'cross_model_review=off source=user'* ]]
+  fi
+}
+
 @test "only top-level frontmatter counts, not the body or nested keys" {
   printf -- '---\nreviewer_set:\n  cross_model_review: off\n---\ncross_model_review: off\n' >|yellow-plugins.local.md
   run -0 "$SCRIPT"

@@ -299,14 +299,17 @@ fi
 
 # Cross-model egress switch (cross_model_review: auto | off). `off` in the
 # repo's or the user-level yellow-plugins.local.md wins (restricting is the
-# safe direction); an unrecognized or empty value counts as off. Same rule as
-# yellow-review's cross-model-mode script. Only top-level frontmatter keys count.
+# safe direction); an unrecognized or empty value, or a file that exists but
+# cannot be read, counts as off. Same rule as yellow-review's cross-model-mode
+# script. Only top-level frontmatter keys count.
 council_cmr_read() {
-  [ -f "$1" ] && [ -r "$1" ] || return 0
-  awk 'NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; next }
+  { [ -e "$1" ] || [ -L "$1" ]; } || return 0
+  if [ ! -f "$1" ] || [ ! -r "$1" ]; then printf '(unreadable)\n'; return 0; fi
+  CMR_OUT=$(awk 'NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; next }
        /^---[ \t\r]*$/ { exit }
        /^cross_model_review[ \t]*:/ { v = $0; sub(/^cross_model_review[ \t]*:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); sub(/[ \t\r]+$/, "", v)
-         if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2); if (v == "") v = "(empty)"; print tolower(v); exit }' "$1" 2>/dev/null
+         if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2); if (v == "") v = "(empty)"; print tolower(v); exit }' "$1" 2>/dev/null) || CMR_OUT='(unreadable)'
+  printf '%s\n' "$CMR_OUT"
 }
 CMR=auto
 CMR_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || CMR_ROOT=
@@ -315,6 +318,9 @@ for CMR_FILE in ${CMR_ROOT:+"$CMR_ROOT/yellow-plugins.local.md"} "${CLAUDE_CONFI
   case "$CMR_V" in
     '' | auto) ;;
     off | false | no) CMR=off ;;
+    '(unreadable)')
+      printf '[council] Warning: %s exists but cannot be read; treating cross_model_review as off\n' "$CMR_FILE" >&2
+      CMR=off ;;
     *)
       printf '[council] Warning: cross_model_review in %s is not auto or off; treating it as off\n' "$CMR_FILE" >&2
       CMR=off ;;

@@ -10,7 +10,9 @@
 # stdout: one line, `cross_model_review=<auto|off> source=<default|repo|user|both>`
 #   source names the file(s) that set `off`; `default` means neither did.
 # stderr: a warning per unrecognized value.
-# Exit: 0 always (a missing or unreadable file reads as unset).
+# Exit: 0 always. A missing file reads as unset; a path that exists but
+#   cannot be read (not a regular file, no read permission, awk read error)
+#   counts as `off` (fail closed) and warns.
 #
 # Precedence: restricting is the safe direction, so `off` in EITHER file wins.
 # /review:pr reads config from the checked-out PR head, so a PR can add an
@@ -21,8 +23,9 @@
 # key must sit at the top level of that block.
 
 cmr_read() {
-    [ -f "$1" ] && [ -r "$1" ] || return 0
-    awk '
+    { [ -e "$1" ] || [ -L "$1" ]; } || return 0
+    if [ ! -f "$1" ] || [ ! -r "$1" ]; then printf '(unreadable)\n'; return 0; fi
+    cmr_out=$(awk '
         NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; next }
         /^---[ \t\r]*$/ { exit }
         /^cross_model_review[ \t]*:/ {
@@ -36,13 +39,17 @@ cmr_read() {
             if (v == "") v = "(empty)"
             print tolower(v)
             exit
-        }' "$1" 2>/dev/null
+        }' "$1" 2>/dev/null) || cmr_out='(unreadable)'
+    printf '%s\n' "$cmr_out"
 }
 
 cmr_judge() { # <label> <value>  -> prints "off" when the value restricts
     case "$2" in
         '' | auto) ;;
         off | false | no) printf 'off\n' ;;
+        '(unreadable)')
+            printf '[review:pr] Warning: the %s config file exists but cannot be read; treating cross_model_review as off\n' "$1" >&2
+            printf 'off\n' ;;
         *)
             printf '[review:pr] Warning: cross_model_review in the %s file is not auto or off; treating it as off\n' "$1" >&2
             printf 'off\n' ;;
