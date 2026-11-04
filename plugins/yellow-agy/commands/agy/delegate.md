@@ -87,6 +87,10 @@ printf -- '--- end untrusted-content %s ---\n' "$TAG"
   grant covers this. Run `/agy:authorize` with this repo and a branch pattern
   to print the command; only the owner can run it, in their own terminal,
   because it asks them to type a code.
+- `AGY_BUDGET`: slow git or the quota probe used the 600 s budget. Usually
+  nothing was created and the task went back to the grant; if a `FAILED` task
+  came back, it keeps its worktree for `/agy:abandon`. Retry with a new
+  request id.
 - `AGY_QUOTA_LOW` or `AGY_QUOTA_UNKNOWN`: nothing was created. Say when to
   retry.
 - Any other code: report it with its recovery action. A `FAILED` task keeps

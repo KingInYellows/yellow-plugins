@@ -3,9 +3,11 @@ import * as path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { Budget } from '../src/budget';
 import type { TurnOutcome } from '../src/classify';
 import { AgyError } from '../src/errors';
 import { buildGrant, putGrant } from '../src/grants';
+import type { HostExec } from '../src/host-exec';
 import { createHostExec } from '../src/host-exec';
 import type { Invocation } from '../src/invocation';
 import type { LifecycleDeps } from '../src/lifecycle';
@@ -889,6 +891,85 @@ describe('Lifecycle', () => {
       ).rejects.toMatchObject({ code: 'AGY_GRANT_EXPIRED' });
       const out = await later.abandon({ requestId: 'r3', localId: 't1' });
       expect(out.state).toBe('ABANDONED');
+    });
+
+    describe('within the 600 s command budget (CLAUDE-255)', () => {
+      /**
+       * A budget on a fake clock, and an exec whose first git call takes
+       * `firstGitMs` of it (slow fetch). Print timeout 420, slack 30 s.
+       */
+      function budgeted(
+        steps: Step[],
+        opts: { startMs?: number; firstGitMs?: number } = {}
+      ) {
+        let clock = opts.startMs ?? 0;
+        const budget = new Budget(() => clock);
+        const real = createHostExec({ kind: 'posix' }, testEnv, budget);
+        let first = true;
+        const exec: HostExec = {
+          ...real,
+          async git(args, options) {
+            if (first) {
+              first = false;
+              clock += opts.firstGitMs ?? 0;
+            }
+            return real.git(args, options);
+          },
+        };
+        const g = granted(steps, {
+          exec,
+          budget,
+          printTimeoutSeconds: 420,
+          deadlineMs: 450_000,
+        });
+        return { ...g, budget };
+      }
+
+      it('refunds the task when a minimum turn no longer fits after the quota probe', async () => {
+        // 585 s usable; 486 s gone leaves 99 s, under the 100 s a 60 s turn needs.
+        const { h, g } = budgeted([planTurn], { startMs: 486_000 });
+        await expect(
+          h.lc.delegate(delegateInput(h.repo))
+        ).rejects.toMatchObject({ code: 'AGY_BUDGET' });
+        const j = readJournal(h.deps.dataDir);
+        expect(j.grants?.[g.grantId]?.totalTasks).toBe(0);
+        expect(j.activeRun).toBeUndefined();
+        expect(fs.existsSync(path.join(h.deps.worktreeRoot, 't1'))).toBe(false);
+        expect(h.calls).toHaveLength(0);
+      });
+
+      it('shortens the turn to what slow git left', async () => {
+        const { h } = budgeted([planTurn], { firstGitMs: 200_000 });
+        const d = await h.lc.delegate(delegateInput(h.repo));
+        expect(d).toMatchObject({ ok: true, state: 'PLAN_PENDING' });
+        const args = h.calls[0]?.args ?? [];
+        const s = Number(
+          (args[args.indexOf('--print-timeout') + 1] ?? '').replace(/s$/, '')
+        );
+        // 585 - 200 - 30 slack - 10 grace = 345, less a little real time.
+        expect(s).toBeLessThanOrEqual(345);
+        expect(s).toBeGreaterThan(330);
+      });
+
+      it('keeps the full print timeout when git is fast', async () => {
+        const { h } = budgeted([planTurn]);
+        await h.lc.delegate(delegateInput(h.repo));
+        expect(h.calls[0]?.args).toEqual(
+          expect.arrayContaining(['--print-timeout', '420s'])
+        );
+      });
+
+      it('refuses a git call that would eat the minimum turn, and refunds the task', async () => {
+        // After 490 s of git, 95 s is left: less than the 100 s held back.
+        const { h, g } = budgeted([planTurn], { firstGitMs: 490_000 });
+        await expect(
+          h.lc.delegate(delegateInput(h.repo))
+        ).rejects.toMatchObject({ code: 'AGY_BUDGET' });
+        const j = readJournal(h.deps.dataDir);
+        expect(j.grants?.[g.grantId]?.totalTasks).toBe(0);
+        expect(j.activeRun).toBeUndefined();
+        expect(h.calls).toHaveLength(0);
+      });
     });
   });
 });

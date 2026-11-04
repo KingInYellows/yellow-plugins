@@ -45,6 +45,7 @@ exports.Lifecycle = void 0;
 const node_crypto_1 = require("node:crypto");
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
+const budget_1 = require("./budget");
 const classify_1 = require("./classify");
 const errors_1 = require("./errors");
 const grants_1 = require("./grants");
@@ -397,20 +398,27 @@ class Lifecycle {
         if (withSchema) {
             await this.deps.exec.writeFile(this.deps.schemaPath, `${JSON.stringify(plan_schema_1.PLAN_SCHEMA)}\n`);
         }
+        const filterDrivers = await this.deps.exec.filterDrivers(worktree);
+        // The pre-turn host commands are done: release the reserve and fit the
+        // turn into what is left of the call's budget.
+        const timing = this.turnTiming();
+        if (timing === undefined) {
+            throw new errors_1.AgyError('AGY_BUDGET', 'too little of the 600 s command budget was left to start the turn; agy did not run');
+        }
         const args = (0, profiles_1.turnArgs)({
             prompt,
             profile,
-            printTimeoutSeconds: this.deps.printTimeoutSeconds,
+            printTimeoutSeconds: timing.printTimeoutSeconds,
             ...(conversationId === undefined ? {} : { conversationId }),
             ...(withSchema ? { jsonSchemaPath: this.deps.schemaPath } : {}),
         });
         const inv = (0, invocation_1.buildInvocation)(this.deps.host, args, {
             cwd: worktree,
             baseEnv: this.deps.baseEnv,
-            filterDrivers: await this.deps.exec.filterDrivers(worktree),
+            filterDrivers,
         });
         const outcome = await this.deps.runTurn(inv, {
-            deadlineMs: this.deps.deadlineMs,
+            deadlineMs: timing.deadlineMs,
             // Durable before the turn can settle: if the owner dies, the claim
             // still names a live agy. A failed write stops the turn.
             onSpawn: (pid) => {
@@ -445,17 +453,42 @@ class Lifecycle {
             return { journal: next, result: outcome };
         });
     }
+    /** The turn's print timeout and deadline now, or undefined if none fits. */
+    turnTiming() {
+        const budget = this.deps.budget;
+        if (budget === undefined) {
+            return {
+                printTimeoutSeconds: this.deps.printTimeoutSeconds,
+                deadlineMs: this.deps.deadlineMs,
+            };
+        }
+        budget.reserveMs = 0;
+        return budget.turnTiming(this.deps.printTimeoutSeconds, this.deps.deadlineMs - this.deps.printTimeoutSeconds * 1000);
+    }
     /**
-     * Builds the turn's profile and passes the quota gate, releasing the
-     * reservation if either refuses. Runs before any worktree change.
+     * Builds the turn's profile, passes the quota gate, and checks that a
+     * minimum turn still fits the call's budget, releasing the reservation if
+     * any refuses. Runs before any worktree change. From here until the turn
+     * spawns, host commands leave the minimum turn's time free.
      */
     async prepare(requestId, build) {
         try {
             const profile = build();
             await this.deps.quotaGate(profile, (0, state_1.readJournal)(this.deps.dataDir));
+            const budget = this.deps.budget;
+            if (budget !== undefined) {
+                const slackMs = this.deps.deadlineMs - this.deps.printTimeoutSeconds * 1000;
+                const reserveMs = budget_1.Budget.minTurnMs(slackMs);
+                if (budget.remainingMs() < reserveMs) {
+                    throw new errors_1.AgyError('AGY_BUDGET', 'too little of the 600 s command budget is left for a turn after the quota probe; nothing was changed');
+                }
+                budget.reserveMs = reserveMs;
+            }
             return profile;
         }
         catch (err) {
+            if (this.deps.budget !== undefined)
+                this.deps.budget.reserveMs = 0;
             await this.release(requestId);
             throw err;
         }

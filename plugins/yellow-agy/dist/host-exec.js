@@ -164,8 +164,14 @@ function runSpawn(spec, stdin, timeoutMs) {
     });
 }
 /** The real HostExec for `host`. */
-function createHostExec(host, baseEnv = process.env) {
-    const run = (cmd, args, options, filterDrivers = []) => runSpawn(hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv), options.stdin, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+function createHostExec(host, baseEnv = process.env, budget) {
+    // Every host command (git, filter discovery, mkdir, tee, rm) is cut to
+    // what is left of the call's budget, so slow git cannot outlive the
+    // wrapper's Bash timeout.
+    const run = async (cmd, args, options, filterDrivers = []) => {
+        const wanted = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+        return runSpawn(hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv), options.stdin, budget === undefined ? wanted : budget.hostTimeoutMs(wanted));
+    };
     // Reading config runs no filter, so discovery itself needs none turned off.
     const discover = async (cwd) => {
         const res = await run('git', ['config', '--name-only', '--get-regexp', '^filter\\.'], { cwd });

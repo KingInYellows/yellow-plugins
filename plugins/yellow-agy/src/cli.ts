@@ -10,6 +10,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { Budget } from './budget';
 import { AgyError } from './errors';
 import type { Grant } from './grants';
 import {
@@ -49,7 +50,8 @@ const MAX_TEXT_BYTES = 100_000;
 /**
  * The command wrappers' Bash timeout is 600 s. The quota probe (60 s + 10 s
  * kill grace) and the turn (print timeout + 30 s slack + 10 s grace) both run
- * inside it, so 420 leaves about 70 s for git and node.
+ * inside it, so 420 leaves about 70 s for git and node. When git is slower
+ * than that, the call's Budget (budget.ts) shortens the turn or refuses it.
  */
 const DEFAULT_PRINT_TIMEOUT_S = 420;
 const MAX_PRINT_TIMEOUT_S = 420;
@@ -61,6 +63,8 @@ export interface CliDeps {
   readonly openTty?: OpenTty;
   readonly wslRun?: WslRun;
   readonly now?: () => Date;
+  /** Milliseconds since the process started (the Budget's clock). */
+  readonly elapsedMs?: () => number;
   /** Tests replace the Lifecycle's side effects. */
   readonly lifecycle?: (
     deps: ConstructorParameters<typeof Lifecycle>[0]
@@ -191,6 +195,7 @@ interface Ctx {
   readonly deps: CliDeps;
   readonly dir: string;
   readonly now: () => Date;
+  readonly budget: Budget;
 }
 
 function lifecycleFor(
@@ -199,7 +204,7 @@ function lifecycleFor(
   grant: Grant | undefined,
   probeCwd: string
 ): Lifecycle {
-  const exec = createHostExec(config.host, ctx.deps.env);
+  const exec = createHostExec(config.host, ctx.deps.env, ctx.budget);
   const printTimeout = printTimeoutSeconds(ctx.deps.env);
   const deps = {
     host: config.host,
@@ -230,6 +235,7 @@ function lifecycleFor(
     sandboxVerified: config.sandboxVerified,
     printTimeoutSeconds: printTimeout,
     deadlineMs: printTimeout * 1000 + DEADLINE_SLACK_MS,
+    budget: ctx.budget,
     ...(grant === undefined ? {} : { grantId: grant.grantId }),
     now: ctx.now,
   };
@@ -473,10 +479,14 @@ export async function main(
     });
     const dir = dataDir(deps.env);
     ensureDataDir(dir);
-    const result = (await run({ deps, dir, now }, op, values)) as Record<
-      string,
-      unknown
-    >;
+    // performance.now() counts from process start, which is when the
+    // wrapper's Bash timeout started too (give or take the shell).
+    const budget = new Budget(deps.elapsedMs ?? (() => performance.now()));
+    const result = (await run(
+      { deps, dir, now, budget },
+      op,
+      values
+    )) as Record<string, unknown>;
     const code = result['code'];
     const failed = typeof code === 'string';
     const exit = failed ? new AgyError(code as never, '').exit : 0;

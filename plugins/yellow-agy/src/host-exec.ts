@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import type { Budget } from './budget';
 import { AgyError } from './errors';
 import type { Host } from './invocation';
 import {
@@ -199,19 +200,25 @@ export function runSpawn(
 /** The real HostExec for `host`. */
 export function createHostExec(
   host: Host,
-  baseEnv: Readonly<Record<string, string | undefined>> = process.env
+  baseEnv: Readonly<Record<string, string | undefined>> = process.env,
+  budget?: Budget
 ): HostExec {
-  const run = (
+  // Every host command (git, filter discovery, mkdir, tee, rm) is cut to
+  // what is left of the call's budget, so slow git cannot outlive the
+  // wrapper's Bash timeout.
+  const run = async (
     cmd: string,
     args: readonly string[],
     options: ExecOptions,
     filterDrivers: readonly string[] = []
-  ): Promise<ExecResult> =>
-    runSpawn(
+  ): Promise<ExecResult> => {
+    const wanted = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    return runSpawn(
       hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv),
       options.stdin,
-      options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+      budget === undefined ? wanted : budget.hostTimeoutMs(wanted)
     );
+  };
   // Reading config runs no filter, so discovery itself needs none turned off.
   const discover = async (cwd: string): Promise<string[]> => {
     const res = await run(

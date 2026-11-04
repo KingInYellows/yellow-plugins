@@ -44,6 +44,7 @@ const node_crypto_1 = require("node:crypto");
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const node_util_1 = require("node:util");
+const budget_1 = require("./budget");
 const errors_1 = require("./errors");
 const grants_1 = require("./grants");
 const host_config_1 = require("./host-config");
@@ -62,7 +63,8 @@ const MAX_TEXT_BYTES = 100_000;
 /**
  * The command wrappers' Bash timeout is 600 s. The quota probe (60 s + 10 s
  * kill grace) and the turn (print timeout + 30 s slack + 10 s grace) both run
- * inside it, so 420 leaves about 70 s for git and node.
+ * inside it, so 420 leaves about 70 s for git and node. When git is slower
+ * than that, the call's Budget (budget.ts) shortens the turn or refuses it.
  */
 const DEFAULT_PRINT_TIMEOUT_S = 420;
 const MAX_PRINT_TIMEOUT_S = 420;
@@ -164,7 +166,7 @@ function noGrant(repo, branch) {
     return new errors_1.AgyError('AGY_AUTHORITY_DENIED', `no live grant covers ${repo} on branch ${branch}`, `Run /agy:authorize --repo ${JSON.stringify(repo)} --branch ${JSON.stringify(branch)} for the command the owner runs in a terminal, then retry.`);
 }
 function lifecycleFor(ctx, config, grant, probeCwd) {
-    const exec = (0, host_exec_1.createHostExec)(config.host, ctx.deps.env);
+    const exec = (0, host_exec_1.createHostExec)(config.host, ctx.deps.env, ctx.budget);
     const printTimeout = printTimeoutSeconds(ctx.deps.env);
     const deps = {
         host: config.host,
@@ -194,6 +196,7 @@ function lifecycleFor(ctx, config, grant, probeCwd) {
         sandboxVerified: config.sandboxVerified,
         printTimeoutSeconds: printTimeout,
         deadlineMs: printTimeout * 1000 + DEADLINE_SLACK_MS,
+        budget: ctx.budget,
         ...(grant === undefined ? {} : { grantId: grant.grantId }),
         now: ctx.now,
     };
@@ -410,7 +413,10 @@ async function main(argv, deps) {
         });
         const dir = (0, state_1.dataDir)(deps.env);
         (0, state_1.ensureDataDir)(dir);
-        const result = (await run({ deps, dir, now }, op, values));
+        // performance.now() counts from process start, which is when the
+        // wrapper's Bash timeout started too (give or take the shell).
+        const budget = new budget_1.Budget(deps.elapsedMs ?? (() => performance.now()));
+        const result = (await run({ deps, dir, now, budget }, op, values));
         const code = result['code'];
         const failed = typeof code === 'string';
         const exit = failed ? new errors_1.AgyError(code, '').exit : 0;

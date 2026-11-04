@@ -24,6 +24,7 @@ plugins/yellow-agy/
     classify.ts     # result classification; an absent finished_reason is a normal finish
     errors.ts       # AGY_* catalog with exit codes and recovery actions
     host-exec.ts    # git and file ops where agy runs (exec-only on the WSL bridge)
+    budget.ts       # the call's 600 s wall-clock budget: caps host commands, shortens or refuses the turn
     process.ts      # runs one agy turn: own POSIX (or bridge Linux) process group, deadline SIGTERM then SIGKILL
     worktree.ts     # create, pre-turn snapshot refs, reset-partial, collect, remove
     state.ts        # journal in the data dir (0700 on POSIX; on Windows, private only under the per-user %LOCALAPPDATA%): lock, durable atomic writes
@@ -54,4 +55,8 @@ plugins/yellow-agy/
 - A call must end inside the wrappers' 600 s Bash timeout. It runs the
   `/usage` probe (60 s + 10 s kill grace) and then the turn (print timeout +
   30 s slack + 10 s grace), so `YELLOW_AGY_PRINT_TIMEOUT_SECONDS` is 60-420
-  (default 420).
+  (default 420). `budget.ts` counts from process start: host commands are
+  cut to what is left (and, before the turn, leave a 60 s turn's worth free),
+  the turn's print timeout is shortened to fit, and a call that can't fit a
+  60 s turn after the quota probe refuses with `AGY_BUDGET` and refunds the
+  task or corrective round.
