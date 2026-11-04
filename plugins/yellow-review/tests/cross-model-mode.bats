@@ -53,6 +53,17 @@ cfg() { # <file> <value-line>
   [[ "$stderr" == *'not auto or off; treating it as off'* ]]
 }
 
+@test "a key with no inline value fails closed instead of reading as auto" {
+  printf -- '---\ncross_model_review:\n  off\n---\n' >|yellow-plugins.local.md
+  run -0 --separate-stderr "$SCRIPT"
+  [ "$output" = 'cross_model_review=off source=repo' ]
+  [[ "$stderr" == *'not auto or off; treating it as off'* ]]
+  cfg "$CLAUDE_CONFIG_DIR/yellow-plugins.local.md" "cross_model_review: ''"
+  rm yellow-plugins.local.md
+  run -0 --separate-stderr "$SCRIPT"
+  [ "$output" = 'cross_model_review=off source=user' ]
+}
+
 @test "only top-level frontmatter counts, not the body or nested keys" {
   printf -- '---\nreviewer_set:\n  cross_model_review: off\n---\ncross_model_review: off\n' >|yellow-plugins.local.md
   run -0 "$SCRIPT"

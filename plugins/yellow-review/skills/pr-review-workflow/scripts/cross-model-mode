@@ -15,7 +15,8 @@
 # Precedence: restricting is the safe direction, so `off` in EITHER file wins.
 # /review:pr reads config from the checked-out PR head, so a PR can add an
 # `off` to the repo file but can never lift a user-level `off` by writing
-# `auto` there. An unrecognized value counts as `off` (fail closed) and warns.
+# `auto` there. An unrecognized value, or a key with no inline value, counts
+# as `off` (fail closed) and warns.
 # Only the YAML frontmatter is read: the first line must be `---`, and the
 # key must sit at the top level of that block.
 
@@ -30,6 +31,9 @@ cmr_read() {
             sub(/[ \t]+#.*$/, "", v)
             sub(/[ \t\r]+$/, "", v)
             if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2)
+            # A present key with no inline value (empty, or a block value on
+            # the next line) is not `auto`: report it so cmr_judge fails closed.
+            if (v == "") v = "(empty)"
             print tolower(v)
             exit
         }' "$1" 2>/dev/null

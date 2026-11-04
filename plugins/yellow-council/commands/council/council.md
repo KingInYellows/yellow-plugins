@@ -299,14 +299,14 @@ fi
 
 # Cross-model egress switch (cross_model_review: auto | off). `off` in the
 # repo's or the user-level yellow-plugins.local.md wins (restricting is the
-# safe direction); an unrecognized value counts as off. Same rule as
+# safe direction); an unrecognized or empty value counts as off. Same rule as
 # yellow-review's cross-model-mode script. Only top-level frontmatter keys count.
 council_cmr_read() {
   [ -f "$1" ] && [ -r "$1" ] || return 0
   awk 'NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; next }
        /^---[ \t\r]*$/ { exit }
        /^cross_model_review[ \t]*:/ { v = $0; sub(/^cross_model_review[ \t]*:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); sub(/[ \t\r]+$/, "", v)
-         if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2); print tolower(v); exit }' "$1" 2>/dev/null
+         if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2); if (v == "") v = "(empty)"; print tolower(v); exit }' "$1" 2>/dev/null
 }
 CMR=auto
 CMR_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || CMR_ROOT=
