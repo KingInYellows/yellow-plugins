@@ -477,6 +477,12 @@ def run_env():
                  "CLAUDE_MEMORY_STORES", "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD",
                  "CLAUDE_ADDITIONAL_DIRECTORIES"):
         env.pop(name, None)
+    # `claude -p` stops a background task once the session has sat idle for
+    # CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS (default 10 minutes). The Workflow
+    # tool always runs in the background, so a high-tier review was killed
+    # mid-run. 0 lifts the ceiling; the caller's subprocess timeout is the
+    # deadline.
+    env["CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS"] = "0"
     return env
 
 
