@@ -185,6 +185,16 @@ manifest change or plugin-authoring path still does.
 | `stack-traversal`             | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack`                                      |
 | `yellow-thermonuclear-review` | Portable structural-quality rubric preloaded by `thermonuclear-reviewer`; adapted from Cursor's MIT-licensed `thermo-nuclear-code-quality-review` |
 
+## Thematic grouping
+
+`/review:pr` numbers its findings and, when related findings form groups, adds a
+`### Themes` section above the P0 table: each theme names its findings by `#`,
+says why they belong together, and gives one preferred fix. Grouping never
+merges findings or changes their severity, route or ledger record. Set
+`review_grouping` in `yellow-plugins.local.md`: `auto` (default) groups only
+when the findings span distinct concerns, `always` groups any two findings that
+share a signal, and `off` never adds the section.
+
 ## Workflows
 
 | Workflow      | Description                                                                                                                                                                            |
