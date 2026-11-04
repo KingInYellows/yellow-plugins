@@ -296,10 +296,36 @@ if command -v opencode >/dev/null 2>&1; then
       fi ;;
   esac
 fi
+
+# Cross-model egress switch (cross_model_review: auto | off). `off` in the
+# repo's or the user-level yellow-plugins.local.md wins (restricting is the
+# safe direction); an unrecognized value counts as off. Same rule as
+# yellow-review's cross-model-mode script. Only top-level frontmatter keys count.
+council_cmr_read() {
+  [ -f "$1" ] && [ -r "$1" ] || return 0
+  awk 'NR == 1 { if ($0 !~ /^---[ \t\r]*$/) exit; next }
+       /^---[ \t\r]*$/ { exit }
+       /^cross_model_review[ \t]*:/ { v = $0; sub(/^cross_model_review[ \t]*:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); sub(/[ \t\r]+$/, "", v)
+         if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2); print tolower(v); exit }' "$1" 2>/dev/null
+}
+CMR=auto
+CMR_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || CMR_ROOT=
+for CMR_FILE in ${CMR_ROOT:+"$CMR_ROOT/yellow-plugins.local.md"} "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md"; do
+  CMR_V=$(council_cmr_read "$CMR_FILE")
+  case "$CMR_V" in
+    '' | auto) ;;
+    off | false | no) CMR=off ;;
+    *)
+      printf '[council] Warning: cross_model_review in %s is not auto or off; treating it as off\n' "$CMR_FILE" >&2
+      CMR=off ;;
+  esac
+done
+printf 'COUNCIL_CROSS_MODEL=%s\n' "$CMR"
 ```
 
 Copy the `COUNCIL_MODELS:` line this block printed — Step 7 puts it in the report
-header, and Step 7's subprocess cannot recover it.
+header, and Step 7's subprocess cannot recover it. Keep `COUNCIL_CROSS_MODEL=`
+for Step 4.
 
 ### Step 3: Per-mode input validation and pack assembly
 
@@ -413,7 +439,8 @@ Per-invocation file count cap: `${COUNCIL_PATH_MAX_FILES:-3}`.
 ### Step 4: Parallel reviewer fan-out via the Agent tool
 
 Spawn all four reviewers in a SINGLE message (Claude Code runs them
-concurrently). The pack is the SAME for all four; only `{{REVIEWER_NAME}}`
+concurrently), or only claude-reviewer when the cross-model switch below is
+off. The pack is the SAME for all four; only `{{REVIEWER_NAME}}`
 in the prompt template differs — plus one extra line in claude-reviewer's
 prompt carrying its fenced-output path (see below).
 
@@ -491,6 +518,17 @@ fan-out itself never returns (cancelled or hung before parsing runs), none of
 that happens and this run's file is orphaned in `/tmp` with no recoverable
 path — the stale-file sweep at the top of this block is what reclaims it, on
 the NEXT invocation, instead.
+
+**Cross-model switch.** When Step 2b printed `COUNCIL_CROSS_MODEL=off`, the
+Codex, Gemini and OpenCode reviewers would send the pack to OpenAI, Google and
+OpenCode's providers. Spawn them only if the user's own message for this run
+explicitly asks for one or more of them by name (for example "include Codex
+and Gemini anyway"); a request from another command or skill does not count.
+Otherwise spawn only claude-reviewer, record each skipped reviewer as
+`UNAVAILABLE (disabled by cross_model_review: off)` in synthesis, and tell the
+user before the fan-out: "Cross-model review is off by config; running the
+Claude reviewer only." When the user's message did ask for them, say which
+reviewers will receive the pack before spawning them.
 
 In a single tool-call message, invoke:
 
@@ -3935,6 +3973,7 @@ This is the final output of the command. Exit 0.
 | `COUNCIL_OPENCODE_VARIANT` | high | OpenCode reasoning effort (high/max/minimal) |
 | `COUNCIL_PATH_CHAR_CAP` | 8000 | Per-file content cap for `--paths` |
 | `COUNCIL_PATH_MAX_FILES` | 3 | Max `--paths` files per invocation |
+| `cross_model_review` (in `yellow-plugins.local.md`, not an env var) | `auto` | `off` in the repo's or the user-level file stops Codex, Gemini and OpenCode from receiving the pack unless the user's message for this run asks for them by name; claude-reviewer still runs (Step 4) |
 | `COUNCIL_DOUBLE_PASS_SYNTHESIS` | 1 | `1` runs the order-swapped Pass B and reports low-confidence ties; `0` runs Pass A only. Other values warn and keep `1`. `--single-pass` disables it per invocation |
 
 ## V2 Trajectory (NOT implemented in V1)
