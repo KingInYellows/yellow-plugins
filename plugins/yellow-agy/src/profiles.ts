@@ -372,9 +372,23 @@ export interface TurnArgsOptions {
   readonly printTimeoutSeconds: number;
 }
 
-const CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
+export const CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 /** The agy argv (without the binary) for one model turn. */
+/** Refuses a prompt agy can't take: empty, or starting with "-". */
+export function assertPromptText(prompt: string): void {
+  if (prompt.trim() === '') {
+    throw new AgyError('AGY_INVALID_INPUT', 'the prompt is empty');
+  }
+  // A prompt that starts with "-" could be read as a flag by agy's parser.
+  if (prompt.startsWith('-')) {
+    throw new AgyError(
+      'AGY_INVALID_INPUT',
+      'the prompt may not start with "-"'
+    );
+  }
+}
+
 export function turnArgs(options: TurnArgsOptions): string[] {
   assertSafeProfile(options.profile);
   const implementing = options.profile.flags.includes('accept-edits');
@@ -392,16 +406,7 @@ export function turnArgs(options: TurnArgsOptions): string[] {
       );
     }
   }
-  if (options.prompt.trim() === '') {
-    throw new AgyError('AGY_INVALID_INPUT', 'the prompt is empty');
-  }
-  // A prompt that starts with "-" could be read as a flag by agy's parser.
-  if (options.prompt.startsWith('-')) {
-    throw new AgyError(
-      'AGY_INVALID_INPUT',
-      'the prompt may not start with "-"'
-    );
-  }
+  assertPromptText(options.prompt);
   if (
     !Number.isInteger(options.printTimeoutSeconds) ||
     options.printTimeoutSeconds < 1

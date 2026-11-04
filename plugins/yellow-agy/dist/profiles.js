@@ -6,11 +6,12 @@
  * permission could slip into a run, so they throw instead of degrading.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TOOL_PERMISSIONS = exports.DEFAULT_TOOL_PERMISSION = void 0;
+exports.CONVERSATION_RE = exports.TOOL_PERMISSIONS = exports.DEFAULT_TOOL_PERMISSION = void 0;
 exports.validateAllowCommand = validateAllowCommand;
 exports.readOnlyProfile = readOnlyProfile;
 exports.implementProfile = implementProfile;
 exports.assertSafeProfile = assertSafeProfile;
+exports.assertPromptText = assertPromptText;
 exports.turnArgs = turnArgs;
 exports.usageArgs = usageArgs;
 const errors_1 = require("./errors");
@@ -303,8 +304,18 @@ function assertSafeProfile(profile) {
         badProfile('command grants must come from implementProfile on a host with a verified sandbox');
     }
 }
-const CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
+exports.CONVERSATION_RE = /^[A-Za-z0-9_-]{1,128}$/;
 /** The agy argv (without the binary) for one model turn. */
+/** Refuses a prompt agy can't take: empty, or starting with "-". */
+function assertPromptText(prompt) {
+    if (prompt.trim() === '') {
+        throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the prompt is empty');
+    }
+    // A prompt that starts with "-" could be read as a flag by agy's parser.
+    if (prompt.startsWith('-')) {
+        throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the prompt may not start with "-"');
+    }
+}
 function turnArgs(options) {
     assertSafeProfile(options.profile);
     const implementing = options.profile.flags.includes('accept-edits');
@@ -316,20 +327,14 @@ function turnArgs(options) {
             throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the first turn is a read-only plan turn with the plan schema');
         }
     }
-    if (options.prompt.trim() === '') {
-        throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the prompt is empty');
-    }
-    // A prompt that starts with "-" could be read as a flag by agy's parser.
-    if (options.prompt.startsWith('-')) {
-        throw new errors_1.AgyError('AGY_INVALID_INPUT', 'the prompt may not start with "-"');
-    }
+    assertPromptText(options.prompt);
     if (!Number.isInteger(options.printTimeoutSeconds) ||
         options.printTimeoutSeconds < 1) {
         throw new errors_1.AgyError('AGY_INVALID_INPUT', 'printTimeoutSeconds must be a positive integer');
     }
     const args = ['-p', options.prompt, '--output-format', 'json'];
     if (options.conversationId !== undefined) {
-        if (!CONVERSATION_RE.test(options.conversationId)) {
+        if (!exports.CONVERSATION_RE.test(options.conversationId)) {
             throw new errors_1.AgyError('AGY_INVALID_INPUT', `invalid conversation id ${JSON.stringify(options.conversationId)}`);
         }
         args.push('--conversation', options.conversationId);

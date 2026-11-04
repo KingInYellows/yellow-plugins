@@ -1,0 +1,8 @@
+{
+  "id": "synthetic-refactor",
+  "repo": "KingInYellows/yellow-plugins",
+  "base": "098fa5f804b4ace62b95dc5fd0a8f1172485bc3d",
+  "tier": "medium",
+  "source": "written for the eval (CLAUDE-239)",
+  "notes": "Behavior-preserving refactor of tokens_in() in the review-gate eval: the summed keys move into a TOKEN_KEYS constant. Same result for every input."
+}

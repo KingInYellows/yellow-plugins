@@ -115,6 +115,35 @@ class SchemaTest(unittest.TestCase):
         control = self.example("example-control.json")
         self.assertTrue(rg.validate_item({**control, "golden": []}, "control"))
 
+    def test_shipped_synthetic_controls_validate_and_have_patches(self):
+        folder = os.path.join(ROOT, "controls", "synthetic")
+        names = [n for n in os.listdir(folder) if n.endswith(".json")] if os.path.isdir(folder) else []
+        for name in names:
+            with open(os.path.join(folder, name), encoding="utf-8") as handle:
+                doc = json.load(handle)
+            self.assertEqual(rg.validate_item(doc, "synthetic"), [], name)
+            self.assertEqual(name, doc["id"] + ".json")
+            self.assertGreater(os.path.getsize(rg.patch_path(os.path.join(folder, name), doc)), 0, name)
+        loaded = [d["id"] for k, d, _ in rg.load_items(os.path.join(ROOT, "none"), os.path.join(ROOT, "controls"))
+                  if k == "synthetic"]
+        self.assertEqual(sorted(loaded), sorted(n[:-5] for n in names))
+
+    def test_invalid_synthetic_controls_are_rejected(self):
+        good = {"id": "syn", "repo": "o/r", "base": "a" * 40, "tier": "low", "source": "test"}
+        self.assertEqual(rg.validate_item(good, "synthetic"), [])
+        for doc, why in (({**good, "head": "b" * 40}, "unknown key head"),
+                         ({**good, "golden": []}, "unknown key golden"),
+                         ({k: v for k, v in good.items() if k != "base"}, "missing base")):
+            self.assertTrue(any(why in e for e in rg.validate_item(doc, "synthetic")), why)
+        with tempfile.TemporaryDirectory() as tmp:
+            write(os.path.join(tmp, "synthetic", "syn.json"), json.dumps(good))
+            with self.assertRaises(SystemExit) as ctx:  # no syn.patch next to it
+                rg.load_items(os.path.join(tmp, "none"), tmp)
+            self.assertIn("syn.patch", str(ctx.exception))
+            write(os.path.join(tmp, "synthetic", "syn.patch"), "")
+            with self.assertRaises(SystemExit):  # an empty patch is no change
+                rg.load_items(os.path.join(tmp, "none"), tmp)
+
     def test_examples_never_load_as_real_cases(self):
         with tempfile.TemporaryDirectory() as tmp:
             shutil.copy(os.path.join(ROOT, "cases", "examples", "example-unquoted-path.json"), tmp)
@@ -186,6 +215,57 @@ class PipelineTest(Tmp):
         self.assertTrue(os.path.isabs(args["diff_path"]))
         with open(args["diff_path"], encoding="utf-8") as handle:
             self.assertIn("+cp $path /tmp", handle.read())
+
+    def add_synthetic(self, sid, patch):
+        write(os.path.join(self.controls, "synthetic", sid + ".json"), json.dumps({
+            "id": sid, "repo": "test/demo", "base": self.base, "tier": "low", "source": "test"}))
+        write(os.path.join(self.controls, "synthetic", sid + ".patch"), patch)
+
+    CLEAN_PATCH = ("diff --git a/lib/x.sh b/lib/x.sh\n--- a/lib/x.sh\n+++ b/lib/x.sh\n"
+                   "@@ -1,3 +1,3 @@\n line 1\n-line 2\n+line two\n line 3\n")
+
+    def test_synthetic_control_is_built_from_base_plus_patch(self):
+        self.add_synthetic("syn-clean", self.CLEAN_PATCH)
+        before = git(self.repo, "status", "--porcelain")
+        self.prepare()
+        rows = {r["id"]: r for r in rg.read_matrix(self.work)}
+        row = rows["syn-clean"]
+        self.assertEqual(row["kind"], "synthetic")
+        head = git(row["wt"], "rev-parse", "HEAD")
+        self.assertEqual(git(self.repo, "rev-parse", head + "^"), self.base)
+        self.assertEqual(git(row["wt"], "show", "HEAD:lib/x.sh").splitlines()[1], "line two")
+        # The checkout and its index are untouched; no scratch index is left.
+        self.assertEqual(git(self.repo, "status", "--porcelain"), before)
+        self.assertEqual([n for n in os.listdir(os.path.join(self.repo, ".git")) if "synthetic" in n], [])
+        with open(row["args"], encoding="utf-8") as handle:
+            args = json.load(handle)
+        self.assertEqual((args["base"], args["head"], args["pr"]), (self.base, head, None))
+        self.assertEqual(args["changed_files"], ["lib/x.sh"])
+        self.assertEqual(args["review_md"], "# Review rules at base\n")
+        with open(os.path.join(self.work, "items.json"), encoding="utf-8") as handle:
+            self.assertEqual(json.load(handle)["syn-clean"]["head"], head)
+        # Same base and patch give the same head and fingerprint on a rerun.
+        self.prepare()
+        again = {r["id"]: r for r in rg.read_matrix(self.work)}["syn-clean"]
+        self.assertEqual((git(again["wt"], "rev-parse", "HEAD"), again["fingerprint"]),
+                         (head, row["fingerprint"]))
+        # Graded as a control: the stand-in's clean answer is no false positive.
+        self.cli("run", self.work)
+        s = rg.summarize(self.work)
+        self.assertEqual((s["synthetic_complete"], s["synthetic_with_fp"]), (1, 0))
+        self.assertEqual((s["controls_with_fp"], s["controls_complete"]), (1, 3))
+        self.cli("grade", self.work, "--date", "2026-11-02", "--results-dir", self.results)
+        with open(os.path.join(self.results, "results-2026-11-02.md"), encoding="utf-8") as handle:
+            md = handle.read()
+        self.assertIn("| of which synthetic", md)
+        self.assertIn("| syn-clean ", md)
+
+    def test_synthetic_patch_that_does_not_apply_stops_prepare(self):
+        self.add_synthetic("syn-bad", self.CLEAN_PATCH.replace("-line 2", "-no such line"))
+        res = self.cli("prepare", self.work, "--cases", self.cases, "--controls", self.controls,
+                       "--repo-dir", "test/demo=" + self.repo)
+        self.assertNotEqual(res.returncode, 0)
+        self.assertIn("syn-bad: syn-bad.patch does not apply at %s" % self.base, res.stderr)
 
     def test_fingerprint_ignores_grading_fields_and_cwd(self):
         self.prepare()
@@ -348,6 +428,17 @@ class PipelineTest(Tmp):
         self.assertNotEqual(edited["grading_set"], s["grading_set"])
 
 
+class RunEnvTest(unittest.TestCase):
+    def test_lifts_print_mode_background_ceiling(self):
+        # The Workflow tool runs in the background; `claude -p` would stop it
+        # after 10 idle minutes unless this ceiling is lifted.
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS": "600000",
+                                          "CLAUDE_EFFORT": "high"}):
+            env = rg.run_env()
+        self.assertEqual(env["CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS"], "0")
+        self.assertNotIn("CLAUDE_EFFORT", env)
+
+
 class GradeMathTest(unittest.TestCase):
     GOLDEN = {"file": "lib/x.sh", "line": 10, "match": [r"unquoted", r"\bpath\b"]}
 
@@ -380,9 +471,15 @@ class GradeMathTest(unittest.TestCase):
                           "agents is missing or not a non-negative integer"])
 
     def test_missing_coverage_failed_or_agents_is_incomplete(self):
-        ok = {"version": 1, "findings": [], "coverage": {"failed": []}, "agents": 3}
+        ok = {"version": 1, "findings": [], "coverage": {"ran": ["a"], "failed": []}, "agents": 3}
         self.assertIsNone(rg.ungradable(ok))
         for wf, why in (({**ok, "coverage": {}}, "coverage.failed is missing"),
+                        ({**ok, "coverage": {"failed": []}}, "coverage.ran is missing"),
+                        ({**ok, "coverage": {"ran": [], "failed": [], "empty": True}},
+                         "coverage.empty is true"),
+                        ({**ok, "coverage": {"ran": None, "failed": []}}, "coverage.ran is missing"),
+                        ({**ok, "coverage": {"ran": [1], "failed": []}}, "coverage.ran is missing"),
+                        ({**ok, "coverage": {"ran": [], "failed": [None]}}, "coverage.failed is missing"),
                         ({**ok, "coverage": {"failed": None}}, "coverage.failed is missing"),
                         ({**ok, "coverage": {"failed": "x"}}, "coverage.failed is missing"),
                         ({k: v for k, v in ok.items() if k != "agents"}, "agents is missing"),
@@ -391,6 +488,22 @@ class GradeMathTest(unittest.TestCase):
                         ({**ok, "agents": True}, "agents is missing"),
                         ({**ok, "agents": -1}, "agents is missing")):
             self.assertIn(why, rg.ungradable(wf) or "", wf)
+
+    def test_findings_missing_grading_fields_are_incomplete(self):
+        f = {"severity": "P1", "display": "Important", "file": "lib/x.sh", "line": 5, "title": "t",
+             "suggested_fix": None}
+        ok = {"version": 1, "findings": [f], "coverage": {"ran": ["a"], "failed": []}, "agents": 3}
+        self.assertIsNone(rg.ungradable(ok))
+        self.assertIsNone(rg.ungradable({**ok, "findings": [{**f, "suggested_fix": "quote it"}]}))
+        for key in ("severity", "display", "file", "line", "title", "suggested_fix"):
+            gone = {k: v for k, v in f.items() if k != key}
+            self.assertIn("findings[0].%s is missing" % key, rg.ungradable({**ok, "findings": [gone]}))
+        for key, value in (("display", "Blocker"), ("severity", "P5"), ("file", ""), ("line", 0),
+                           ("line", "5"), ("line", True), ("title", ""), ("title", None),
+                           ("suggested_fix", 3)):
+            why = rg.ungradable({**ok, "findings": [f, {**f, key: value}]})
+            self.assertIn("findings[1].%s is not" % key, why or "", (key, value))
+            self.assertNotIn("findings[0]", why)
 
     def summary(self, recall, fp, agents, cost=1.0, ids=("a", "b")):
         return {"recall": recall, "fp_rate": fp, "mean_cost_usd": cost, "mean_agents": agents,
@@ -416,6 +529,10 @@ class GradeMathTest(unittest.TestCase):
         a = {"x": {"kind": "case", "golden": [{"file": "f", "line": 1, "match": ["a"]}]}}
         b = {"x": {"kind": "case", "golden": [{"file": "f", "line": 1, "match": ["b"]}]}}
         self.assertNotEqual(rg.grading_set(a), rg.grading_set(b))
+        moved = {"x": {**a["x"], "head": "c" * 40}}
+        self.assertNotEqual(rg.grading_set(a), rg.grading_set(moved))
+        prose = {"x": {**a["x"], "notes": "edited", "source": "s", "tier": "high"}}
+        self.assertEqual(rg.grading_set(a), rg.grading_set(prose))
         self.assertEqual(rg.grading_set(a), rg.grading_set(json.loads(json.dumps(a))))
 
     def test_cost_usd_never_decides(self):

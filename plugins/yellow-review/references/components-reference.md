@@ -197,6 +197,14 @@ flags, exit codes, trust-boundary rules and library behavior.
   moved by the final re-read leaves the approval unknown), the high-tier
   cross-lineage review on the head, and `missing` tokens, which block only under
   `enforce`
+- `pr-base-remote <pr-url>` — prints the configured remote whose fetch URL names
+  the PR's base repository (`origin` tried first, host, owner and repo compared
+  case-insensitively), else `https://<host>/<owner>/<repo>.git`. The risk-tier
+  blocks in `/review:pr` Step 3a2 and `/review:resolve` Step 9 fetch the base
+  branch and the default branch (the policy) from it, and `/review:resolve` also
+  fetches `refs/pull/<n>/head` when the head is missing locally, because
+  `origin` is the fork in a fork checkout. Local git only, no network; exit 2 on
+  a URL that is not `https://<host>/<owner>/<repo>/pull/<n>`
 - `classify-risk [--policy-ref <ref> | --policy-file <file>] <base-ref> <head-ref>`
   (or `--stdin [--numstat] [<base-ref>]` with paths, or
   `<added>\t<deleted>\t<path>` numstat rows, one per line on stdin) — Review
@@ -215,11 +223,12 @@ flags, exit codes, trust-boundary rules and library behavior.
   (the script header has the jq filter). Paths are repository-root relative.
   Needs `jq` and `git`; no network calls. Design:
   `plans/risk-tiered-review-pipeline.md` at the repository root
-- `sync-blocking-comment [--reasons <file>] <owner/repo> <pr> <resolution>` —
-  `/review:resolve` Step 9: where conversation resolution is not enforced, keep
-  one sticky PR comment (marker line, edited in place) listing the unresolved
-  threads with links and the run's status for each; no reviewer prose, logins in
-  backticks. Worst case about 370 s (contract "Blocking-threads comment")
+- `sync-blocking-comment [--reasons <file>] [--risk <file>] <owner/repo> <pr> <resolution>`
+  — `/review:resolve` Step 9: where conversation resolution is not enforced,
+  keep one sticky PR comment (marker line, edited in place) listing the
+  unresolved threads with links and the run's status for each; no reviewer
+  prose, logins in backticks. `--risk` takes `classify-risk` output and adds a
+  tier line. Worst case about 370 s (contract "Blocking-threads comment")
 - `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a thread with
   an idempotency marker (skips when our latest recent comment has a marker for
   the thread, any disposition, and only bot comments follow it). Which prior
@@ -829,6 +838,9 @@ in the transcript (Ctrl-O) on a second `/review:pr` run within the hour.
   committed on `main`; covers base-ref and `--policy-ref` policy reads,
   first-match order, the size rule with binary files, literal glob dots and
   fail-closed policies
+- `pr-base-remote.bats` — a throwaway repository with fork-style remotes; covers
+  origin first, the base remote in a fork, the https fallback, URL forms and
+  rejected input
 - `file-line-counts.bats` — pins the thermonuclear line-count invariant
   alongside `skills/pr-review-workflow/scripts/file-line-counts`
 - `review-ledger.bats` — throwaway repositories with a bare origin, built by

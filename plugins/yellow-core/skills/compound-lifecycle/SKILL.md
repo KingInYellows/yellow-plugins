@@ -274,7 +274,15 @@ Same as the archive step in Consolidate (move + `superseded_by`
 frontmatter), but skip the `knowledge-compounder` dispatch since
 there's no successor entry.
 
-### Step 9 — Report
+### Step 9 — Discoverability check
+
+Read `references/discoverability.md` and run it. It checks that the repo's
+agent-instruction file still tells agents without these plugins about
+`docs/solutions/`, and proposes one informational line when it does not. In
+autofix mode it only reports; it never edits an instruction file. Add its result
+to the report's Coverage section.
+
+### Step 10 — Report
 
 Present a synthesized summary, regardless of mode. Before writing it,
 Read `references/report-template.md` and emit the report exactly in the
@@ -310,6 +318,8 @@ brings them into context.
   `archived/` and `README.md`)
 - **Writes** `docs/solutions/<category>/<slug>.md` (in-place Updates) and
   `docs/solutions/archived/<category>/<slug>.md` (archive moves)
+- **May edit** one line of the repo's agent-instruction file (Step 9,
+  interactive mode and only with approval)
 - **Dispatches** `knowledge-compounder` via `Agent` for Consolidate and
   Replace classifications
 

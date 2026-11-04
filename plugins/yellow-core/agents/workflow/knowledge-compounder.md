@@ -633,6 +633,14 @@ Append section in format:
 - See `docs/solutions/<category>/<slug>.md`
 ```
 
+### Discoverability Check (interactive only)
+
+After a write to `docs/solutions/`, run the check in
+`${CLAUDE_PLUGIN_ROOT}/skills/compound-lifecycle/references/discoverability.md`
+once per session. It confirms the repo's agent-instruction file still points at
+`docs/solutions/` and, if not, offers one informational line through
+`AskUserQuestion`. Skip it when spawned non-interactively.
+
 ## Success Output
 
 Print completion summary with:

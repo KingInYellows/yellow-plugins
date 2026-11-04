@@ -1,0 +1,119 @@
+#!/bin/bash
+# Give `/review:pr --report-only` a tree at the PR head without touching the
+# caller's checkout: no `git checkout`, no branch switch, no index or
+# work-tree change, and HEAD stays where it was.
+#
+# Usage:
+#   report-only-root open <PR#>
+#   report-only-root close <review_root>
+#
+# open, on success (exit 0), prints three lines:
+#   mode=in-place|worktree
+#   review_root=<absolute directory>
+#   head=<40-hex PR head>
+#   in-place: the current HEAD already is the PR head and `git status
+#     --porcelain` is empty, so the review reads the current tree.
+#   worktree: anything else. A detached worktree of the PR head is added
+#     under <git-common-dir>/yellow-review/report-only/pr-<N>.XXXXXX. A
+#     linked worktree has its own HEAD and index, so the caller's are not
+#     touched; it shares the object store and the review-findings ledger.
+#   The head comes from lib/review-ledger.sh remote-head, which re-reads
+#   headRefOid and fetches refs/pull/<N>/head (fork PRs included) into
+#   FETCH_HEAD only.
+# close removes a `worktree` root and prints `closed`. It refuses (exit 2)
+#   anything that is not a direct pr-* child of this clone's report-only
+#   directory made of plain path characters, so an in-place root (the
+#   caller's own checkout) is never removed.
+#
+# Exit status: 0 ok; 2 usage or refused path; 3 PR head unverifiable
+# (shallow clone, fetch failure, head moving); 1 any other failure. A failed
+# open leaves no worktree behind.
+
+set -u
+
+case "$0" in
+  */*) ROR_DIR=${0%/*} ;;
+  *) ROR_DIR=. ;;
+esac
+RL="$ROR_DIR/../../../lib/review-ledger.sh"
+
+die() {
+  printf '[review:pr] report-only: %s\n' "$2" >&2
+  exit "$1"
+}
+
+ror_base() {
+  local common
+  common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
+  case "$common" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  case "$common" in
+    *[!A-Za-z0-9._/@+-]*) return 1 ;;
+  esac
+  printf '%s/yellow-review/report-only\n' "$common"
+}
+
+cmd_open() {
+  local pr="${1:-}" head local_head top base root
+  case "$pr" in
+    '' | *[!0-9]* | 0*) die 2 "open: PR number must be a positive integer" ;;
+  esac
+  [ -x "$RL" ] || die 1 "open: review-ledger.sh not found next to this script"
+  head=$("$RL" remote-head "$pr") || die 3 "open: PR #$pr head unverifiable; nothing changed"
+  case "$head" in
+    *[!0-9a-f]* | '') die 3 "open: unexpected head value" ;;
+  esac
+  [ "${#head}" -eq 40 ] || [ "${#head}" -eq 64 ] || die 3 "open: unexpected head value"
+
+  local_head=$(git rev-parse -q --verify HEAD 2>/dev/null) || local_head=''
+  if [ "$local_head" = "$head" ] && [ -z "$(git status --porcelain --untracked-files=normal 2>/dev/null)" ]; then
+    top=$(git rev-parse --show-toplevel) || die 1 "open: no work tree"
+    # Later calls run `cd '<review_root>'`, so the path must be quote-safe.
+    case "$top" in
+      /*) ;;
+      *) die 1 "open: work tree path is not absolute" ;;
+    esac
+    case "$top" in
+      *[!A-Za-z0-9._/@+-]*) die 1 "open: work tree path has unsafe characters" ;;
+    esac
+    printf 'mode=in-place\nreview_root=%s\nhead=%s\n' "$top" "$head"
+    return 0
+  fi
+
+  base=$(ror_base) || die 1 "open: git dir path is not absolute or has unsafe characters"
+  mkdir -p "$base" || die 1 "open: cannot create $base"
+  git worktree prune 2>/dev/null
+  root=$(mktemp -d "$base/pr-$pr.XXXXXX") || die 1 "open: mktemp failed"
+  if ! git worktree add --quiet --detach "$root" "$head" >/dev/null 2>&1; then
+    rm -rf "$root"
+    git worktree prune 2>/dev/null
+    die 1 "open: git worktree add failed"
+  fi
+  printf 'mode=worktree\nreview_root=%s\nhead=%s\n' "$root" "$head"
+}
+
+cmd_close() {
+  local root="${1:-}" base rest
+  base=$(ror_base) || die 1 "close: git dir path is not absolute or has unsafe characters"
+  case "$root" in
+    '' | *[!A-Za-z0-9._/@+-]* | */../* | */.. | */./*) die 2 "close: refusing $root" ;;
+    "$base"/pr-*) ;;
+    *) die 2 "close: refusing $root" ;;
+  esac
+  rest=${root#"$base"/}
+  case "$rest" in
+    */*) die 2 "close: refusing $root" ;;
+  esac
+  git worktree remove --force "$root" 2>/dev/null
+  rm -rf "$root"
+  git worktree prune 2>/dev/null
+  printf 'closed\n'
+}
+
+case "${1:-}" in
+  open) shift; [ $# -eq 1 ] || die 2 "usage: report-only-root open <PR#>"; cmd_open "$1" ;;
+  close) shift; [ $# -eq 1 ] || die 2 "usage: report-only-root close <review_root>"; cmd_close "$1" ;;
+  *) die 2 "usage: report-only-root open <PR#> | close <review_root>" ;;
+esac
