@@ -10,6 +10,10 @@
  *   2. Block when a NEW or MODIFIED doc has missing/invalid required
  *      frontmatter fields (title, date, category, track, problem, tags) or
  *      out-of-enum values.
+ *   3. Block when the optional `retire_when` field (the outside-the-repo
+ *      condition that would retire a learning; ported from Compound
+ *      Engineering's ce-compound schema) is present but not a non-empty,
+ *      single-line string.
  *
  * The validator runs only on files in the diff against `origin/main` (or the
  * ref in `VALIDATE_SOLUTIONS_BASE_REF`). Pre-existing non-conforming docs
@@ -209,7 +213,14 @@ function getChangedFiles() {
       // emitted verbatim (no quoting).
       raw = execFileSync(
         'git',
-        ['diff', '--name-status', '-z', `${BASE_REF}...HEAD`, '--', 'docs/solutions/'],
+        [
+          'diff',
+          '--name-status',
+          '-z',
+          `${BASE_REF}...HEAD`,
+          '--',
+          'docs/solutions/',
+        ],
         { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
       );
     } catch (err) {
@@ -268,7 +279,7 @@ function getChangedFiles() {
     const normalized = path.posix.normalize(relPath);
     if (
       normalized !== relPath ||
-      normalized.split('/').some(s => s === '..') ||
+      normalized.split('/').some((s) => s === '..') ||
       path.isAbsolute(normalized)
     ) {
       process.stderr.write(
@@ -330,6 +341,11 @@ function parseFrontmatter(text) {
   // tags can be inline (`tags: [a, b]`) or block-list. yaml.parse normalises
   // both forms to a JS array, so a simple Array.isArray check suffices.
   fields.__hasTags = Array.isArray(parsed.tags) && parsed.tags.length > 0;
+  // YAML folds a block scalar (`|` / `>`, any indicator) and a plain or
+  // quoted scalar continued on indented lines into one parsed line, so
+  // record from the value node whether the source spans lines for
+  // validateRetireWhen(). The node range excludes trailing comments.
+  fields.__retireWhenMultiLine = retireWhenSpansLines(fmRaw);
   return fields;
 }
 
@@ -365,6 +381,56 @@ function validateFrontmatter(file, fm) {
       file,
       SOL_FRONTMATTER,
       `date "${fm.date}" is not ISO 8601 (YYYY-MM-DD)`
+    );
+  }
+}
+
+function retireWhenSpansLines(fmRaw) {
+  const doc = yaml.parseDocument(fmRaw);
+  const items = (doc.contents && doc.contents.items) || [];
+  const pair = items.find(
+    (i) => i.key && String(i.key.value) === 'retire_when'
+  );
+  const node = pair && pair.value;
+  if (!node || !node.range) return false;
+  if (node.type === 'BLOCK_LITERAL' || node.type === 'BLOCK_FOLDED') {
+    return true;
+  }
+  return /[\r\n]/.test(fmRaw.slice(node.range[0], node.range[1]));
+}
+
+// `retire_when` is optional. When present it names the change outside the
+// repo that would retire the learning, as one line a refresh can check.
+function validateRetireWhen(file, fm) {
+  if (!('retire_when' in fm)) return;
+  const value = fm.retire_when;
+  if (typeof value !== 'string') {
+    let got = typeof value;
+    if (Array.isArray(value)) got = 'a list';
+    else if (value === null) got = 'empty';
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      `retire_when must be a single-line string (got ${got}); omit the field ` +
+        'when no outside condition retires the learning'
+    );
+    return;
+  }
+  if (fm.__retireWhenMultiLine || /[\r\n]/.test(value)) {
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      'retire_when must be a single-line string, not a multi-line or block ' +
+        'scalar (`|` / `>`)'
+    );
+    return;
+  }
+  if (value.trim().length === 0) {
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      'retire_when is empty; omit the field when no outside condition ' +
+        'retires the learning'
     );
   }
 }
@@ -505,6 +571,7 @@ function main() {
       continue;
     }
     validateFrontmatter(entry.path, fm);
+    validateRetireWhen(entry.path, fm);
     if (entry.status === 'A') {
       if (validateSlug(entry.path)) {
         checkSlugCollision(entry.path, corpusIndex);

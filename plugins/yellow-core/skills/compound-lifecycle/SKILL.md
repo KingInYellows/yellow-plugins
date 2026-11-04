@@ -85,9 +85,9 @@ Glob `docs/solutions/**/*.md`, excluding:
 - `docs/solutions/archived/**` (already-archived entries)
 - `docs/solutions/_lifecycle-runs/**` (autofix run reports — avoid self-ingestion)
 
-Read frontmatter (`limit: 30`) of each candidate. Collect: `title`,
-`track`, `tags`, `problem`, `category`, `severity`, `status` (when
-present), `updated:` or file mtime fallback.
+Read frontmatter (`limit: 30`) of each candidate. Collect: `title`, `track`,
+`tags`, `problem`, `category`, `severity`, `status` (when present),
+`retire_when` (when present), `updated:` or file mtime fallback.
 
 ### Step 2 — Apply scope hint (if provided)
 
@@ -149,6 +149,31 @@ along these dimensions:
   results for its own problem statement (a self-recall failure is a
   drift signal)
 
+### Step 4a — Check retirement conditions
+
+A `retire_when` field names the change outside the repo that would retire a
+learning: an upstream bug fixed in a release, a tool or platform version, a
+dependency's behavior. List every in-scope candidate that carries it as its own
+triage group, whatever its staleness score, and keep the result out of the Step
+5 score.
+
+For each one, check the condition read-only. Use `gh issue view` / `gh pr view`
+on the cited upstream item, `gh release view` or release notes for a version,
+`claude --version` and the Claude Code changelog for Claude Code versions, and a
+web fetch for anything else. Never edit code, rerun CI, or remove a workaround
+to test the condition; a verification that needs a repo change belongs in the
+doc body as the step before removal.
+
+- **Met:** classify in Step 6 as Update, Replace, or Delete-and-archive, with
+  the evidence (`retire_when met: <issue closed in vX.Y>`) as the rationale.
+  Never Keep. The Step 5 citation gate does not apply: inbound references show
+  the doc is cited, not that it is still true.
+- **Not met:** no retirement action. Score and classify the doc in Steps 5-6
+  as usual, and report the check separately.
+- **Cannot check** (no network, private tracker, ambiguous wording): no
+  retirement action. Score and classify as usual, and report the check as
+  unverified with the reason.
+
 ### Step 5 — Compute staleness and overlap
 
 Before computing ANY staleness score or overlap cluster, Read
@@ -163,8 +188,8 @@ reclassifies entries, and the citation gate MUST run before the score
 
 ### Step 6 — Classify
 
-For each stale or overlapping candidate (or cluster), classify into one
-of five outcomes. The classification is a recommendation; the user has
+For each stale or overlapping candidate (or cluster), and each candidate with
+a met `retire_when` (Step 4a), classify into one of five outcomes. The classification is a recommendation; the user has
 final say in interactive mode.
 
 | Outcome | When | Action |
@@ -204,6 +229,9 @@ Mark Consolidate / Replace / Delete-and-archive candidates as
 `status: stale` with `stale_reason: <classification rationale>` and
 `stale_date: <today>` in their frontmatter, and surface them in the
 Recommendations section of the final report.
+
+A met `retire_when` never auto-applies in autofix mode: mark it `status: stale`
+with the evidence as `stale_reason`, whatever the outcome.
 
 ### Step 8 — Execute
 

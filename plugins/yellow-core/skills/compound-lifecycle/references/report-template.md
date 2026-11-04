@@ -21,6 +21,10 @@ in this shape — the sections are parsed by downstream readers.
 - High-confidence pairs (ruvector cosine ≥ 0.90): <int>
 - Review-suggestions (0.78–0.90): <int>
 
+### Retirement conditions (`retire_when`)
+- <category>/<slug>.md — <met | not met | unverified> — <evidence or reason>
+- ...
+
 ### Applied (interactive mode: with user approval; autofix: unambiguous Updates only)
 - <category>/<slug>.md — <classification> — <one-line rationale>
 - ...
