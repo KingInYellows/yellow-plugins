@@ -1161,7 +1161,9 @@ fi
 # creating a second task.
 REQUEST_ID="linear-${KEY}"
 
-OUTPUT=$(node "$CLI" delegate --repo "$AGY_REPO" --branch "$NEW_BRANCH" --base "$BASE" --remote origin --prompt-file "$PACKET_FILE" --request-id "$REQUEST_ID")
+# Git Bash rewrites /-leading arguments to native programs (/home/x becomes
+# C:/Program Files/Git/home/x); the WSL path must reach node unchanged.
+OUTPUT=$(MSYS_NO_PATHCONV=1 node "$CLI" delegate --repo "$AGY_REPO" --branch "$NEW_BRANCH" --base "$BASE" --remote origin --prompt-file "$PACKET_FILE" --request-id "$REQUEST_ID")
 printf 'exit=%s\n' "$?"
 printf 'branch=%s\n' "$NEW_BRANCH"
 printf '%s\n' "$OUTPUT" | jq -c '{ok, code: (.code // .error.code), localId, state, requiresAttention}'
@@ -1170,7 +1172,7 @@ case "$CODE" in
   AGY_AUTHORITY_DENIED|AGY_GRANT_EXPIRED|AGY_GRANT_EXHAUSTED)
     printf 'No live grant covers %s on %s. Ask the owner to run this in a separate terminal on this machine (not through Claude Code), then retry:\n' "$AGY_REPO" "$NEW_BRANCH"
     shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
-    printf '  node %s authorize --repo %s --branch %s --operations %s\n' "$(shq "$CLI")" "$(shq "$AGY_REPO")" "$(shq "agy/${ISSUE_ID}-*")" "$(shq create,approve,reply,collect)"
+    printf '  MSYS_NO_PATHCONV=1 node %s authorize --repo %s --branch %s --operations %s\n' "$(shq "$CLI")" "$(shq "$AGY_REPO")" "$(shq "agy/${ISSUE_ID}-*")" "$(shq create,approve,reply,collect)"
     ;;
 esac
 # agy-written text only inside a fence with a random tag.

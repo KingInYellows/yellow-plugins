@@ -237,6 +237,8 @@ setup() {
   [ -n "$block" ]
   printf '%s\n' "$block" | grep -qF 'CLI="${YELLOW_AGY_ROOT}/dist/cli.js"'
   printf '%s\n' "$block" | grep -qF -- '--prompt-file "$PACKET_FILE" --request-id "$REQUEST_ID")'
+  # Git Bash must not rewrite the WSL repo path on its way to node.
+  printf '%s\n' "$block" | grep -qF 'OUTPUT=$(MSYS_NO_PATHCONV=1 node "$CLI" delegate'
   printf '%s\n' "$block" | grep -qF "PACKET_FILE='YELLOW_TODO_packet_path_from_path_step'"
   # agy never pushes and this command never writes a grant.
   ! printf '%s\n' "$block" | grep -qE 'git push|authorize --repo "\$'
@@ -271,7 +273,7 @@ JS
   ARGV_OUT="$BATS_TEST_TMPDIR/argv.json" PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$script"
   [ "$status" -eq 0 ]
   [[ "$output" == *"branch=agy/ENG-7-r2"* ]]
-  [[ "$output" == *"authorize --repo '$repo' --branch 'agy/ENG-7-*'"* ]]
+  [[ "$output" == *"  MSYS_NO_PATHCONV=1 node '"*"' authorize --repo '$repo' --branch 'agy/ENG-7-*'"* ]]
   [ ! -e "$packet_dir" ]
   argv=$(cat "$BATS_TEST_TMPDIR/argv.json")
   [[ "$argv" == '["delegate","--repo","'"$repo"'","--branch","agy/ENG-7-r2","--base","main","--remote","origin","--prompt-file","'"$packet_dir"'/packet.txt","--request-id","linear-'* ]]
