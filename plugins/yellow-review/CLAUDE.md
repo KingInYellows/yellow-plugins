@@ -149,7 +149,7 @@ or written to the ledger. `tests/integration/review-gate-workflow.test.ts` runs
 the body in `node:vm` with stub agents; ESLint ignores `plugins/*/workflows/`
 because no parser accepts top-level `return` beside `export`.
 
-### Scripts (23)
+### Scripts (24)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
@@ -159,6 +159,9 @@ the resolve scripts: `references/resolve/dispositions.md`.
   — read PR threads, blockers, changed ranges, and new threads for the Step 8
   re-pass; `get-pr-comments --include-resolved` returns every thread with
   `isResolved`
+- `cross-model-mode` — resolves `cross_model_review` (`off` in the repo or
+  user-level `yellow-plugins.local.md` wins); `/review:pr` drops
+  `codex-reviewer` when it prints `off`
 - `prior-comments-context` — `/review:pr`'s fenced block of every earlier
   thread, review body and conversation comment for `previous-comments-reviewer`;
   prints nothing when the PR has none
