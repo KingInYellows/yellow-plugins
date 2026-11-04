@@ -294,6 +294,15 @@ JS
   [ ! -e "$packet_dir" ]
 }
 
+@test "agy block: output that is not a JSON envelope stops with an error" {
+  agy_block_script
+  printf 'process.exitCode = 1;\n' > "$BATS_TEST_TMPDIR/agy/dist/cli.js"
+  cd "$repo"
+  PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$script"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"agy returned no usable result (exit=1)"* ]]
+}
+
 @test "agy block: an unallocated packet path is refused before anything runs" {
   agy_block_script
   sed -i "s|^PACKET_FILE=.*|PACKET_FILE='/tmp/packet.txt'|" "$script"

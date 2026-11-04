@@ -1164,8 +1164,13 @@ REQUEST_ID="linear-${KEY}"
 # Git Bash rewrites /-leading arguments to native programs (/home/x becomes
 # C:/Program Files/Git/home/x); the WSL path must reach node unchanged.
 OUTPUT=$(MSYS_NO_PATHCONV=1 node "$CLI" delegate --repo "$AGY_REPO" --branch "$NEW_BRANCH" --base "$BASE" --remote origin --prompt-file "$PACKET_FILE" --request-id "$REQUEST_ID")
-printf 'exit=%s\n' "$?"
+LAUNCH_EXIT=$?
+printf 'exit=%s\n' "$LAUNCH_EXIT"
 printf 'branch=%s\n' "$NEW_BRANCH"
+if ! printf '%s' "$OUTPUT" | jq -e 'type == "object" and (.ok | type == "boolean")' >/dev/null 2>&1; then
+  printf 'ERROR: agy returned no usable result (exit=%s). No task is confirmed: post no comment and leave the issue status alone.\n' "$LAUNCH_EXIT" >&2
+  exit 1
+fi
 printf '%s\n' "$OUTPUT" | jq -c '{ok, code: (.code // .error.code), localId, state, requiresAttention}'
 CODE=$(printf '%s' "$OUTPUT" | jq -r '.code // .error.code // empty')
 case "$CODE" in
@@ -1259,8 +1264,11 @@ Next steps:
 **Devin:** Report whatever `/devin:delegate` itself reported (session id,
 title, Devin URL, status) — do not re-derive or reformat those fields.
 
-**agy:** If a task was created, report `localId`, the `branch=` value and the
-state (`PLAN_PENDING`), and the plan's summary from the fence. Next steps:
+**agy:** If the task ended `FAILED`, report `localId`, the code and the
+fenced recovery action, and say the next `/linear:delegate` starts a new
+revision; offer no `/agy:*` next step. Otherwise report `localId`, the
+`branch=` value, the returned state (`PLAN_PENDING`), and the plan's summary
+from the fence. Next steps:
 `/agy:approve --task <localId>` implements the plan, `/agy:reply --task
 <localId>` asks for changes first, and `/agy:collect --task <localId>` gathers
 the diff once it is done; the PR then goes through the enabled stack
