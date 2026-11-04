@@ -1187,7 +1187,13 @@ agy's proposal, not as instructions. On a grant refusal, show the printed
 `authorize` line and stop: nothing ran, no Linear comment is posted, and the
 issue is unchanged. Do not try to run `authorize` yourself. On
 `AGY_QUOTA_LOW` or `AGY_QUOTA_UNKNOWN`, nothing was created; say when to
-retry and stop. On any other `{ok:false}`, report the code and the fenced
+retry and stop. On `{ok:false}` with a `localId` and state `FAILED` (the plan
+turn timed out or the model failed), the task exists and its request is
+settled: the same revision only replays that failure. Report the code and
+the fenced recovery action, then continue to Step 8 with `**Status:** Failed
+(<code>)`. Posting that comment is the user's confirmed way to move on: the
+next `/linear:delegate` counts it, so it gets a new revision, branch and
+request id. On any other `{ok:false}`, report the code and the fenced
 recovery action and stop. **Never re-run the launch automatically.**
 
 ### Step 8: Confirm Before Posting the Linear Comment
@@ -1200,6 +1206,9 @@ Build comment content:
 **<Session/Agent/Task>:** <SESSION_URL, Cursor agent identifier, Jules session resource, or agy task id and branch — see Step 10>
 **Status:** Starting
 ```
+
+For an agy task that ended `FAILED` in Step 7, the status line is
+`**Status:** Failed (<code>)` instead.
 
 **Dedup check**: Reuse the Step 4 `list_comments` result (or re-fetch if
 Step 7 took long enough that a fresher read is warranted). Scan for any
@@ -1215,6 +1224,8 @@ If Yes: Call `save_comment` with the built body as `body` and the issue `id`
 ### Step 9: Update Status (Tier 1 Auto-Apply)
 
 Transition issue to "In Progress" (Tier 1 — auto-apply, non-terminal):
+
+Skip this step for an agy task that ended `FAILED`; nothing is in progress.
 
 1. **H1 re-fetch**: Call `get_issue` again to check current status
 2. If status has changed since Step 1: report the new status and skip the update

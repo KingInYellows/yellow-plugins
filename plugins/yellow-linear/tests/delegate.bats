@@ -319,6 +319,12 @@ JS
   [ ! -e "$BATS_TEST_TMPDIR/argv.json" ]
 }
 
+@test "a FAILED agy task goes on to a Failed comment so the next run gets a new revision" {
+  grep -qF 'with a `localId` and state `FAILED`' "$DELEGATE_MD"
+  grep -qF 'continue to Step 8 with `**Status:** Failed' "$DELEGATE_MD"
+  grep -qF '`**Status:** Failed (<code>)` instead.' "$DELEGATE_MD"
+}
+
 @test "READY_JULES maps to the jules provider inside the marked decision list" {
   providers_block=$(awk '/<!-- linear-delegate-providers:start -->/,/<!-- linear-delegate-providers:end -->/' "$DELEGATE_MD")
   printf '%s\n' "$providers_block" | grep -qF '**`READY_JULES`** → provider = `jules`'
