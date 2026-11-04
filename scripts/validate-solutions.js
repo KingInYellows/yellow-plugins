@@ -10,6 +10,17 @@
  *   2. Block when a NEW or MODIFIED doc has missing/invalid required
  *      frontmatter fields (title, date, category, track, problem, tags) or
  *      out-of-enum values.
+ *   3. Block when the optional `retire_when` field (the outside-the-repo
+ *      condition that would retire a learning; ported from Compound
+ *      Engineering's ce-compound schema) is present but not a non-empty,
+ *      single-line string.
+ *   4. Block when a NEW or MODIFIED doc's body cites a repo path, commit or
+ *      relative link that does not exist, or leaves a `{{...}}` drafting
+ *      placeholder (SOL-003; see scripts/lib/doc-claims.js, a Node
+ *      port of Compound Engineering's validate-doc-claims.py). Deleted
+ *      paths, stale checkouts, unclassifiable hex and links to archived
+ *      docs are warnings only, and so is any finding on a line marked
+ *      `(historical)`.
  *
  * The validator runs only on files in the diff against `origin/main` (or the
  * ref in `VALIDATE_SOLUTIONS_BASE_REF`). Pre-existing non-conforming docs
@@ -33,8 +44,17 @@
  *                                             this to inject synthetic change
  *                                             sets.
  *   SOLUTIONS_DIR=docs/solutions              corpus root (test override)
+ *   VALIDATE_SOLUTIONS_REPO_ROOT=<repo root>  root that cited paths and
+ *                                             commits resolve against (test
+ *                                             override)
  *   GITHUB_ACTIONS=true                       emits `::error file=`/`::notice::`
  *                                             annotations.
+ *
+ * Usage:
+ *   node scripts/validate-solutions.js              diff-scoped (CI)
+ *   node scripts/validate-solutions.js --doc <path> one doc, no diff; used by
+ *                                                   knowledge-compounder
+ *                                                   before its M3 gate
  *
  * Exit codes:
  *   0 - no validation errors (or soft-skip)
@@ -49,6 +69,8 @@ const os = require('os');
 const path = require('path');
 
 const yaml = require('yaml');
+
+const { checkDocClaims } = require('./lib/doc-claims');
 
 // Private Symbol sentinel for YAML parse errors. Symbol keys cannot appear in
 // a YAML-parsed object (YAML produces only string-keyed objects), so there is
@@ -77,6 +99,18 @@ if (
   process.exit(1);
 }
 
+const REPO_ROOT = path.resolve(
+  process.env.VALIDATE_SOLUTIONS_REPO_ROOT || ROOT
+);
+if (REPO_ROOT !== ROOT && !REPO_ROOT.startsWith(TMP_PREFIX + path.sep)) {
+  console.error(
+    '[validate-solutions] Error: VALIDATE_SOLUTIONS_REPO_ROOT must be the ' +
+      'project root or under the system temp dir. Refusing: ' +
+      REPO_ROOT
+  );
+  process.exit(1);
+}
+
 const IS_CI = process.env.GITHUB_ACTIONS === 'true';
 const BASE_REF = process.env.VALIDATE_SOLUTIONS_BASE_REF || 'origin/main';
 
@@ -85,6 +119,7 @@ const BASE_REF = process.env.VALIDATE_SOLUTIONS_BASE_REF || 'origin/main';
 const SOL = 'ERROR-' + 'SOL';
 const SOL_SLUG_COLLISION = SOL + '-001';
 const SOL_FRONTMATTER = SOL + '-002';
+const SOL_CLAIM = SOL + '-003';
 
 const VALID_CATEGORIES = new Set([
   'security-issues',
@@ -114,6 +149,16 @@ function emitError(file, code, msg) {
     console.log(`::error file=${file}::${code}: ${msg}`);
   } else {
     console.error(`✗ ${file}: ${code}: ${msg}`);
+  }
+}
+
+let warningCount = 0;
+function emitWarning(file, msg) {
+  warningCount += 1;
+  if (IS_CI) {
+    console.log(`::warning file=${file}::${msg}`);
+  } else {
+    console.error(`! ${file}: warning: ${msg}`);
   }
 }
 
@@ -209,7 +254,14 @@ function getChangedFiles() {
       // emitted verbatim (no quoting).
       raw = execFileSync(
         'git',
-        ['diff', '--name-status', '-z', `${BASE_REF}...HEAD`, '--', 'docs/solutions/'],
+        [
+          'diff',
+          '--name-status',
+          '-z',
+          `${BASE_REF}...HEAD`,
+          '--',
+          'docs/solutions/',
+        ],
         { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
       );
     } catch (err) {
@@ -268,7 +320,7 @@ function getChangedFiles() {
     const normalized = path.posix.normalize(relPath);
     if (
       normalized !== relPath ||
-      normalized.split('/').some(s => s === '..') ||
+      normalized.split('/').some((s) => s === '..') ||
       path.isAbsolute(normalized)
     ) {
       process.stderr.write(
@@ -330,6 +382,11 @@ function parseFrontmatter(text) {
   // tags can be inline (`tags: [a, b]`) or block-list. yaml.parse normalises
   // both forms to a JS array, so a simple Array.isArray check suffices.
   fields.__hasTags = Array.isArray(parsed.tags) && parsed.tags.length > 0;
+  // YAML folds a block scalar (`|` / `>`, any indicator) and a plain or
+  // quoted scalar continued on indented lines into one parsed line, so
+  // record from the value node whether the source spans lines for
+  // validateRetireWhen(). The node range excludes trailing comments.
+  fields.__retireWhenMultiLine = retireWhenSpansLines(fmRaw);
   return fields;
 }
 
@@ -365,6 +422,56 @@ function validateFrontmatter(file, fm) {
       file,
       SOL_FRONTMATTER,
       `date "${fm.date}" is not ISO 8601 (YYYY-MM-DD)`
+    );
+  }
+}
+
+function retireWhenSpansLines(fmRaw) {
+  const doc = yaml.parseDocument(fmRaw);
+  const items = (doc.contents && doc.contents.items) || [];
+  const pair = items.find(
+    (i) => i.key && String(i.key.value) === 'retire_when'
+  );
+  const node = pair && pair.value;
+  if (!node || !node.range) return false;
+  if (node.type === 'BLOCK_LITERAL' || node.type === 'BLOCK_FOLDED') {
+    return true;
+  }
+  return /[\r\n]/.test(fmRaw.slice(node.range[0], node.range[1]));
+}
+
+// `retire_when` is optional. When present it names the change outside the
+// repo that would retire the learning, as one line a refresh can check.
+function validateRetireWhen(file, fm) {
+  if (!('retire_when' in fm)) return;
+  const value = fm.retire_when;
+  if (typeof value !== 'string') {
+    let got = typeof value;
+    if (Array.isArray(value)) got = 'a list';
+    else if (value === null) got = 'empty';
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      `retire_when must be a single-line string (got ${got}); omit the field ` +
+        'when no outside condition retires the learning'
+    );
+    return;
+  }
+  if (fm.__retireWhenMultiLine || /[\r\n]/.test(value)) {
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      'retire_when must be a single-line string, not a multi-line or block ' +
+        'scalar (`|` / `>`)'
+    );
+    return;
+  }
+  if (value.trim().length === 0) {
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      'retire_when is empty; omit the field when no outside condition ' +
+        'retires the learning'
     );
   }
 }
@@ -446,8 +553,74 @@ function checkSlugCollision(file, corpusIndex) {
   }
 }
 
+// `--doc <path>`: validate one doc outside the diff (knowledge-compounder
+// runs this before M3). Status 'M' skips the slug-collision check, which
+// the agent's own suffix loop already covers.
+let DOC_MODE = false;
+function getDocArg() {
+  const i = process.argv.indexOf('--doc');
+  if (i === -1) return undefined;
+  const arg = process.argv[i + 1];
+  if (!arg) {
+    console.error('[validate-solutions] Error: --doc needs a path');
+    process.exit(2);
+  }
+  const abs = path.resolve(arg);
+  const rel = path.relative(SOLUTIONS_DIR, abs).split(path.sep).join('/');
+  if (
+    rel.startsWith('..') ||
+    path.isAbsolute(rel) ||
+    rel.startsWith('archived/') ||
+    rel.split('/').length !== 2 ||
+    !rel.endsWith('.md')
+  ) {
+    console.error(
+      '[validate-solutions] Error: --doc must name a live ' +
+        `docs/solutions/<category>/<slug>.md file, got: ${arg}`
+    );
+    process.exit(2);
+  }
+  return [{ status: 'M', path: `docs/solutions/${rel}` }];
+}
+
+// The doc as it was before this change, or undefined when it did not exist
+// (or git cannot say): the merge base in a diff-scoped run, HEAD with --doc
+// (so an uncommitted amendment is judged only on what it adds).
+function baseVersion(relPath) {
+  const run = (args) =>
+    execFileSync('git', args, {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  try {
+    const base = DOC_MODE
+      ? 'HEAD'
+      : run(['merge-base', BASE_REF, 'HEAD']).trim();
+    return run(['show', `${base}:${relPath}`]);
+  } catch {
+    return undefined;
+  }
+}
+
+function checkClaims(entry, fullPath, text) {
+  const result = checkDocClaims({
+    text,
+    docPath: fullPath,
+    repoRoot: REPO_ROOT,
+    baseRef: BASE_REF,
+    baselineText: entry.status === 'M' ? baseVersion(entry.path) : undefined,
+  });
+  const { warnings, notes } = result;
+  for (const msg of result.errors) emitError(entry.path, SOL_CLAIM, msg);
+  for (const msg of warnings) emitWarning(entry.path, msg);
+  for (const msg of notes) emitNotice(`${entry.path}: note: ${msg}`);
+}
+
 function main() {
-  const changed = getChangedFiles();
+  const docArg = getDocArg();
+  DOC_MODE = docArg !== undefined;
+  const changed = docArg || getChangedFiles();
   if (changed === null) {
     emitNotice(
       `cannot reach ${BASE_REF} (likely fork PR or shallow clone) — ` +
@@ -505,6 +678,8 @@ function main() {
       continue;
     }
     validateFrontmatter(entry.path, fm);
+    validateRetireWhen(entry.path, fm);
+    checkClaims(entry, fullPath, text);
     if (entry.status === 'A') {
       if (validateSlug(entry.path)) {
         checkSlugCollision(entry.path, corpusIndex);
@@ -514,7 +689,7 @@ function main() {
 
   console.log(
     `\n[validate-solutions] checked ${changed.length} file(s); ` +
-      `${errors.length} error(s)`
+      `${errors.length} error(s), ${warningCount} warning(s)`
   );
   process.exit(errors.length > 0 ? 1 : 0);
 }

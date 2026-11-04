@@ -105,7 +105,7 @@ grep '^STATUSLINE_VERSION' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-statuslin
 | ------------------------ | -------------------------------------------------------------- |
 | `spec-flow-analyzer`     | User flow analysis, gap identification                         |
 | `brainstorm-orchestrator` | Iterative brainstorm dialogue with research integration       |
-| `knowledge-compounder`   | Extract and document solved problems to compound knowledge     |
+| `knowledge-compounder`   | Extract and document solved problems to compound knowledge; writes only learnings that pass the durable-bar counterfactual, then checks cited paths, commits and links with `validate-solutions.js --doc` |
 | `session-historian`      | Cross-vendor session search across Claude Code (local JSONL), Devin (REST API via MCP), and Codex (local directory-per-session); BM25 + optional ruvector cosine + recency fused via Reciprocal Rank Fusion; secret redaction (AWS keys, GitHub tokens, API keys, JWTs, PEM blocks) before excerpts are returned |
 | `staging-reviewer`       | Drain orchestrator for the background-compounding pipeline; spawned by the SessionStart hook's `claude -p` drain subshell |
 | `staging-scorer`         | Haiku-backed rubric scorer for one transcript excerpt; structured JSON output with hardened prompt covering injection-attempt detection |
@@ -118,7 +118,7 @@ grep '^STATUSLINE_VERSION' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-statuslin
 | `agent-native-architecture` | Reference for five agent-native architecture principles: action parity, context parity, shared workspace, primitives over workflows, dynamic context injection (applied by `yellow-review:review:agent-native-reviewer`)                                            |
 | `agent-native-audit`        | Step-by-step audit checklist for evaluating an existing codebase against agent-native principles — capability mapping, noun test, anti-pattern catalog                                                                                                              |
 | `brainstorming`       | Reference guide for iterative brainstorm dialogues — question techniques, YAGNI, approach exploration, and research escalation                                    |
-| `compound-lifecycle`  | Audit, refresh, and consolidate `docs/solutions/` with composite-scored staleness detection, BM25+cosine overlap clustering, and archive superseded entries       |
+| `compound-lifecycle`  | Audit, refresh, and consolidate `docs/solutions/` with composite-scored staleness detection, BM25+cosine overlap clustering, and archive superseded entries; checks each `retire_when` condition read-only and never auto-applies a met one |
 | `create-agent-skills` | Guidance for creating skills and agents: Claude 5 body style, security-fencing for untrusted input, reviewer/scanner confidence-scored findings vs task-specific output for other archetypes, W1.5b `disallowedTools` on memory-backed read-only agents |
 | `debugging`           | Systematic root-cause debugging with causal-chain gate, prediction-for-uncertain-links hypotheses, three-failed-attempts smart escalation, and conditional defense-in-depth |
 | `git-worktree`        | Git worktree management for parallel development                                                                                                                  |

@@ -789,7 +789,7 @@ with consent.
 
 **yellow-agy:**
 
-Scaffold successor to yellow-jules (setup checks only). Classify from Step 1's
+Local successor to yellow-jules (`/agy:*` delegate commands). Classify from Step 1's
 `agy:` row, the same row yellow-council reads. On Windows agy may live only
 inside WSL, which this dashboard does not probe; `/agy:setup` is authoritative
 and also checks auth variables and overages.

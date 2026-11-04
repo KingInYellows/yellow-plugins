@@ -93,9 +93,12 @@ export const ERROR_CODES = {
   // entries serve as the single source of truth that the validator's
   // assembled strings MUST match; any change here requires a paired edit
   // in scripts/validate-solutions.js (the constants SOL/SOL_SLUG_COLLISION/
-  // SOL_FRONTMATTER).
+  // SOL_FRONTMATTER/SOL_CLAIM_UNGROUNDED). SOL-003 is the body claim-
+  // grounding check (scripts/lib/doc-claims.js): a cited path, commit or
+  // relative link that does not exist, or a leftover {{...}} scaffold.
   SOL_SLUG_COLLISION: 'ERROR-SOL-001',
   SOL_FRONTMATTER_INVALID: 'ERROR-SOL-002',
+  SOL_CLAIM_UNGROUNDED: 'ERROR-SOL-003',
 
   // Plan Lifecycle Errors (PLAN) — scripts/validate-plans.js gates plans
   // newly added or modified under `plans/complete/` against stray unchecked
@@ -464,6 +467,7 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
     [ErrorCategory.SOLUTION_DOCS]: [
       ERROR_CODES.SOL_SLUG_COLLISION,
       ERROR_CODES.SOL_FRONTMATTER_INVALID,
+      ERROR_CODES.SOL_CLAIM_UNGROUNDED,
     ],
     [ErrorCategory.PLAN_LIFECYCLE]: [ERROR_CODES.PLAN_STRAY_CHECKBOX],
     [ErrorCategory.SETUP_COVERAGE]: [

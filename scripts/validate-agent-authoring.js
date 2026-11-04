@@ -222,6 +222,30 @@ const MEMORY_PROTOCOL_SENTINEL_FILES = [
   'yellow-core/skills/mcp-integration-patterns/SKILL.md',
 ];
 
+// RULE 22 — durable-bar drift lint. CE's durable-bar paragraph (ported from
+// EveryInc/compound-engineering-plugin skills/ce-compound/SKILL.md @ b405537)
+// gates every new learning in knowledge-compounder and staging-scorer. Each
+// copy sits between DURABLE_BAR_START/END markers and must be byte-identical
+// to every other copy, and its whitespace-normalized text must equal the
+// upstream paragraph so a matching edit to all copies cannot drift from CE
+// silently. Markdown outside the declared files may not carry the markers.
+const DURABLE_BAR_START = '<!-- durable-bar:start -->';
+const DURABLE_BAR_END = '<!-- durable-bar:end -->';
+const DURABLE_BAR_TEXT =
+  'A learning earns its place only when it holds durable project reasoning ' +
+  'that is not readily recoverable from the final code, tests, types, ' +
+  'comments, or existing documentation, and losing it would plausibly cause ' +
+  'recurrence, material risk, or substantial rediscovery. Apply this ' +
+  'counterfactual: if the learning document disappeared, would a future ' +
+  'engineer reading the final implementation still be likely to repeat the ' +
+  'mistake or redo substantial investigation? Completion, effort, and diff ' +
+  'size do not establish eligibility.';
+// Plugins-relative POSIX paths of every file that carries the block.
+const DURABLE_BAR_FILES = [
+  'yellow-core/agents/workflow/knowledge-compounder.md',
+  'yellow-core/agents/workflow/staging-scorer.md',
+];
+
 // RULE 15 (a–d) — SKILL.md authoring lint, ALL warning-tier. AGENTS.md and
 // the root CLAUDE.md document these skill-authoring conventions but until
 // this rule nothing enforced them (docs/optimization/analysis.md §3.4 calls
@@ -1087,6 +1111,101 @@ function validateMemoryProtocolSentinel(markdownFiles, errors) {
   }
 }
 
+// RULE 22 — durable-bar drift lint (see the constant block above).
+function extractDurableBar(content) {
+  const normalized = content.replace(/\r\n/g, '\n');
+  const start = normalized.indexOf(DURABLE_BAR_START);
+  if (start === -1) return null;
+  const bodyStart = start + DURABLE_BAR_START.length;
+  const end = normalized.indexOf(DURABLE_BAR_END, bodyStart);
+  if (end === -1) return null;
+  const rest = normalized.slice(end + DURABLE_BAR_END.length);
+  return {
+    body: normalized.slice(bodyStart, end),
+    duplicated: rest.includes(DURABLE_BAR_START),
+  };
+}
+
+function validateDurableBar(markdownFiles, errors) {
+  const declaredPaths = DURABLE_BAR_FILES.map((rel) =>
+    path.join(PLUGINS_DIR, ...rel.split('/'))
+  );
+  const declared = new Set(declaredPaths);
+  // Same fixture convention as RULE 16: a fixture tree only writes the files
+  // a test exercises, so absence is expected unless strict mode is forced.
+  const fixtureRun = Boolean(process.env.VALIDATE_PLUGINS_DIR);
+  const strict = !fixtureRun || process.env.VALIDATE_SENTINEL_STRICT === '1';
+  // Fixture trees built for other rules reuse these agent paths without the
+  // bar; in a non-strict fixture run, check only once some declared file
+  // opts in by carrying the start marker.
+  const optedIn = declaredPaths.some(
+    (p) =>
+      fs.existsSync(p) &&
+      fs.readFileSync(p, 'utf8').includes(DURABLE_BAR_START)
+  );
+  const checkDeclared = strict || optedIn;
+  const copies = [];
+
+  for (const filePath of checkDeclared ? declaredPaths : []) {
+    if (!fs.existsSync(filePath)) {
+      if (strict) {
+        errors.push(
+          `${relative(filePath)}: RULE 22 — declared durable-bar file is ` +
+            `missing. Update DURABLE_BAR_FILES (scripts/validate-agent-` +
+            `authoring.js) in the same commit that moves or removes it.`
+        );
+      }
+      continue;
+    }
+    const block = extractDurableBar(fs.readFileSync(filePath, 'utf8'));
+    if (!block) {
+      errors.push(
+        `${relative(filePath)}: RULE 22 — missing durable-bar block. Keep ` +
+          `CE's paragraph between "${DURABLE_BAR_START}" and ` +
+          `"${DURABLE_BAR_END}".`
+      );
+      continue;
+    }
+    if (block.duplicated) {
+      errors.push(
+        `${relative(filePath)}: RULE 22 — more than one durable-bar block; ` +
+          `keep exactly one.`
+      );
+    }
+    if (block.body.replace(/\s+/g, ' ').trim() !== DURABLE_BAR_TEXT) {
+      errors.push(
+        `${relative(filePath)}: RULE 22 — durable-bar text differs from ` +
+          `CE's paragraph (DURABLE_BAR_TEXT). Port upstream changes by ` +
+          `updating the constant and every copy together.`
+      );
+    }
+    copies.push({ filePath, body: block.body });
+  }
+
+  for (let i = 1; i < copies.length; i += 1) {
+    if (copies[i].body !== copies[0].body) {
+      errors.push(
+        `${relative(copies[i].filePath)}: RULE 22 — durable-bar block is ` +
+          `not byte-identical to the copy in ` +
+          `${relative(copies[0].filePath)}. Copy the block verbatim, ` +
+          `including line wrapping.`
+      );
+    }
+  }
+
+  for (const filePath of markdownFiles) {
+    if (declared.has(filePath)) continue;
+    const content = fs.readFileSync(filePath, 'utf8');
+    if (content.includes(DURABLE_BAR_START)) {
+      errors.push(
+        `${relative(filePath)}: RULE 22 — undeclared durable-bar copy. Add ` +
+          `this file to DURABLE_BAR_FILES (scripts/validate-agent-` +
+          `authoring.js) or remove the block.`
+      );
+    }
+  }
+}
+
 // RULE 17 — wrapper -> canonical-skill drift lint. A command markdown file
 // using the shell-03 wrapper idiom ("Invoke the `Skill` tool with `skill:
 // "<name>"`.") must have a matching skills/<name>/SKILL.md in the SAME
@@ -1705,6 +1824,7 @@ function main() {
   validateSkillFiles(skillFiles, { errors, warnings });
   validateSizeCeilings(commandFiles, agentFiles, warnings);
   validateMemoryProtocolSentinel(markdownFiles, errors);
+  validateDurableBar(markdownFiles, errors);
   validateStagingPromoterFrontmatter(agentFiles, errors);
   validateMemoryWriteSectionGate(agentFiles, errors);
 

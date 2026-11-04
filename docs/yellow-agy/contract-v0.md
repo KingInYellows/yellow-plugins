@@ -1,16 +1,17 @@
 # yellow-agy provider CLI contract, version 0 (draft)
 
-Status: draft for review, 2026-10-30. Nothing implements it yet. It replaces
-`docs/yellow-jules/contract-v1.md` once yellow-agy ships. Evidence:
+Status: draft, 2026-10-30; implemented by `plugins/yellow-agy` from 2026-11-03.
+It replaces `docs/yellow-jules/contract-v1.md` once yellow-agy ships. Evidence:
 `docs/spikes/antigravity-cli-delegate-2026-10.md`.
 
 ## Scope
 
 yellow-agy hands one coding task to the Antigravity CLI (`agy`) running on the
 owner's own machine, in an isolated git worktree, under the owner's Google AI
-Pro sign-in. It keeps yellow-jules' authority model (owner-typed grants,
-controller epoch, locked journal) and its verbs, so `/linear:delegate` keeps its
-shape. It replaces the vendor session API with local child processes.
+Pro sign-in. It keeps yellow-jules' authority model (owner-typed grants, locked
+journal; v0 drops the controller epoch, see "Output envelope") and its verbs, so
+`/linear:delegate` keeps its shape. It replaces the vendor session API with
+local child processes.
 
 Routing is an adapter-phase prerequisite, not part of v0: the delegate
 classifier gains `READY_AGY` and accepts `--provider agy`. `READY_JULES` and
@@ -73,11 +74,11 @@ in WSL. The hard rules apply on every host. `--sandbox` is unverified on native
 Windows, so test and lint commands stay off there. `setup` resolves one
 invocation and records it in the data dir:
 
-| Host                       | Invocation                                                                                                                         | Worktree root                                                            |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                    | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
-| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u <each BRIDGE_UNSET_VARS name> <the GIT_CONFIG_COUNT/KEY_n/VALUE_n set below> agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
-| Windows native agy         | `agy.exe`                                                                                                                          | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
+| Host                       | Invocation                                                                                                                                                                | Worktree root                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Linux / macOS / inside WSL | `agy` on `PATH`                                                                                                                                                           | `${XDG_DATA_HOME:-$HOME/.local/share}/yellow-agy/worktrees`              |
+| Windows with agy in WSL    | `wsl.exe -d <distro> --cd <wsl-path> -e env -u <each BRIDGE_UNSET_VARS name> <the GIT_CONFIG_COUNT/KEY_n/VALUE_n set below> setsid -w sh -c <fixed pgid script> sh agy …` | WSL `~/.local/share/yellow-agy/worktrees` (agy trusts only the WSL home) |
+| Windows native agy         | `agy.exe`                                                                                                                                                                 | `%LOCALAPPDATA%\yellow-agy\worktrees`                                    |
 
 The worktree is created where agy runs. On the WSL bridge that means a WSL clone
 of the repo, never `/mnt/c`. The bridge always uses `wsl.exe --exec` (`-e`),
@@ -86,6 +87,14 @@ never the `--` form, so no shell in the distro re-parses prompts or the
 `stream-json` mode, which v0 doesn't use. Windows caps a command line at 32,767
 characters, so on the bridge a prompt whose full argv would exceed 30,000
 characters fails with `AGY_PROMPT_TOO_LONG` before anything spawns.
+
+Killing `wsl.exe` does not stop the Linux processes behind it, so on the bridge
+`setsid` makes agy lead its own Linux process group, a fixed `sh -c` script
+(arguments stay positional) prints `yellow-agy-pgid:<pgid>` as the first stderr
+line, and a deadline or cancel runs
+`wsl.exe [-d <distro>] -e kill -s TERM|KILL -- -<pgid>`. The marker line is
+stripped before classification. On POSIX hosts agy and every host git call run
+in their own process group, and a timeout signals the group.
 
 ## Run lifecycle
 
@@ -109,21 +118,34 @@ characters fails with `AGY_PROMPT_TOO_LONG` before anything spawns.
    `approve` can start implementation. After approval it uses the implement
    profile. A correction spends a corrective round (R31 counters, unchanged). A
    `PLAN_PENDING` correction passes `--json-schema <plan.schema.json>` and
-   replaces the stored plan, so `approve` implements the corrected plan.
-4. `collect` (no live run): `git -C <worktree> format-patch <base>..HEAD` for
+   replaces the stored plan, so `approve` implements the corrected plan. A
+   correction turn that completes without a valid plan clears it, and `approve`
+   refuses until one arrives; a correction turn that fails (auth, quota, model
+   error, timeout, interrupt) keeps the old plan. A plan turn that times out or
+   is interrupted is a failure with `AGY_TIMEOUT` / `AGY_INTERRUPTED`, never a
+   `PLAN_PENDING` success. Plans, denied actions and finish reasons are redacted
+   before they reach the journal.
+4. `collect` (no live run on any task; it holds the active-run claim until its
+   artifacts are written): `git -C <worktree> format-patch <base>..HEAD` for
    commits, then, in a temporary `GIT_INDEX_FILE` seeded from the real index,
    `git add --intent-to-add --all` and `git diff --binary HEAD`, leaving the
    real index untouched, for staged, unstaged and untracked changes, into
-   `artifacts/<localId>/`. Every artifact is scanned with yellow-jules'
-   secret-shape layers; a hit sets `secretShapedContent: true` and
-   `requiresAttention`, and the owner reviews it before the stack provider opens
-   a PR.
+   `artifacts/<localId>/`. Both pass `--no-ext-diff --no-textconv`, so no
+   repository diff helper runs outside agy's sandbox, and patches are kept as
+   raw bytes (text files need not be UTF-8). A nested git repository that HEAD
+   doesn't already track as a gitlink can't be carried in a patch, so `collect`
+   (and with it `abandon`) refuses with `AGY_WORKTREE`. Ignored paths are never
+   collected, a repository inside one included, and `abandon` removes them with
+   the worktree. An empty generated patch is removed. Every artifact is scanned
+   with yellow-jules' secret-shape layers; a hit sets
+   `secretShapedContent: true` and `requiresAttention`, and the owner reviews it
+   before the stack provider opens a PR.
 5. `abandon` (terminal-gated, no live run): run `collect` first so nothing is
    lost, settle the journal, `git worktree remove --force` the worktree, and
    keep the branch.
-6. `status` / `list`: built from the journal and worktree git state. There's no
-   vendor polling. `supervise` does at most one `reply` or `approve` per pass,
-   the same as today.
+6. `status` / `list`: read from the journal alone. There's no vendor polling.
+   `supervise` does at most one `reply` or `approve` per pass, the same as
+   today.
 
 ## Reservations, retries and recovery
 
@@ -151,15 +173,34 @@ local processes.
 - A claim whose pid is dead is stale. The next call settles it before doing
   anything else. A `delegate` reservation with no `conversation_id` is released:
   its worktree is removed, and its branch is deleted if it has no commits beyond
-  the base. A turn reservation is settled as `INTERRUPTED`.
+  the base. When the crash came before the base was journaled, no turn has run,
+  so the base is the worktree's `HEAD`, read only while it still has that branch
+  checked out. If removing that worktree fails and it still exists, the claim
+  stays and the call fails with `AGY_WORKTREE` naming the command to run. A
+  stale `collect` claim is dropped. A stale `abandon` claim settles the task as
+  `ABANDONED` when its worktree is gone, and otherwise is dropped so `abandon`
+  can be retried. Other turn reservations settle with an `AGY_INTERRUPTED`
+  outcome: an unapproved `PLAN_PENDING` task stays `PLAN_PENDING`, any other
+  task becomes `INTERRUPTED`, and a claim with a recorded child pid adds a usage
+  entry. The settlement is written before the new call's own checks run.
+- The agy child's pid is written to the claim before the turn can settle; if
+  that write fails, the turn is stopped and the call fails with the write's
+  error. Journal writes fsync the temp file and then the directory around the
+  rename. A stale lock is removed only by the holder of `journal.lock.takeover`,
+  and only if it still holds the exact text judged stale; a holder removes its
+  lock on release only if the lock still holds its own token.
 - After `INTERRUPTED` or `TIMED_OUT`, the worktree may hold partial edits. The
   next `approve` or `reply` refuses with `requiresAttention` until the owner
   passes `--keep-partial` (continue on top of them) or `--reset-partial`. Reset
-  runs `git reset --hard <pre-turn HEAD>` and `git clean -fd`, then restores the
-  snapshot with `git read-tree --reset -u <snapshot>` followed by the index-only
-  `git read-tree <pre-turn-index>`, so work from earlier turns, deletions
-  included, comes back with its staged and unstaged parts as they were. Both
-  refs are deleted once the reset or the next turn settles.
+  first lists every ignored untracked file under the rules in force, then runs
+  `git reset --hard <pre-turn HEAD>` and `git read-tree --reset -u <snapshot>`,
+  then `git clean -fd` against a scratch index holding the snapshot tree plus
+  those files, and finally the index-only `git read-tree <pre-turn-index>`.
+  Clean never touches an indexed path, so a file the turn's rules ignored
+  survives even when the restored `.gitignore` files un-ignore it. Work from
+  earlier turns, deletions included, comes back with its staged and unstaged
+  parts as they were. Both refs are deleted once the reset or the next turn
+  settles.
 
 ## Permission profiles (`--settings` JSON)
 
@@ -215,8 +256,8 @@ defense in depth.
   program-running or rerouting `GIT_*` variable git(1) documents (`GIT_EDITOR`,
   `GIT_EXTERNAL_DIFF`, `GIT_PAGER`, `GIT_ASKPASS`, …), since the distro's own
   environment is out of the Windows-side scrub's reach. The adapter's own host
-  git calls (`collect`, snapshots, in the lifecycle PR) use the same override
-  set and scrubbed environment.
+  git calls (`collect`, snapshots) use the same override set and scrubbed
+  environment, and discover the filter drivers afresh before each call.
 
 ## Result classification
 
@@ -276,16 +317,56 @@ and after each turn.
 ## Output envelope, exit codes, error catalog, local state, grants
 
 These are the same as yellow-jules contract-v1 (one JSON object on stdout, exit
-0/1/2, `requiresAttention` + `attention`, owner-only data dir, grants written
-only by `authorize` on `/dev/tty`, controller epoch). The changes are the
-`AGY_*` code prefix, the `YELLOW_AGY_*` env prefix, and a grant that names
-`--allow-command` patterns and `minQuotaPercent` instead of vendor sources.
+0/1/2, `requiresAttention` + `attention`, owner-only data dir, grants created
+only by `authorize` after a terminal confirmation). The changes are the `AGY_*`
+code prefix, the `YELLOW_AGY_*` env prefix, and a grant that names
+`--allow-command` patterns and `minQuotaPercent` instead of vendor sources. On
+Windows the owner-only guarantee covers the per-user default under
+`%LOCALAPPDATA%`; a `YELLOW_AGY_DATA_DIR` override inherits whatever ACL its
+directory has, so point it only at a directory you alone can read.
+
+Grants live in the journal (`grants`), so a grant's check and its charge are
+part of the same locked write as the reservation they cover. A grant names the
+canonical repo path, an exact branch or a prefix ending in one `*`, the
+operations it permits (`create`, `approve`, `reply`, `collect`), the
+`--allow-command` list, `minQuotaPercent` (default 10), `maxTotalTasks` (default
+3, at most 10), `maxCorrectiveRounds` per task (default 2, at most 3) and an
+expiry (default 120 minutes, at most 24 hours). `delegate` picks the
+latest-expiring live grant that covers the repo and branch; every later call
+uses the grant its task was created under. A `delegate` refused before its
+worktree exists (quota gate, a worktree conflict) gives the task back; one that
+ran a turn keeps it spent. `authorize --list` and `--revoke` need no terminal,
+because they never widen authority. `abandon` needs no grant, so it works after
+one expires, and is confirmed on the terminal instead. The confirmation opens
+`/dev/tty`, or the console (`CONIN$`/`CONOUT$`) on Windows, which is unverified
+until the real-Windows check. v0 has no controller epoch: there is one journal
+on one host, and the active-run claim already serializes runs.
+
+`setup` records the resolved host in `host.json` in the data dir, and every call
+that runs agy or git (`delegate`, `approve`, `reply`, `collect`, `abandon`,
+`authorize` when it creates a grant) refuses until it exists. `status`,
+`authorize --list` and `--revoke` only read or narrow the journal. On the bridge
+it resolves the worktree root with `realpath -e` inside WSL and refuses a result
+under `/mnt`.
+
+The `/usage` shape is pinned to the output captured from agy 1.4.12 on the
+owner's WSL host (`plugins/yellow-agy/tests/fixtures/usage-1.4.12.json`):
+`status` is `"SUCCESS"`, `command.name` is `"usage"`, and
+`command.data.groups[]` each hold `buckets[]` with a 0-1 `remaining_fraction`
+(groups are model families, each with one or more buckets such as the weekly and
+5-hour windows). The gate takes the lowest fraction across every bucket, because
+agy picks the model, multiplies it by 100, subtracts recent turns, and compares
+the result with `minQuotaPercent`. It refuses with `AGY_QUOTA_UNKNOWN` when the
+output has any other shape, a group has no buckets, a fraction is missing or
+outside 0-1, or the probe was killed or didn't exit 0.
 
 New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
 `AGY_AUTH_MODE`, `AGY_OVERAGES`, `AGY_AUTH_REQUIRED`, `AGY_BUSY`, `AGY_QUOTA`,
 `AGY_QUOTA_LOW`, `AGY_TIMEOUT`, `AGY_INTERRUPTED`, `AGY_DENIED`,
 `AGY_MODEL_ERROR`, `AGY_WORKTREE`, `AGY_BRIDGE`, `AGY_MCP`,
-`AGY_PROMPT_TOO_LONG`, `AGY_QUOTA_UNKNOWN`, `AGY_SETTINGS`.
+`AGY_PROMPT_TOO_LONG`, `AGY_QUOTA_UNKNOWN`, `AGY_SETTINGS`,
+`AGY_AUTHORITY_DENIED`, `AGY_GRANT_EXPIRED`, `AGY_GRANT_EXHAUSTED`,
+`AGY_CONFIRMATION_REQUIRED`.
 
 ## Probe answers (2026-11, agy 1.4.12 under WSL2)
 

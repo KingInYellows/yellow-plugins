@@ -1,0 +1,67 @@
+#!/bin/sh
+# Print what to `git fetch` from to reach a pull request's base repository:
+# the name of a configured remote whose URL points at it, else its https URL.
+# In a fork checkout `origin` is the fork, whose owner controls its branches,
+# so callers that read the risk policy or the base branch fetch from this
+# instead of `origin`.
+# Usage: pr-base-remote <pr-url>
+#   <pr-url> is `gh pr view <PR#> --json url -q .url`:
+#   https://<host>/<owner>/<repo>/pull/<n>.
+# Remotes are tried with `origin` first, then in `git remote` order. A remote
+# matches when its fetch URL (https, ssh, git or scp-like form, any user or
+# port, optional .git) names the same host, owner and repository, ignoring
+# case. A remote whose name is not ^[A-Za-z0-9._][A-Za-z0-9._-]*$ is skipped.
+# Output: one line on stdout, a remote name or https://<host>/<owner>/<repo>.git
+# Exit codes: 0 ok, 2 usage (bad URL, or not inside a git repository).
+# Makes no network calls and changes nothing.
+
+set -eu
+
+usage() {
+  printf 'Usage: pr-base-remote <pr-url>\n' >&2
+  exit 2
+}
+
+[ $# -eq 1 ] || usage
+PR_URL=$1
+
+# https://host[:port]/owner/repo/pull/n, nothing else.
+printf '%s\n' "$PR_URL" |
+  grep -Eq '^https://[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/pull/[1-9][0-9]*$' ||
+  usage
+[ "$(printf '%s\n' "$PR_URL" | wc -l)" -eq 1 ] || usage
+git rev-parse --git-dir >/dev/null 2>&1 || {
+  printf '[pr-base-remote] Error: not inside a git repository\n' >&2
+  exit 2
+}
+
+# host/owner/repo, lower case, port dropped.
+REST=${PR_URL#https://}
+REST=${REST%/pull/*}
+HOSTPORT=${REST%%/*}
+HOST=${HOSTPORT%%:*}
+WANT=$(printf '%s/%s\n' "$HOST" "${REST#*/}" | tr 'A-Z' 'a-z')
+
+# normalize <url>: host/owner/repo in lower case, or nothing.
+normalize() {
+  printf '%s\n' "$1" | tr 'A-Z' 'a-z' | sed -E -e 's#/+$##' -e 's#\.git$##' |
+    sed -n -E \
+    -e 's#^(https?|ssh|git)://([^@/]*@)?([^/:]+)(:[0-9]*)?/([^/]+/[^/]+)$#\3/\5#p' \
+    -e 't' \
+    -e 's#^([^@/:]*@)?([^/:]+):/?([^/]+/[^/]+)$#\2/\3#p'
+}
+
+REMOTES=$( {
+  git remote | grep -Fx origin || :
+  git remote | grep -Fvx origin || :
+})
+for r in $REMOTES; do
+  case "$r" in -*) continue ;; esac
+  printf '%s\n' "$r" | grep -Eq '^[A-Za-z0-9._][A-Za-z0-9._-]*$' || continue
+  url=$(git remote get-url "$r" 2>/dev/null) || continue
+  if [ "$(normalize "$url")" = "$WANT" ]; then
+    printf '%s\n' "$r"
+    exit 0
+  fi
+done
+printf 'https://%s/%s.git\n' "$HOSTPORT" "${REST#*/}"

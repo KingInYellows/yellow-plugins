@@ -532,12 +532,22 @@ feature PR's `## Notes` section: `Solution doc tracked separately in
 
 Two checks run on every PR that touches `docs/solutions/`:
 
-- **`validate-solutions` (blocking).** Runs inside `validate:schemas`.
-  Fails on exact-slug collisions (`ERROR-SOL-001`) when a NEW doc reuses an
-  existing slug from any category, and on missing or invalid required
-  frontmatter (`ERROR-SOL-002`). Diff-scoped — only new/modified files in
-  the current PR's diff are checked. Pre-existing non-conforming docs are
-  not retroactively gated; they only trip the validator when modified.
+- **`validate-solutions` (blocking).** Runs inside `validate:schemas`. Fails on
+  exact-slug collisions (`ERROR-SOL-001`) when a NEW doc reuses an existing slug
+  from any category, and on missing or invalid required frontmatter
+  (`ERROR-SOL-002`). The optional `retire_when` field must be a non-empty
+  single-line string when present (`ERROR-SOL-002` otherwise). The body's
+  citations must be grounded (`ERROR-SOL-003`): a backticked repo path, a commit
+  SHA presented as a commit ("fixed in commit `<sha>`", "landed in `<sha>`"), or
+  a relative link that exists nowhere fails, and so does a leftover `{{...}}`
+  placeholder. Deleted or renamed paths, links to archived docs, and hex that is
+  not presented as a commit only warn. On a modified doc, citations already in
+  the base version only warn. When the fix being documented removed what a line
+  cites, add `(historical)` to that line. Run one doc with
+  `node scripts/validate-solutions.js --doc <path>`. Diff-scoped — only
+  new/modified files in the current PR's diff are checked. Pre-existing
+  non-conforming docs are not retroactively gated; they only trip the validator
+  when modified.
 - **`validate-solutions-advisory` (non-blocking).** Emits a
   `::warning::` annotation when a PR closes a P0/P1-labeled issue but
   contains no `docs/solutions/` change. This is a nudge, never a block —

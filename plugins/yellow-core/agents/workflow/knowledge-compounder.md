@@ -53,6 +53,44 @@ MEMORY_PATH="$HOME/.claude/projects/$PROJECT_SLUG/memory/MEMORY.md"
 
 If the above exits non-zero, stop. Do not proceed.
 
+## Durable Bar (gates every write)
+
+<!-- Verbatim from EveryInc/compound-engineering-plugin skills/ce-compound/SKILL.md
+     @ b405537 (ce-durable-bar block). RULE 22 in validate-agent-authoring.js keeps
+     every copy byte-identical; edit all copies together. -->
+
+<!-- durable-bar:start -->
+
+A learning earns its place only when it holds durable project reasoning that is
+not readily recoverable from the final code, tests, types, comments, or existing
+documentation, and losing it would plausibly cause recurrence, material risk, or
+substantial rediscovery. Apply this counterfactual: if the learning document
+disappeared, would a future engineer reading the final implementation still be
+likely to repeat the mistake or redo substantial investigation? Completion,
+effort, and diff size do not establish eligibility.
+
+<!-- durable-bar:end -->
+
+Judge this from the session, never by asking the user. An explicit
+`/flow:compound` invocation asks for the judgment now; it does not lower the
+bar. Apply the bar on every path (normal, review-findings, in-PR) before M3. The
+skip-eligibility heuristics below stay as a cheaper fast path that can skip
+earlier; passing them does not clear the bar.
+
+- If the counterfactual fails, write nothing. Print the SKIP line from the
+  skip-eligibility check with the counterfactual as its reason (for example "the
+  rename is self-explanatory from the diff"), then exit without reaching M3.
+- An existing learning that became materially inaccurate or incomplete
+  qualifies, because leaving it would mislead. Route it to AMEND_EXISTING
+  instead of creating a duplicate.
+- A `<consolidation-context>` handoff from `compound-lifecycle` (Consolidate or
+  Replace) merges or supersedes docs the caller will archive. Judge the
+  counterfactual with those source docs excluded, since they are about to
+  disappear; their being recoverable today is not a reason to skip.
+- Write one learning per run. When the session holds several, document the
+  strongest and name the rest in the Success Output so the caller can run again
+  for each; batching blurs the per-learning judgment.
+
 ## Phase 1: Parallel Extraction (6 Subagents)
 
 **Fast path (structured findings):** If spawned with `--- begin review-findings ---`
@@ -106,9 +144,9 @@ would derive from raw conversation transcript. Use them directly:
    "Prevention" / "Testing" sections; if absent, leave the section as a
    placeholder for the M3 reviewer to fill in.
 
-Skip-eligibility check (run BEFORE jumping to Compounding Rules): if all of
-the following are true, emit a `SKIP` signal and exit cleanly without
-reaching M3:
+Skip-eligibility check (a fast path ahead of the Durable Bar; run BEFORE jumping
+to Compounding Rules): if all of the following are true, emit a `SKIP` signal
+and exit cleanly without reaching M3:
 
 - PR title matches `(typo|whitespace|formatting|version bump|dep bump|chore: bump)`
 - PR body contains no failure-mode narrative (no "Problem", "Symptom",
@@ -255,8 +293,11 @@ When spawned after a PR review, apply severity-based filtering:
 - **Never compound (P3)**: Style suggestions and minor improvements are not worth
   persisting.
 
-When spawned by `/flow:compound`, all findings are worthy (user explicitly
-requested compounding) — apply Routing Decision directly without severity filter.
+When spawned by `/flow:compound`, skip the severity filter (the user explicitly
+requested compounding) and apply Routing Decision directly.
+
+Severity only selects candidates. Every candidate must still clear the Durable
+Bar above before it reaches M3.
 
 ## Routing Decision
 
@@ -294,6 +335,12 @@ If the above exits non-zero, stop and report the error. Never silently
 substitute a fallback.
 
 ## M3 Confirmation
+
+Ground the draft first: every backticked repo path, relative link and commit SHA
+it cites must exist (Glob, Read, `git cat-file -e <sha>^{commit}`). Fix or drop
+each one that does not, or mark the line `(historical)` when the fix being
+documented removed it. Cite PR numbers rather than branch commit SHAs, which a
+squash merge rewrites.
 
 Use AskUserQuestion before any writes. The question body MUST include all of
 the following so the user can review the actual content (not just file
@@ -477,6 +524,7 @@ track: <bug | knowledge>          # NEW: classifies the entry
 problem: <one-line problem statement>  # NEW: keyword-rich, ~80 chars
 tags: [<tag1>, <tag2>, ...]       # existing — ensure non-empty (3+ tags)
 components: [...]                  # existing
+retire_when: '<outside condition>' # OPTIONAL: see below; omit when none
 ---
 ```
 
@@ -499,6 +547,16 @@ When in doubt: `bug` if there was a specific incident being remembered;
 retrieval over `problem` + `tags` + `title` for relevance ranking. Keep it
 specific: not "auth issue" but "session token leaks via URL parameter on OAuth
 callback".
+
+**`retire_when` field (optional, from CE's ce-compound schema):** set it only
+when the guidance holds just while something outside the repo holds: an open
+upstream bug, a tool or platform version, a dependency's behavior. Name that
+change and how a refresh can check it without changing the repo, as one line,
+for example
+`retire_when: 'anthropics/claude-code issue closed as fixed in a released version; check the issue and the release notes'`.
+Omit it otherwise. A verification that needs a repo change, such as removing a
+workaround and rerunning CI, belongs in the body as the step before removal.
+`compound-lifecycle` checks these conditions on every refresh.
 
 #### Context Budget Precheck (CE ce-compound v2.39.0 pattern)
 
@@ -569,6 +627,33 @@ After Write, verify:
 
 If the above exits non-zero, stop. Do not proceed.
 
+When the repo ships `scripts/validate-solutions.js` (yellow-plugins does), run
+it on the written doc (`DOC_PATH=docs/solutions/$CATEGORY/$FINAL_SLUG.md`), or
+on `DOC_PATH=$AMEND_TARGET` after amending:
+
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+BASE="$(git -C "$GIT_ROOT" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || printf 'origin/main')"
+TRUSTED=1
+for f in scripts/validate-solutions.js scripts/lib/doc-claims.js; do
+  git -C "$GIT_ROOT" cat-file -e "$BASE:$f" 2>/dev/null || TRUSTED=0
+done
+if [ "$TRUSTED" = 1 ] && git -C "$GIT_ROOT" diff --quiet "$BASE" -- scripts/validate-solutions.js scripts/lib/ 2>/dev/null; then
+  node "$GIT_ROOT/scripts/validate-solutions.js" --doc "$GIT_ROOT/$DOC_PATH"
+else
+  printf '[knowledge-compounder] claim check skipped: validator missing or differs from %s\n' "$BASE"
+fi
+```
+
+The check runs only the validator as it is on the default branch. A branch that
+changes `scripts/validate-solutions.js` or `scripts/lib/` skips it, so a
+checkout's own edits never execute here. Report a skip in the Success Output.
+
+`ERROR-SOL-003` means a cited path, commit or relative link does not exist, or a
+`{{...}}` placeholder leaked. Fix the citation with Edit, or mark its line
+`(historical)`, and re-run until it exits 0. List remaining warnings in the
+Success Output.
+
 ### MEMORY.md Update (MEMORY_ONLY or BOTH)
 
 If MEMORY_AVAILABLE is false, output content for manual copy instead of Edit.
@@ -580,6 +665,14 @@ Append section in format:
 - **Bold key**: explanation — `code snippet`
 - See `docs/solutions/<category>/<slug>.md`
 ```
+
+### Discoverability Check (interactive only)
+
+After a write to `docs/solutions/`, run the check in
+`${CLAUDE_PLUGIN_ROOT}/skills/compound-lifecycle/references/discoverability.md`
+once per session. It confirms the repo's agent-instruction file still points at
+`docs/solutions/` and, if not, offers one informational line through
+`AskUserQuestion`. Skip it when spawned non-interactively.
 
 ## Success Output
 

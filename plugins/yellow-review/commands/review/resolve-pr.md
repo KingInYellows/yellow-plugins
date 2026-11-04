@@ -873,11 +873,77 @@ A non-zero exit (an unreadable head is exit 2) adds the Notes line
 3's `conversationResolution` is `enforced`. Otherwise use the Write tool to put
 a JSON object at a `mktemp` path mapping each thread this run leaves blocking to
 its status (`disagree`, `unclear`, `human-held`, `needs-permission`,
-`not-found`, `verify-failed`, `not-attempted`), and run it as its own Bash call
-with a `timeout` of 420000 ms:
+`not-found`, `verify-failed`, `not-attempted`). Then classify the PR's risk tier
+the way `/review:pr` Step 3a2 does, with the policy read at the default branch's
+fetched tip so neither the PR nor a parent in its stack sets it. Every fetch
+goes to the PR's base repository (`pr-base-remote`), not `origin`, which is the
+fork in a fork checkout:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/sync-blocking-comment" --reasons "<reasons-file>" "<owner/repo>" "<PR#>" "<conversationResolution>"
+rr_net() {
+  for rr_t in timeout gtimeout; do
+    if command -v "$rr_t" >/dev/null 2>&1 &&
+      "$rr_t" --kill-after=1 1 true >/dev/null 2>&1; then
+      "$rr_t" --kill-after=5 30 "$@"
+      return
+    fi
+  done
+  "$@"
+}
+rr_warn() { printf '[review:resolve] Warning: risk tier unknown (%s)\n' "$1" >&2; }
+RISK_FILE=""
+PR_URL=$(rr_net gh pr view "<PR#>" --json url -q .url) || PR_URL=""
+BASE_REMOTE=$("${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/pr-base-remote" "$PR_URL") || BASE_REMOTE=""
+BASE_REPO=${PR_URL#https://}
+BASE_REPO=${BASE_REPO%/pull/*}
+DEFAULT_BRANCH=""
+[ -z "$BASE_REMOTE" ] ||
+  DEFAULT_BRANCH=$(rr_net gh repo view "$BASE_REPO" --json defaultBranchRef -q .defaultBranchRef.name) || DEFAULT_BRANCH=""
+BASE_BRANCH=$(rr_net gh pr view "<PR#>" --json baseRefName -q .baseRefName) || BASE_BRANCH=""
+PR_HEAD=$(rr_net gh pr view "<PR#>" --json headRefOid -q .headRefOid) || PR_HEAD=""
+RISK_OK=1
+for rr_b in "$DEFAULT_BRANCH" "$BASE_BRANCH"; do
+  case "$rr_b" in '' | -* | *..* | *[!A-Za-z0-9._/-]*) RISK_OK=0 ;; esac
+done
+case "$PR_HEAD" in *[!0-9a-f]* | '') RISK_OK=0 ;; esac
+if [ -z "$BASE_REMOTE" ]; then
+  rr_warn 'no usable base repository'
+elif [ "$RISK_OK" != 1 ]; then
+  rr_warn 'no usable default branch, base branch or PR head'
+elif ! git cat-file -e "$PR_HEAD^{commit}" 2>/dev/null &&
+  ! { rr_net git fetch --no-tags --quiet "$BASE_REMOTE" "refs/pull/<PR#>/head" &&
+    git cat-file -e "$PR_HEAD^{commit}" 2>/dev/null; }; then
+  rr_warn 'published PR head unreadable'
+elif ! rr_net git fetch --no-tags --quiet "$BASE_REMOTE" "refs/heads/$BASE_BRANCH"; then
+  rr_warn 'base branch fetch failed'
+elif ! BASE_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
+  rr_warn 'fetched base branch unreadable'
+elif ! rr_net git fetch --no-tags --quiet "$BASE_REMOTE" "refs/heads/$DEFAULT_BRANCH"; then
+  rr_warn 'default branch fetch failed'
+elif ! POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
+  rr_warn 'fetched default branch unreadable'
+elif ! RISK_FILE=$(mktemp "${TMPDIR:-/tmp}/resolve-risk.XXXXXX"); then
+  RISK_FILE=""
+  rr_warn 'mktemp failed'
+elif ! "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
+  --policy-ref "$POLICY_SHA" "$BASE_SHA" "$PR_HEAD" >|"$RISK_FILE"; then
+  rm -f "$RISK_FILE"
+  RISK_FILE=""
+  rr_warn 'classify-risk failed'
+fi
+printf 'risk_file=%s\n' "$RISK_FILE"
+```
+
+It classifies the published head (`headRefOid`), the commit the comment names,
+not local `HEAD`, which can hold an unpushed Step 6 commit. Each network call is
+bounded at 30 s as in `/review:pr` Step 3a2, and each failure prints a
+`risk tier unknown (<stage>)` warning. An empty `risk_file=` drops `--risk`
+below and the comment has no tier line; it never stops the run. Run the sync as
+its own Bash call with a `timeout` of 420000 ms, with `--risk "<risk-file>"`
+only when the path printed above is not empty:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/sync-blocking-comment" --reasons "<reasons-file>" --risk "<risk-file>" "<owner/repo>" "<PR#>" "<conversationResolution>"
 ```
 
 It lists every unresolved thread GitHub reports, not only this run's. Exit 4

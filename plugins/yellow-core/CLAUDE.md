@@ -51,6 +51,19 @@ it before editing a command, library or the staging pipeline.
 - Background compounding: `staging-reviewer` (drain orchestrator),
   `staging-scorer` (Haiku), `staging-promoter` (non-interactive writer; its
   `disallowedTools: [AskUserQuestion]` is load-bearing, enforced by RULE 14)
+- `knowledge-compounder` and `staging-scorer` both gate writes on the
+  durable-bar counterfactual (ported from Compound Engineering). The paragraph
+  between the `durable-bar` markers must stay byte-identical in both files;
+  RULE 22 in `validate-agent-authoring.js` enforces it.
+- Solution docs may carry an optional single-line `retire_when` (the outside
+  change that retires them; `validate-solutions.js` blocks other shapes with
+  SOL-002). `compound-lifecycle` checks it read-only in Step 4a; a met
+  condition bypasses the citation gate, and autofix only marks it
+  `status: stale`.
+- `knowledge-compounder` grounds each new doc before finishing: it runs
+  `scripts/validate-solutions.js --doc <path>` when the script exists, and fixes
+  any SOL-003 (cited path, commit or link that does not resolve) or marks the
+  line `(historical)`.
 
 ### Commands (19)
 
