@@ -88,7 +88,10 @@ row's id.
 
 `cases/examples/` holds two files marked `"example": true` that only show the
 format. Their SHAs are made up; `prepare` loads them only with `--examples` and
-a real case must never set `example`. No confirmed cases ship yet.
+a real case must never set `example`. Ten confirmed cases ship (confirmed
+2026-11-04). Three of them (`1645-`, `1648-`, `1649-`) point at intermediate PR
+commits that are not on `main`; if `prepare` says a commit is missing, fetch it
+by SHA (`git fetch origin <sha>`).
 
 ## Adding a case: harvest, confirm, write
 

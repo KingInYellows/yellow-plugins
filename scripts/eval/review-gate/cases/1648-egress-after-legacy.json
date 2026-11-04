@@ -1,0 +1,23 @@
+{
+  "id": "1648-egress-after-legacy",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1648,
+  "base": "6c10f10b37f9501875b7fdb44cde8c6eb361fd16",
+  "head": "49e8749528a918b70c6c77b09f3e8f1bb50a3505",
+  "lane": "correctness",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "plugins/yellow-review/commands/review/review-pr.md",
+      "line": 496,
+      "match": [
+        "legacy",
+        "switch|cross.?model|off|egress|codex"
+      ]
+    }
+  ],
+  "source": "Codex P1 on #1648 at 49e8749 (discussion_r4459285370): the cross_model_review switch is resolved after the legacy pipeline branch, so legacy still dispatches codex-reviewer; fixed before merge",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-04",
+  "notes": "head is an intermediate PR commit, not on main; fetch it by SHA."
+}

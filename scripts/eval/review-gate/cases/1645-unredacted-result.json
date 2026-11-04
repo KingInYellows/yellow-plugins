@@ -1,0 +1,23 @@
+{
+  "id": "1645-unredacted-result",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1645,
+  "base": "1906931dc6377f361a29b8fc4b5b37d4bc22fbd4",
+  "head": "499972d451e6d3a5a25e7c77f0d41da29539afb4",
+  "lane": "security",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "scripts/ci/review-gate/ci.py",
+      "line": 186,
+      "match": [
+        "redact|secret|credential|token|PAT",
+        "result|output|comment|publish|upload|persist|write"
+      ]
+    }
+  ],
+  "source": "Codex P1 on #1645 at 499972d (discussion_r4449432657): model output written and published without redaction; fixed before merge",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-04",
+  "notes": "head is an intermediate PR commit, not on main; fetch it by SHA."
+}

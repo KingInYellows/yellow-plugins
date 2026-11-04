@@ -1,0 +1,23 @@
+{
+  "id": "1356-unscoped-read-tools",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1356,
+  "base": "7b9405b07dacdb16aa99c21ab70528439f057bf4",
+  "head": "c295e48bb21c4d8fdb4fac3f20b2a2e852e841ee",
+  "lane": "security",
+  "tier": "medium",
+  "golden": [
+    {
+      "file": "scripts/eval/model-swap/run-one.sh",
+      "line": 45,
+      "match": [
+        "Read|Grep|Glob|allowedTools",
+        "scope|outside|host|any (file|path)|unrestricted|work.?dir|directory"
+      ]
+    }
+  ],
+  "source": "fix #1426 (b07eb1e): --allowedTools approved bare Read/Grep/Glob, so a fixture could read host files outside the run directory",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-04",
+  "notes": "The shortlist named #1402, which does not touch run-one.sh; the --allowedTools line came from #1356 (c295e48)."
+}

@@ -83,7 +83,7 @@ class SchemaTest(unittest.TestCase):
         self.assertTrue(case["example"] and control["example"])
 
     def test_shipped_cases_and_controls_validate(self):
-        # Ships zero confirmed cases; any added later must validate here too.
+        # Every shipped case and control must validate.
         for kind, folder in (("case", "cases"), ("control", "controls")):
             path = os.path.join(ROOT, folder)
             for name in os.listdir(path) if os.path.isdir(path) else []:

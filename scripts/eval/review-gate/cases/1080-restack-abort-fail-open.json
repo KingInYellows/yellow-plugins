@@ -1,0 +1,30 @@
+{
+  "id": "1080-restack-abort-fail-open",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1080,
+  "base": "2d877ca9aa90f0ff92e6d4b7f3786341413871af",
+  "head": "a6cd602ff595f41f1f09c3b831a82b01e4d6b26b",
+  "lane": "correctness",
+  "tier": "medium",
+  "golden": [
+    {
+      "file": "plugins/yellow-core/skills/git-worktree/scripts/worktree-restack.sh",
+      "line": 1521,
+      "match": [
+        "unreadable|cannot (be )?read|fail.?(open|closed)|error|unknown",
+        "rebase|git.?dir"
+      ]
+    },
+    {
+      "file": "plugins/yellow-core/skills/git-worktree/scripts/worktree-restack.sh",
+      "line": 1587,
+      "match": [
+        "worktree",
+        "record|any|other|unrelated|every|not (the )?run"
+      ]
+    }
+  ],
+  "source": "fix #1197 (d8a000c): restack --abort aborted in-chain rebases in any worktree, and treated an unreadable git dir or head-name as no rebase",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-04"
+}
