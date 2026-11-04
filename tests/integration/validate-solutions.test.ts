@@ -751,6 +751,52 @@ describe('validate-solutions — claim grounding (SOL-003)', () => {
     expect(r.status).toBe(0);
   });
 
+  it('masks a code span that wraps onto the next line', () => {
+    const r = runClaims(
+      'wrapped-span',
+      [
+        '',
+        'Write the token as `{{VALUE}} and',
+        '[a](./nope.md)` in the template.',
+        '',
+      ].join('\n')
+    );
+    expect(r.stdout + r.stderr).not.toMatch(/ERROR-SOL-003/);
+    expect(r.status).toBe(0);
+  });
+
+  it('does not pair backticks across a blank line', () => {
+    const r = runClaims(
+      'span-paragraphs',
+      [
+        '',
+        'A stray ` tick.',
+        '',
+        'The fix lives in {{FIX_PATH}} `x`.',
+        '',
+      ].join('\n')
+    );
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/ERROR-SOL-003.*\{\{FIX_PATH\}\}/);
+  });
+
+  it('does not pair backticks across a heading or list item', () => {
+    const r = runClaims(
+      'span-blocks',
+      [
+        '',
+        '## A stray ` tick',
+        'The fix lives in {{FIX_PATH}} `x`.',
+        '- item with ` tick',
+        '- then {{OTHER}} `y`.',
+        '',
+      ].join('\n')
+    );
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/\{\{FIX_PATH\}\}/);
+    expect(r.stdout + r.stderr).toMatch(/\{\{OTHER\}\}/);
+  });
+
   it('skips model ids and scheme-relative links', () => {
     const r = runClaims(
       'model-ids',
