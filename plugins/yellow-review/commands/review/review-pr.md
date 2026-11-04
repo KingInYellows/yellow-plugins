@@ -1224,8 +1224,9 @@ helper); the default routing is human review.
 Persist the simplifier's findings with ledger.md's "After Step 8" section
 (`--step 8 --anchor-source worktree`).
 
-Then re-partition the theme groups as `themes.md` says: drop applied findings,
-drop groups left with fewer than two.
+Then re-partition the theme groups as `themes.md` says: number the
+simplifier's findings after the last `#` and add each one that shares a
+group's signal, drop applied findings, and drop groups left with fewer than two.
 
 ### Step 9: Commit and Push
 
@@ -1317,7 +1318,7 @@ findings, grouped by severity:
 ## Review Summary — PR #<num>
 
 ### Themes
-(Only when Step 6 "Number and group" built groups; see themes.md "Render".)
+(Only when groups remain after Step 8's re-partition; see themes.md "Render".)
 
 ### P0 — Critical
 | # | File | Issue | Reviewer(s) | Confidence | Route |
@@ -1368,6 +1369,7 @@ findings were produced but extension classification was malformed."
 - Reviewers run: <list>
 - Reviewers skipped (graceful degradation): <list with reasons>
 - Findings suppressed at confidence < 75: <count>
+- Themes: <group count | not built (themes.md unreadable)>
 - Findings demoted to soft-bucket: <count>
 - Compact-return validation drops (base schema): <count>
 - Findings defaulted (missing rule/scope): <count or omit when zero> — update yellow-core / yellow-codex

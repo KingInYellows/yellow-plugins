@@ -187,12 +187,13 @@ manifest change or plugin-authoring path still does.
 
 ## Thematic grouping
 
-`/review:pr` numbers its findings and, when they span distinct concerns, adds a
+`/review:pr` numbers its findings and, when related findings form groups, adds a
 `### Themes` section above the P0 table: each theme names its findings by `#`,
 says why they belong together, and gives one preferred fix. Grouping never
 merges findings or changes their severity, route or ledger record. Set
-`review_grouping: auto | off | always` in `yellow-plugins.local.md` (default
-`auto`).
+`review_grouping` in `yellow-plugins.local.md`: `auto` (default) groups only
+when the findings span distinct concerns, `always` groups any two findings that
+share a signal, and `off` never adds the section.
 
 ## Workflows
 
