@@ -75,7 +75,9 @@ it before editing a script, library or command.
   fixes; persists unapplied findings to the ledger; `--non-interactive`
   suppresses push and learnings prompts; `--report-only` (used by `/flow:work`
   Phase 5) reports without checkout, edits or push, reading a detached worktree
-  of the PR head when the checkout is elsewhere
+  of the PR head when the checkout is elsewhere; the report opens with a
+  `### Themes` section grouping related findings by root cause or fix path
+  (`review_grouping: auto | off | always`)
 - `/review:resolve` — parallel resolution of unresolved PR threads via GraphQL;
   every thread gets a disposition (`fixed`, `addressed`, `oos`,
   `disagree`/`unclear`); ends with the `Resolve:` contract line;
