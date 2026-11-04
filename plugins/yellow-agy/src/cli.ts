@@ -28,6 +28,8 @@ import { detectHost, readHostConfig, writeHostConfig } from './host-config';
 import { createHostExec } from './host-exec';
 import { assertWslPath } from './invocation';
 import { Lifecycle } from './lifecycle';
+import type { RunMcpList } from './mcp';
+import { assertMcpGate, mcpWarnings, parseAllowedMcp } from './mcp';
 import { runTurn } from './process';
 import { quotaGate } from './quota';
 import { redact } from './redact';
@@ -62,6 +64,9 @@ export interface CliDeps {
   readonly stdout: (text: string) => void;
   readonly openTty?: OpenTty;
   readonly wslRun?: WslRun;
+  /** Tests replace host detection and the `agy mcp list` spawn. */
+  readonly detectHost?: typeof detectHost;
+  readonly runMcpList?: RunMcpList;
   readonly now?: () => Date;
   /** Milliseconds since the process started (the Budget's clock). */
   readonly elapsedMs?: () => number;
@@ -314,12 +319,49 @@ async function authorize(ctx: Ctx, flags: Flags): Promise<unknown> {
 async function run(ctx: Ctx, op: string, flags: Flags): Promise<unknown> {
   switch (op) {
     case 'setup': {
-      const config = detectHost({
+      const config = (ctx.deps.detectHost ?? detectHost)({
         env: ctx.deps.env,
         ...(ctx.deps.wslRun === undefined ? {} : { wslRun: ctx.deps.wslRun }),
       });
+      // Before host.json exists, so a host with an enabled MCP server the
+      // owner did not allow is never recorded (CLAUDE-254).
+      const allowedMcp = parseAllowedMcp(flags['allow-mcp']);
+      const mcpServers = assertMcpGate(
+        config.host,
+        config.worktreeRoot,
+        ctx.deps.env,
+        allowedMcp,
+        ctx.deps.runMcpList
+      );
+      const warnings = mcpWarnings(mcpServers, allowedMcp);
+      if (allowedMcp.length > 0) {
+        // Only the owner may widen what a delegated run starts, so the
+        // allowance is confirmed on their terminal like a grant.
+        const shown = allowedMcp.map((name) => {
+          const s = mcpServers.find((m) => m.name === name);
+          return s === undefined
+            ? `  ${name}: not configured in agy`
+            : `  ${name} (${s.enabled ? 'enabled' : 'disabled'}): ${s.command}`;
+        });
+        await confirmOnTty({
+          summary: [
+            'Allow these agy MCP servers in delegated runs:',
+            ...shown,
+            ...warnings.map((w) => `Warning: ${w}`),
+          ].join('\n'),
+          ...(ctx.deps.openTty === undefined
+            ? {}
+            : { openTty: ctx.deps.openTty }),
+        });
+      }
       writeHostConfig(ctx.dir, config);
-      return { host: config.host, worktreeRoot: config.worktreeRoot };
+      return {
+        host: config.host,
+        worktreeRoot: config.worktreeRoot,
+        mcpServers,
+        allowedMcp,
+        mcpWarnings: warnings,
+      };
     }
     case 'authorize':
       return authorize(ctx, flags);
@@ -455,6 +497,7 @@ const OPTIONS = {
   'reset-partial': { type: 'boolean' },
   operations: { type: 'string' },
   'allow-command': { type: 'string', multiple: true },
+  'allow-mcp': { type: 'string', multiple: true },
   'min-quota-percent': { type: 'string' },
   'max-tasks': { type: 'string' },
   'max-corrective-rounds': { type: 'string' },

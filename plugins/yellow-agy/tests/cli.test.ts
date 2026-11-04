@@ -316,3 +316,80 @@ describe('cli', () => {
     expect(abandoned).toMatchObject({ localId: 't1' });
   });
 });
+
+describe('setup MCP gate (CLAUDE-254)', () => {
+  const captured = fs.readFileSync(
+    path.join(__dirname, 'fixtures', 'mcp-list-1.4.12.txt'),
+    'utf8'
+  );
+
+  function setupCall(stdout: string, extra: Partial<CliDeps> = {}) {
+    const root = tmpDir('agy-setup-');
+    const data = path.join(root, 'data');
+    const out: unknown[] = [];
+    const deps: CliDeps = {
+      env: { YELLOW_AGY_DATA_DIR: data, HOME: process.env['HOME'] },
+      stdout: (t) => out.push(JSON.parse(t)),
+      detectHost: () => ({
+        version: 1,
+        host: { kind: 'posix' },
+        worktreeRoot: root,
+        schemaPath: path.join(root, 'plan.schema.json'),
+        sandboxVerified: false,
+      }),
+      runMcpList: () => ({ status: 0, stdout, stderr: '' }),
+      ...extra,
+    };
+    return {
+      data,
+      out,
+      run: (...args: string[]) => main(['setup', ...args], deps),
+    };
+  }
+
+  it('refuses with AGY_MCP and records no host while a server is enabled', async () => {
+    const s = setupCall(captured);
+    expect(await s.run()).toBe(2);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((s.out.at(-1) as any).error.code).toBe('AGY_MCP');
+    expect(fs.existsSync(path.join(s.data, 'host.json'))).toBe(false);
+  });
+
+  it('records the host once every server is disabled', async () => {
+    const s = setupCall(captured.replace(' enabled  ', ' disabled '));
+    expect(await s.run()).toBe(0);
+    expect(fs.existsSync(path.join(s.data, 'host.json'))).toBe(true);
+  });
+
+  it('records the host with an allowed server once the owner confirms it', async () => {
+    const tty = fakeTty();
+    const s = setupCall(captured, { openTty: tty.open });
+    expect(await s.run('--allow-mcp', 'GitHits')).toBe(0);
+    expect(fs.existsSync(path.join(s.data, 'host.json'))).toBe(true);
+    expect(tty.shown.join('')).toContain('githits@latest');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = s.out.at(-1) as any;
+    expect(res.allowedMcp).toEqual(['GitHits']);
+    expect(res.mcpWarnings).toHaveLength(2);
+  });
+
+  it('records nothing when the owner does not confirm the allowance', async () => {
+    const s = setupCall(captured, { openTty: fakeTty('AAAAAA').open });
+    expect(await s.run('--allow-mcp', 'GitHits')).not.toBe(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((s.out.at(-1) as any).error.code).toBe('AGY_AUTHORITY_DENIED');
+    expect(fs.existsSync(path.join(s.data, 'host.json'))).toBe(false);
+  });
+
+  it('refuses an allowance with no terminal to confirm it', async () => {
+    const s = setupCall(captured, {
+      openTty: () => {
+        throw new Error('no tty');
+      },
+    });
+    expect(await s.run('--allow-mcp', 'GitHits')).not.toBe(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((s.out.at(-1) as any).error.code).toBe('AGY_CONFIRMATION_REQUIRED');
+    expect(fs.existsSync(path.join(s.data, 'host.json'))).toBe(false);
+  });
+});

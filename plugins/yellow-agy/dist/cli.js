@@ -51,6 +51,7 @@ const host_config_1 = require("./host-config");
 const host_exec_1 = require("./host-exec");
 const invocation_1 = require("./invocation");
 const lifecycle_1 = require("./lifecycle");
+const mcp_1 = require("./mcp");
 const process_1 = require("./process");
 const quota_1 = require("./quota");
 const redact_1 = require("./redact");
@@ -258,12 +259,43 @@ async function authorize(ctx, flags) {
 async function run(ctx, op, flags) {
     switch (op) {
         case 'setup': {
-            const config = (0, host_config_1.detectHost)({
+            const config = (ctx.deps.detectHost ?? host_config_1.detectHost)({
                 env: ctx.deps.env,
                 ...(ctx.deps.wslRun === undefined ? {} : { wslRun: ctx.deps.wslRun }),
             });
+            // Before host.json exists, so a host with an enabled MCP server the
+            // owner did not allow is never recorded (CLAUDE-254).
+            const allowedMcp = (0, mcp_1.parseAllowedMcp)(flags['allow-mcp']);
+            const mcpServers = (0, mcp_1.assertMcpGate)(config.host, config.worktreeRoot, ctx.deps.env, allowedMcp, ctx.deps.runMcpList);
+            const warnings = (0, mcp_1.mcpWarnings)(mcpServers, allowedMcp);
+            if (allowedMcp.length > 0) {
+                // Only the owner may widen what a delegated run starts, so the
+                // allowance is confirmed on their terminal like a grant.
+                const shown = allowedMcp.map((name) => {
+                    const s = mcpServers.find((m) => m.name === name);
+                    return s === undefined
+                        ? `  ${name}: not configured in agy`
+                        : `  ${name} (${s.enabled ? 'enabled' : 'disabled'}): ${s.command}`;
+                });
+                await (0, tty_1.confirmOnTty)({
+                    summary: [
+                        'Allow these agy MCP servers in delegated runs:',
+                        ...shown,
+                        ...warnings.map((w) => `Warning: ${w}`),
+                    ].join('\n'),
+                    ...(ctx.deps.openTty === undefined
+                        ? {}
+                        : { openTty: ctx.deps.openTty }),
+                });
+            }
             (0, host_config_1.writeHostConfig)(ctx.dir, config);
-            return { host: config.host, worktreeRoot: config.worktreeRoot };
+            return {
+                host: config.host,
+                worktreeRoot: config.worktreeRoot,
+                mcpServers,
+                allowedMcp,
+                mcpWarnings: warnings,
+            };
         }
         case 'authorize':
             return authorize(ctx, flags);
@@ -393,6 +425,7 @@ const OPTIONS = {
     'reset-partial': { type: 'boolean' },
     operations: { type: 'string' },
     'allow-command': { type: 'string', multiple: true },
+    'allow-mcp': { type: 'string', multiple: true },
     'min-quota-percent': { type: 'string' },
     'max-tasks': { type: 'string' },
     'max-corrective-rounds': { type: 'string' },
