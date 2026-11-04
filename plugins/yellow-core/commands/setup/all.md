@@ -490,16 +490,19 @@ fi
 
 printf '\n=== Remote-Agent Provider Tooling ===\n'
 # setup-all-remote-agent-tooling:start
-# Coarse "is the plugin CLI resolvable" proxy for yellow-cursor and
-# yellow-jules: checks that `dist/cli.js` exists at the plugin's installPath
-# (from `claude plugin list --json`, NEVER a `${CLAUDE_PLUGIN_ROOT}/../<plugin>`
-# relative guess — the real plugin cache is version-suffixed). This is a
+# Coarse "is the plugin CLI resolvable" proxy for yellow-cursor, yellow-jules
+# and yellow-agy (the local agent): checks that `dist/cli.js` exists at the
+# plugin's installPath (from `claude plugin list --json`, NEVER a
+# `${CLAUDE_PLUGIN_ROOT}/../<plugin>` relative guess — the real plugin cache
+# is version-suffixed). This is a
 # coarse signal — file presence, not a live SDK resolution or auth check —
-# the authoritative live checks are `/cursor:setup` and `/jules:setup`.
+# the authoritative live checks are `/cursor:setup`, `/jules:setup` and
+# `/agy:setup`.
 # yellow-devin ships no CLI to resolve: its tooling is the DEVIN_* credential
 # rows under "Environment Variables" above.
 _cursor_root=""
 _jules_root=""
+_agy_root=""
 _enabled_install_path() {
   printf '%s' "$_plugin_list_json" | PLUGIN_ID="$1" PROJECT_PATH="$repo_top" node -e '
     const fs = require("fs");
@@ -527,6 +530,7 @@ _enabled_install_path() {
 if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
   _cursor_root=$(_enabled_install_path 'yellow-cursor@yellow-plugins')
   _jules_root=$(_enabled_install_path 'yellow-jules@yellow-plugins')
+  _agy_root=$(_enabled_install_path 'yellow-agy@yellow-plugins')
 fi
 if [ -n "$_cursor_root" ] && [ -f "$_cursor_root/dist/cli.js" ]; then
   printf 'cursor_cli_resolved: OK (%s)\n' "$_cursor_root"
@@ -559,6 +563,11 @@ if [ -n "$_jules_root" ] && [ -f "$_jules_root/dist/cli.js" ]; then
 else
   printf 'jules_cli_resolved: NOT FOUND\n'
 fi
+if [ -n "$_agy_root" ] && [ -f "$_agy_root/dist/cli.js" ]; then
+  printf 'agy_cli_resolved: OK (%s)\n' "$_agy_root"
+else
+  printf 'agy_cli_resolved: NOT FOUND\n'
+fi
 # Remote-agent group state for Step 2.5, from the classifier /linear:delegate
 # uses. Tooling flags come from the probes above; devin counts only when both
 # credential env vars are exported, because its commands call curl directly.
@@ -568,11 +577,12 @@ if [ -n "$_core_root" ] && [ -f "$_core_root/lib/remote-agent-provider-state.js"
   _t_cursor=no; [ -n "$_cursor_root" ] && [ -f "$_cursor_root/dist/cli.js" ] && [ "$_cursor_sdk" = yes ] && _t_cursor=yes
   _t_devin=no; [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && [ -n "${DEVIN_ORG_ID:-}" ] && _t_devin=yes
   _t_jules=no; [ -n "$_jules_root" ] && [ -f "$_jules_root/dist/cli.js" ] && _t_jules=yes
+  _t_agy=no; [ -n "$_agy_root" ] && [ -f "$_agy_root/dist/cli.js" ] && _t_agy=yes
   # Without a repo, project/local rows from other checkouts must not count, so
   # drop them here; the classifier only filters them when given a path.
   printf '%s' "$_plugin_list_json" | _RA_LIB="$_core_root/lib/remote-agent-provider-state.js" \
     _RA_PROJECT="${repo_top:-}" _RA_CURSOR="$_t_cursor" _RA_DEVIN="$_t_devin" _RA_JULES="$_t_jules" \
-    node -e '
+    _RA_AGY="$_t_agy" node -e '
 let d = "";
 process.stdin.on("data", (c) => { d += c; }).on("end", () => {
   const e = process.env;
@@ -583,7 +593,7 @@ process.stdin.on("data", (c) => { d += c; }).on("end", () => {
     const r = require(e._RA_LIB).classifyRemoteAgentState({
       plugins,
       projectPath: e._RA_PROJECT || null,
-      tooling: { cursor: e._RA_CURSOR === "yes", devin: e._RA_DEVIN === "yes", jules: e._RA_JULES === "yes" },
+      tooling: { cursor: e._RA_CURSOR === "yes", devin: e._RA_DEVIN === "yes", jules: e._RA_JULES === "yes", agy: e._RA_AGY === "yes" },
     });
     state = String(r.state || "UNKNOWN");
     detail = String(r.detail || "");
@@ -592,11 +602,11 @@ process.stdin.on("data", (c) => { d += c; }).on("end", () => {
   process.stdout.write("remote_agent_state: " + clean(state) + "\n");
   if (detail) process.stdout.write("remote_agent_detail: " + clean(detail) + "\n");
 });' 2>/dev/null || printf 'remote_agent_state: UNKNOWN\n'
-  unset _t_cursor _t_devin _t_jules
+  unset _t_cursor _t_devin _t_jules _t_agy
 else
   printf 'remote_agent_state: UNKNOWN (yellow-core classifier not resolved)\n'
 fi
-unset _cursor_data _cursor_sdk _core_root
+unset _cursor_data _cursor_sdk _core_root _agy_root
 # setup-all-remote-agent-tooling:end
 ```
 
@@ -1069,8 +1079,8 @@ readiness is worth reporting. Only the **enabled** one is offered for setup:
    `/stack:status` (or the `stack-provider-router` skill). For
    `remote-agent`, read Step 1's `remote_agent_state` row: the dashboard
    already ran `lib/remote-agent-provider-state.js classify` (the classifier
-   `/linear:delegate` uses) with the cursor, devin and jules tooling probes,
-   so `PARTIAL_TOOLING` is reachable; its `detail` is on the
+   `/linear:delegate` uses) with the cursor, devin, jules and agy tooling
+   probes, so `PARTIAL_TOOLING` is reachable; its `detail` is on the
    `remote_agent_detail` row. `UNKNOWN` means the classifier could not run; treat it like a missing yellow-core (item 5). Do not infer
    either group's active member from which CLI happens to be on PATH.
 2. Offer setup for that member only. Show every other member's row with its
@@ -1081,7 +1091,9 @@ readiness is worth reporting. Only the **enabled** one is offered for setup:
    or `PARTIAL_TOOLING` (no provider enabled, both enabled, an intent
    mismatch, an unparseable `.yellow-stack.yml` i.e. `CONFIG_INVALID`, or a
    managed-scope conflict); `remote-agent`: not `READY_CURSOR`,
-   `READY_DEVIN`, `READY_JULES`, or `PARTIAL_TOOLING` (`UNSELECTED`,
+   `READY_DEVIN`, `READY_JULES`, `READY_AGY` (no remote-agent provider is
+   enabled, but the local agent yellow-agy is; it sits outside the group's
+   exactly-one rule), or `PARTIAL_TOOLING` (`UNSELECTED`,
    `CONFLICT`, or `CONFIG_INVALID`) — do **not** pick one. Report the state and its
    `detail` (fenced as untrusted, same as `/stack:status` and
    `/linear:delegate` do), and point at `/stack:select` for `stacked-pr`
@@ -1096,7 +1108,7 @@ readiness is worth reporting. Only the **enabled** one is offered for setup:
    enablement and cannot install missing tooling): `/gt-setup` for
    `gt-workflow`, `/github-stack:setup` for `github-workflow`,
    `/cursor:setup` for `yellow-cursor`, `/devin:setup` for `yellow-devin`,
-   `/jules:setup` for `yellow-jules`.
+   `/jules:setup` for `yellow-jules`, `/agy:setup` for `yellow-agy`.
 5. If `yellow-core` is not installed, neither group's status can be
    determined (both classifiers live in `plugins/yellow-core/lib/`): report
    every member's readiness, annotate that the active provider could not be

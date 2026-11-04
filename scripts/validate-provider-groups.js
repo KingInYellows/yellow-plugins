@@ -33,6 +33,13 @@
  *     or in a comment does not satisfy them. A consumer that silently lacks a
  *     provider would either refuse it or route it nowhere; adding a
  *     provider must land with every consumer's handling (R25).
+ *   - the local agent declared in the remote-agent router's
+ *     `// local-agent:start` block (yellow-agy) is a real marketplace plugin
+ *     (-002), stays out of every capability group (-006), and is handled at
+ *     each consumer site: READY_AGY → provider = `agy` in /linear:delegate,
+ *     READY_AGY among setup:all's acceptable states, and an executable
+ *     `agy_cli_resolved` probe (-008). A router with no such block declares
+ *     no local agent and skips these checks.
  *
  * SCOPE BOUNDARY — read this before assuming the gate covers more than it
  * does. Everything here is STATIC: declaration shape, uniqueness,
@@ -214,6 +221,59 @@ const CONSUMER_SITES = [
         },
       },
     ],
+  },
+];
+
+// The local-agent role (yellow-agy): declared in the remote-agent router, not
+// in the catalog, because a one-member capability group is not a choice.
+const LOCAL_AGENT_ROUTER = path.join(
+  'plugins',
+  'yellow-core',
+  'lib',
+  'remote-agent-provider-state.js'
+);
+const LOCAL_AGENT_START = '// local-agent:start';
+const LOCAL_AGENT_END = '// local-agent:end';
+const LOCAL_AGENT_ENTRY_RE =
+  /^const LOCAL_AGENT = Object\.freeze\(\{ id: '([a-z0-9-]+)', plugin: '([a-z0-9-]+)' \}\);$/m;
+const LOCAL_AGENT_SITES = [
+  {
+    path: path.join(
+      'plugins',
+      'yellow-linear',
+      'commands',
+      'linear',
+      'delegate.md'
+    ),
+    marker: 'linear-delegate-providers',
+    describe: 'the READY_<ID> → provider mapping',
+    check: (slice, agent) => {
+      const ready = `READY_${agent.id.toUpperCase()}`;
+      const bullet = findBullet(slice, `\`${ready}\``);
+      return bullet && bullet.includes(`provider = \`${agent.id}\``)
+        ? []
+        : [`${ready} → provider = \`${agent.id}\``];
+    },
+  },
+  {
+    path: SETUP_ALL_RELATIVE,
+    marker: 'setup-all-remote-agent-states',
+    describe: 'the acceptable READY_<ID> states',
+    check: (slice, agent) => {
+      const ready = `READY_${agent.id.toUpperCase()}`;
+      return slice.includes(ready) ? [] : [ready];
+    },
+  },
+  {
+    path: SETUP_ALL_RELATIVE,
+    marker: 'setup-all-remote-agent-tooling',
+    describe: 'the executable provider tooling probe (comments do not count)',
+    check: (slice, agent) => {
+      const token = `${agent.id}_cli_resolved`;
+      return stripShellComments(slice).includes(token)
+        ? []
+        : [`${token} (in executable code, not comments)`];
+    },
   },
 ];
 
@@ -813,6 +873,82 @@ function validateConsumerSites(groups, errors) {
   }
 }
 
+/**
+ * The local agent's declaration, or null when the router declares none (or
+ * is absent: validateRouterTable reports a missing router).
+ */
+function readLocalAgent(errors) {
+  let router;
+  try {
+    router = readText(path.join(ROOT, LOCAL_AGENT_ROUTER));
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    fail(`Failed to read ${LOCAL_AGENT_ROUTER}: ${error.message}`);
+  }
+  const start = router.indexOf(LOCAL_AGENT_START);
+  const end = start === -1 ? -1 : router.indexOf(LOCAL_AGENT_END, start);
+  if (start === -1 && router.indexOf(LOCAL_AGENT_END) === -1) return null;
+  const block = start === -1 || end === -1 ? null : router.slice(start, end);
+  const match = block && block.match(LOCAL_AGENT_ENTRY_RE);
+  if (!match) {
+    errors.push(
+      `${PROVIDER_ROUTER_TABLE_DRIFT}: ${LOCAL_AGENT_ROUTER} has a ${LOCAL_AGENT_START} / ${LOCAL_AGENT_END} block without exactly one parseable \`const LOCAL_AGENT = Object.freeze({ id: '<id>', plugin: '<plugin>' });\` line`
+    );
+    return null;
+  }
+  return { id: match[1], plugin: match[2] };
+}
+
+function validateLocalAgent(groups, marketplaceNames, errors) {
+  const agent = readLocalAgent(errors);
+  if (agent === null) return;
+  if (!marketplaceNames.has(agent.plugin)) {
+    errors.push(
+      `${PROVIDER_UNKNOWN_PLUGIN}: local agent "${agent.id}" names plugin "${agent.plugin}", which is not in the generated marketplace`
+    );
+  }
+  for (const [group, members] of groups) {
+    if (members.some((member) => member.plugin === agent.plugin)) {
+      errors.push(
+        `${PROVIDER_ROUTER_TABLE_DRIFT}: local agent ${agent.plugin} also declares capabilityProvider group "${group}"; the local agent sits outside every capability group`
+      );
+    }
+  }
+  const cache = new Map();
+  for (const site of LOCAL_AGENT_SITES) {
+    if (!cache.has(site.path)) {
+      try {
+        cache.set(site.path, readText(path.join(ROOT, site.path)));
+      } catch (error) {
+        if (error.code !== 'ENOENT') {
+          fail(`Failed to read ${site.path}: ${error.message}`);
+        }
+        cache.set(site.path, null);
+      }
+    }
+    const text = cache.get(site.path);
+    if (text === null) {
+      errors.push(
+        `${PROVIDER_CONSUMER_SITE_DRIFT}: consumer site ${site.path} (local agent "${agent.id}") is missing from disk`
+      );
+      continue;
+    }
+    const result = markerSlice(text, site.marker);
+    if (result.error !== undefined) {
+      errors.push(
+        `${PROVIDER_CONSUMER_SITE_DRIFT}: ${site.path}: ${result.error}`
+      );
+      continue;
+    }
+    const missing = site.check(result.slice, agent);
+    if (missing.length > 0) {
+      errors.push(
+        `${PROVIDER_CONSUMER_SITE_DRIFT}: local agent "${agent.id}" (${agent.plugin}) is missing from ${site.describe} in ${site.path} [${site.marker}]: ${missing.join(', ')}`
+      );
+    }
+  }
+}
+
 function validateRouterTable(groups, errors) {
   for (const entry of ROUTER_TABLES) {
     if (!groups.has(entry.group)) {
@@ -847,6 +983,7 @@ function main() {
   validateSetupAllSection(groups, errors);
   validateRouterTable(groups, errors);
   validateConsumerSites(groups, errors);
+  validateLocalAgent(groups, marketplaceNames, errors);
 
   if (errors.length > 0) {
     exitWithErrors(errors);
@@ -862,8 +999,9 @@ function main() {
         `${group} (${members.map((member) => member.id).join(', ')})`
     )
     .join('; ');
+  const agent = readLocalAgent([]);
   console.log(
-    `[validate-provider-groups] OK: ${groups.size} capability group(s) verified — ${summary}`
+    `[validate-provider-groups] OK: ${groups.size} capability group(s) verified — ${summary}${agent ? `; local agent: ${agent.id}` : ''}`
   );
 }
 

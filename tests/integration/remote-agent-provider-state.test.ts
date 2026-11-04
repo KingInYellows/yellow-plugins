@@ -78,7 +78,12 @@ describe('provider table', () => {
     expect(PREFERRED_PROVIDER_ID).toBe('cursor');
   });
 
-  it('declares exactly the seven states', () => {
+  it('declares the local agent outside the remote-agent table', () => {
+    expect(provider.LOCAL_AGENT).toEqual({ id: 'agy', plugin: 'yellow-agy' });
+    expect(PROVIDERS.map((p: { id: string }) => p.id)).not.toContain('agy');
+  });
+
+  it('declares exactly the eight states', () => {
     expect(Object.keys(STATES).sort()).toEqual(
       [
         'CONFIG_INVALID',
@@ -87,13 +92,14 @@ describe('provider table', () => {
         'READY_CURSOR',
         'READY_DEVIN',
         'READY_JULES',
+        'READY_AGY',
         'UNSELECTED',
       ].sort()
     );
   });
 });
 
-describe('classifyRemoteAgentState — the seven states', () => {
+describe('classifyRemoteAgentState — the remote-agent states', () => {
   it('case 1: neither provider installed => UNSELECTED', () => {
     const result = classifyRemoteAgentState({
       plugins: fixture('neither-installed'),
@@ -104,7 +110,8 @@ describe('classifyRemoteAgentState — the seven states', () => {
     expect(result.providers.devin.installed).toBe(false);
     expect(result.detail).toContain('No remote-agent provider is installed');
     expect(result.detail).toContain('yellow-cursor (preferred)');
-    expect(result.detail).toContain('experimental yellow-jules');
+    expect(result.detail).toContain('yellow-agy');
+    expect(result.detail).not.toContain('yellow-jules');
   });
 
   it('case 2: both installed, cursor enabled => READY_CURSOR', () => {
@@ -294,6 +301,89 @@ describe('classifyRemoteAgentState — the seven states', () => {
   });
 });
 
+describe('classifyRemoteAgentState — the local agent (yellow-agy)', () => {
+  it('READY_AGY: only yellow-agy enabled', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('agy-enabled'),
+      tooling: { agy: true },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.READY_AGY);
+    expect(result.localAgent).toMatchObject({
+      id: 'agy',
+      plugin: 'yellow-agy',
+      enabled: true,
+      tooling: true,
+      ready: true,
+    });
+    expect(result.toolingKnown).toBe(true);
+  });
+
+  it('READY_AGY with an unrun probe reports toolingKnown false', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('agy-enabled'),
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.READY_AGY);
+    expect(result.toolingKnown).toBe(false);
+    expect(result.localAgent.tooling).toBeNull();
+    expect(result.localAgent.ready).toBe(true);
+  });
+
+  it('PARTIAL_TOOLING: only yellow-agy enabled, its CLI probed as unresolved', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('agy-enabled'),
+      tooling: { agy: false },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.PARTIAL_TOOLING);
+    expect(result.detail).toContain('yellow-agy');
+    expect(result.localAgent.ready).toBe(false);
+  });
+
+  it('a remote-agent provider plus yellow-agy is not a CONFLICT; the remote one wins', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('cursor-and-agy-enabled'),
+      tooling: { cursor: true, agy: true },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.READY_CURSOR);
+    expect(result.localAgent.enabled).toBe(true);
+    expect(result.localAgent.ready).toBe(true);
+  });
+
+  it('a remote-agent CONFLICT stays a CONFLICT, and still reports the local agent', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('conflict-and-agy-enabled'),
+      tooling: { agy: true },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.CONFLICT);
+    expect(result.detail).not.toContain('yellow-agy');
+    expect(result.localAgent.ready).toBe(true);
+  });
+
+  it('installed but not enabled yellow-agy leaves UNSELECTED', () => {
+    const result = classifyRemoteAgentState({
+      plugins: fixture('agy-installed-not-enabled'),
+      tooling: { agy: true },
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.UNSELECTED);
+    expect(result.localAgent).toMatchObject({
+      installed: true,
+      enabled: false,
+      ready: false,
+    });
+  });
+
+  it('CONFIG_INVALID reports no local agent', () => {
+    const result = classifyRemoteAgentState({ plugins: { not: 'an array' } });
+    expect(result.state).toBe(STATES.CONFIG_INVALID);
+    expect(result.localAgent).toBeNull();
+  });
+});
+
 describe('summarizeProviders', () => {
   it('folds one row per scope into a single enabled/installed verdict', () => {
     const { providers } = summarizeProviders(
@@ -383,6 +473,19 @@ describe('CLI — classify end to end', () => {
     const parsed = JSON.parse(run.stdout);
     expect(parsed.state).toBe(STATES.READY_DEVIN);
     expect(parsed.toolingKnown).toBe(false);
+  });
+
+  it('--tooling-agy yes classifies the agy fixture to READY_AGY; no is PARTIAL_TOOLING', () => {
+    const file = join(FIXTURE_DIR, 'agy-enabled.json');
+    const yes = JSON.parse(
+      runCli(['classify', '--plugins-file', file, '--tooling-agy', 'yes'])
+        .stdout
+    );
+    expect(yes.state).toBe(STATES.READY_AGY);
+    const no = JSON.parse(
+      runCli(['classify', '--plugins-file', file, '--tooling-agy', 'no']).stdout
+    );
+    expect(no.state).toBe(STATES.PARTIAL_TOOLING);
   });
 
   describe('malformed input, exit-code divergence from stack-provider-state.js', () => {

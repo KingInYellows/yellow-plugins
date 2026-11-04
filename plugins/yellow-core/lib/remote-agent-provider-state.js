@@ -4,7 +4,11 @@
  * remote-agent-provider-state.js — the single owner of remote-agent provider
  * state (which member of the `remote-agent` capability group is active:
  * Cursor cloud agents via yellow-cursor, Devin sessions via yellow-devin, or
- * Google Jules sessions via yellow-jules, which is experimental).
+ * Google Jules sessions via yellow-jules, which is deprecated). It also
+ * reports the `local-agent` role: yellow-agy, which runs the Antigravity CLI
+ * on the owner's own machine. That role sits outside the group's
+ * exactly-one rule (it is not a remote agent), so enabling yellow-agy next to
+ * a remote-agent provider is never a CONFLICT.
  *
  * Deliberately smaller than its sibling
  * plugins/yellow-core/lib/stack-provider-state.js:
@@ -19,6 +23,10 @@
  *
  * HARD RULES this module encodes:
  *   - Any number of providers MAY be installed. Exactly one MAY be enabled.
+ *     The local agent (yellow-agy) does not count toward that one.
+ *   - READY_AGY is reported only when no remote-agent provider is enabled.
+ *     When one is, the local agent is still described under `localAgent`,
+ *     and `/linear:delegate --provider agy` is how the caller picks it.
  *   - Cursor is the PREFERRED provider: UNSELECTED and CONFLICT guidance
  *     recommends it, but this module NEVER auto-selects — it only reports
  *     a state and lets the caller (or its own `--provider` escape hatch,
@@ -26,8 +34,8 @@
  *   - This module NEVER executes a command, NEVER reads the environment,
  *     and NEVER reads a file other than `--plugins-file`. The tooling
  *     readiness of each provider is a probe RESULT the caller passes in
- *     (for cursor and jules: whether the plugin's CLI resolved on disk; for
- *     devin: whether its credential env vars are set) — this module has no
+ *     (for cursor, jules and agy: whether the plugin's CLI resolved on disk;
+ *     for devin: whether its credential env vars are set) — this module has no
  *     opinion on how that probe was performed.
  *
  * CLI:
@@ -42,6 +50,8 @@
  *   --tooling-devin <yes|no|unknown>   probe result (omit/unknown ⇒ not
  *                                      checked)
  *   --tooling-jules <yes|no|unknown>   probe result (omit/unknown ⇒ not
+ *                                      checked)
+ *   --tooling-agy <yes|no|unknown>     probe result (omit/unknown ⇒ not
  *                                      checked)
  *
  * Output is a single JSON object on stdout.
@@ -82,6 +92,17 @@ const PROVIDERS = Object.freeze([
 ]);
 // provider-table:end
 
+/**
+ * The `local-agent` role. Not part of the `remote-agent` provider table above
+ * (and not declared as a catalog capabilityProvider, since a one-member group
+ * is not a choice): scripts/validate-provider-groups.js checks this block
+ * against the marketplace and the consumer sites separately. Do not reformat
+ * the block: the validator matches this exact shape.
+ */
+// local-agent:start
+const LOCAL_AGENT = Object.freeze({ id: 'agy', plugin: 'yellow-agy' });
+// local-agent:end
+
 /** Marketplace this repository's provider plugins are published under. */
 const DEFAULT_MARKETPLACE = 'yellow-plugins';
 
@@ -89,7 +110,8 @@ const DEFAULT_MARKETPLACE = 'yellow-plugins';
 const PREFERRED_PROVIDER_ID = 'cursor';
 
 /**
- * The seven remote-agent provider states. Exported so consumers compare
+ * The eight provider states (seven for the remote-agent group, plus READY_AGY
+ * for the local agent). Exported so consumers compare
  * against a constant rather than a string literal a typo can silently break.
  */
 const STATES = Object.freeze({
@@ -97,6 +119,7 @@ const STATES = Object.freeze({
   READY_CURSOR: 'READY_CURSOR',
   READY_DEVIN: 'READY_DEVIN',
   READY_JULES: 'READY_JULES',
+  READY_AGY: 'READY_AGY',
   CONFLICT: 'CONFLICT',
   PARTIAL_TOOLING: 'PARTIAL_TOOLING',
   CONFIG_INVALID: 'CONFIG_INVALID',
@@ -128,45 +151,58 @@ function summarizeProviders(plugins, { projectPath = null } = {}) {
   const summary = {};
 
   for (const provider of PROVIDERS) {
-    const entries = rows.filter((row) => {
-      if (
-        row === null ||
-        typeof row !== 'object' ||
-        typeof row.id !== 'string'
-      ) {
-        return false;
-      }
-      if (row.id !== `${provider.plugin}@${DEFAULT_MARKETPLACE}`) {
-        return false;
-      }
-      if (
-        (row.scope === 'project' || row.scope === 'local') &&
-        projectScopeFiltered
-      ) {
-        return row.projectPath === projectPath;
-      }
-      return true;
+    summary[provider.id] = summarizeOne(rows, provider, {
+      projectPath,
+      projectScopeFiltered,
     });
-
-    const enabledEntries = entries.filter((entry) => entry.enabled === true);
-    summary[provider.id] = {
-      id: provider.id,
-      plugin: provider.plugin,
-      installed: entries.length > 0,
-      enabled: enabledEntries.length > 0,
-      scopes: [...new Set(entries.map((entry) => entry.scope))],
-      enabledScopes: [...new Set(enabledEntries.map((entry) => entry.scope))],
-    };
   }
 
-  return { providers: summary, projectScopeFiltered };
+  return {
+    providers: summary,
+    localAgent: summarizeOne(rows, LOCAL_AGENT, {
+      projectPath,
+      projectScopeFiltered,
+    }),
+    projectScopeFiltered,
+  };
+}
+
+/** One plugin's folded installed/enabled verdict (see summarizeProviders). */
+function summarizeOne(rows, provider, { projectPath, projectScopeFiltered }) {
+  const entries = rows.filter((row) => {
+    if (row === null || typeof row !== 'object' || typeof row.id !== 'string') {
+      return false;
+    }
+    if (row.id !== `${provider.plugin}@${DEFAULT_MARKETPLACE}`) {
+      return false;
+    }
+    if (
+      (row.scope === 'project' || row.scope === 'local') &&
+      projectScopeFiltered
+    ) {
+      return row.projectPath === projectPath;
+    }
+    return true;
+  });
+
+  const enabledEntries = entries.filter((entry) => entry.enabled === true);
+  return {
+    id: provider.id,
+    plugin: provider.plugin,
+    installed: entries.length > 0,
+    enabled: enabledEntries.length > 0,
+    scopes: [...new Set(entries.map((entry) => entry.scope))],
+    enabledScopes: [...new Set(enabledEntries.map((entry) => entry.scope))],
+  };
 }
 
 /**
  * Classify the current remote-agent provider state.
  *
  * Precedence is first-match-wins, worst-first:
- *   CONFIG_INVALID > CONFLICT > UNSELECTED > PARTIAL_TOOLING > READY_*
+ *   CONFIG_INVALID > CONFLICT > (local agent: PARTIAL_TOOLING | READY_AGY)
+ *     > UNSELECTED > PARTIAL_TOOLING > READY_*
+ * The local-agent states apply only when no remote-agent provider is enabled.
  *
  * CONFIG_INVALID is checked FIRST, ahead of even CONFLICT — unlike
  * stack-provider-state.js's CONFIG_INVALID (a broken *intent file*, checked
@@ -177,7 +213,7 @@ function summarizeProviders(plugins, { projectPath = null } = {}) {
  *
  * @param {{
  *   plugins: unknown,
- *   tooling?: { cursor?: boolean, devin?: boolean, jules?: boolean },
+ *   tooling?: { cursor?: boolean, devin?: boolean, jules?: boolean, agy?: boolean },
  *   projectPath?: string|null,
  * }} input
  */
@@ -190,6 +226,7 @@ function classifyRemoteAgentState({
     return {
       group: PROVIDER_GROUP,
       providers: {},
+      localAgent: null,
       projectScopeFiltered: false,
       toolingKnown: null,
       state: STATES.CONFIG_INVALID,
@@ -198,16 +235,26 @@ function classifyRemoteAgentState({
     };
   }
 
-  const { providers, projectScopeFiltered } = summarizeProviders(plugins, {
-    projectPath,
-  });
+  const { providers, localAgent, projectScopeFiltered } = summarizeProviders(
+    plugins,
+    { projectPath }
+  );
   const enabled = PROVIDERS.map((provider) => providers[provider.id]).filter(
     (entry) => entry.enabled
   );
 
+  // The local agent is reported in every state. `tooling` is the caller's
+  // probe (null = not checked); `ready` means enabled and not probed as
+  // broken, which is what `/linear:delegate --provider agy` requires.
+  const agyTooling = typeof tooling.agy === 'boolean' ? tooling.agy : null;
   const result = {
     group: PROVIDER_GROUP,
     providers,
+    localAgent: {
+      ...localAgent,
+      tooling: agyTooling,
+      ready: localAgent.enabled && agyTooling !== false,
+    },
     projectScopeFiltered,
     // `false` means at least one relevant probe was never run. `null` when
     // nothing is enabled — there is no probe relevant to consume yet.
@@ -227,11 +274,31 @@ function classifyRemoteAgentState({
         .map((entry) => `${entry.plugin} @ ${entry.enabledScopes.join('/')}`)
         .join(
           ', '
-        )}). Exactly one may be enabled — disable the others; yellow-cursor is the preferred choice (yellow-jules is experimental).`,
+        )}). Exactly one may be enabled — disable the others; yellow-cursor is the preferred choice (yellow-jules is deprecated).`,
     };
   }
 
-  // 2. UNSELECTED — nothing enabled.
+  // 2. No remote-agent provider enabled: the local agent, when enabled, is
+  //    the provider (READY_AGY, or PARTIAL_TOOLING when its probe failed).
+  //    Its toolingKnown replaces the remote-agent `null`.
+  if (enabled.length === 0 && localAgent.enabled) {
+    if (agyTooling === false) {
+      return {
+        ...result,
+        toolingKnown: true,
+        state: STATES.PARTIAL_TOOLING,
+        detail: `${LOCAL_AGENT.plugin} is enabled, but its tooling is not ready (the plugin CLI could not be resolved). Run /agy:setup.`,
+      };
+    }
+    return {
+      ...result,
+      toolingKnown: agyTooling !== null,
+      state: STATES.READY_AGY,
+      detail: `${LOCAL_AGENT.plugin} ("${LOCAL_AGENT.id}") is enabled and no remote-agent provider is; the local agent is the provider.`,
+    };
+  }
+
+  // 3. UNSELECTED — nothing enabled.
   if (enabled.length === 0) {
     const installed = PROVIDERS.map(
       (provider) => providers[provider.id]
@@ -241,16 +308,16 @@ function classifyRemoteAgentState({
       state: STATES.UNSELECTED,
       detail:
         installed.length === 0
-          ? 'No remote-agent provider is installed. Install and enable yellow-cursor (preferred), or yellow-devin, or the experimental yellow-jules.'
+          ? 'No remote-agent provider is installed. Install and enable yellow-cursor (preferred) or yellow-devin, or enable yellow-agy to run the local agent.'
           : `Installed but not enabled: ${installed
               .map((entry) => entry.plugin)
               .join(
                 ', '
-              )}. Enable yellow-cursor (preferred), or yellow-devin, or the experimental yellow-jules.`,
+              )}. Enable yellow-cursor (preferred) or yellow-devin, or enable yellow-agy to run the local agent.`,
     };
   }
 
-  // 3. PARTIAL_TOOLING — the right plugin is enabled but its tooling probe
+  // 4. PARTIAL_TOOLING — the right plugin is enabled but its tooling probe
   //    reported not-ready. Only an explicit `false` counts; an unrun probe
   //    leaves the state READY_* with toolingKnown: false.
   const active = enabled[0];
@@ -262,7 +329,7 @@ function classifyRemoteAgentState({
     };
   }
 
-  // 4. READY_*.
+  // 5. READY_*.
   return {
     ...result,
     state: READY_STATE_BY_ID[active.id],
@@ -363,9 +430,11 @@ function main(argv) {
   const cursor = parseToolingFlag(args['tooling-cursor']);
   const devin = parseToolingFlag(args['tooling-devin']);
   const jules = parseToolingFlag(args['tooling-jules']);
+  const agy = parseToolingFlag(args['tooling-agy']);
   if (cursor !== undefined) tooling.cursor = cursor;
   if (devin !== undefined) tooling.devin = devin;
   if (jules !== undefined) tooling.jules = jules;
+  if (agy !== undefined) tooling.agy = agy;
 
   const state = classifyRemoteAgentState({ plugins, tooling, projectPath });
   console.log(JSON.stringify(state, null, 2));
@@ -379,6 +448,7 @@ if (require.main === module) {
 module.exports = {
   PROVIDER_GROUP,
   PROVIDERS,
+  LOCAL_AGENT,
   STATES,
   PREFERRED_PROVIDER_ID,
   summarizeProviders,

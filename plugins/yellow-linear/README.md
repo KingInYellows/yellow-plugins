@@ -39,7 +39,7 @@ server is visible in the current session.
 | `/linear:triage`     | Review and assign incoming Linear issues                                         |
 | `/linear:plan-cycle` | Plan sprint cycle by selecting backlog issues                                    |
 | `/linear:status`     | Generate project and initiative health report                                    |
-| `/linear:delegate`   | Delegate a Linear issue to a Devin AI session                                    |
+| `/linear:delegate`   | Delegate a Linear issue to Cursor, Devin, or the local agent (yellow-agy)        |
 
 ## Agents
 
@@ -65,8 +65,8 @@ server is visible in the current session.
 
 Linear issue text is treated as untrusted. `/linear:work` and the
 `linear-issue-loader` agent redact credential-like lines, such as API keys,
-tokens and `*_API_KEY=` assignments, as soon as the text is fetched. They
-show and save only the redacted copy, fenced as reference-only.
+tokens and `*_API_KEY=` assignments, as soon as the text is fetched. They show
+and save only the redacted copy, fenced as reference-only.
 
 ## Graphite Merge Queue
 

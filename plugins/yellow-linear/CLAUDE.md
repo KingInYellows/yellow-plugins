@@ -42,13 +42,16 @@ cycles, and documents.
 - `/linear:plan-cycle` — Plan sprint cycle by selecting backlog issues. Offers
   "What Next?" routing after planning.
 - `/linear:status` — Generate project and initiative health report
-- `/linear:delegate` — Delegate a Linear issue to a remote coding agent via the
-  `remote-agent` capability group. Resolves the enabled provider automatically
-  (`--provider cursor|devin|jules` breaks a tie only when more than one is
-  enabled) — yellow-cursor is the preferred provider, yellow-devin is the
-  legacy path, and experimental yellow-jules launches only under a grant the
-  owner wrote in a terminal (no covering grant: it prints the terminal command
-  and stops before any vendor call).
+- `/linear:delegate` — Delegate a Linear issue to a coding agent: a member of
+  the `remote-agent` capability group, or the local agent yellow-agy. Resolves
+  the enabled provider automatically (`--provider cursor|devin|jules` breaks a
+  tie only when more than one remote agent is enabled; `--provider agy` picks
+  the local agent whenever it is enabled). yellow-cursor is the preferred
+  provider, yellow-devin is the legacy path, yellow-agy is the provider when no
+  remote agent is enabled, and deprecated yellow-jules stops after 2026-11-11
+  and points to yellow-agy. Jules and agy launch only under a grant the owner
+  wrote in a terminal (no covering grant: the command prints the terminal
+  command and stops).
   Requires yellow-core installed (owns the group's classifier)
 
 ### Agents (3)
@@ -122,7 +125,18 @@ going through commands. Bundled-server tool names carry the plugin prefix:
   stops, sending nothing and posting no Linear comment.
   The Jules branch needs the yellow-jules release that ships `delegate` and
   `authorize --list` (the grants release); an older read-only install fails
-  the dry run with a usage error and sends nothing.
+  the dry run with a usage error and sends nothing. After 2026-11-11 Jules is
+  read-only, so `READY_JULES` stops before the packet and points to yellow-agy.
+- **yellow-agy** (optional, the local agent) — reported by the classifier under
+  `localAgent` (`READY_AGY`, `--tooling-agy`). It is not a remote agent, so it
+  never makes a `CONFLICT`. `/linear:delegate` runs `delegate` on the
+  yellow-agy CLI (resolved via `installPath`) with the packet as
+  `--prompt-file`, a new branch `agy/<ISSUE-ID>-r<rev>` from the current
+  branch, and a request id derived from the issue and revision, so a retry
+  replays instead of creating a second task. The CLI enforces the owner's
+  grant and the quota gate; with no grant the command prints the owner's
+  `authorize` line and posts nothing. On a Windows host the clone's path is
+  translated with `wslpath` because agy runs in WSL.
 
 ## Testing
 
