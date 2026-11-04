@@ -46,7 +46,7 @@ setup() {
 }
 
 @test "provider resolution step appears before the launch step" {
-  resolve_line=$(grep -n '^### Step 3: Resolve the Remote-Agent Provider' "$DELEGATE_MD" | head -1 | cut -d: -f1)
+  resolve_line=$(grep -n '^### Step 3: Resolve the Provider' "$DELEGATE_MD" | head -1 | cut -d: -f1)
   launch_line=$(grep -n '^### Step 7: Launch' "$DELEGATE_MD" | head -1 | cut -d: -f1)
   [ -n "$resolve_line" ]
   [ -n "$launch_line" ]
@@ -54,7 +54,7 @@ setup() {
 }
 
 @test "provider resolution step appears before the Linear status transition" {
-  resolve_line=$(grep -n '^### Step 3: Resolve the Remote-Agent Provider' "$DELEGATE_MD" | head -1 | cut -d: -f1)
+  resolve_line=$(grep -n '^### Step 3: Resolve the Provider' "$DELEGATE_MD" | head -1 | cut -d: -f1)
   transition_line=$(grep -n '^### Step 9: Update Status' "$DELEGATE_MD" | head -1 | cut -d: -f1)
   [ -n "$resolve_line" ]
   [ -n "$transition_line" ]
@@ -205,11 +205,144 @@ setup() {
   printf '%s' "$normalized" | grep -q -- 'ONLY.*state.*--provider.*may override'
 }
 
-@test "--provider accepts exactly cursor, devin, or jules" {
-  run grep -F 'exactly `cursor`, `devin`, or `jules`' "$DELEGATE_MD"
+@test "--provider accepts exactly cursor, devin, jules, or agy" {
+  run grep -F 'is exactly `cursor`, `devin`, `jules`, or `agy`' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
-  run grep -F "argument-hint: '[issue-id] [--provider cursor|devin|jules]'" "$DELEGATE_MD"
+  run grep -F "argument-hint: '[issue-id] [--provider cursor|devin|jules|agy]'" "$DELEGATE_MD"
   [ "$status" -eq 0 ]
+}
+
+@test "READY_AGY maps to the agy provider, and --provider agy needs localAgent.ready" {
+  providers_block=$(awk '/<!-- linear-delegate-providers:start -->/,/<!-- linear-delegate-providers:end -->/' "$DELEGATE_MD")
+  printf '%s\n' "$providers_block" | grep -qF '**`READY_AGY`** → provider = `agy`'
+  normalized=$(tr '\n' ' ' < "$DELEGATE_MD")
+  printf '%s' "$normalized" | grep -qF 'use provider = `agy` when `classification.localAgent.ready` is `true`'
+}
+
+@test "Step 3 probes the yellow-agy CLI and passes it to the classifier" {
+  run grep -F 'YELLOW_AGY_ROOT=$(resolve_plugin_root yellow-agy dist/cli.js)' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F '"$TOOLING_JULES" "$TOOLING_AGY")' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
+@test "after the Jules cutoff, READY_JULES points the user to yellow-agy" {
+  providers_block=$(awk '/<!-- linear-delegate-providers:start -->/,/<!-- linear-delegate-providers:end -->/' "$DELEGATE_MD")
+  printf '%s\n' "$providers_block" | grep -qF '`20261111`'
+  printf '%s\n' "$providers_block" | grep -qF 'pass `--provider agy`'
+}
+
+@test "the agy branch launches through the yellow-agy CLI with a packet file and a request id" {
+  block=$(awk '/^```bash$/{buf="";inb=1;next} /^```$/{if(inb && buf ~ /NEW_BRANCH=/){printf "%s", buf; exit} inb=0;next} inb{buf=buf $0 "\n"}' "$DELEGATE_MD")
+  [ -n "$block" ]
+  printf '%s\n' "$block" | grep -qF 'CLI="${YELLOW_AGY_ROOT}/dist/cli.js"'
+  printf '%s\n' "$block" | grep -qF -- '--prompt-file "$PACKET_FILE" --request-id "$REQUEST_ID")'
+  # Git Bash must not rewrite the WSL repo path on its way to node.
+  printf '%s\n' "$block" | grep -qF 'OUTPUT=$(MSYS_NO_PATHCONV=1 node "$CLI" delegate'
+  printf '%s\n' "$block" | grep -qF "PACKET_FILE='YELLOW_TODO_packet_path_from_path_step'"
+  # agy never pushes and this command never writes a grant.
+  ! printf '%s\n' "$block" | grep -qE 'git push|authorize --repo "\$'
+}
+
+agy_block_script() {
+  block=$(awk '/^```bash$/{buf="";inb=1;next} /^```$/{if(inb && buf ~ /NEW_BRANCH=/){printf "%s", buf; exit} inb=0;next} inb{buf=buf $0 "\n"}' "$DELEGATE_MD")
+  repo="$BATS_TEST_TMPDIR/repo"
+  mkdir -p "$repo" "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/agy/dist"
+  git -C "$repo" init -q -b main
+  mkdir -p "$repo/.git/tmp"
+  packet_dir=$(mktemp -d "$repo/.git/tmp/yellow-linear-packet.XXXXXX")
+  printf 'packet body\n' > "$packet_dir/packet.txt"
+  printf '[{"id":"yellow-agy@yellow-plugins","scope":"user","enabled":true,"installPath":"%s"}]\n' "$BATS_TEST_TMPDIR/agy" > "$BATS_TEST_TMPDIR/plugins.json"
+  printf '#!/bin/sh\ncat "%s"\n' "$BATS_TEST_TMPDIR/plugins.json" > "$BATS_TEST_TMPDIR/bin/claude"
+  chmod +x "$BATS_TEST_TMPDIR/bin/claude"
+  script="$BATS_TEST_TMPDIR/block.sh"
+  printf '%s\n' "$block" \
+    | sed -e "s|^ISSUE_ID=.*|ISSUE_ID='ENG-7'|" \
+          -e "s|^DELEGATION_REV=.*|DELEGATION_REV='2'|" \
+          -e "s|^PACKET_FILE=.*|PACKET_FILE='$packet_dir/packet.txt'|" > "$script"
+}
+
+@test "agy block: a grant refusal prints the owner's authorize line and removes the packet" {
+  agy_block_script
+  cat > "$BATS_TEST_TMPDIR/agy/dist/cli.js" <<'JS'
+require('fs').writeFileSync(process.env.ARGV_OUT, JSON.stringify(process.argv.slice(2)));
+process.stdout.write(JSON.stringify({ ok: false, operation: 'delegate', error: { code: 'AGY_AUTHORITY_DENIED', message: 'no grant', recoveryAction: 'authorize' } }) + '\n');
+process.exitCode = 2;
+JS
+  cd "$repo"
+  ARGV_OUT="$BATS_TEST_TMPDIR/argv.json" PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$script"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"branch=agy/ENG-7-r2"* ]]
+  [[ "$output" == *"  MSYS_NO_PATHCONV=1 node '"*"' authorize --repo '$repo' --branch 'agy/ENG-7-*'"* ]]
+  [ ! -e "$packet_dir" ]
+  argv=$(cat "$BATS_TEST_TMPDIR/argv.json")
+  [[ "$argv" == '["delegate","--repo","'"$repo"'","--branch","agy/ENG-7-r2","--base","main","--remote","origin","--prompt-file","'"$packet_dir"'/packet.txt","--request-id","linear-'* ]]
+}
+
+@test "agy block: a created task prints its id and fences the plan" {
+  agy_block_script
+  cat > "$BATS_TEST_TMPDIR/agy/dist/cli.js" <<'JS'
+process.stdout.write(JSON.stringify({ ok: true, operation: 'delegate', localId: 'at-1', state: 'PLAN_PENDING', requiresAttention: true, plan: { summary: 'do it' } }) + '\n');
+JS
+  cd "$repo"
+  PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$script"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"localId":"at-1"'* ]]
+  [[ "$output" == *"PLAN_PENDING"* ]]
+  [[ "$output" != *"authorize --repo"* ]]
+  [[ "$output" == *"--- begin untrusted-content"* ]]
+  [ ! -e "$packet_dir" ]
+}
+
+@test "agy block: output that is not a JSON envelope stops with an error" {
+  agy_block_script
+  printf 'process.exitCode = 1;\n' > "$BATS_TEST_TMPDIR/agy/dist/cli.js"
+  cd "$repo"
+  PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$script"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"agy returned no usable result (exit=1)"* ]]
+}
+
+@test "agy block: an unallocated packet path is refused before anything runs" {
+  agy_block_script
+  sed -i "s|^PACKET_FILE=.*|PACKET_FILE='/tmp/packet.txt'|" "$script"
+  cd "$repo"
+  PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$script"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not an allocated packet path"* ]]
+}
+
+@test "agy block: a WSL UNC clone path becomes the WSL path, a drive path never reaches the CLI" {
+  agy_block_script
+  cat > "$BATS_TEST_TMPDIR/agy/dist/cli.js" <<'JS'
+require('fs').writeFileSync(process.env.ARGV_OUT, JSON.stringify(process.argv.slice(2)));
+process.stdout.write(JSON.stringify({ ok: true, operation: 'delegate', localId: 'at-2', state: 'PLAN_PENDING' }) + '\n');
+JS
+  cd "$repo"
+  printf '#!/bin/sh\nprintf "%%s\\r\\n" "${FAKE_DISTRO:-Ubuntu-24.04}"\n' > "$BATS_TEST_TMPDIR/bin/wsl.exe"
+  chmod +x "$BATS_TEST_TMPDIR/bin/wsl.exe"
+  sed "s|^repo_root=\$(git rev-parse.*|repo_root='//wsl.localhost/Ubuntu-24.04/home/k/proj'|" "$script" > "$BATS_TEST_TMPDIR/unc.sh"
+  ARGV_OUT="$BATS_TEST_TMPDIR/argv.json" PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$BATS_TEST_TMPDIR/unc.sh"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$BATS_TEST_TMPDIR/argv.json")" == '["delegate","--repo","/home/k/proj",'* ]]
+  # A clone in another distro than agy's is refused before the CLI runs.
+  rm -f "$BATS_TEST_TMPDIR/argv.json"
+  mkdir -p "$packet_dir" && printf 'packet body\n' > "$packet_dir/packet.txt"
+  FAKE_DISTRO=Debian ARGV_OUT="$BATS_TEST_TMPDIR/argv.json" PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$BATS_TEST_TMPDIR/unc.sh"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'is in WSL distro "Ubuntu-24.04" but agy runs in "Debian"'* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/argv.json" ]
+  sed "s|^repo_root=\$(git rev-parse.*|repo_root='C:/Users/k/proj'|" "$script" > "$BATS_TEST_TMPDIR/drive.sh"
+  rm -f "$BATS_TEST_TMPDIR/argv.json"
+  ARGV_OUT="$BATS_TEST_TMPDIR/argv.json" PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$BATS_TEST_TMPDIR/drive.sh"
+  [ "$status" -ne 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/argv.json" ]
+}
+
+@test "a FAILED agy task goes on to a Failed comment so the next run gets a new revision" {
+  grep -qF 'with a `localId` and state `FAILED`' "$DELEGATE_MD"
+  grep -qF 'continue to Step 8 with `**Status:** Failed' "$DELEGATE_MD"
+  grep -qF '`**Status:** Failed (<code>)` instead.' "$DELEGATE_MD"
 }
 
 @test "READY_JULES maps to the jules provider inside the marked decision list" {
@@ -333,7 +466,7 @@ setup() {
 @test "the classifier receives the jules tooling probe" {
   run grep -F 'TOOLING_JULES=$([ -n "$YELLOW_JULES_ROOT" ]' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
-  run grep -F '"$TOOLING_CURSOR" "$TOOLING_DEVIN" "$TOOLING_JULES")' "$DELEGATE_MD"
+  run grep -F '"$TOOLING_CURSOR" "$TOOLING_DEVIN" "$TOOLING_JULES" "$TOOLING_AGY")' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
   run grep -F 'resolve_plugin_root yellow-jules dist/cli.js' "$DELEGATE_MD"
   [ "$status" -eq 0 ]

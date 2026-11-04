@@ -668,6 +668,103 @@ describe('validate-provider-groups — consumer sites (ERROR-PROVIDER-008, R25)'
   });
 });
 
+describe('validate-provider-groups — local agent (yellow-agy)', () => {
+  const REMOTE = [
+    ...DEFAULT_PROVIDERS,
+    { plugin: 'yellow-cursor', group: 'remote-agent', id: 'cursor' },
+    { plugin: 'yellow-devin', group: 'remote-agent', id: 'devin' },
+  ];
+  const remoteMembers = REMOTE.filter((p) => p.group === 'remote-agent');
+  const AGY_SITES = {
+    'linear-delegate-providers': `${CONSUMER_SITES['linear-delegate-providers']!.render(remoteMembers)}\n- **\`READY_AGY\`** → provider = \`agy\`.`,
+    'setup-all-remote-agent-states': `${CONSUMER_SITES['setup-all-remote-agent-states']!.render(remoteMembers)}, \`READY_AGY\``,
+    'setup-all-remote-agent-tooling': `${CONSUMER_SITES['setup-all-remote-agent-tooling']!.render(remoteMembers)}\nprintf 'agy_cli_resolved: OK\\n'`,
+  };
+
+  function withLocalAgent(
+    options: {
+      sites?: Record<string, string | null>;
+      marketplace?: boolean;
+      line?: string;
+      providers?: Array<{ plugin: string; group: string; id: string }>;
+    } = {}
+  ): string {
+    const providers = options.providers ?? REMOTE;
+    const root = buildFixture({
+      providers,
+      marketplaceNames: [
+        ...providers.map((p) => p.plugin),
+        ...(options.marketplace === false ? [] : ['yellow-agy']),
+      ],
+      consumerSites: { ...AGY_SITES, ...options.sites },
+    });
+    const router = join(root, ROUTER_TABLE_PATHS['remote-agent']!);
+    writeFileSync(
+      router,
+      `${readFileSync(router, 'utf8')}// local-agent:start\n${
+        options.line ??
+        "const LOCAL_AGENT = Object.freeze({ id: 'agy', plugin: 'yellow-agy' });"
+      }\n// local-agent:end\n`,
+      'utf8'
+    );
+    return root;
+  }
+
+  it('passes when the local agent is handled at every consumer site', () => {
+    const run = runValidator(withLocalAgent());
+    expect(run.status).toBe(0);
+  });
+
+  it.each([
+    ['linear-delegate-providers', 'READY_AGY → provider = `agy`'],
+    ['setup-all-remote-agent-states', 'READY_AGY'],
+    ['setup-all-remote-agent-tooling', 'agy_cli_resolved'],
+  ])('fails when the local agent is missing from %s', (marker, token) => {
+    const site = CONSUMER_SITES[marker]!;
+    const run = runValidator(
+      withLocalAgent({ sites: { [marker]: site.render(remoteMembers) } })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-008');
+    expect(run.stderr).toContain('local agent "agy"');
+    expect(run.stderr).toContain(token);
+  });
+
+  it('fails when the local agent plugin is not in the marketplace', () => {
+    const run = runValidator(withLocalAgent({ marketplace: false }));
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-002');
+    expect(run.stderr).toContain('yellow-agy');
+  });
+
+  it('fails when the local-agent block cannot be parsed', () => {
+    const run = runValidator(
+      withLocalAgent({ line: "const LOCAL_AGENT = { id: 'agy' };" })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('ERROR-PROVIDER-006');
+  });
+
+  it('fails when the local agent also joins a capability group', () => {
+    const providers = [
+      ...REMOTE,
+      { plugin: 'yellow-agy', group: 'remote-agent', id: 'agy' },
+    ];
+    const run = runValidator(
+      withLocalAgent({
+        providers,
+        sites: {
+          'linear-delegate-providers': CONSUMER_SITES[
+            'linear-delegate-providers'
+          ]!.render(providers.filter((p) => p.group === 'remote-agent')),
+        },
+      })
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('sits outside every capability group');
+  });
+});
+
 describe('generated-manifest non-emission (live repository)', () => {
   const declaring = ['gt-workflow', 'github-workflow'];
 

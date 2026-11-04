@@ -41,6 +41,10 @@ run is file edits only until agy's `--sandbox` is verified on a host.
 | `/agy:collect`   | Writes the work as patches and scans them for secret-shaped content                             |
 | `/agy:abandon`   | Prints the terminal command that collects, removes the worktree, keeps the branch               |
 
+`/linear:delegate` routes a Linear issue here when no remote-agent provider is
+enabled, or with `--provider agy`. It runs the same `delegate` on a new
+`agy/<ISSUE-ID>-r<rev>` branch and stops at the plan.
+
 A grant is the owner's written permission: repo, branch pattern, operations, the
 allowed test and lint commands, the AI Pro quota floor, task and correction
 limits, and an expiry. Only the owner creates one, by typing a code shown in
