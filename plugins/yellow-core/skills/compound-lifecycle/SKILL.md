@@ -168,9 +168,11 @@ doc body as the step before removal.
   the evidence (`retire_when met: <issue closed in vX.Y>`) as the rationale.
   Never Keep. The Step 5 citation gate does not apply: inbound references show
   the doc is cited, not that it is still true.
-- **Not met:** Keep, and report the check.
-- **Cannot check** (no network, private tracker, ambiguous wording): Keep, and
-  report it as unverified with the reason.
+- **Not met:** no retirement action. Score and classify the doc in Steps 5-6
+  as usual, and report the check separately.
+- **Cannot check** (no network, private tracker, ambiguous wording): no
+  retirement action. Score and classify as usual, and report the check as
+  unverified with the reason.
 
 ### Step 5 — Compute staleness and overlap
 
@@ -186,8 +188,8 @@ reclassifies entries, and the citation gate MUST run before the score
 
 ### Step 6 — Classify
 
-For each stale or overlapping candidate (or cluster), classify into one
-of five outcomes. The classification is a recommendation; the user has
+For each stale or overlapping candidate (or cluster), and each candidate with
+a met `retire_when` (Step 4a), classify into one of five outcomes. The classification is a recommendation; the user has
 final say in interactive mode.
 
 | Outcome | When | Action |
