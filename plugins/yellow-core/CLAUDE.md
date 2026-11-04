@@ -60,6 +60,10 @@ it before editing a command, library or the staging pipeline.
   SOL-002). `compound-lifecycle` checks it read-only in Step 4a; a met
   condition bypasses the citation gate, and autofix only marks it
   `status: stale`.
+- `knowledge-compounder` grounds each new doc before finishing: it runs
+  `scripts/validate-solutions.js --doc <path>` when the script exists, and fixes
+  any SOL-003 (cited path, commit or link that does not resolve) or marks the
+  line `(historical)`.
 
 ### Commands (19)
 

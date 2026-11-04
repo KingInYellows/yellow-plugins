@@ -336,6 +336,12 @@ substitute a fallback.
 
 ## M3 Confirmation
 
+Ground the draft first: every backticked repo path, relative link and commit SHA
+it cites must exist (Glob, Read, `git cat-file -e <sha>^{commit}`). Fix or drop
+each one that does not, or mark the line `(historical)` when the fix being
+documented removed it. Cite PR numbers rather than branch commit SHAs, which a
+squash merge rewrites.
+
 Use AskUserQuestion before any writes. The question body MUST include all of
 the following so the user can review the actual content (not just file
 paths) before approving:
@@ -620,6 +626,33 @@ After Write, verify:
 ```
 
 If the above exits non-zero, stop. Do not proceed.
+
+When the repo ships `scripts/validate-solutions.js` (yellow-plugins does), run
+it on the written doc (`DOC_PATH=docs/solutions/$CATEGORY/$FINAL_SLUG.md`), or
+on `DOC_PATH=$AMEND_TARGET` after amending:
+
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+BASE="$(git -C "$GIT_ROOT" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || printf 'origin/main')"
+TRUSTED=1
+for f in scripts/validate-solutions.js scripts/lib/doc-claims.js; do
+  git -C "$GIT_ROOT" cat-file -e "$BASE:$f" 2>/dev/null || TRUSTED=0
+done
+if [ "$TRUSTED" = 1 ] && git -C "$GIT_ROOT" diff --quiet "$BASE" -- scripts/validate-solutions.js scripts/lib/ 2>/dev/null; then
+  node "$GIT_ROOT/scripts/validate-solutions.js" --doc "$GIT_ROOT/$DOC_PATH"
+else
+  printf '[knowledge-compounder] claim check skipped: validator missing or differs from %s\n' "$BASE"
+fi
+```
+
+The check runs only the validator as it is on the default branch. A branch that
+changes `scripts/validate-solutions.js` or `scripts/lib/` skips it, so a
+checkout's own edits never execute here. Report a skip in the Success Output.
+
+`ERROR-SOL-003` means a cited path, commit or relative link does not exist, or a
+`{{...}}` placeholder leaked. Fix the citation with Edit, or mark its line
+`(historical)`, and re-run until it exits 0. List remaining warnings in the
+Success Output.
 
 ### MEMORY.md Update (MEMORY_ONLY or BOTH)
 
