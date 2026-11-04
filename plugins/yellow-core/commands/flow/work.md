@@ -1080,12 +1080,14 @@ step 5. Phase 4 becomes a summary phase:
    ```
 
 2. Invoke `/review:pr` via the Skill tool with `skill: "review:pr"` and `args`
-   set to the PR number.
+   set to `<PR#> --report-only` (substitute the PR number).
 
-   `/review:pr` will:
-   - Select review agents adaptively based on PR size and content
-   - Apply P1/P2 fixes automatically
-   - Compound findings to docs/solutions/ if significant
+   `/review:pr` selects review agents adaptively and reports findings without
+   editing, committing or pushing; this phase does not own the tree once the PR
+   is submitted. Show the user its report. To apply the fixes, the user runs
+   `/review:pr <PR#>` (or `/review:sweep <PR#>` unattended). If the installed
+   yellow-review predates `--report-only` and rejects it as an unknown flag,
+   re-invoke with only the PR number.
 
    **Graceful degradation:** If the Skill invocation fails (skill not found,
    yellow-review plugin not installed, or any error), skip this phase and
