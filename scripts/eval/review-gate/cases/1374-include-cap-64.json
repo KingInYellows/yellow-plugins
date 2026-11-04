@@ -1,0 +1,22 @@
+{
+  "id": "1374-include-cap-64",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1374,
+  "base": "6c535803ac347406ffc1098f033b7e5dd7a38825",
+  "head": "4130982c1c5435d66a191c48fa1996592c256e50",
+  "lane": "correctness",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "plugins/yellow-review/lib/resolve-paths.sh",
+      "line": 2539,
+      "match": [
+        "\\b64\\b|cap|limit|bound",
+        "include"
+      ]
+    }
+  ],
+  "source": "fix #1386 (c90072f), Codex P2 on #1374: a valid acyclic config with more than 64 includes was refused (--mark-hooks exit 2)",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-04"
+}

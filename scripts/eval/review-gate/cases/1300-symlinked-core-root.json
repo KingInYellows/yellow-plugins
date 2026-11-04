@@ -1,0 +1,22 @@
+{
+  "id": "1300-symlinked-core-root",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1300,
+  "base": "85766df25bfc66b93bb3b1423e6309b82de43197",
+  "head": "4cff1a23a407a7827dcf0b6b29ebf2d624bf4a2d",
+  "lane": "security",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "scripts/snippets/yellow-core-root.sh",
+      "line": 10,
+      "match": [
+        "symlink|sym.?link|\\[ -L|link",
+        "root|lib"
+      ]
+    }
+  ],
+  "source": "fix #1302 (62c54bb): core_libs_ok accepted a symlinked root or lib/ (and a relative or dot-component root) that could point back into the checkout",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-04"
+}

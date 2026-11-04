@@ -1,0 +1,23 @@
+{
+  "id": "1649-runs-checkout-validator",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1649,
+  "base": "4af3eebaccea1984e410d3ff9fe871d75b9dd709",
+  "head": "0ecf3439b0a837fea0d8af748b608d37a98fe885",
+  "lane": "security",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "plugins/yellow-core/agents/workflow/knowledge-compounder.md",
+      "line": 633,
+      "match": [
+        "validate-solutions|validator|node",
+        "checkout|repo(sitory)?.?(provided|controlled)|arbitrary|untrusted|contributor|execut"
+      ]
+    }
+  ],
+  "source": "Codex security P1 on #1649 at 0ecf343 (discussion_r4459338392), after review-gate had run; fixed in 5040678 before merge",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-04",
+  "notes": "head is an intermediate PR commit, not on main; fetch it by SHA."
+}

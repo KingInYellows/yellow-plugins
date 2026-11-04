@@ -1,0 +1,30 @@
+{
+  "id": "1100-overlayfs-hardlink-dev",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1100,
+  "base": "728ea9c47aa982374da94ee0355f983f15182c43",
+  "head": "f7e73c44c6f429e238ba9e3f392eb2169f8cf43e",
+  "lane": "security",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "plugins/yellow-review/lib/resolve-paths.sh",
+      "line": 358,
+      "match": [
+        "overlay|st_dev|device|%D",
+        "director|hard.?link|samefile"
+      ]
+    },
+    {
+      "file": "plugins/yellow-review/lib/resolve-paths.sh",
+      "line": 661,
+      "match": [
+        "overlay|st_dev|device|%D",
+        "director|hard.?link|filter"
+      ]
+    }
+  ],
+  "source": "fix #1277 (667fc58): hard-link screens compared a file's st_dev with the root directory's, which differs on overlayfs, so a planted hard link passed",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-04"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "1095-heredoc-key-on-disk",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1095,
+  "base": "97913e4fa3f3695142eafed0ff7206da00b43b8a",
+  "head": "28f866a5675b888813728130e311645ee9069627",
+  "lane": "security",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "plugins/yellow-core/lib/jev-prefilter.sh",
+      "line": 197,
+      "match": [
+        "here.?doc|heredoc|<<",
+        "temp|tmp|disk|file"
+      ]
+    }
+  ],
+  "source": "fix #1252 (e31d257): the TypeSafe API key went to curl through a here-document, which bash before 5.1 backs with a temp file",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-04",
+  "notes": "The shortlist named #1240, but #1240 merged after the fix; the here-document came from #1095 (28f866a)."
+}
