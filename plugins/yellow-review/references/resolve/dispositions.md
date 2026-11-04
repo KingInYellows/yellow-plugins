@@ -907,6 +907,11 @@ one PR comment listing every unresolved thread (outdated included, as in
   `https://` URL; otherwise the thread ID), `path:line`, the opener's login in
   backticks so nobody is mentioned, and the status. Backticks, pipes, angle
   brackets and line breaks are stripped. At most 50 rows; the rest are counted.
+- With `--risk` (`classify-risk` output, computed in Step 9 with the policy at
+  the default branch's tip), a `**Risk tier:**` line under the heading shows the
+  tier and the policy source. Only `tier` and `policy` are read, each from a
+  fixed vocabulary; paths and rule text never reach the comment. Without the
+  file, or when Step 9 could not classify, the line is left out.
 - An unchanged body is not rewritten. With nothing blocking, an existing comment
   is edited to say so and none is created. `enforced`, and
   `YELLOW_REVIEW_BLOCKING_COMMENT=0`, skip without a `gh` call. A comment left
