@@ -75,9 +75,9 @@ it before editing a script, library or command.
   fixes; persists unapplied findings to the ledger; `--non-interactive`
   suppresses push and learnings prompts; `--report-only` (used by `/flow:work`
   Phase 5) reports without checkout, edits or push, reading a detached worktree
-  of the PR head when the checkout is elsewhere; the report opens with a
-  `### Themes` section grouping related findings by root cause or fix path
-  (`review_grouping: auto | off | always`)
+  of the PR head when the checkout is elsewhere; when related findings form
+  groups, the report opens with a `### Themes` section grouping them by root
+  cause or fix path (`review_grouping: auto | off | always`)
 - `/review:resolve` — parallel resolution of unresolved PR threads via GraphQL;
   every thread gets a disposition (`fixed`, `addressed`, `oos`,
   `disagree`/`unclear`); ends with the `Resolve:` contract line;
@@ -130,24 +130,26 @@ user-invocable.
 ### Workflows (1)
 
 `workflows/review-gate.js` runs as `/yellow-review:review-gate` (Claude Code
-2.1.316 loads `workflows/` without a manifest field; not yet checked on CI's
-pinned 2.1.293, which gates Phase 3). It is the Hunt → Vote → Rank core of the
-risk-tiered pipeline: one persona agent per `args.include` name, a plain-code
-dedup barrier, 1 or 3 votes per finding by severity and tier from the read-only
-`review-gate-verifier` agent, then Important / Nit / Pre-existing display with
-the REVIEW.md Nit cap. Its `args` and return shape are a fixed contract the eval
-runner builds against; a hunter that returns `null`, or an unknown persona name,
-lands in `coverage.failed`, and `coverage.empty` marks a run in which no hunter
-returned; neither counts as clean. Today only `/review:pr` under
-`review_pipeline: workflow` calls it, in shadow mode
-(`references/review-pr/workflow-shadow.md`): agents read a detached checkout of
-the head commit under the git common dir (removed on every exit path), Coverage
-gets a comparison line, and its findings are never applied or written to the
-ledger. `tests/integration/review-gate-workflow.test.ts` runs the body in
-`node:vm` with stub agents; ESLint ignores `plugins/*/workflows/` because no
-parser accepts top-level `return` beside `export`.
+2.1.316 loads `workflows/` without a manifest field; `claude-code-action`'s
+2.1.293 is unchecked, so the CI job installs 2.1.316 itself). It is the Hunt →
+Vote → Rank core of the risk-tiered pipeline: one persona agent per
+`args.include` name, a plain-code dedup barrier, 1 or 3 votes per finding by
+severity and tier from the read-only `review-gate-verifier` agent, then
+Important / Nit / Pre-existing display with the REVIEW.md Nit cap. Its `args`
+and return shape are a fixed contract the eval runner builds against; a hunter
+that returns `null`, or an unknown persona name, lands in `coverage.failed`, and
+`coverage.empty` marks a run in which no hunter returned; neither counts as
+clean. Two callers: the repo's `.github/workflows/review-gate.yml` runs it
+headless on non-draft PRs (`scripts/ci/review-gate/README.md`; shadow by
+default, never blocks), and `/review:pr` under `review_pipeline: workflow` runs
+it in shadow mode (`references/review-pr/workflow-shadow.md`): agents read a
+detached checkout of the head commit under the git common dir (removed on every
+exit path), Coverage gets a comparison line, and its findings are never applied
+or written to the ledger. `tests/integration/review-gate-workflow.test.ts` runs
+the body in `node:vm` with stub agents; ESLint ignores `plugins/*/workflows/`
+because no parser accepts top-level `return` beside `export`.
 
-### Scripts (23)
+### Scripts (24)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
@@ -175,9 +177,13 @@ the resolve scripts: `references/resolve/dispositions.md`.
   from its changed paths and `.github/review-risk.json` read at a trusted ref
   (`--policy-ref`, the default branch for stacked PRs) or local file; local git
   only, no network
+- `pr-base-remote` — the remote (or https URL) of a PR's base repository, so the
+  risk-tier fetches in `/review:pr` and `/review:resolve` never read the policy
+  from a fork's `origin`; local git only, no network
 - `sync-blocking-comment` — Step 9's sticky "blocking threads" PR comment for
   repos that do not enforce conversation resolution; one comment per PR, found
-  by its marker and edited in place
+  by its marker and edited in place; `--risk` adds the `classify-risk` tier and
+  policy source
 - `apply-thread-actions` — the Step 7 write phase in one call: runs the three
   scripts below (plus `handback-pr-thread`) per thread from a JSONL plan; exit 4
   stops, exit 5 resumes

@@ -37,6 +37,10 @@ const WORKFLOW_POLICIES: Record<string, WorkflowPolicy> = {
     category: 'supersedable-pr-validation',
     workflowKey: 'lint-plugins',
   },
+  'review-gate.yml': {
+    category: 'supersedable-pr-validation',
+    workflowKey: 'review-gate',
+  },
   'upstream-pins-advisory.yml': {
     category: 'manual-or-scheduled-analytical',
     reason:
