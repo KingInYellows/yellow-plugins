@@ -94,6 +94,9 @@ identically without `yellow-codex` installed.
 - Large diffs (>128K tokens) cause hard errors -- no built-in truncation
 - Codex CLI is actively evolving (v0.140.0+) -- flags may change
 - Each invocation uses OpenAI API tokens; concurrent use may trigger rate limits
+- `codex-reviewer` sends diff content to OpenAI. Set `cross_model_review: off`
+  in `yellow-plugins.local.md` (repo or user-level) to stop `/review:pr` and
+  `/council` from dispatching it automatically
 - `--output-schema` is silently ignored by the `codex exec review` subcommand
   on every model -- use plain `codex exec` when structured JSON is required
 

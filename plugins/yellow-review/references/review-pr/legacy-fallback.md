@@ -17,7 +17,10 @@ persona dispatch table and use the pre-Wave-2 adaptive selection:
   `architecture-strategist`, `performance-oracle`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`
 - Optional supplementary: `codex-reviewer` (yellow-codex) — when yellow-codex
-  is installed AND diff > 100 lines. Spawn via
+  is installed AND diff > 100 lines AND the cross-model egress switch is
+  `auto`. Resolve it exactly as `review-pr.md` "Cross-model egress switch"
+  says (run `cross-model-mode`; on `off` or if it cannot run, skip
+  `codex-reviewer` and add the same Coverage line). Spawn via
   `Agent(subagent_type="yellow-codex:review:codex-reviewer", run_in_background=true)`.
   If the agent is not found (yellow-codex not installed), skip silently.
   `codex-reviewer` returns the structured 6-key council contract
