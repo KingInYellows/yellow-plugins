@@ -146,7 +146,7 @@ or written to the ledger. `tests/integration/review-gate-workflow.test.ts` runs
 the body in `node:vm` with stub agents; ESLint ignores `plugins/*/workflows/`
 because no parser accepts top-level `return` beside `export`.
 
-### Scripts (22)
+### Scripts (23)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
