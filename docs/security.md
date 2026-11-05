@@ -963,8 +963,10 @@ own machine to plan and then edit one task in a new git worktree. See
   `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`,
   `GOOGLE_APPLICATION_CREDENTIALS` and the agy ADC switch), and each run's
   pinned settings profile sets `useG1Credits: false`. The plugin never reads,
-  copies or proxies agy's OAuth tokens or credential files; it reads only agy's
-  `settings.json`.
+  copies or proxies agy's OAuth tokens or credential files. It reads only agy's
+  `settings.json` and the `userSettings.useAiCredits` key of
+  `~/.gemini/config/config.json`, and setup refuses while either turns AI
+  credits on.
 - **Owner-confirmed authority.** Nothing runs without a grant naming the repo, a
   branch pattern, the operations, a quota floor, task and correction limits and
   an expiry (at most 24 hours). Only `authorize` creates a grant, and only after
