@@ -469,20 +469,6 @@ describe('runSpawn on a bridge Linux group (CLAUDE-246)', () => {
     env: { PATH: process.env['PATH'] ?? '' },
     linuxGroup: { distro: 'Ubuntu' },
   });
-  // A killed process nobody has reaped yet is a zombie: dead for this test.
-  const alive = (pid: number): boolean => {
-    try {
-      process.kill(pid, 0);
-    } catch {
-      return false;
-    }
-    try {
-      const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
-      return stat.slice(stat.lastIndexOf(')') + 2)[0] !== 'Z';
-    } catch {
-      return true;
-    }
-  };
 
   it.skipIf(process.platform === 'win32')(
     'kills the Linux group on timeout and waits for that kill before rejecting',
@@ -517,7 +503,8 @@ describe('runSpawn on a bridge Linux group (CLAUDE-246)', () => {
         'KILL',
       ]);
       expect(pgid).toBeGreaterThan(1);
-      expect(alive(pgid)).toBe(false);
+      // A reused pid would pass alive(pgid); the group must be gone.
+      expect(() => process.kill(-pgid, 0)).toThrow();
     }
   );
 
