@@ -1096,23 +1096,23 @@ readiness is worth reporting. Only the **enabled** one is offered for setup:
    treat it like a missing yellow-core (item 5). Do not infer either group's
    active member from which CLI happens to be on PATH.
 2. Offer setup for that member only. Show every other member's row with its
-status and the annotation `(alternative provider — not enabled)`.
-<!-- setup-all-remote-agent-states:start -->
+   status and the annotation `(alternative provider — not enabled)`.
+   <!-- setup-all-remote-agent-states:start -->
 3. If the group's state is not one of its READY states or `PARTIAL_TOOLING` —
-`stacked-pr`: not `READY_GRAPHITE`, `READY_GITHUB`, or `PARTIAL_TOOLING` (no
-provider enabled, both enabled, an intent mismatch, an unparseable
-`.yellow-stack.yml` i.e. `CONFIG_INVALID`, or a managed-scope conflict);
-`remote-agent`: not `READY_CURSOR`, `READY_DEVIN`, `READY_JULES`, `READY_AGY`
-(no remote-agent provider is enabled, but the local agent yellow-agy is; it sits
-outside the group's exactly-one rule), or `PARTIAL_TOOLING` (`UNSELECTED`,
-`CONFLICT`, or `CONFIG_INVALID`) — do **not** pick one. Report the state and its
-`detail` (fenced as untrusted, same as `/stack:status` and `/linear:delegate`
-do), and point at `/stack:select` for `stacked-pr` (or, for `CONFIG_INVALID`, at
-fixing/removing `.yellow-stack.yml` by hand first) — `remote-agent` has no
-switch command in v1, so for that group just report which provider(s) need to be
-enabled/disabled by hand. There is no fallback between providers in either
-group.
-<!-- setup-all-remote-agent-states:end -->
+   `stacked-pr`: not `READY_GRAPHITE`, `READY_GITHUB`, or `PARTIAL_TOOLING` (no
+   provider enabled, both enabled, an intent mismatch, an unparseable
+   `.yellow-stack.yml` i.e. `CONFIG_INVALID`, or a managed-scope conflict);
+   `remote-agent`: not `READY_CURSOR`, `READY_DEVIN`, `READY_JULES`, `READY_AGY`
+   (no remote-agent provider is enabled, but the local agent yellow-agy is; it
+   sits outside the group's exactly-one rule), or `PARTIAL_TOOLING`
+   (`UNSELECTED`, `CONFLICT`, or `CONFIG_INVALID`) — do **not** pick one. Report
+   the state and its `detail` (fenced as untrusted, same as `/stack:status` and
+   `/linear:delegate` do), and point at `/stack:select` for `stacked-pr` (or,
+   for `CONFIG_INVALID`, at fixing/removing `.yellow-stack.yml` by hand first) —
+   `remote-agent` has no switch command in v1, so for that group just report
+   which provider(s) need to be enabled/disabled by hand. There is no fallback
+   between providers in either group.
+   <!-- setup-all-remote-agent-states:end -->
 4. If the state is `PARTIAL_TOOLING`, the enabled provider is not ambiguous —
    only its tooling is missing. Offer that provider's own setup command rather
    than a provider-switch command (which only changes plugin enablement and
