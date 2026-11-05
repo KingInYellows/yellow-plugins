@@ -848,6 +848,7 @@ PR state with no pipe, as in Step 7:
 
 ```bash
 PR_STATE=$(gh pr view "<PR#>" --json state,headRefOid -q '.state + " " + .headRefOid') || PR_STATE="unreadable"
+printf '%s\n' "$PR_STATE"
 ```
 
 If the state is not `OPEN` (including `unreadable`), skip every retry and
