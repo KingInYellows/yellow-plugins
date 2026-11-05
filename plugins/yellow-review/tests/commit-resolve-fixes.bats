@@ -356,6 +356,149 @@ STUB
   [[ "$stderr" == *"timed out"* ]]
 }
 
+@test "a failed submit prints a recovery line naming the local commit and the remote head (exit 5)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  export STUB_SUBMIT_FAIL=1
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 5 ]
+  local_sha=$(git rev-parse HEAD)
+  [ "$local_sha" != "$FIRST_SHA" ]
+  [[ "$stderr" == *"recovery: local commit $local_sha; remote head $FIRST_SHA."* ]]
+  [[ "$stderr" == *"Never force-push."* ]]
+}
+
+# --- Head re-check (--expected-head) ---
+
+# other_writer_sha: a commit on top of FIRST_SHA that another writer pushes.
+other_writer_sha() {
+  git commit-tree -p "$FIRST_SHA" -m "fix: another writer" "$FIRST_SHA^{tree}"
+}
+
+@test "--expected-head that still matches HEAD and the remote commits and pushes" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "$FIRST_SHA" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
+}
+
+@test "--expected-head must be a full lowercase commit id (exit 2)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "${FIRST_SHA:0:12}" -- src/a.txt
+  [ "$status" -eq 2 ]
+  run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "$(printf '%s' "$FIRST_SHA" | tr a-f A-F)" -- src/a.txt
+  [ "$status" -eq 2 ]
+}
+
+@test "a remote head pushed by another writer before the commit exits 8 with nothing committed" {
+  other=$(other_writer_sha)
+  git push -q -f origin "$other:refs/heads/feature" 2>/dev/null
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "$FIRST_SHA" -- src/a.txt
+  [ "$status" -eq 8 ]
+  [[ "$stderr" == *"reason=head-moved"* ]]
+  [[ "$stderr" == *"remote=$other"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature\nfix')" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a local HEAD that is not --expected-head exits 8 with nothing committed" {
+  other=$(other_writer_sha)
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "$other" -- src/a.txt
+  [ "$status" -eq 8 ]
+  [[ "$stderr" == *"local=$FIRST_SHA"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^gt modify' "$STUB_LOG"
+}
+
+@test "a remote head pushed during the commit undoes the commit and exits 8 before the submit" {
+  export OTHER_SHA
+  OTHER_SHA=$(other_writer_sha)
+  real_gt="$STUB_BIN/gt.real"
+  mv "$STUB_BIN/gt" "$real_gt"
+  cat >| "$STUB_BIN/gt" <<STUB
+#!/bin/sh
+"$real_gt" "\$@" || exit \$?
+# Another writer pushes while the commit runs.
+if [ "\$1" = modify ]; then
+  git --git-dir="\$ORIGIN_DIR" update-ref refs/heads/feature "\$OTHER_SHA"
+fi
+STUB
+  chmod +x "$STUB_BIN/gt"
+  # The other writer's commit must exist in origin for update-ref.
+  git push -q origin "$OTHER_SHA:refs/heads/other" 2>/dev/null
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "$FIRST_SHA" -- src/a.txt
+  [ "$status" -eq 8 ]
+  [[ "$stderr" == *"reason=head-moved"* ]]
+  [[ "$stderr" == *"commit undone, nothing submitted"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature\nfix')" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a local commit made on top of ours before the submit exits 8 and submits nothing" {
+  real_git=$(command -v git)
+  # Once our commit exists, another process commits on the branch and
+  # publishes it, so both the local tip and the remote head move before the
+  # pre-submit check.
+  cat >| "$STUB_BIN/git" <<STUB
+#!/bin/sh
+if [ "\$1" = diff ] && [ ! -e "$BATS_TEST_TMPDIR/moved" ] \\
+  && [ "\$("$real_git" rev-parse -q --verify HEAD^ 2>/dev/null)" = "$FIRST_SHA" ]; then
+  : >| "$BATS_TEST_TMPDIR/moved"
+  "$real_git" commit -q --allow-empty -m "chore: another local commit" >/dev/null 2>&1
+  publish >/dev/null 2>&1
+fi
+exec "$real_git" "\$@"
+STUB
+  chmod +x "$STUB_BIN/git"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "$FIRST_SHA" -- src/a.txt
+  [ "$status" -eq 8 ]
+  [[ "$stderr" == *"reason=head-moved"* ]]
+  [[ "$stderr" == *"local HEAD moved after the commit"* ]]
+  [[ "$stderr" == *"recovery: local commit $(git rev-parse HEAD^) kept below $(git rev-parse HEAD); not submitted"* ]]
+  # Both commits stay; nothing reached the provider.
+  [ "$(git rev-list --count "$FIRST_SHA"..HEAD)" = 2 ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a submit that failed after its push landed says not to resubmit (exit 5)" {
+  real_gt="$STUB_BIN/gt.real"
+  mv "$STUB_BIN/gt" "$real_gt"
+  cat >| "$STUB_BIN/gt" <<STUB
+#!/bin/sh
+if [ "\$1" = submit ]; then
+  publish >/dev/null 2>&1
+  exit 1
+fi
+exec "$real_gt" "\$@"
+STUB
+  chmod +x "$STUB_BIN/gt"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 5 ]
+  [[ "$stderr" == *"recovery: local commit $(git rev-parse HEAD) is already the remote head; the submit landed. Do not resubmit."* ]]
+}
+
+@test "an unreadable remote branch counts as a moved head (exit 8)" {
+  real_git=$(command -v git)
+  cat >| "$STUB_BIN/git" <<STUB
+#!/bin/sh
+[ "\$1" = ls-remote ] && { echo "fatal: unable to access remote" >&2; exit 128; }
+exec "$real_git" "\$@"
+STUB
+  chmod +x "$STUB_BIN/git"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "$FIRST_SHA" -- src/a.txt
+  [ "$status" -eq 8 ]
+  [[ "$stderr" == *"could not be read"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
 # --- Untrusted file lists ---
 
 @test "--files-from reads one path per line" {

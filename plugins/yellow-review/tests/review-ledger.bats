@@ -1062,6 +1062,40 @@ require_universal_ctags() {
   [ "$("$RL" summary --all | jq -c '."12"')" = '{"pending":0,"attention":0,"merge_blocking":0,"skipped":0}' ]
 }
 
+# A flock stand-in for the fold's lock: it fails, after removing PR 12's
+# ledger files when $1 is "prune" (a concurrent prune finishing mid-read).
+stub_failing_flock() {
+  mkdir -p "$BATS_TEST_TMPDIR/stub-bin"
+  printf '#!/bin/sh\n[ "%s" = prune ] && rm -f "%s/12.jsonl" "%s/12.pending"\nexit 1\n' \
+    "$1" "$LEDGER_DIR" "$LEDGER_DIR" >|"$BATS_TEST_TMPDIR/stub-bin/flock"
+  chmod +x "$BATS_TEST_TMPDIR/stub-bin/flock"
+}
+
+@test "CLAUDE-269: summary skips a ledger pruned mid-read instead of reporting null" {
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  printf 'garbage-line\n' >>"$LEDGER_DIR/$LEDGER_PR.jsonl"
+  stub_failing_flock prune
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/stub-bin:$PATH" "$RL" summary --all
+  [ "$status" -eq 0 ]
+  [ "$output" = '{}' ]
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  printf 'garbage-line\n' >>"$LEDGER_DIR/$LEDGER_PR.jsonl"
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/stub-bin:$PATH" "$RL" summary 12
+  [ "$status" -eq 0 ]
+  [ "$output" = '{}' ]
+}
+
+@test "CLAUDE-269: a ledger that is still there and cannot be read stays null" {
+  observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
+  printf 'garbage-line\n' >>"$LEDGER_DIR/$LEDGER_PR.jsonl"
+  stub_failing_flock keep
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/stub-bin:$PATH" "$RL" summary --all
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '."12"' <<<"$output")" = null ]
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/stub-bin:$PATH" "$RL" summary 12
+  [ "$status" -ne 0 ]
+}
+
 @test "summary counts only pending P0-P2 findings as merge-blocking" {
   observe "$BASE" "[$(finding a.sh 2 '{"severity":"P1"}'), $(finding a.sh 3 '{"severity":"P3"}'), $(finding a.sh 4 '{"severity":"P0","owner":"human"}')]" >/dev/null
   [ "$("$RL" summary 12 | jq -c '."12"')" = '{"pending":2,"attention":1,"merge_blocking":1,"skipped":0}' ]

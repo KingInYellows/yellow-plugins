@@ -557,3 +557,30 @@ cs_detect_auth_route() {
     printf '%s' "subscription"
   fi
 }
+
+# --- Review-run lock (read side) ---
+# /review:resolve, /review:sweep, /review:sweep-all and /review:resolve-stack
+# (yellow-review) hold <staging-dir>/.review-run-lock/ while they run: one
+# regular file named run.* per running review, written by yellow-review's
+# review-run-lock script. A drain must not write into a checkout a review is
+# resolving, because the review's ignored-file guard stops on any new
+# gitignored file (a .promote-done sentinel included). A holder file older
+# than CS_REVIEW_LOCK_TTL_MIN minutes is a crashed run and does not count.
+# yellow-review's skills/pr-review-workflow/scripts/review-run-lock writes the
+# same layout; change both together.
+CS_REVIEW_LOCK_TTL_MIN=120
+
+# Print the review-run lock directory for a staging dir.
+cs_review_lock_dir() {
+  printf '%s/.review-run-lock' "$1"
+}
+
+# Return 0 when a review run holds the checkout of staging dir $1, 1 otherwise.
+# A symlinked lock directory is ignored (not created by review-run-lock).
+cs_review_lock_live() {
+  local d
+  d=$(cs_review_lock_dir "$1")
+  [ -d "$d" ] && [ ! -L "$d" ] || return 1
+  find "$d" -mindepth 1 -maxdepth 1 -type f -name 'run.*' \
+    -mmin "-$CS_REVIEW_LOCK_TTL_MIN" 2>/dev/null | grep -q .
+}

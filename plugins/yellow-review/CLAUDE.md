@@ -82,7 +82,9 @@ it before editing a script, library or command.
 - `/review:resolve` — parallel resolution of unresolved PR threads via GraphQL;
   every thread gets a disposition (`fixed`, `addressed`, `oos`,
   `disagree`/`unclear`); ends with the `Resolve:` contract line;
-  `--non-interactive` suppresses all gates
+  `--non-interactive` suppresses all gates. It re-checks the PR head before the
+  commit, the submit and the write phase, and stops with a recovery patch when
+  another writer pushed meanwhile
 - `/review:resolve-stack` — walk a Graphite stack bottom-up running
   `/review:resolve --non-interactive`, fully unattended; ends with the
   `ResolveStack:` outcome line
@@ -90,7 +92,9 @@ it before editing a script, library or command.
 - `/review:sweep` — `/review:pr` then `/review:resolve` then `/review:triage` on
   one PR, all non-interactive
 - `/review:sweep-all` — `/review:sweep` over every open non-draft PR you
-  authored; one upfront confirmation; ends with the `SweepAll:` outcome line
+  authored; one upfront confirmation; skips a PR whose head commit is newer than
+  `YELLOW_REVIEW_RECENT_PUSH_MINUTES` (another writer); ends with the
+  `SweepAll:` outcome line
 - `/review:triage` — own the review-findings ledger lifecycle for one PR
   (reconcile, apply, dismiss, restore); `rl prune` is the only ledger deletion
   path
@@ -150,7 +154,7 @@ or written to the ledger. `tests/integration/review-gate-workflow.test.ts` runs
 the body in `node:vm` with stub agents; ESLint ignores `plugins/*/workflows/`
 because no parser accepts top-level `return` beside `export`.
 
-### Scripts (25)
+### Scripts (26)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
@@ -160,6 +164,10 @@ the resolve scripts: `references/resolve/dispositions.md`.
   — read PR threads, blockers, changed ranges, and new threads for the Step 8
   re-pass; `get-pr-comments --include-resolved` returns every thread with
   `isResolved`
+- `review-run-lock` — `acquire` / `release` / `refresh` a holder of
+  yellow-core's review-run lock so no compound-staging drain writes into a
+  checkout under review; `drain-live` reports a running drain
+  (`references/review-run-lock.md`)
 - `cross-model-mode` — resolves `cross_model_review` (`off` in the repo or
   user-level `yellow-plugins.local.md` wins); `/review:pr` drops
   `codex-reviewer` when it prints `off`

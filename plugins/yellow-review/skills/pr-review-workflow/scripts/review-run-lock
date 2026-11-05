@@ -1,0 +1,110 @@
+#!/bin/bash
+# Hold yellow-core's review-run lock while a review command runs, so the
+# compound-staging drain does not write into the checkout under review.
+# Usage: review-run-lock acquire | release <holder> | refresh <holder> | drain-live
+#   acquire     create one holder file under
+#               <staging-dir>/.review-run-lock/ (creating the staging dir when
+#               yellow-core has not yet, so a drain that starts staging later in
+#               the run still sees the holder) and print `holder=run.XXXXXX`,
+#               an opaque token, then the drain-live line below. Prints
+#               `holder=none` when the staging dir is a symlink (not ours to
+#               write into). Holder files older than 120 minutes are reaped
+#               first.
+#   release     remove the holder (and the lock dir once empty); `none` is a
+#               no-op. Anything but a `run.XXXXXX` token is refused, so a
+#               holder never carries a path into a command line.
+#   refresh     touch the holder, for runs that last longer than 120 minutes.
+#   drain-live  print `drain=live` when a drain holds .drain-lock (a directory
+#               younger than 30 minutes, yellow-core's stale-lock age), else
+#               `drain=idle`.
+# The staging dir is $HOME/.claude/projects/<git toplevel, / as ->/
+# compound-staging, as yellow-core's cs_derive_project_slug and
+# cs_staging_dir_for_slug build it. yellow-core reads the lock with
+# cs_review_lock_live (lib/compound-staging.sh) and staging-promoter's
+# review-run check; change all three together. The lock is advisory: it stops
+# new drains and promotions, not a drain that already wrote.
+# Exit codes: 0 done, 1 the lock could not be created or removed, 2 usage.
+set -uo pipefail
+
+TTL_MIN=120
+DRAIN_STALE_MIN=30
+
+die() { printf '[review-run-lock] Error: %s\n' "$2" >&2; exit "$1"; }
+
+top=$(git rev-parse --show-toplevel 2>/dev/null) || top=$PWD
+[ -n "${HOME:-}" ] || die 1 "HOME is not set"
+STAGING="$HOME/.claude/projects/$(printf '%s' "$top" | tr '/' '-')/compound-staging"
+LOCK="$STAGING/.review-run-lock"
+
+reap() {
+    [ -d "$LOCK" ] && [ ! -L "$LOCK" ] || return 0
+    find "$LOCK" -mindepth 1 -maxdepth 1 -type f -name 'run.*' -mmin "+$TTL_MIN" \
+        -exec rm -f -- {} + 2>/dev/null
+    rmdir -- "$LOCK" 2>/dev/null
+    return 0
+}
+
+# check_holder <token>: 0 when <token> is a run.XXXXXX holder name.
+check_holder() {
+    [[ "$1" =~ ^run\.[A-Za-z0-9]{6}$ ]]
+}
+
+drain_state() {
+    if [ -d "$STAGING/.drain-lock" ] && [ ! -L "$STAGING/.drain-lock" ] &&
+        [ -z "$(find "$STAGING/.drain-lock" -maxdepth 0 -mmin "+$DRAIN_STALE_MIN" 2>/dev/null)" ]; then
+        printf 'drain=live\n'
+    else
+        printf 'drain=idle\n'
+    fi
+}
+
+case "${1:-}" in
+    acquire)
+        [ $# -eq 1 ] || die 2 "acquire takes no arguments"
+        if [ -L "$STAGING" ]; then
+            printf 'holder=none\n'
+            drain_state
+            exit 0
+        fi
+        if [ ! -d "$STAGING" ]; then
+            (umask 077 && mkdir -p -- "$STAGING") || die 1 "could not create $STAGING"
+        fi
+        reap
+        # The reap above can rmdir an empty lock dir between another run's
+        # mkdir and its mktemp; retry a few times.
+        for _ in 1 2 3; do
+            if [ -L "$LOCK" ] || { [ -e "$LOCK" ] && [ ! -d "$LOCK" ]; }; then
+                die 1 "$LOCK is not a directory; remove it"
+            fi
+            mkdir -- "$LOCK" 2>/dev/null || [ -d "$LOCK" ] || continue
+            h=$(mktemp "$LOCK/run.XXXXXX" 2>/dev/null) || continue
+            printf 'pid=%s start=%s\n' "$PPID" "$(date +%s)" >|"$h" || { rm -f -- "$h"; continue; }
+            printf 'holder=%s\n' "${h##*/}"
+            drain_state
+            exit 0
+        done
+        die 1 "could not create a holder in $LOCK"
+        ;;
+    release | refresh)
+        [ $# -eq 2 ] || die 2 "$1 takes one holder token"
+        [ "$2" = none ] && exit 0
+        check_holder "$2" || die 2 "not a review-run lock holder token (run.XXXXXX)"
+        [ ! -L "$LOCK" ] || die 1 "$LOCK is a symlink; remove it"
+        if [ "$1" = refresh ]; then
+            [ -f "$LOCK/$2" ] || die 1 "holder is gone (reaped?); acquire again"
+            touch -- "$LOCK/$2" || die 1 "could not refresh the holder"
+            exit 0
+        fi
+        rm -f -- "$LOCK/$2" || die 1 "could not remove the holder"
+        rmdir -- "$LOCK" 2>/dev/null
+        exit 0
+        ;;
+    drain-live)
+        [ $# -eq 1 ] || die 2 "drain-live takes no arguments"
+        drain_state
+        exit 0
+        ;;
+    *)
+        die 2 "usage: review-run-lock acquire | release <holder> | refresh <holder> | drain-live"
+        ;;
+esac

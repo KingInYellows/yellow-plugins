@@ -75,6 +75,11 @@ failed, `TMPDIR` is inside the worktree, or its path holds a byte outside
 the final summary or at any earlier stop (a failed check, an empty list, a
 cancel), run `rm -f -- "<marker>"` unless it is `none`.
 
+Then read `${CLAUDE_PLUGIN_ROOT}/references/review-run-lock.md` and run its
+Acquire block, keeping `<holder>` (its `drain=live` stop ends the batch here,
+before any PR). Refresh the holder at each item 1 Announce, and run its Release
+block wherever the marker is removed.
+
 `gt` is not checked here — each per-PR sweep invocation runs its own pre-flight
 and will surface a `gt` failure inline.
 
@@ -241,7 +246,11 @@ For each iteration:
    Check the PR first, with the literal PR number:
 
    ```bash
-   OUT=$(gh pr view <PR#> --json state -q .state 2>&1) && RC=0 || RC=$?
+   # <state> <head> <minutes since the head commit> <branch>; -1 when unknown
+   # (including a commit list that stops before the head), 0 for a commit
+   # date ahead of this clock.
+   Q='"\(.state) \(.headRefOid) \(.headRefOid as $h | (.commits[-1] // {} | if .oid == $h then .committedDate else null end) as $d | if $d then ((now - ($d | fromdateiso8601)) / 60 | floor | if . < 0 then 0 else . end) else -1 end) \(.headRefName)"'
+   OUT=$(gh pr view <PR#> --json state,headRefOid,headRefName,commits -q "$Q" 2>&1) && RC=0 || RC=$?
    RL=0 CAUSE=""
    classify() {
      RL=0 CAUSE=""
@@ -260,12 +269,21 @@ For each iteration:
    case "$CAUSE" in
      'network error'|'gh exited '*)
        sleep 5
-       OUT=$(gh pr view <PR#> --json state -q .state 2>&1) && RC=0 || RC=$?
+       OUT=$(gh pr view <PR#> --json state,headRefOid,headRefName,commits -q "$Q" 2>&1) && RC=0 || RC=$?
        classify
        ;;
    esac
    if [ "$RC" -eq 0 ]; then
-     printf 'state=%s exit=0 ratelimited=0\n' "$OUT"
+     read -r ST OID AGE REF <<<"$OUT"
+     WIN=${YELLOW_REVIEW_RECENT_PUSH_MINUTES:-15}
+     case "$WIN" in '' | *[!0-9]*) WIN=15 ;; esac
+     RECENT=0
+     case "$AGE" in
+       '' | *[!0-9]*) ;;
+       *) [ "$WIN" -gt 0 ] && [ "$AGE" -lt "$WIN" ] &&
+         [ "$(git rev-parse -q --verify "refs/heads/$REF" 2>/dev/null)" != "$OID" ] && RECENT=1 ;;
+     esac
+     printf 'state=%s exit=0 ratelimited=0 recent_push=%s\n' "$ST" "$RECENT"
    elif [ "$RL" -eq 1 ]; then
      printf 'state=unreadable exit=%s ratelimited=1\n' "$RC"
    else
@@ -294,9 +312,17 @@ For each iteration:
    to `### Step 5: End-of-loop summary table`. Do not continue to the next PR.
    When `exit` is `0` and `state` is not `OPEN`, record
    `skipped — PR closed before sweep` and do NOT invoke the Skill: go to item 6.
-   Only `exit=0` with `state=OPEN` proceeds to item 2. A stop inside the sweep
-   that this check cannot foresee (for example a branch mismatch) still reaches
-   item 5b.
+   When `recent_push=1`, the PR's head commit is younger than
+   `YELLOW_REVIEW_RECENT_PUSH_MINUTES` (default 15, `0` turns the check off) and
+   is not the local branch's tip, so another writer (a cloud session, an autofix
+   bot) is likely still pushing it: record `Outcome` `skipped`, `Skip Reason`
+   `recent push (another writer)`, `Blocking` `?`, do NOT invoke the Skill, and
+   go to item 6. A head this clone already has (an upstack branch an earlier
+   sweep restacked and submitted) is not skipped. The age is the head commit's
+   committer date, which a rebase or amend refreshes; a push of an old commit is
+   not seen. Only `exit=0` with `state=OPEN` and `recent_push=0` proceeds to
+   item 2. A stop inside the sweep that this check cannot foresee (for example a
+   branch mismatch) still reaches item 5b.
 
 2. **Invoke sweep** — invoke the `Skill` tool with `skill: "review:sweep"` and
    `args: "<PR#>"`. The skill name is `review:sweep` (the value of the `name:`
@@ -311,8 +337,11 @@ For each iteration:
      `branch mismatch`, `local branch behind the PR head`,
      `head ignore rules unreadable`,
      `config tracked here, ignored on the PR head` or
-     `config untracked here, ignored on the PR head`), not `no contract`. Item
-     4's clean-tree check still runs; the batch continues.
+     `config untracked here, ignored on the PR head`), not `no contract`. For
+     `branch mismatch`, when the sweep's stderr has a
+     `is checked out in the worktree` line, put that worktree path and its
+     `cd '<path>' && /review:sweep <PR#>` command in `Notes`. Item 4's
+     clean-tree check still runs; the batch continues.
    - If the LAST line fully matches
      `^Sweep: aborted \((local-config-changed)\)$` (`/review:sweep` "Skip
      line"), `yellow-plugins.local.md` changed during the sweep: outcome is
@@ -404,10 +433,12 @@ It prints
 for every ledger in this clone. `skipped` counts records the fold could not
 read, any of which may be a pending finding. A ledger that fails to fold emits
 `"<PR#>": null` for that entry while the command still exits 0 — a per-row
-failure, not a call failure. For each row, the `Residual` cell is
-`<pending>/<attention>`, `—` when the PR has no ledger, and `?` when its entry
-is `null` (fold failed) or the whole call failed. Exclude any `?` row from the
-pending and attention totals below — do not treat `null` as `0`.
+failure, not a call failure. A ledger pruned while the command reads it (another
+session's `prune`) is left out, like a PR with no ledger. For each row, the
+`Residual` cell is `<pending>/<attention>`, `—` when the PR has no ledger, and
+`?` when its entry is `null` (fold failed) or the whole call failed. Exclude any
+`?` row from the pending and attention totals below — do not treat `null` as
+`0`.
 
 Print a pipe-delimited markdown summary table:
 

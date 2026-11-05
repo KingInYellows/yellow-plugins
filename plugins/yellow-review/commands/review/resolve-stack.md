@@ -121,6 +121,10 @@ cancel), run `rm -f -- "<marker>"` unless it is `none`.
 Capture the printed `repo:` value — substitute it as a literal `<owner/repo>` in
 every later Bash block (variables do not survive across Bash tool calls).
 
+Then read `${CLAUDE_PLUGIN_ROOT}/references/review-run-lock.md` and run its
+Acquire block, keeping `<holder>`. Refresh it before each PR in Step 3, and run
+its Release block wherever the marker is removed.
+
 **Optional ruvector recall** (best-effort; skip to Step 2 silently on any
 failure): when `.ruvector/` exists in the project root and
 `ToolSearch("hooks_recall")` finds the tool, call

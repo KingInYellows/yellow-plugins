@@ -243,6 +243,16 @@ if [ "$REQUEUE_ONLY" = "1" ]; then
   json_exit "requeue-only: stale processing entries restored to pending/"
 fi
 
+# --- Review-run lock ---
+# A yellow-review resolve or sweep running in this checkout treats any new
+# gitignored file as a resolver escaping its bounds and stops (2026-10-20: the
+# drain's .promote-done sentinels did exactly that). Skip dispatch while one
+# runs; pending entries stay for the next SessionStart. A drain already running
+# is covered by staging-promoter's own check before it writes.
+if cs_review_lock_live "$STAGING_DIR"; then
+  json_exit "review run in progress in this checkout; deferring drain"
+fi
+
 # --- Resolve claude binary ---
 # Allow tests to override via COMPOUND_DRAIN_CMD env var, but ONLY
 # inside a bats test process (bats exports BATS_VERSION to every test
