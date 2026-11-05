@@ -69,6 +69,9 @@ A **control** (`controls/<id>.json`, schema `schema/control.schema.json`) is a
 merged PR with no later revert, fix, bot P1 or post-merge CI failure against it:
 `{id, repo, base, head, tier, source}`. Any Important finding on a control is a
 false positive; the FP rate is controls with at least one over controls graded.
+Seven merged-PR controls ship (picked 2026-11-05): three high, three medium and
+one low tier. Each was reviewed by the bots with no P1 and has no later fix or
+revert touching its files.
 
 A **synthetic control** (`controls/synthetic/<id>.json`, schema
 `schema/synthetic.schema.json`, plus `controls/synthetic/<id>.patch`) is a clean

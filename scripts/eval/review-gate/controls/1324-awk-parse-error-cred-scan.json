@@ -1,0 +1,10 @@
+{
+  "id": "1324-awk-parse-error-cred-scan",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1324,
+  "base": "7727baa2612e4afa6b69c099b3c2629cf6ef85c1",
+  "head": "a1aa653d9ff821418f552ff0fdbcda62f91b6ac2",
+  "tier": "high",
+  "source": "merged PR #1324 with no later fix, revert, bot P1 or post-merge CI failure (picked 2026-11-05)",
+  "notes": "An awk parse error in the resolve-text credential scan now counts as a failed scan (shell)."
+}
