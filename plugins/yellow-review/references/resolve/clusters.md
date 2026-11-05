@@ -38,6 +38,16 @@ upstream `EveryInc/compound-engineering-plugin` PR #480 at locked SHA
      thread with no line, `review-level` when `path` is null) followed by that
      thread's comment bodies; the ID is the thread's validated `PRRT_` ID
      (`^PRRT_[A-Za-z0-9_-]+$`) and `<path>` the validated `cluster.path`
+   - `rank` — 0, 1 or 2, below
+
+## Rank
+
+A cluster's rank orders Step 6's per-cluster line cap: rank 0 first, and
+within a rank the cluster order of this step. It is 0 when any thread carries a
+bot-authored P0 badge, 2 when every thread is a bot thread whose badge is P2 or
+P3, and 1 otherwise (a P1 badge, no badge, or any human thread). Badges are
+reviewer text and can be forged, so rank only orders admission; it never
+decides whether a thread is fixed, skipped or downgraded.
 
 `cluster_line_distance` and every other `resolve_pr.*` value come from the
 Step 1 snapshot, which already validated them and warned once. Do not re-read

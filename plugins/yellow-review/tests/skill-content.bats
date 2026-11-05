@@ -1167,7 +1167,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   pre=$(grep -n '^\*\*Range pre-check\.\*\*' "$RESOLVE_PR" | cut -d: -f1)
   ver=$(grep -n '^\*\*Verify\.\*\*' "$RESOLVE_PR" | cut -d: -f1)
   [ -n "$pre" ] && [ -n "$ver" ] && [ "$pre" -lt "$ver" ]
-  grep -qF -- 'commit-resolve-fixes" --check-ranges --ranges-from "<ranges-file>" --files-from "<files-file>"' "$RESOLVE_PR"
+  grep -qF -- 'commit-resolve-fixes" --check-ranges --ranges-from "<ranges-file>" --clusters-from "<clusters-file>" --files-from "<files-file>"' "$RESOLVE_PR"
   [[ "$text" == *'**Non-interactive:** revert the listed files'* ]]
   [[ "$text" == *'**Interactive:** one `AskUserQuestion`'* ]]
   [[ "$text" == *'"Include them / Revert them"'* ]]
@@ -1176,6 +1176,28 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$text" == *'dropping files afterwards would commit an unverified subset'* ]]
   # The commit call keeps the whole-commit refusal as a backstop.
   [[ "$text" == *'It is a backstop that does not fire after a clean pre-check'* ]]
+}
+
+@test "resolve-pr: the 50-line cap defers whole clusters by rank instead of the whole run" {
+  text=$(flat "$RESOLVE_PR")
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  clusters=$(flat "$RESOLVE_REFS/clusters.md")
+  [[ "$text" == *'`<rank> <path>...` with its `Files modified`'* ]]
+  [[ "$text" == *'`unclear` with evidence `over the 50-line run cap (deferred)`'* ]]
+  [[ "$disp" == *'`over the 50-line run cap (deferred)`'* ]]
+  [[ "$clusters" == *'## Rank'* ]]
+  [[ "$clusters" == *'rank only orders admission'* ]]
+}
+
+@test "resolve-pr: non-interactive Step 4 holds runner-file clusters for an attended run" {
+  text=$(flat "$RESOLVE_PR")
+  s4=$(grep -n '^### Step 4:' "$RESOLVE_PR" | cut -d: -f1)
+  rf=$(grep -n '^\*\*Runner files (non-interactive only)\.\*\*' "$RESOLVE_PR" | cut -d: -f1)
+  gate=$(grep -n '^\*\*Spawn-cap gate' "$RESOLVE_PR" | cut -d: -f1)
+  [ -n "$rf" ] && [ "$s4" -lt "$rf" ] && [ "$rf" -lt "$gate" ]
+  grep -qF -- 'commit-resolve-fixes" --check-paths --unattended --files-from "<paths-file>"' "$RESOLVE_PR"
+  [[ "$text" == *'evidence `needs an attended /review:resolve (runner file <path>)`'* ]]
+  [[ "$text" == *'does not count toward the cluster cap'* ]]
 }
 
 @test "edit range: resolver prompt, clusters.md and the script state the same numeric margin" {

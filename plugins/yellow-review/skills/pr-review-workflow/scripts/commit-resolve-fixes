@@ -7,6 +7,7 @@
 #                             [--files-from <file>] [--ranges-from <file>]
 #                             [-- <files...>]
 #        commit-resolve-fixes --check-ranges --ranges-from <file>
+#                             [--clusters-from <file>]
 #                             [--files-from <file>] [-- <files...>]
 #        commit-resolve-fixes --check-paths [--unattended]
 #                             [--files-from <file>] [-- <files...>]
@@ -40,6 +41,19 @@
 #            caller runs it before verification so out-of-range files can be
 #            reverted first; the check on the staged set (above) stays as the
 #            backstop.
+#   clusters: --clusters-from (with --check-ranges) applies the line cap per
+#            cluster instead of per run. Each row is "<rank> <path>..." for one
+#            resolver cluster, rank 0 (P0), 1 (P1 or unbadged) or 2 (P2 and
+#            lower). Clusters that share a file form one group (a file cannot
+#            be half reverted). Groups are admitted by best rank, then row
+#            order, each only while the admitted total stays within
+#            MAX_CHANGED_LINES; a group that does not fit is skipped and later
+#            ones are still tried. The report then marks "over-cap" on the
+#            deferred groups' files only, and adds
+#            "deferred_clusters":[<row number>...] (1-based) and
+#            "admitted_lines":<n>. A listed file in no row joins no group and
+#            counts toward the admitted total first. A malformed row or a
+#            non-canonical path is exit 2.
 #   paths:   --check-paths reports which listed paths the commit would refuse
 #            by path alone, before anything is edited: it stages and commits
 #            nothing, needs no --provider, --pr or --message, makes no network
@@ -710,7 +724,7 @@ yr_adopt_path || die 3 "no PATH directory is left once those that reach into the
 PLUGIN_ROOT=$(cd -- "$CRF_DIR/../../.." && pwd) || { printf '[commit-resolve-fixes] Error: cannot resolve the plugin root\n' >&2; exit 2; }
 
 usage() {
-    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--expected-head <oid>] [--files-from <file>] [--ranges-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-ranges --ranges-from <file> [--files-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-paths [--unattended] [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--expected-head <oid>] [--files-from <file>] [--ranges-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-ranges --ranges-from <file> [--clusters-from <file>] [--files-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-paths [--unattended] [--files-from <file>] [-- <files...>]\n' >&2
     exit 2
 }
 
@@ -724,6 +738,8 @@ RANGES_FROM=""
 RANGE_ROWS=""
 CHECK_RANGES=0
 CHECK_PATHS=0
+CLUSTERS_FROM=""
+CLUSTER_ROWS=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --provider) [ $# -ge 2 ] || usage; PROVIDER="$2"; shift 2 ;;
@@ -745,11 +761,18 @@ while [ $# -gt 0 ]; do
             RANGE_ROWS=$(cat -- "$2" 2>/dev/null) || die 2 "--ranges-from not readable: $2"
             shift 2
             ;;
+        --clusters-from)
+            [ $# -ge 2 ] || usage
+            CLUSTERS_FROM="$2"
+            CLUSTER_ROWS=$(cat -- "$2" 2>/dev/null) || die 2 "--clusters-from not readable: $2"
+            shift 2
+            ;;
         --) shift; RP_FILES+=("$@"); break ;;
         *) usage ;;
     esac
 done
 FILES=(${RP_FILES[@]+"${RP_FILES[@]}"})
+[ -z "$CLUSTERS_FROM" ] || [ "$CHECK_RANGES" = 1 ] || die 2 "--clusters-from needs --check-ranges"
 
 # --- Path-check mode: report the listed paths the commit would refuse ---
 if [ "$CHECK_PATHS" = 1 ]; then
@@ -843,6 +866,74 @@ out_of_range_spans() {
             END { print bad }'
 }
 
+# check_clusters: the per-cluster cap of --clusters-from (see the header). Reads
+# CLUSTER_ROWS and FILES, updates REPORT. Rows are validated first, each file is
+# counted once with changed_lines, and awk groups, orders and admits (bash 3.2
+# has no associative arrays).
+check_clusters() {
+    local row p n parts counts="" files out kind val deferred='[]' admitted=0
+    while IFS= read -r row; do
+        [ -n "$row" ] || continue
+        [[ "$row" =~ ^[0-2](\ [^\ ]+)+$ ]] || die 2 "--clusters-from has a malformed row (expected '<rank 0-2> <path>...')"
+        read -r -a parts <<<"$row"
+        for p in "${parts[@]:1}"; do
+            rp_canonical "$p" || die 2 "path must be canonical and repo-relative: $p"
+        done
+    done <<<"$CLUSTER_ROWS"
+    files=$( { printf '%s\n' ${FILES[@]+"${FILES[@]}"}; printf '%s\n' "$CLUSTER_ROWS" | yr_awk '{ for (i = 2; i <= NF; i++) print $i }'; } \
+        | yr_awk 'NF && !seen[$0]++') || die 3 "could not list the cluster files"
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        n=$(changed_lines worktree "$p") || die 3 "could not count the changed lines of $p"
+        counts+="$p $n"$'\n'
+    done <<<"$files"
+    # Input: "L <path> <lines>" rows, "F <path>" for each listed file, then
+    # "C <rank> <path>..." per cluster. Output: "D <row>" per deferred
+    # cluster, "O <path>" per deferred file, "A <admitted lines>".
+    out=$( { printf '%s' "$counts" | yr_awk 'NF { print "L", $1, $2 }'
+             printf '%s\n' ${FILES[@]+"${FILES[@]}"} | yr_awk 'NF { print "F", $1 }'
+             printf '%s\n' "$CLUSTER_ROWS" | yr_awk 'NF { print "C", $0 }'; } \
+        | yr_awk -v cap="$MAX_CHANGED_LINES" '
+            function find(x) { while (par[x] != x) x = par[x]; return x }
+            $1 == "L" { lines[$2] = $3; next }
+            $1 == "F" { listed[$2] = 1; next }
+            $1 == "C" {
+                n++; rank[n] = $2; par[n] = n; np[n] = NF - 2
+                for (i = 3; i <= NF; i++) {
+                    path[n, i - 2] = $i; named[$i] = 1
+                    if ($i in owner) { a = find(owner[$i]); b = find(n); if (a != b) { if (a < b) par[b] = a; else par[a] = b } }
+                    else owner[$i] = n
+                }
+            }
+            END {
+                adm = 0
+                for (p in listed) if (!(p in named)) adm += lines[p]
+                # Groups by root: best rank, then the root (its first row).
+                for (k = 1; k <= n; k++) { r = find(k); if (!(r in best) || rank[k] < best[r]) best[r] = rank[k] }
+                for (rk = 0; rk <= 2; rk++) for (r = 1; r <= n; r++) {
+                    if (!(r in best) || best[r] != rk) continue
+                    split("", seen); tot = 0; fl = ""
+                    for (k = 1; k <= n; k++) {
+                        if (find(k) != r) continue
+                        for (i = 1; i <= np[k]; i++) { p = path[k, i]; if (!(p in seen)) { seen[p] = 1; tot += lines[p]; fl = fl " " p } }
+                    }
+                    if (adm + tot <= cap) { adm += tot; continue }
+                    for (k = 1; k <= n; k++) if (find(k) == r) print "D", k
+                    m = split(fl, fs, " "); for (i = 1; i <= m; i++) print "O", fs[i]
+                }
+                print "A", adm
+            }') || die 3 "could not apply the per-cluster cap"
+    while read -r kind val; do
+        case "$kind" in
+            D) deferred=$(jq -c --argjson k "$val" '. + [$k]' <<<"$deferred") || die 3 "could not build the report" ;;
+            O) mark_over_cap "$val" ;;
+            A) admitted=$val ;;
+        esac
+    done <<<"$out"
+    REPORT=$(jq -c --argjson d "$deferred" --argjson a "$admitted" '.deferred_clusters = ($d | sort) | .admitted_lines = $a' <<<"$REPORT") \
+        || die 3 "could not build the report"
+}
+
 # --- Check-only mode: report out-of-range files, change nothing ---
 if [ "$CHECK_RANGES" = 1 ]; then
     [ -n "$RANGES_FROM" ] || die 2 "--check-ranges needs --ranges-from"
@@ -860,12 +951,18 @@ if [ "$CHECK_RANGES" = 1 ]; then
         REPORT=$(jq -c --arg p "$f" --arg s "$spans" '.out_of_range += [{path: $p, old_lines: ($s | split(","))}]' <<<"$REPORT") \
             || die 3 "could not build the report"
     done
-    if [ "${#FILES[@]}" -gt 0 ]; then
+    # mark_over_cap <file>: add "over-cap" to the file's report entry.
+    mark_over_cap() {
+        REPORT=$(jq -c --arg p "$1" 'if any(.out_of_range[]; .path == $p) then .out_of_range |= map(if .path == $p then .old_lines += ["over-cap"] else . end) else .out_of_range += [{path: $p, old_lines: ["over-cap"]}] end' <<<"$REPORT") \
+            || die 3 "could not build the report"
+    }
+    if [ -n "$CLUSTERS_FROM" ]; then
+        check_clusters
+    elif [ "${#FILES[@]}" -gt 0 ]; then
         total=$(changed_lines worktree "${FILES[@]}") || die 3 "could not count the changed lines"
         if [ "$total" -gt "$MAX_CHANGED_LINES" ]; then
             for f in "${FILES[@]}"; do
-                REPORT=$(jq -c --arg p "$f" 'if any(.out_of_range[]; .path == $p) then .out_of_range |= map(if .path == $p then .old_lines += ["over-cap"] else . end) else .out_of_range += [{path: $p, old_lines: ["over-cap"]}] end' <<<"$REPORT") \
-                    || die 3 "could not build the report"
+                mark_over_cap "$f"
             done
         fi
     fi
