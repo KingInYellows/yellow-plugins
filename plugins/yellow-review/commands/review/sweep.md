@@ -236,8 +236,10 @@ fi
   printf '[review:sweep] Error: branch mismatch (expected %s, on %s). Aborting resolve.\n' "$EXPECTED" "$ACTUAL" >&2
   WT=$(git worktree list --porcelain 2>/dev/null |
     awk -v b="branch refs/heads/$EXPECTED" '/^worktree /{ p = substr($0, 10) } $0 == b { print p; exit }')
+  # Quote the path for the suggested cd: each ' becomes '\''.
+  QWT=$(printf '%s' "$WT" | sed "s/'/'\\\\''/g")
   [ -z "$WT" ] ||
-    printf "[review:sweep] %s is checked out in the worktree %s. Sweep it there: cd '%s' && /review:sweep <PR#>\n" "$EXPECTED" "$WT" "$WT" >&2
+    printf "[review:sweep] %s is checked out in the worktree %s. Sweep it there: cd '%s' && /review:sweep <PR#>\n" "$EXPECTED" "$WT" "$QWT" >&2
   exit 1
 }
 N=$(git reflog show --format=%H HEAD 2>/dev/null | wc -l | tr -d ' ')
