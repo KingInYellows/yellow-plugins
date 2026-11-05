@@ -141,6 +141,13 @@ fi
 
 If the block exits non-zero, stop.
 
+### Step 2d: Hold the Review-Run Lock
+
+Read `${CLAUDE_PLUGIN_ROOT}/references/review-run-lock.md` and run its Acquire
+block, keeping `<holder>`. From here on, every stop and the end of Step 9 run
+its Release block before printing the `Resolve:` line: a compound-staging drain
+must not write into this checkout while the ignored-file guard is watching it.
+
 ### Step 3: Fetch Unresolved Comments
 
 Determine repo from git remote:
@@ -965,9 +972,9 @@ removed any (each path in its `reverted` list with the patch path, or
 re-passes ran, or why it was skipped), **Notes**
 (`shared ruvector store changed during the run (not judged)` when a Step 6 call
 printed the `Note: .ruvector/intelligence.json` line; not blocking), and
-**Conversation resolution** (`enforced` / `not enforced` / `unknown`). The last
-two lines are exactly the contract's `Repass:` line and then its `Resolve:`
-line.
+**Conversation resolution** (`enforced` / `not enforced` / `unknown`). Run Step
+2d's Release block before printing them. The last two lines are exactly the
+contract's `Repass:` line and then its `Resolve:` line.
 
 ## Error Handling
 

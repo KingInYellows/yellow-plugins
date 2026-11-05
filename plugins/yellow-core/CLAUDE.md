@@ -204,6 +204,9 @@ guard, `--model haiku` unless `COMPOUND_DRAIN_MODEL` is set), and
 `staging-promoter`. `cs_stage_entry` is the second producer (used by
 yellow-review's `lib/stage-learning.sh`). `COMPOUND_JEV_PREFILTER=shadow` is an
 opt-in, log-only pre-filter that sends session text to a third party.
+No drain starts, and `staging-promoter` writes nothing, while a yellow-review
+resolve or sweep holds `.review-run-lock/` in the same staging dir
+(`cs_review_lock_live`; holders older than 120 min are ignored).
 `/compound:review-staged` drains manually. Architecture, thresholds, the Jev log
 layout, auth route and cost are in the reference.
 

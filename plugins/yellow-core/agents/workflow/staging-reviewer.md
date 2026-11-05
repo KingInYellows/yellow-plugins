@@ -537,7 +537,10 @@ The suggested_solution_category derives from `category` + content:
 | preference | (any) | code-quality (or skip if too generic) |
 
 On successful promotion (promoter returns paths written), delete the
-`processing/<session_id>.jsonl` file.
+`processing/<session_id>.jsonl` file. A promoter that reports
+`deferring promotion` (a yellow-review run holds the checkout) wrote nothing:
+leave the file in `processing/`, skip the remaining promotions, and end the
+drain, since every later promotion would defer too.
 
 If the promoter Agent call errors, leave the file in `processing/` — the
 next drain will retry it (Phase 0 finds files > 1h via the SessionStart

@@ -156,7 +156,8 @@ README for the personas that do carry the field.
 Three hooks run automatically once the plugin is enabled:
 
 - **SessionStart** — dispatches the background drain of the compound-staging
-  queue. The drain runs on Haiku; set `COMPOUND_DRAIN_MODEL` to `sonnet`,
+  queue, except while a yellow-review `/review:resolve` or sweep runs in the
+  same checkout (the drain's files would trip its ignored-file stop). The drain runs on Haiku; set `COMPOUND_DRAIN_MODEL` to `sonnet`,
   `opus`, or a full `claude-<id>` to change it. Any other value is logged and
   ignored (the drain stays on Haiku). Each drain writes a log to
   `~/.claude/projects/<slug>/compound-staging/drain-logs/`. A log line

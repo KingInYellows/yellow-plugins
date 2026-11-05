@@ -1767,3 +1767,23 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   [[ "$t" == *'`off`: never group'* ]]
   [[ "$t" == *'drop any group left with fewer than two findings'* ]]
 }
+
+@test "review commands hold the review-run lock and the reference names the drain stop" {
+  ref="$BATS_TEST_DIRNAME/../references/review-run-lock.md"
+  for cmd in resolve-pr sweep sweep-all resolve-stack; do
+    grep -qF 'references/review-run-lock.md' "$COMMANDS_DIR/$cmd.md" \
+      || { echo "$cmd.md does not load the lock reference"; false; }
+    flat "$COMMANDS_DIR/$cmd.md" | grep -qF 'Acquire block' || { echo "$cmd.md: no Acquire"; false; }
+    flat "$COMMANDS_DIR/$cmd.md" | grep -qF 'Release block' || { echo "$cmd.md: no Release"; false; }
+  done
+  text=$(flat "$ref")
+  [[ "$text" == *'review-run-lock" acquire'* ]]
+  [[ "$text" == *'review-run-lock" release "<holder>"'* ]]
+  [[ "$text" == *'Do not widen the ignored-file guard'* ]]
+  [[ "$text" == *'a compound drain is writing to this checkout'* ]]
+  [[ "$text" == *'`drain=live` means a drain that started before this run'* ]]
+  flat "$SWEEP_ALL" | grep -qF 'its `drain=live` stop ends the batch'
+  # The holder is an opaque token, never a path pasted into a command.
+  [[ "$text" == *'an opaque `run.XXXXXX` token'* ]]
+}
+
