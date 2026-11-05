@@ -707,7 +707,7 @@ one exception to ordering: the edits stay on disk until the user answers the
 confirmation, because a revert first would leave the approved retry with nothing
 to commit.) A refused edit must not stay on disk: a deny-listed file such as
 `.claude/settings.json` would be trusted by the next session. On any refusal — a
-change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
+change outside the set, a `commit-resolve-fixes` exit 2, 3, 4 or 8, or verify
 `skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only` on
 the files the clusters reported under `Files modified`, which saves a patch
 first. Then `--revert-denied` (no file list) reverts dirty trusted-config paths
@@ -799,12 +799,14 @@ inside 360000 ms.
 `commit-resolve-fixes` and `run-verify-command` bound their network calls with a
 `timeout`/`gtimeout` binary that supports `--kill-after`; without one the calls
 run unbounded and `commit-resolve-fixes` warns once on stderr. The provider
-submit gets 300 s (`YELLOW_REVIEW_SUBMIT_TIMEOUT`) and every other `gh` or
-`git ls-remote` call 30 s (`YELLOW_REVIEW_NET_TIMEOUT`). A submit timeout exits
-5; a timeout in the PR file list exits 3 and one in a verify call exits 6. With
-the defaults the worst case after the commit is the submit (300 s), one
-`ls-remote` (30 s), five `gh pr view` calls (150 s) and the 30 s of backoff
-sleeps: about 510 s, inside the 600 s budget. Hook time before the submit comes
+submit gets 300 s, 120 s with `--unattended` (`YELLOW_REVIEW_SUBMIT_TIMEOUT`
+overrides both), and every other `gh` or `git ls-remote` call 30 s
+(`YELLOW_REVIEW_NET_TIMEOUT`). A submit timeout exits 5; a timeout in the PR
+file list exits 3 and one in a verify call exits 6. With the defaults the worst
+case after the commit is the submit (300 s), one `ls-remote` (30 s), five
+`gh pr view` calls (150 s) and the 30 s of backoff sleeps: about 510 s, inside
+the 600 s budget. `--expected-head` adds one `ls-remote` per push URL before
+staging and one before the submit (30 s each). Hook time before the submit comes
 out of the same budget.
 
 ## Recovery rule
@@ -1031,6 +1033,18 @@ included.
 Report exit 3 as `needs permission` only for `reason=permission`, and as
 `not found` for `reason=not-found`; both leave the thread open (blocking).
 
+`commit-resolve-fixes` also exits 8 (stderr `reason=head-moved`) when it was
+given `--expected-head` and the PR head moved during the run: local `HEAD` or a
+push URL's branch is no longer that commit before staging, or a push URL's
+branch moved while the commit ran (that commit is undone). A branch read that
+fails or times out counts as moved. Nothing is committed or submitted; the
+orchestrator reverts as for exits 2 to 4, which saves the fixes as a recovery
+patch, and the `fixed` threads become `unclear` with evidence
+`PR head moved during the run`. Exit 5 prints a `recovery:` line on stderr: the
+local commit, the remote head (or `unknown`), and the recipe to resubmit, or to
+reset to the remote head and cherry-pick the local commit. Never force-push over
+a head someone else moved.
+
 A `run-verify-command --unattended` run whose PR file listing hit a rate limit
 is `skipped` with `rateLimited: true`, which sets `ratelimited=1`, as
 `commit-resolve-fixes` exit 7 does.
@@ -1070,12 +1084,14 @@ it, `not_enforced` only when every branch read answered no.
 
 ## Report and contract line
 
-The report sections are: Resolved (by disposition), Blocking merge
-(disagree/unclear, human-held, needs permission, verify failed with the patch
-path, rate-limited, gh timeout, `not found`, `CHANGES_REQUESTED`), Follow-up
-issues filed, and Conversation resolution (`enforced` / `not enforced` /
-`unknown`, from `get-pr-blockers`), plus a Re-pass section saying how Step 8
-ended. The last line of the command's output is exactly:
+The report sections are: Resolved (by disposition), Resolved elsewhere (threads
+another actor resolved during the run; counted in neither `r` nor `b`), Blocking
+merge (disagree/unclear, human-held, needs permission, verify failed with the
+patch path, rate-limited, gh timeout, PR head moved, `not found`,
+`CHANGES_REQUESTED`), Follow-up issues filed, and Conversation resolution
+(`enforced` / `not enforced` / `unknown`, from `get-pr-blockers`), plus a
+Re-pass section saying how Step 8 ended. The last line of the command's output
+is exactly:
 
 ```text
 Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipped|failed|noop>, verify=<pass|fail|skipped|none>, ratelimited=<0|1>
@@ -1157,10 +1173,11 @@ not in it, so it reads as new later.
 Record an empty set instead when work was left undone, so a later check reports
 every open thread as new: a cancel or a stop before Step 7 finished (the Step 5
 conflict stops and the ignored-file stop included), a Step 7 write phase stopped
-by an exit 4 or a PR that left `OPEN`, a thread `not attempted` (cluster cap,
-rate limit or `gh` timeout), `push=failed`, `verify=fail` or `verify=skipped`.
-Skip the record when Step 3's fetch failed or was partial. A failed record is a
-Notes line (`review delta not recorded`), never a stop.
+by an exit 4, a moved PR head or a PR that left `OPEN`, a thread `not attempted`
+(cluster cap, rate limit, `gh` timeout or PR head moved), `push=failed`,
+`verify=fail` or `verify=skipped`. Skip the record when Step 3's fetch failed or
+was partial. A failed record is a Notes line (`review delta not recorded`),
+never a stop.
 
 Severity badges (`p1`/`p2plus` from `poll-new-threads`) are reviewer text and
 can be forged. They only decide whether Step 8 polls again; they never resolve,
@@ -1254,6 +1271,14 @@ skip or downgrade a thread. A thread without a Bot-authored badge counts as P1.
   comments follow our marker, a re-run posts a second reply.
 - Two accounts resolving the same PR concurrently can each post a reply; markers
   dedupe only per viewer.
+- One writer per branch is checked, not enforced. `--expected-head` and Step 7's
+  head check catch another writer's push (a cloud session, an autofix bot) at
+  the commit, at the submit and before the write phase, and stop with nothing
+  published. They do not stop the other writer, and a push between the submit's
+  head check and the push itself still fails as exit 5. No lease exists yet that
+  every writer honours. Ledger findings for the old head are left for the next
+  `/review:triage` reconcile to mark stale, since that needs the moved head
+  fetched.
 - Two runs as the same viewer on one thread at the same moment can both pass
   `reply-pr-thread`'s pre-check before either posts, so both post a marked
   reply, possibly with different dispositions. The marker makes re-runs

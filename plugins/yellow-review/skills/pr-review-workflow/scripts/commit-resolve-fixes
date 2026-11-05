@@ -3,6 +3,7 @@
 # the active stacked-PR provider, and verify the remote head.
 # Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg>
 #                             [--unattended] [--allow-credential-shaped]
+#                             [--expected-head <oid>]
 #                             [--files-from <file>] [--ranges-from <file>]
 #                             [-- <files...>]
 #        commit-resolve-fixes --check-ranges --ranges-from <file>
@@ -57,6 +58,16 @@
 #   staged diff); any other added line in the commit is scanned and refused.
 #   --allow-credential-shaped together with --unattended is a usage error
 #   (exit 2): the override needs a human.
+#   head:    --expected-head is the PR head the caller checked before the
+#            resolvers ran (/review:resolve Step 2c). Before anything is staged,
+#            HEAD and every push URL's branch must still be that commit, and
+#            every push URL's branch must still be it after the commit, right
+#            before the submit. Another writer pushing the branch mid-run fails
+#            either check: exit 8 with stderr `reason=head-moved`, nothing
+#            committed (the second check undoes the commit first), so the
+#            caller keeps the edits as a recovery patch instead of submitting
+#            against a diverged remote. A branch read that fails or times out
+#            is treated the same way, because the head cannot be confirmed.
 #   message: one line starting with a conventional `fix` prefix; carries
 #            counts and paths only, never reviewer text. It is screened like
 #            public text (rt_text_clean: credential shapes, images, mentions,
@@ -84,14 +95,18 @@
 #             5 submit failed or timed out, 6 verify mismatch or a
 #             verify call timed out, 7 GitHub rate limit while listing the
 #             PR's changed files (stderr `reason=rate-limit`; nothing staged
-#             or committed). After 5 or 6 the commit exists locally:
-#             resubmit through the provider rather than re-running this
-#             script (a re-run sees a clean tree: NOOP).
+#             or committed), 8 the PR head moved during the run (stderr
+#             `reason=head-moved`; see --expected-head). After 5 or 6 the
+#             commit exists locally: resubmit through the provider rather
+#             than re-running this script (a re-run sees a clean tree: NOOP).
+#             Exit 5 also prints a `recovery:` line on stderr with the local
+#             commit and the remote head, when it can be read.
 # Env: YELLOW_REVIEW_GITHUB_STACK_RUNTIME — path to github-stack-runtime.js
 #        (default: the sibling github-workflow plugin).
 #      YELLOW_REVIEW_VERIFY_BACKOFF (default "2 4 8 16") — seconds between
 #        PR head checks after the first.
-#      YELLOW_REVIEW_SUBMIT_TIMEOUT (default 300) and
+#      YELLOW_REVIEW_SUBMIT_TIMEOUT (default 300, 120 with --unattended, so an
+#        unattended submit against a stuck remote fails fast) and
 #      YELLOW_REVIEW_NET_TIMEOUT (default 30) — seconds allowed for the
 #        provider submit and for each gh / git ls-remote call, enforced with
 #        the timeout binary lib/verify-run.sh's vr_timeout_bin finds (timeout
@@ -692,7 +707,7 @@ yr_adopt_path || die 3 "no PATH directory is left once those that reach into the
 PLUGIN_ROOT=$(cd -- "$CRF_DIR/../../.." && pwd) || { printf '[commit-resolve-fixes] Error: cannot resolve the plugin root\n' >&2; exit 2; }
 
 usage() {
-    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--files-from <file>] [--ranges-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-ranges --ranges-from <file> [--files-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-paths [--unattended] [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--expected-head <oid>] [--files-from <file>] [--ranges-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-ranges --ranges-from <file> [--files-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-paths [--unattended] [--files-from <file>] [-- <files...>]\n' >&2
     exit 2
 }
 
@@ -701,6 +716,7 @@ PR=""
 MESSAGE=""
 UNATTENDED=0
 ALLOW_CREDENTIAL=0
+EXPECTED_HEAD=""
 RANGES_FROM=""
 RANGE_ROWS=""
 CHECK_RANGES=0
@@ -712,6 +728,7 @@ while [ $# -gt 0 ]; do
         --message) [ $# -ge 2 ] || usage; MESSAGE="$2"; shift 2 ;;
         --unattended) UNATTENDED=1; shift ;;
         --allow-credential-shaped) ALLOW_CREDENTIAL=1; shift ;;
+        --expected-head) [ $# -ge 2 ] || usage; EXPECTED_HEAD="$2"; shift 2 ;;
         --files-from)
             [ $# -ge 2 ] || usage
             rp_read_file_list "$2" || die 2 "--files-from not readable: $2"
@@ -858,6 +875,8 @@ case "$PROVIDER" in
     *) die 2 "--provider must be graphite or github" ;;
 esac
 [[ "$PR" =~ ^[1-9][0-9]*$ ]] || die 2 "--pr must be a positive integer"
+[ -z "$EXPECTED_HEAD" ] || [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] \
+    || die 2 "--expected-head must be a full lowercase commit id"
 [[ "$MESSAGE" =~ ^fix(\([a-z0-9._/-]+\))?!?:\ [^[:cntrl:]]+$ ]] \
     || die 2 "--message must be one line starting with 'fix:' or 'fix(<scope>):'"
 [ "${#MESSAGE}" -le "$MAX_MESSAGE_CHARS" ] || die 2 "--message exceeds $MAX_MESSAGE_CHARS characters"
@@ -886,7 +905,11 @@ jq() { "$YELLOW_REVIEW_JQ" "$@"; }
 # coreutils) calls run unbounded, with one warning before the first of them.
 # A timeout exits 124 (137 after KILL), which every caller below already
 # treats as a failure of that step.
-SUBMIT_TIMEOUT="${YELLOW_REVIEW_SUBMIT_TIMEOUT:-300}"
+# Unattended runs default lower: nobody is watching, and a submit that has not
+# finished in two minutes is almost always a diverged or unreachable remote.
+SUBMIT_DEFAULT=300
+[ "$UNATTENDED" = 1 ] && SUBMIT_DEFAULT=120
+SUBMIT_TIMEOUT="${YELLOW_REVIEW_SUBMIT_TIMEOUT:-$SUBMIT_DEFAULT}"
 NET_TIMEOUT="${YELLOW_REVIEW_NET_TIMEOUT:-30}"
 [[ "$SUBMIT_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_SUBMIT_TIMEOUT must be a positive integer"
 [[ "$NET_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_NET_TIMEOUT must be a positive integer"
@@ -1373,6 +1396,40 @@ runtime_override_check() {
 }
 [ "$PROVIDER" != github ] || runtime_override_check die "nothing committed"
 
+# --- Head re-check (--expected-head) ---
+# remote_head_moved: 0 when some push URL's branch is not <oid> or cannot be
+# read (HM_WHY says which), 1 when every one is <oid>. Another writer (a cloud
+# thread, an autofix bot) can push the branch between the caller's Step 2c
+# check and this commit; submitting then would fight a diverged remote.
+HM_WHY=""
+remote_head_moved() {
+    local want="$1" url rc out got
+    for url in "${PUSH_URLS[@]}"; do
+        rc=0
+        out=$(bounded "$NET_TIMEOUT" "$YELLOW_REVIEW_GIT" ls-remote -- "$url" "refs/heads/$BRANCH" 2>"$NET_ERR") || rc=$?
+        got=$(printf '%s\n' "$out" | awk 'NR == 1 { print $1 }')
+        if [ "$rc" -ne 0 ] || [ -z "$got" ]; then
+            HM_WHY="the remote branch could not be read"
+            [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ] && HM_WHY="ls-remote timed out after ${NET_TIMEOUT}s"
+            return 0
+        fi
+        if [ "$got" != "$want" ]; then
+            HM_WHY="remote=$got"
+            return 0
+        fi
+    done
+    return 1
+}
+head_moved() {
+    printf 'reason=head-moved\n' >&2
+    die 8 "PR head moved during the run: expected=$EXPECTED_HEAD $1; nothing committed"
+}
+if [ -n "$EXPECTED_HEAD" ]; then
+    LOCAL_HEAD=$(git rev-parse HEAD) || die 3 "could not read HEAD; nothing committed"
+    [ "$LOCAL_HEAD" = "$EXPECTED_HEAD" ] || head_moved "local=$LOCAL_HEAD"
+    if remote_head_moved "$EXPECTED_HEAD"; then head_moved "($HM_WHY)"; fi
+fi
+
 # --- Stage and compare ---
 lgit add -- "${EXPECTED[@]}" || die 3 "git add failed"
 STAGED=$(git diff --cached --no-renames --name-only -z | tr '\0' '\n' | LC_ALL=C sort) || {
@@ -1451,6 +1508,7 @@ SHA=""
 # branch; a failure is aborted with `gt abort` and reported, and the user
 # retries `gt restack` themselves.
 undo_commit() {
+    local code="${2:-4}"
     git reset -q "$BEFORE" || printf '[commit-resolve-fixes] Warning: could not undo commit %s\n' "${SHA:-HEAD}" >&2
     if [ "$PROVIDER" = graphite ] && ! gt restack --upstack --no-interactive >&2; then
         # A conflicting restack leaves the repository mid-rebase; abort it so
@@ -1458,7 +1516,8 @@ undo_commit() {
         gt abort >&2 || printf '[commit-resolve-fixes] Warning: gt abort failed; the repository may be mid-rebase, run `gt abort` or `git rebase --abort`\n' >&2
         printf '[commit-resolve-fixes] Warning: could not restack the upstack branches after undoing the commit; the failed restack was aborted. Resolve any conflicts and retry `gt restack` before submitting\n' >&2
     fi
-    die 4 "$1"
+    [ "$code" != 8 ] || printf 'reason=head-moved\n' >&2
+    die "$code" "$1"
 }
 case "$PROVIDER" in
     graphite) gt modify -c -m "$MESSAGE" --no-interactive >&2 || die 4 "gt modify -c failed" ;;
@@ -1524,7 +1583,25 @@ if [ -s "$DIRTY_FILE" ]; then
     undo_commit "the working tree is not clean after the commit (a hook left changes behind); nothing submitted"
 fi
 
+# --- Head re-check before the submit ---
+# The commit and its checks took time; a push that landed meanwhile would
+# make the submit fight a diverged remote. Undo instead (exit 8).
+if [ -n "$EXPECTED_HEAD" ] && remote_head_moved "$BEFORE"; then
+    undo_commit "PR head moved during the run: expected=$BEFORE ($HM_WHY); commit undone, nothing submitted" 8
+fi
+
 # --- Submit ---
+# submit_failed: exit 5 with a recovery recipe. The local commit exists and
+# the remote did not take it; never force over a remote someone else moved.
+submit_failed() {
+    local rh="" url="${PUSH_URLS[0]:-}"
+    if [ -n "$url" ]; then
+        rh=$(bounded "$NET_TIMEOUT" "$YELLOW_REVIEW_GIT" ls-remote -- "$url" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }') || rh=""
+    fi
+    printf 'recovery: local commit %s; remote head %s. Resubmit through the provider; if the remote moved, reset the branch to the remote head, cherry-pick %s and resubmit. Never force-push.\n' \
+        "$SHA" "${rh:-unknown}" "$SHA" >&2
+    die 5 "$1"
+}
 case "$PROVIDER" in
     graphite)
         # --stack publishes the upstack branches that `gt modify -c` restacked
@@ -1537,7 +1614,7 @@ case "$PROVIDER" in
         SUBMIT_RC=0
         bounded "$SUBMIT_TIMEOUT" "${TOOL_BIN_gt:-gt}" submit --stack --no-interactive --no-edit >|"$NET_ERR" 2>&1 || SUBMIT_RC=$?
         print_submit_output
-        [ "$SUBMIT_RC" -eq 0 ] || die 5 "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
+        [ "$SUBMIT_RC" -eq 0 ] || submit_failed "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
         ;;
     github)
         # The runtime always exits 0 and reports through its JSON status.
@@ -1547,11 +1624,11 @@ case "$PROVIDER" in
         REMOTE_ARGS=()
         [ "$REMOTE_EXPLICIT" = 1 ] && REMOTE_ARGS=(--remote "$REMOTE_NAME")
         OUT=$(bounded "$SUBMIT_TIMEOUT" "${TOOL_BIN_node:-node}" "$RUNTIME" submit ${REMOTE_ARGS[@]+"${REMOTE_ARGS[@]}"}) \
-            || die 5 "github-stack-runtime submit crashed or timed out after ${SUBMIT_TIMEOUT}s"
+            || submit_failed "github-stack-runtime submit crashed or timed out after ${SUBMIT_TIMEOUT}s"
         ST=$(printf '%s' "$OUT" | jq -r '.status // empty' 2>/dev/null || true)
         if [ "$ST" != SUCCESS ]; then
             printf '%s\n' "$OUT" >&2
-            die 5 "github-stack-runtime submit returned status '${ST:-unparseable}'"
+            submit_failed "github-stack-runtime submit returned status '${ST:-unparseable}'"
         fi
         ;;
 esac

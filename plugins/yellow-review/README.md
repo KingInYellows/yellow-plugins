@@ -102,6 +102,16 @@ edited in place on each run, so everyone sees what still blocks without local
 state. It never creates the comment when nothing blocks; set
 `YELLOW_REVIEW_BLOCKING_COMMENT=0` to turn it off.
 
+One writer per branch is checked, not assumed. `/review:resolve` remembers the
+PR head it started from and commits nothing (exit 8, fixes kept as a recovery
+patch) when another writer pushed the branch since, and it posts no replies when
+the head moved before its write phase. Threads someone else resolved meanwhile
+are reported as `resolved elsewhere`, not as blocking. `/review:sweep-all` skips
+a PR whose head commit is younger than `YELLOW_REVIEW_RECENT_PUSH_MINUTES`
+(default 15, `0` turns it off) unless this clone already has that commit. An
+unattended submit times out after 120 s and prints a recovery line; it never
+force-pushes.
+
 Human-reviewer threads resolve only on hard evidence by default; others are held
 open (`resolve_pr.resolve_human_threads` in `yellow-plugins.local.md`).
 Unattended runs file at most 3 issues per PR. Replies and issues carry a hidden

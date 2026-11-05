@@ -241,7 +241,9 @@ For each iteration:
    Check the PR first, with the literal PR number:
 
    ```bash
-   OUT=$(gh pr view <PR#> --json state -q .state 2>&1) && RC=0 || RC=$?
+   # <state> <head> <minutes since the head commit> <branch>; -1 when unknown.
+   Q='"\(.state) \(.headRefOid) \((.commits[-1].committedDate // null) as $d | if $d then ((now - ($d | fromdateiso8601)) / 60 | floor) else -1 end) \(.headRefName)"'
+   OUT=$(gh pr view <PR#> --json state,headRefOid,headRefName,commits -q "$Q" 2>&1) && RC=0 || RC=$?
    RL=0 CAUSE=""
    classify() {
      RL=0 CAUSE=""
@@ -260,12 +262,21 @@ For each iteration:
    case "$CAUSE" in
      'network error'|'gh exited '*)
        sleep 5
-       OUT=$(gh pr view <PR#> --json state -q .state 2>&1) && RC=0 || RC=$?
+       OUT=$(gh pr view <PR#> --json state,headRefOid,headRefName,commits -q "$Q" 2>&1) && RC=0 || RC=$?
        classify
        ;;
    esac
    if [ "$RC" -eq 0 ]; then
-     printf 'state=%s exit=0 ratelimited=0\n' "$OUT"
+     read -r ST OID AGE REF <<<"$OUT"
+     WIN=${YELLOW_REVIEW_RECENT_PUSH_MINUTES:-15}
+     case "$WIN" in '' | *[!0-9]*) WIN=15 ;; esac
+     RECENT=0
+     case "$AGE" in
+       '' | *[!0-9]*) ;;
+       *) [ "$WIN" -gt 0 ] && [ "$AGE" -lt "$WIN" ] &&
+         [ "$(git rev-parse -q --verify "refs/heads/$REF" 2>/dev/null)" != "$OID" ] && RECENT=1 ;;
+     esac
+     printf 'state=%s exit=0 ratelimited=0 recent_push=%s\n' "$ST" "$RECENT"
    elif [ "$RL" -eq 1 ]; then
      printf 'state=unreadable exit=%s ratelimited=1\n' "$RC"
    else
@@ -294,9 +305,17 @@ For each iteration:
    to `### Step 5: End-of-loop summary table`. Do not continue to the next PR.
    When `exit` is `0` and `state` is not `OPEN`, record
    `skipped — PR closed before sweep` and do NOT invoke the Skill: go to item 6.
-   Only `exit=0` with `state=OPEN` proceeds to item 2. A stop inside the sweep
-   that this check cannot foresee (for example a branch mismatch) still reaches
-   item 5b.
+   When `recent_push=1`, the PR's head commit is younger than
+   `YELLOW_REVIEW_RECENT_PUSH_MINUTES` (default 15, `0` turns the check off) and
+   is not the local branch's tip, so another writer (a cloud session, an autofix
+   bot) is likely still pushing it: record `Outcome` `skipped`, `Skip Reason`
+   `recent push (another writer)`, `Blocking` `?`, do NOT invoke the Skill, and
+   go to item 6. A head this clone already has (an upstack branch an earlier
+   sweep restacked and submitted) is not skipped. The age is the head commit's
+   committer date, which a rebase or amend refreshes; a push of an old commit is
+   not seen. Only `exit=0` with `state=OPEN` and `recent_push=0` proceeds to
+   item 2. A stop inside the sweep that this check cannot foresee (for example a
+   branch mismatch) still reaches item 5b.
 
 2. **Invoke sweep** — invoke the `Skill` tool with `skill: "review:sweep"` and
    `args: "<PR#>"`. The skill name is `review:sweep` (the value of the `name:`
