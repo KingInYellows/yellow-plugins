@@ -1244,7 +1244,8 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 
 @test "resolve-pr: the Step 2c head is passed to the commit and re-checked before the write phase" {
   text=$(flat "$RESOLVE_PR")
-  [[ "$text" == *'keep `PR_OID` as the literal `<head-oid>`'* ]]
+  grep -qF -- "printf 'head-oid=%s\\n' \"\$PR_OID\"" "$RESOLVE_PR"
+  [[ "$text" == *'keep the printed `head-oid=` value as the literal `<head-oid>`'* ]]
   [[ "$text" == *'--expected-head "<head-oid>" --files-from "<files-file>"'* ]]
   [[ "$text" == *'exits 2, 3, 4, 7 and 8 revert first'* ]]
   [[ "$text" == *'evidence `PR head moved during the run`'* ]]
