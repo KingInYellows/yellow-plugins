@@ -13,6 +13,42 @@ and this project adheres to
 
 ---
 
+## [2.1.31] - 2026-11-05
+
+### Added
+
+- **yellow-linear 2.3.0, yellow-core 2.13.0** — `/linear:delegate` can hand a
+  Linear issue to the local agent, yellow-agy (CLAUDE-261, #1672). The
+  remote-agent classifier returns the new `READY_AGY` state when no remote-agent
+  provider is enabled, `--provider agy` picks it in any other state, and after
+  2026-11-11 `READY_JULES` points to yellow-agy.
+- **yellow-review 3.15.0, yellow-council 0.7.0, yellow-core 2.13.0, yellow-codex
+  0.5.2** — A `cross_model_review: auto | off` switch in
+  `yellow-plugins.local.md`. With `off`, `/review:pr` never selects
+  `codex-reviewer` and `/council` runs only the Claude reviewer unless the run
+  names the external reviewers (CLAUDE-217, #1648).
+
+### Changed
+
+- **yellow-agy 0.2.1** — Every `/agy:*` call fits inside the wrappers' 600 s
+  Bash timeout: a call that can no longer fit a turn refuses with the new
+  `AGY_BUDGET` code and refunds the task or corrective round (CLAUDE-255,
+  #1677).
+- **yellow-agy 0.2.1** — `setup` runs `agy mcp list` itself and refuses with
+  `AGY_MCP` when a server is enabled, unless the owner keeps it with
+  `setup --allow-mcp <name>` and a code typed on their own terminal (CLAUDE-254,
+  #1681).
+- **yellow-review 3.15.0, yellow-core 2.13.0, yellow-devin 3.0.11** — Persona
+  reviewers return anchor-25-and-below findings at that anchor so the single
+  confidence gate suppresses and counts them; `/devin:review-prs` applies the
+  same gate (CLAUDE-256, #1673).
+
+### Fixed
+
+- **yellow-agy 0.2.1** — On the Windows/WSL bridge, a timed-out host command now
+  kills its Linux process group and waits for the kill before the call fails
+  (CLAUDE-246, #1679).
+
 ## [2.1.30] - 2026-11-04
 
 ### Added
