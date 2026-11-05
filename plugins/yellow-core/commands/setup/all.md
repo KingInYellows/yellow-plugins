@@ -531,11 +531,16 @@ _enabled_install_path() {
 _agy_state=unknown
 if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
   # enabled | disabled | not_listed; anything that fails to parse stays unknown.
-  _agy_state=$(printf '%s' "$_plugin_list_json" | node -e '
+  # Same scope rule as _enabled_install_path: project and local rows count
+  # only when they belong to this repository.
+  _agy_state=$(printf '%s' "$_plugin_list_json" | PROJECT_PATH="$repo_top" node -e '
     let rows;
     try { rows = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch { process.exit(1); }
     if (!Array.isArray(rows)) process.exit(1);
-    const mine = rows.filter((r) => r && r.id === "yellow-agy@yellow-plugins");
+    const projectPath = process.env.PROJECT_PATH || "";
+    const mine = rows.filter((r) => r && r.id === "yellow-agy@yellow-plugins" &&
+      ((r.scope !== "project" && r.scope !== "local") ||
+        (projectPath.length > 0 && r.projectPath === projectPath)));
     process.stdout.write(mine.some((r) => r.enabled === true) ? "enabled" : mine.length ? "disabled" : "not_listed");
   ' 2>/dev/null) || _agy_state=unknown
   [ -n "$_agy_state" ] || _agy_state=unknown
