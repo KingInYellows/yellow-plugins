@@ -616,8 +616,10 @@ script's constant, `clusters.md`), and the files of every cluster deferred by
 the 50-line run cap (its `old_lines` then holds `over-cap`). Clusters are
 admitted best rank first, then in row order, while the total stays within 50
 lines; clusters sharing a file are admitted or deferred together, and
-`deferred_clusters` holds their 1-based row numbers. A non-zero exit is a
-refusal (above). An empty list continues to Verify. Otherwise:
+`deferred_clusters` holds their 1-based row numbers. A listed file in no row
+counts first and, when such files alone pass 50 lines, is itself marked
+`over-cap`. A non-zero exit is a refusal (above). An empty list continues to
+Verify. Otherwise:
 
 - **Non-interactive:** revert the listed files.
 - **Interactive:** one `AskUserQuestion` (part of the push-confirmation gate)

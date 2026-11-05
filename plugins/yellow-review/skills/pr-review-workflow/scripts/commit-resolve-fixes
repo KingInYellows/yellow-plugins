@@ -52,8 +52,9 @@
 #            deferred groups' files only, and adds
 #            "deferred_clusters":[<row number>...] (1-based) and
 #            "admitted_lines":<n>. A listed file in no row joins no group and
-#            counts toward the admitted total first. A malformed row or a
-#            non-canonical path is exit 2.
+#            counts toward the admitted total first; when those files alone
+#            exceed MAX_CHANGED_LINES, each is marked "over-cap" and they count
+#            nothing. A malformed row or a non-canonical path is exit 2.
 #   paths:   --check-paths reports which listed paths the commit would refuse
 #            by path alone, before anything is edited: it stages and commits
 #            nothing, needs no --provider, --pr or --message, makes no network
@@ -908,6 +909,10 @@ check_clusters() {
             END {
                 adm = 0
                 for (p in listed) if (!(p in named)) adm += lines[p]
+                # Files in no cluster that alone exceed the cap are over-cap
+                # themselves and count nothing; the clusters are then admitted
+                # as if those files were absent.
+                if (adm > cap) { for (p in listed) if (!(p in named)) print "O", p; adm = 0 }
                 # Groups by root: best rank, then the root (its first row).
                 for (k = 1; k <= n; k++) { r = find(k); if (!(r in best) || rank[k] < best[r]) best[r] = rank[k] }
                 for (rk = 0; rk <= 2; rk++) for (r = 1; r <= n; r++) {

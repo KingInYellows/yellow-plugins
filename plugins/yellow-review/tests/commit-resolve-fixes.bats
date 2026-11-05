@@ -1012,6 +1012,19 @@ three_cluster_files() {
   [ "$(jq -c '[.out_of_range[].path] | sort' <<<"$output")" = '["src/b.txt","src/c.txt"]' ]
 }
 
+@test "--clusters-from marks files in no cluster over-cap when they alone exceed the cap" {
+  three_cluster_files
+  sed -i.bak -e '31,60s/$/x/' src/a.txt && rm -f src/a.txt.bak
+  # src/a.txt (60 lines) is in no row; it is over-cap and the cluster still fits.
+  printf '1 src/b.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
+  printf 'src/a.txt\nsrc/b.txt\n' >| "$BATS_TEST_TMPDIR/files"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '[.out_of_range[] | [.path, .old_lines]]' <<<"$output")" = '[["src/a.txt",["over-cap"]]]' ]
+  [ "$(jq -c .deferred_clusters <<<"$output")" = '[]' ]
+  [ "$(jq -c .admitted_lines <<<"$output")" = 30 ]
+}
+
 @test "--clusters-from groups clusters that share a file and defers them together" {
   three_cluster_files
   # Rows 2 and 3 share src/c.txt: their group is 60 lines and is deferred as one.
