@@ -216,7 +216,7 @@ the resolve scripts: `references/resolve/dispositions.md`.
   `commit-resolve-fixes --check-ranges --clusters-from` applies the 50-line cap
   per cluster (best rank first; a deferred cluster stays open for the next run),
   and `--check-paths --unattended` lets `/review:resolve` skip runner-file
-  clusters before any resolver runs `run-verify-command --revert-denied` also
+  clusters before any resolver runs. `run-verify-command --revert-denied` also
   judges trusted-config symlinks (tracked, untracked or nested) and leaves FIFO,
   socket and device paths in place, reporting them instead of opening them
 - `head-ignore-probe`, `guard-local-config` — protect the ignored
