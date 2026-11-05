@@ -45,7 +45,9 @@ plugins/yellow-agy/
 
 - Subscription auth only. Never suggest an API key, Vertex/ADC, or AI-credit
   overages, and never read or copy files under `~/.gemini/` other than
-  `antigravity-cli/settings.json`, which setup only reads.
+  `antigravity-cli/settings.json` and the `userSettings.useAiCredits` key of
+  `config/config.json`, which setup only reads. agy drops `useG1Credits: false`
+  when it rewrites settings.json, so an absent key means off.
 - The WSL bridge is exec-only: `wsl.exe [-d <distro>] -e …`, never the `--`
   form, which re-parses arguments in the distro's shell. Every bridge command
   (agy turns and host git, mkdir, tee, rm) runs under `setsid -w` and prints

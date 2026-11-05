@@ -1,7 +1,7 @@
 ---
 name: agy:setup
 # prettier-ignore
-description: "Check that the Antigravity CLI (agy) is installed, new enough, signed in on the Google AI Pro subscription with no API-key or Vertex variables, has overages off and no enabled MCP servers, then record the host. Use after installing yellow-agy or when a delegate refuses with an AGY_* setup code."
+description: "Check that the Antigravity CLI (agy) is installed, new enough, signed in on the Google AI Pro subscription with no API-key or Vertex variables, has AI-credit overages off and no enabled MCP servers, then record the host. Use after installing yellow-agy or when a delegate refuses with an AGY_* setup code."
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -88,46 +88,68 @@ if [ "$_agy_mode" = wsl ]; then
   printf 'in WSL:    %s\n' "${_agy_wsl_hits:-none}"
 fi
 
-printf '\n=== Global settings (useG1Credits, permissions) ===\n'
-_agy_cfg=''
+printf '\n=== Global settings (AI credits, permissions) ===\n'
+# One parser for both hosts, run where agy's files live (host node, or node
+# inside WSL). It reads antigravity-cli/settings.json and only the
+# userSettings.useAiCredits key of config/config.json, which agy copies into
+# useG1Credits at startup. agy saves useG1Credits with omitempty, so false is
+# written as no key: unset means off. With _AGY_CFG/_AGY_CFG2 set (WSL without
+# node) it parses those copies instead. The program goes in on stdin, so
+# nothing crosses the bridge as an argument.
+_agy_js='
+  const fs = require("fs"), os = require("os"), path = require("path");
+  const out = (s) => process.stdout.write(s + "\n");
+  const read = (env, rel) => {
+    if (process.env[env] !== undefined) return process.env[env];
+    try { return fs.readFileSync(path.join(os.homedir(), rel), "utf8"); } catch { return ""; }
+  };
+  const parse = (raw) => {
+    if (raw.trim() === "") return {};
+    try { const v = JSON.parse(raw); return v !== null && typeof v === "object" && !Array.isArray(v) ? v : undefined; }
+    catch { return undefined; }
+  };
+  const cfg = parse(read("_AGY_CFG", ".gemini/antigravity-cli/settings.json"));
+  const user = parse(read("_AGY_CFG2", ".gemini/config/config.json"));
+  if (cfg === undefined) {
+    out("useG1Credits: UNPARSEABLE");
+  } else {
+    const v = cfg.useG1Credits;
+    out(v === true ? "useG1Credits: ON" : "useG1Credits: " + (v === undefined ? "not set" : String(v)) + " (ok)");
+  }
+  if (user === undefined) {
+    out("useAiCredits: UNPARSEABLE (config/config.json)");
+  } else {
+    const u = user.userSettings && typeof user.userSettings === "object" ? user.userSettings.useAiCredits : undefined;
+    out(u === true ? "useAiCredits: ON (config/config.json)" : "useAiCredits: " + (u === undefined ? "not set" : String(u)) + " (ok)");
+  }
+  const c = cfg || {};
+  const tp = c.toolPermission;
+  out(tp === "always-proceed" ? "toolPermission: always-proceed LOOSE" : "toolPermission: " + (tp === undefined ? "not set" : String(tp)) + " (ok)");
+  const nw = c.allowNonWorkspaceAccess;
+  out(nw === true ? "allowNonWorkspaceAccess: true LOOSE" : "allowNonWorkspaceAccess: " + (nw === undefined ? "not set" : String(nw)) + " (ok)");
+  const am = c.agentMode;
+  out(am !== undefined && /accept|auto|proceed|yolo|edit/i.test(String(am)) ? "agentMode: " + String(am) + " LOOSE" : "agentMode: " + (am === undefined ? "not set" : String(am)) + " (ok)");
+'
 case "$_agy_mode" in
-  native) [ -f "$HOME/.gemini/antigravity-cli/settings.json" ] && _agy_cfg=$(cat "$HOME/.gemini/antigravity-cli/settings.json" 2>/dev/null) ;;
-  wsl)    _agy_cfg=$(_agy_wsl sh -c 'cat "$HOME/.gemini/antigravity-cli/settings.json"' 2>/dev/null) ;;
+  none)
+    printf 'settings:  SKIPPED\n' ;;
+  native)
+    if command -v node >/dev/null 2>&1; then
+      printf '%s' "$_agy_js" | node -
+    else
+      printf 'settings:  UNKNOWN (node not found)\n'
+    fi ;;
+  wsl)
+    if _agy_wsl sh -c 'command -v node' >/dev/null 2>&1; then
+      printf '%s' "$_agy_js" | _agy_wsl node - 2>/dev/null | tr -d '\r'
+    elif command -v node >/dev/null 2>&1; then
+      _agy_cfg=$(_agy_wsl sh -c 'cat "$HOME/.gemini/antigravity-cli/settings.json"' 2>/dev/null)
+      _agy_cfg2=$(_agy_wsl sh -c 'cat "$HOME/.gemini/config/config.json"' 2>/dev/null)
+      printf '%s' "$_agy_js" | _AGY_CFG="$_agy_cfg" _AGY_CFG2="$_agy_cfg2" node -
+    else
+      printf 'settings:  UNKNOWN (node not found on the host or in WSL)\n'
+    fi ;;
 esac
-if [ "$_agy_mode" = none ]; then
-  printf 'settings:  SKIPPED\n'
-elif [ -z "$_agy_cfg" ]; then
-  printf 'useG1Credits: NO SETTINGS FILE\n'
-else
-  # One parser for both hosts. It reads the settings from _AGY_CFG when set
-  # (host node), else from the file in its own home (node inside WSL). The
-  # program goes in on stdin, so nothing crosses the bridge as an argument.
-  _agy_js='
-    const fs = require("fs"), os = require("os"), path = require("path");
-    let raw = process.env._AGY_CFG;
-    if (raw === undefined) {
-      try { raw = fs.readFileSync(path.join(os.homedir(), ".gemini/antigravity-cli/settings.json"), "utf8"); }
-      catch { raw = ""; }
-    }
-    let cfg;
-    try { cfg = JSON.parse(raw); } catch { process.stdout.write("useG1Credits: UNPARSEABLE\n"); process.exit(0); }
-    const v = cfg && cfg.useG1Credits;
-    process.stdout.write(v === false ? "useG1Credits: false (ok)\n" : v === undefined ? "useG1Credits: NOT SET\n" : "useG1Credits: ON\n");
-    const tp = cfg && cfg.toolPermission;
-    process.stdout.write(tp === "always-proceed" ? "toolPermission: always-proceed LOOSE\n" : "toolPermission: " + (tp === undefined ? "not set" : String(tp)) + " (ok)\n");
-    const nw = cfg && cfg.allowNonWorkspaceAccess;
-    process.stdout.write(nw === true ? "allowNonWorkspaceAccess: true LOOSE\n" : "allowNonWorkspaceAccess: " + (nw === undefined ? "not set" : String(nw)) + " (ok)\n");
-    const am = cfg && cfg.agentMode;
-    process.stdout.write(am !== undefined && /accept|auto|proceed|yolo|edit/i.test(String(am)) ? "agentMode: " + String(am) + " LOOSE\n" : "agentMode: " + (am === undefined ? "not set" : String(am)) + " (ok)\n");
-  '
-  if [ "$_agy_mode" = wsl ] && _agy_wsl sh -c 'command -v node' >/dev/null 2>&1; then
-    printf '%s' "$_agy_js" | _agy_wsl node - 2>/dev/null | tr -d '\r'
-  elif command -v node >/dev/null 2>&1; then
-    printf '%s' "$_agy_js" | _AGY_CFG="$_agy_cfg" node -
-  else
-    printf 'useG1Credits: UNKNOWN (node not found on the host or in WSL)\n'
-  fi
-fi
 
 printf '\n=== MCP servers (agy mcp list) ===\n'
 # Listing starts no server and makes no model call; the env is scrubbed anyway.
@@ -146,7 +168,7 @@ else
   # Past the cap, a server could be listed below what is shown.
   [ "${#_agy_mcp}" -gt 8000 ] && printf 'mcp:       TRUNCATED (output over 8000 bytes)\n'
 fi
-unset _agy_floor _agy_distro _agy_vars _agy_vars_re _agy_mode _agy_path _agy_ver _agy_low _agy_hits _agy_wsl_hits _agy_cfg _agy_js _agy_mcp _agy_tag _v
+unset _agy_floor _agy_distro _agy_vars _agy_vars_re _agy_mode _agy_path _agy_ver _agy_low _agy_hits _agy_wsl_hits _agy_cfg _agy_cfg2 _agy_js _agy_mcp _agy_tag _v
 unset -f _agy_wsl
 ```
 
@@ -165,10 +187,16 @@ Report each finding with its code, and stop at the first one that blocks:
    values) and ask the owner to remove them from their shell profile, or from
    the distro's environment for the `in WSL` row. Delegates refuse while any is
    set.
-4. **`useG1Credits` not `false (ok)`** (`AGY_OVERAGES`): overages are on or not
-   pinned off. Ask the owner to set `"useG1Credits": false` in
-   `~/.gemini/antigravity-cli/settings.json` (inside WSL on the bridge) by hand.
-   Every delegate run also forces it off, but setup requires it.
+4. **`useG1Credits: ON`, `useAiCredits: ON`, `UNPARSEABLE` or `UNKNOWN`**
+   (`AGY_OVERAGES`): AI-credit overages are on, or setup can't tell. `not set`
+   passes: agy saves `useG1Credits` only when it is `true`, so a `false` the
+   owner adds disappears the next time agy rewrites the file. Ask the owner to
+   turn **Use AI Credits** off in agy's `/config`, or to set `useG1Credits` to
+   `false` in `~/.gemini/antigravity-cli/settings.json` and
+   `userSettings.useAiCredits` to `false` in `~/.gemini/config/config.json`
+   (inside WSL on the bridge), by hand. agy copies `useAiCredits` into
+   `useG1Credits` at startup, and the Antigravity IDE can write it back to
+   `true`. Every delegate run also forces `useG1Credits: false`.
 5. **Any `LOOSE` row** (`AGY_SETTINGS`): `toolPermission: always-proceed` runs
    commands without prompting, `allowNonWorkspaceAccess: true` lets agy edit
    outside the worktree, and an `agentMode` that auto-approves edits (such as

@@ -30,9 +30,13 @@ adapter verifies, and they fail closed until it does:
   them itself or `WSLENV` can forward them, so the bridge runs
   `env -u <each var> agy …` inside WSL. `setup` refuses with `AGY_AUTH_MODE` if
   any of them is set in the caller's env or, on the bridge, in
-  `wsl.exe -d <distro> -e env`, and with `AGY_OVERAGES` unless the global config
-  has `useG1Credits: false`. Every run's `--settings` also forces
-  `useG1Credits: false`.
+  `wsl.exe -d <distro> -e env`, and with `AGY_OVERAGES` when `useG1Credits` is
+  `true` in the global settings or `userSettings.useAiCredits` is `true` in
+  `~/.gemini/config/config.json`, which agy copies into `useG1Credits` at
+  startup. An absent `useG1Credits` counts as off, because agy saves the key
+  with omitempty and drops `false` whenever it rewrites the file (seen on the
+  owner's PC when agy self-updated to 1.5.1; google-antigravity/antigravity-cli
+  issue 1352). Every run's `--settings` also forces `useG1Credits: false`.
 - **Unmodified binary, own sign-in.** The CLI never reads, copies or moves agy
   credential files. It doesn't proxy agy or embed it behind a network listener
   (Antigravity Additional Terms §6).
