@@ -1,5 +1,6 @@
 ---
 name: setup:all
+# prettier-ignore
 description: "Run setup for all installed marketplace plugins. Checks local prerequisites, MCP visibility, environment variables, and plugin status, then offers interactive setup for plugins that need it."
 argument-hint: ''
 allowed-tools:
@@ -13,8 +14,8 @@ allowed-tools:
 # Set Up Marketplace Plugins
 
 Run a unified readiness dashboard across every plugin in this marketplace, then
-offer the relevant setup commands in a fixed order. The command does not
-install plugins; it validates and configures the ones already installed.
+offer the relevant setup commands in a fixed order. The command does not install
+plugins; it validates and configures the ones already installed.
 
 ## Workflow
 
@@ -68,7 +69,7 @@ command -v od >/dev/null 2>&1 && printf 'od:                 OK\n' || printf 'od
 command -v sort >/dev/null 2>&1 && printf 'sort:               OK\n' || printf 'sort:               NOT FOUND\n'
 # The rest of /council:setup's required set, plus its /dev/urandom check.
 _cn_miss=""
-for _cn_t in mktemp awk sed grep find; do command -v "$_cn_t" >/dev/null 2>&1 || _cn_miss="$_cn_miss $_cn_t"; done
+for _cn_t in mktemp awk sed grep find cp ln chmod cmp; do command -v "$_cn_t" >/dev/null 2>&1 || _cn_miss="$_cn_miss $_cn_t"; done
 case "$(od -An -N4 -tu4 /dev/urandom 2>/dev/null | tr -d ' \n')" in
   '' | *[!0-9]*) _cn_miss="$_cn_miss /dev/urandom" ;;
 esac
@@ -613,6 +614,7 @@ unset _cursor_data _cursor_sdk _core_root _agy_root
 ### Step 1.5: Session MCP Visibility (ToolSearch probes)
 
 <!-- setup-all-toolsearch-probes:start -->
+
 Run four ToolSearch probes to capture current-session MCP visibility:
 
 - `list_teams`
@@ -636,74 +638,73 @@ restarted.
 
 Read
 `${CLAUDE_PLUGIN_ROOT}/references/setup-all/credential-status-and-version-drift.md`
-and run the two probe blocks exactly as written there: Step 1.6 reads
-each credential-bearing plugin's `credential-status.json` (the
-AUTHORITATIVE classification source when present), and Step 1.7 runs the
-24h-cached `claude plugin list --json --available` version-drift check.
-Do not re-derive either bash block from memory — the jq field
-extraction, the cache TTL handling, and the `sort -V` outdated
-comparison are load-bearing, and an improvised probe misclassifies
-plugins in the Step 2 dashboard. If the Read fails (file missing, path
-unresolved), stop and report the exact path that could not be loaded —
-do not reconstruct the probes from memory or silently skip them.
+and run the two probe blocks exactly as written there: Step 1.6 reads each
+credential-bearing plugin's `credential-status.json` (the AUTHORITATIVE
+classification source when present), and Step 1.7 runs the 24h-cached
+`claude plugin list --json --available` version-drift check. Do not re-derive
+either bash block from memory — the jq field extraction, the cache TTL handling,
+and the `sort -V` outdated comparison are load-bearing, and an improvised probe
+misclassifies plugins in the Step 2 dashboard. If the Read fails (file missing,
+path unresolved), stop and report the exact path that could not be loaded — do
+not reconstruct the probes from memory or silently skip them.
 
 ### Step 2: Classify Plugin Status
 
 Classify each installed plugin as **READY**, **PARTIAL**, or **NEEDS SETUP**.
 
-If Step 1 printed `plugin_cache: NOT FOUND` OR `plugin_cache_warning: unable
-to inspect plugin cache`, STOP before classifying: in both branches no
-installed-status lines were emitted, so installed state is unknown for every
-plugin — do NOT read the absence of a plugin's line as `NOT INSTALLED`.
-Report the matching cause — "Plugin cache directory not found at
-~/.claude/plugins/cache — cannot determine installed plugins. Fix the cache
-path (or reinstall plugins) and re-run /setup:all." or "Plugin cache exists
-but cannot be inspected (need python3 or jq) — install one and re-run
-/setup:all." — and stop.
+If Step 1 printed `plugin_cache: NOT FOUND` OR
+`plugin_cache_warning: unable to inspect plugin cache`, STOP before classifying:
+in both branches no installed-status lines were emitted, so installed state is
+unknown for every plugin — do NOT read the absence of a plugin's line as
+`NOT INSTALLED`. Report the matching cause — "Plugin cache directory not found
+at ~/.claude/plugins/cache — cannot determine installed plugins. Fix the cache
+path (or reinstall plugins) and re-run /setup:all." or "Plugin cache exists but
+cannot be inspected (need python3 or jq) — install one and re-run /setup:all." —
+and stop.
 
 If a plugin shows `NOT INSTALLED` in the Installed Plugins section, classify it
 as **NOT INSTALLED** and skip all other checks for that plugin.
 
 <!-- setup-all-classification:start -->
+
 **gt-workflow:**
 
-`/gt-setup` stops when the repo is not initialised (`graphite_repo` missing
-OR `gt_trunk` unavailable), so both checks are required. `gt_trunk:
-SKIPPED` (no `gt`, or not in a git repo) is a failure, not a pass.
+`/gt-setup` stops when the repo is not initialised (`graphite_repo` missing OR
+`gt_trunk` unavailable), so both checks are required. `gt_trunk: SKIPPED` (no
+`gt`, or not in a git repo) is a failure, not a pass.
 
-- READY: `git_repo` ok AND `gt` OK AND `jq` OK AND `graphite_auth` present
-  AND `graphite_repo` present AND `gt_trunk` names a branch (not
-  `UNAVAILABLE`, not `SKIPPED`) AND `.graphite.yml` present
+- READY: `git_repo` ok AND `gt` OK AND `jq` OK AND `graphite_auth` present AND
+  `graphite_repo` present AND `gt_trunk` names a branch (not `UNAVAILABLE`, not
+  `SKIPPED`) AND `.graphite.yml` present
 - PARTIAL: every READY condition except `.graphite.yml`, which is missing
-- NEEDS SETUP: any of `git_repo`, `gt`, `jq`, `graphite_auth`,
-  `graphite_repo` or `gt_trunk` fails
+- NEEDS SETUP: any of `git_repo`, `gt`, `jq`, `graphite_auth`, `graphite_repo`
+  or `gt_trunk` fails
 
-Whatever the status, if `gt_mcp_check` is `too_old`, add to the Detail
-column: "gt is below 1.6.7 (show the version from that row), so the bundled
-Graphite MCP server is unavailable; upgrade gt". The CLI workflow still
-works, so this does not change the status.
+Whatever the status, if `gt_mcp_check` is `too_old`, add to the Detail column:
+"gt is below 1.6.7 (show the version from that row), so the bundled Graphite MCP
+server is unavailable; upgrade gt". The CLI workflow still works, so this does
+not change the status.
 
 **github-workflow:**
 
-Alternative provider of the `stacked-pr` capability group (see the
-Alternative Provider Groups section below). It is classified like any other
-plugin, but its setup is only ever offered when it is the **enabled**
-provider — a user running Graphite must never be asked to configure GitHub
-stacks as well.
+Alternative provider of the `stacked-pr` capability group (see the Alternative
+Provider Groups section below). It is classified like any other plugin, but its
+setup is only ever offered when it is the **enabled** provider — a user running
+Graphite must never be asked to configure GitHub stacks as well.
 
 - READY: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` OK
 - PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `MISSING` — the
-  provider plugin is installed but the official `github/gh-stack` extension
-  is not; detail: "install with `gh extension install github/gh-stack`"
-- PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `WRONG_OWNER` —
-  a third-party extension holds the `gh stack` name, so the official one
-  cannot be installed beside it; detail: "a `stack`-named gh extension is
-  installed that is not `github/gh-stack`; remove it with
-  `gh extension remove stack`, then `gh extension install github/gh-stack`"
+  provider plugin is installed but the official `github/gh-stack` extension is
+  not; detail: "install with `gh extension install github/gh-stack`"
+- PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `WRONG_OWNER` — a
+  third-party extension holds the `gh stack` name, so the official one cannot be
+  installed beside it; detail: "a `stack`-named gh extension is installed that
+  is not `github/gh-stack`; remove it with `gh extension remove stack`, then
+  `gh extension install github/gh-stack`"
 - UNKNOWN: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `UNAVAILABLE` —
-  `gh extension list` itself failed, so the extension's state was never
-  read. Report it as undetermined; do NOT offer the install and do NOT
-  report READY. Suggest re-running after checking `gh auth status`.
+  `gh extension list` itself failed, so the extension's state was never read.
+  Report it as undetermined; do NOT offer the install and do NOT report READY.
+  Suggest re-running after checking `gh auth status`.
 - NEEDS SETUP: `gh` missing OR `gh_auth` NOT AUTHENTICATED
 
 **yellow-ruvector:**
@@ -719,120 +720,124 @@ stacks as well.
 
 **yellow-morph:**
 
-The Morph API key can be supplied via either the plugin's `userConfig`
-prompt (stored in the system keychain, preferred) or a shell
-`MORPH_API_KEY` export (power-user fallback). Neither is visible to
-shell checks directly, so treat READY as "key is configured via *some*
-path" and rely on `/morph:status` for authoritative OFFLINE detection.
+The Morph API key can be supplied via either the plugin's `userConfig` prompt
+(stored in the system keychain, preferred) or a shell `MORPH_API_KEY` export
+(power-user fallback). Neither is visible to shell checks directly, so treat
+READY as "key is configured via _some_ path" and rely on `/morph:status` for
+authoritative OFFLINE detection.
 
-- READY: `node2222_check` ok AND `npm` OK AND `rg` OK AND either of:
-  (a) shell `MORPH_API_KEY` set, OR
-  (b) `pluginConfigs.yellow-morph.options.morph_api_key` present in
-      `~/.claude/.credentials.json` (userConfig was answered). Detection:
-      classification derives from the `MORPH_API_KEY` row already produced
-      by Step 1 — if it shows `set (shell env)` or `set (userConfig)`,
-      condition (b) is satisfied. Do NOT re-run a grep here; the Step 1
-      row is the source. It is a key-name match in
-      `${CLAUDE_CONFIG_DIR:-~/.claude}/.credentials.json`, not a path-scoped
-      lookup, and `/morph:status` remains authoritative.
-- PARTIAL: local prerequisites are satisfied but neither the shell env
-  var nor the userConfig option is detectable — the plugin will install
-  but the MCP server will not start. Recommend running `/morph:setup`
-  or answering the userConfig prompt at next plugin-enable.
+- READY: `node2222_check` ok AND `npm` OK AND `rg` OK AND either of: (a) shell
+  `MORPH_API_KEY` set, OR (b) `pluginConfigs.yellow-morph.options.morph_api_key`
+  present in `~/.claude/.credentials.json` (userConfig was answered). Detection:
+  classification derives from the `MORPH_API_KEY` row already produced by Step 1
+  — if it shows `set (shell env)` or `set (userConfig)`, condition (b) is
+  satisfied. Do NOT re-run a grep here; the Step 1 row is the source. It is a
+  key-name match in `${CLAUDE_CONFIG_DIR:-~/.claude}/.credentials.json`, not a
+  path-scoped lookup, and `/morph:status` remains authoritative.
+- PARTIAL: local prerequisites are satisfied but neither the shell env var nor
+  the userConfig option is detectable — the plugin will install but the MCP
+  server will not start. Recommend running `/morph:setup` or answering the
+  userConfig prompt at next plugin-enable.
 - NEEDS SETUP: any local prerequisite missing (`node2222_check` — `/morph:setup`
   requires Node 22.22.0 or later — `npm`, or `rg`).
 
 **yellow-cursor:**
 
-Alternative provider of the `remote-agent` capability group (see the
-Alternative Provider Groups section below) and the **preferred** member —
-`yellow-devin` below is the legacy path. `credential-status.json` is not
-emitted for this plugin in v1 (it has no MCP server and no SessionStart
-hook writing that file), so classification reads Step 1's `CURSOR_API_KEY`
-row plus the `cursor_stored_login`, `cursor_cli_resolved` and
-`cursor_sdk_resolved` probes directly. The plugin has no `userConfig`: the
-CLI reads `CURSOR_API_KEY` or the Cursor SDK's stored login. Every command
-fails with `CURSOR_SDK_MISSING` until `/cursor:setup` installs `@cursor/sdk`.
+Alternative provider of the `remote-agent` capability group (see the Alternative
+Provider Groups section below) and the **preferred** member — `yellow-devin`
+below is the legacy path. `credential-status.json` is not emitted for this
+plugin in v1 (it has no MCP server and no SessionStart hook writing that file),
+so classification reads Step 1's `CURSOR_API_KEY` row plus the
+`cursor_stored_login`, `cursor_cli_resolved` and `cursor_sdk_resolved` probes
+directly. The plugin has no `userConfig`: the CLI reads `CURSOR_API_KEY` or the
+Cursor SDK's stored login. Every command fails with `CURSOR_SDK_MISSING` until
+`/cursor:setup` installs `@cursor/sdk`.
 
 - READY: `cursor_cli_resolved` is `OK` AND `cursor_sdk_resolved` is `OK` AND
   `jq` OK AND `node2222_lt25_check` ok AND (`CURSOR_API_KEY` shows
   `set (shell env)` OR `cursor_stored_login` is `present`)
-- PARTIAL: plugin enabled but any READY condition fails while at least one
-  of the CLI or a credential source resolved — detail names the gap, e.g.
+- PARTIAL: plugin enabled but any READY condition fails while at least one of
+  the CLI or a credential source resolved — detail names the gap, e.g.
   "@cursor/sdk not installed — run `/cursor:setup`"
 - NEEDS SETUP: neither the CLI nor any credential source resolved
 
 **yellow-devin:**
 
-Legacy remote-agent provider — `yellow-cursor` above is preferred; this
-plugin remains supported for existing Devin workflows and security fixes
-only. Credentials may come from shell env vars or the plugin's `userConfig`
-prompt, but 8 of 9 devin commands read `$DEVIN_SERVICE_USER_TOKEN` /
-`$DEVIN_ORG_ID` directly via curl — only shell env is fully functional.
-Classification derives from the two Step 1 rows (`set (shell env)` /
-`set (userConfig)` / `NOT SET`). On macOS, userConfig values live in the
-system keychain and are invisible to Step 1's file grep — a keychain-only
-credential shows `NOT SET`; `/devin:setup` is the authoritative check.
+Legacy remote-agent provider — `yellow-cursor` above is preferred; this plugin
+remains supported for existing Devin workflows and security fixes only.
+Credentials may come from shell env vars or the plugin's `userConfig` prompt,
+but 8 of 9 devin commands read `$DEVIN_SERVICE_USER_TOKEN` / `$DEVIN_ORG_ID`
+directly via curl — only shell env is fully functional. Classification derives
+from the two Step 1 rows (`set (shell env)` / `set (userConfig)` / `NOT SET`).
+On macOS, userConfig values live in the system keychain and are invisible to
+Step 1's file grep — a keychain-only credential shows `NOT SET`; `/devin:setup`
+is the authoritative check.
 
 - READY: `curl` OK AND `jq` OK AND both rows show `set (shell env)`
-- PARTIAL: `curl` OK AND `jq` OK AND both rows resolved, but at least one
-  only as `set (userConfig)` — detail: "userConfig is set but the shell env
-  var is unset; /devin:* commands call curl directly and will return 401.
-  Export the vars (or see /devin:setup)."
+- PARTIAL: `curl` OK AND `jq` OK AND both rows resolved, but at least one only
+  as `set (userConfig)` — detail: "userConfig is set but the shell env var is
+  unset; /devin:\* commands call curl directly and will return 401. Export the
+  vars (or see /devin:setup)."
 - NEEDS SETUP: `curl` missing OR `jq` missing OR either row `NOT SET`
 
 **yellow-jules:**
 
-Experimental remote-agent provider — `yellow-cursor` above is preferred. The
-CLI reads `JULES_API_KEY` from the shell environment only (no `userConfig`),
-so classification reads Step 1's `JULES_API_KEY` row and the
-`jules_cli_resolved` probe. Whether the pinned Jules SDK is installed is not
-visible here; `/jules:setup` is the authoritative check and installs it only
-with consent.
+Experimental remote-agent provider — `yellow-cursor` above is preferred. The CLI
+reads `JULES_API_KEY` from the shell environment only (no `userConfig`), so
+classification reads Step 1's `JULES_API_KEY` row and the `jules_cli_resolved`
+probe. Whether the pinned Jules SDK is installed is not visible here;
+`/jules:setup` is the authoritative check and installs it only with consent.
 
 - READY: `jules_cli_resolved` is `OK` AND `JULES_API_KEY` shows
   `set (shell env)` — detail notes that `/jules:setup` verifies the SDK
 - PARTIAL: plugin enabled but `jules_cli_resolved` is `NOT FOUND`, OR the CLI
-  resolved but `JULES_API_KEY` is `NOT SET` — detail: "export
-  `JULES_API_KEY`, then run `/jules:setup` to verify or install the SDK"
+  resolved but `JULES_API_KEY` is `NOT SET` — detail: "export `JULES_API_KEY`,
+  then run `/jules:setup` to verify or install the SDK"
 - NEEDS SETUP: neither the CLI nor the credential resolved
 
 **yellow-agy:**
 
-Local successor to yellow-jules (`/agy:*` delegate commands). Classify from Step 1's
-`agy:` row, the same row yellow-council reads. On Windows agy may live only
-inside WSL, which this dashboard does not probe; `/agy:setup` is authoritative
-and also checks auth variables and overages.
+Local successor to yellow-jules (`/agy:*` delegate commands). Classify from Step
+1's `agy:` row (the same row yellow-council reads), the `agy_cli_resolved` row,
+and `jq`, which `/agy:setup` needs to record the host. On Windows agy may live
+only inside WSL, which this dashboard does not probe. `/agy:setup` is
+authoritative: it checks agy 1.4.12 or later, no API-key or Vertex variables,
+overages off (`useG1Credits: false`), no loose permission settings, and no
+enabled agy MCP server the owner has not allowed by name
+(`setup --allow-mcp <name>`, run by the owner), then records the host.
 
 Never READY: the version row alone cannot confirm subscription-only auth,
-overages off, or the permission settings, so `/agy:setup` must run.
+overages off, the permission settings or the MCP servers, so `/agy:setup` must
+run.
 
-- PARTIAL: `agy` OK with any version, OR `agy` NOT FOUND on a host where Step
-  1's `wsl.exe` row is OK — detail: "run `/agy:setup` to check auth, overages,
-  permissions and the WSL bridge"
-- NEEDS SETUP: `agy` NOT FOUND and the `wsl.exe` row is NOT FOUND
+- PARTIAL: `agy_cli_resolved` OK AND `jq` OK AND either `agy` OK with version
+  1.4.12 or later, OR `agy` NOT FOUND on a host where Step 1's `wsl.exe` row is
+  OK — detail: "run `/agy:setup` to check auth, overages, permissions, MCP
+  servers and the WSL bridge"
+- NEEDS SETUP: `agy` NOT FOUND and the `wsl.exe` row is NOT FOUND; `agy` OK but
+  older than 1.4.12 or with no parseable version (`AGY_VERSION`: update agy);
+  `agy_cli_resolved` NOT FOUND (reinstall yellow-agy); or `jq` NOT FOUND
 
 **yellow-semgrep:**
 
-Prefer the credential-status file from Step 1.6 over shell-env-only probes;
-a file reported `malformed` counts as absent.
-The wrapper script honors both userConfig and shell env as of v4.1.0.
+Prefer the credential-status file from Step 1.6 over shell-env-only probes; a
+file reported `malformed` counts as absent. The wrapper script honors both
+userConfig and shell env as of v4.1.0.
 
 - READY: `curl` OK AND `jq` OK AND `semgrep` OK AND (status file shows
-  `semgrep_app_token` present, OR status file absent AND `SEMGREP_APP_TOKEN`
-  set in shell env)
-- PARTIAL: token resolved (per status file or shell env) but `semgrep` CLI
-  is missing
-- NEEDS SETUP: token absent (status file shows `0/1 present` OR file
-  absent AND shell env unset) OR `curl` missing OR `jq` missing
+  `semgrep_app_token` present, OR status file absent AND `SEMGREP_APP_TOKEN` set
+  in shell env)
+- PARTIAL: token resolved (per status file or shell env) but `semgrep` CLI is
+  missing
+- NEEDS SETUP: token absent (status file shows `0/1 present` OR file absent AND
+  shell env unset) OR `curl` missing OR `jq` missing
 
 **yellow-research:**
 
-Prefer the credential-status file from Step 1.6 over shell-env-only probes;
-a file reported `malformed` counts as absent.
-The 3-element fallback wrapper means keys may be resolved from the keychain
-(invisible to the dashboard's Bash subprocess) — the status file is the
-only accurate signal.
+Prefer the credential-status file from Step 1.6 over shell-env-only probes; a
+file reported `malformed` counts as absent. The 3-element fallback wrapper means
+keys may be resolved from the keychain (invisible to the dashboard's Bash
+subprocess) — the status file is the only accurate signal.
 
 Compute bundled source availability out of 5:
 
@@ -841,17 +846,18 @@ Compute bundled source availability out of 5:
 2. `tavily_api_key` present per status file, OR `TAVILY_API_KEY` set
 3. `perplexity_api_key` present per status file, OR `PERPLEXITY_API_KEY` set
 4. Parallel Task tool visible via ToolSearch
-5. Ceramic counts when `ceramic_search` is visible via ToolSearch (OAuth;
-   no API key).
+5. Ceramic counts when `ceramic_search` is visible via ToolSearch (OAuth; no API
+   key).
 
 - READY: all 5 bundled sources available
 - PARTIAL: 1-4 bundled sources available
 - NEEDS SETUP: 0 bundled sources available
 
 If the status file is absent AND no shell env vars are set, surface a hint:
-"yellow-research credentials not detected — restart Claude Code to populate
-the status file, or run `/plugin disable yellow-research && /plugin enable
-yellow-research` to re-trigger the userConfig prompts."
+"yellow-research credentials not detected — restart Claude Code to populate the
+status file, or run
+`/plugin disable yellow-research && /plugin enable yellow-research` to
+re-trigger the userConfig prompts."
 
 **yellow-linear:**
 
@@ -867,41 +873,44 @@ yellow-research` to re-trigger the userConfig prompts."
   stacked-PR provider, whose own row reports its tooling.
 - PARTIAL: all required local checks pass AND `yellow-core` installed, but
   `yellow-linear` is NOT INSTALLED (optional — only `/debt:sync` needs it)
-- NEEDS SETUP: any required local check fails OR `yellow-core` is NOT
-  INSTALLED (non-optional dependency: debt commands source
-  `validate_file_path()` from yellow-core/lib/validate-fs.sh and fail
-  without it)
+- NEEDS SETUP: any required local check fails OR `yellow-core` is NOT INSTALLED
+  (non-optional dependency: debt commands source `validate_file_path()` from
+  yellow-core/lib/validate-fs.sh and fail without it)
 
 **yellow-ci:**
 
 - READY: `gh` OK AND `jq` OK AND `ssh` OK AND `gh_auth` OK AND
   `.claude/yellow-ci.local.md` exists AND `yellow-linear` installed
-- PARTIAL: `gh` OK AND `jq` OK AND `gh_auth` OK AND config exists, but `ssh`
-  is missing (only self-hosted runner diagnosis needs it) — OR all other
-  READY conditions hold but `yellow-linear` is NOT INSTALLED (optional —
-  only `/ci:report-linear` needs it)
-- NEEDS SETUP: `gh` missing OR `jq` missing OR `gh_auth` NOT AUTHENTICATED
-  (the `ci-setup` skill stops on it) OR config missing
+- PARTIAL: `gh` OK AND `jq` OK AND `gh_auth` OK AND config exists, but `ssh` is
+  missing (only self-hosted runner diagnosis needs it) — OR all other READY
+  conditions hold but `yellow-linear` is NOT INSTALLED (optional — only
+  `/ci:report-linear` needs it)
+- NEEDS SETUP: `gh` missing OR `jq` missing OR `gh_auth` NOT AUTHENTICATED (the
+  `ci-setup` skill stops on it) OR config missing
 
 **yellow-review:**
 
-- READY: `gh` OK AND `jq` OK AND `gh_auth` OK AND `awk` OK AND
-  `yellow-core` installed. `gt` is not required: review pushes route through
-  the enabled stacked-PR provider, whose own row reports its tooling.
-- PARTIAL: required local review checks pass, but `yellow-core` is NOT INSTALLED
-- NEEDS SETUP: any required local review check fails (`awk` NOT FOUND
-  means `/review:resolve`'s commit and verify scripts cannot run)
+- READY: `gh` OK AND `jq` OK AND `gh_auth` OK AND `awk` OK AND `flock` OK AND
+  `realpath` OK AND `yellow-core` installed. `gt` is not required: review pushes
+  route through the enabled stacked-PR provider, whose own row reports its
+  tooling.
+- PARTIAL: required local review checks pass, but `yellow-core` is NOT
+  INSTALLED, OR `flock` or `realpath` is NOT FOUND — reviews still run, but
+  every review-findings ledger write fails; detail: "ledger degraded: install
+  flock/realpath (macOS: `brew install flock coreutils`), then run
+  `/review:setup`"
+- NEEDS SETUP: any required local review check fails (`awk` NOT FOUND means
+  `/review:resolve`'s commit and verify scripts cannot run)
 
 **yellow-browser-test:**
 
-Run a project-type heuristic before classifying. Read `web_signal_count`
-from Step 1's "Web App Signals" section (the bash dashboard probes
-`package.json` for framework deps, `Gemfile` for Rails, `requirements.txt`/
-`pyproject.toml` for Django/Flask/FastAPI, `go.mod` for Gin/Echo/Fiber/Chi/
-Gorilla, `Cargo.toml` for Axum/Actix/Rocket/Warp, PaaS configs
-`fly.toml`/`render.yaml`/`vercel.json`/`netlify.toml`, and
-Compose files (`compose.y*ml`, `docker-compose.y*ml`) for HTTP port
-mappings).
+Run a project-type heuristic before classifying. Read `web_signal_count` from
+Step 1's "Web App Signals" section (the bash dashboard probes `package.json` for
+framework deps, `Gemfile` for Rails, `requirements.txt`/ `pyproject.toml` for
+Django/Flask/FastAPI, `go.mod` for Gin/Echo/Fiber/Chi/ Gorilla, `Cargo.toml` for
+Axum/Actix/Rocket/Warp, PaaS configs
+`fly.toml`/`render.yaml`/`vercel.json`/`netlify.toml`, and Compose files
+(`compose.y*ml`, `docker-compose.y*ml`) for HTTP port mappings).
 
 If `web_signal_count` is `0` AND `.claude/yellow-browser-test.local.md` is
 absent, OMIT this plugin from the dashboard entirely — a non-web-app repo
@@ -910,9 +919,10 @@ absent, OMIT this plugin from the dashboard entirely — a non-web-app repo
 Classification when `web_signal_count >= 1` OR config file present:
 
 - READY: `.claude/yellow-browser-test.local.md` exists AND `agent-browser` OK
-- RECOMMENDED: `web_signal_count >= 1` but `.claude/yellow-browser-test.local.md`
-  is missing — emit "Web app detected; run `/browser-test:setup` to enable
-  testing." This is informational, not a NEEDS SETUP error.
+- RECOMMENDED: `web_signal_count >= 1` but
+  `.claude/yellow-browser-test.local.md` is missing — emit "Web app detected;
+  run `/browser-test:setup` to enable testing." This is informational, not a
+  NEEDS SETUP error.
 - NEEDS SETUP: config file exists but `agent-browser` missing — detail notes
   that installing it needs `npm` and Node 22.22.0 or later
 
@@ -925,31 +935,29 @@ If `web_signal_count` is `0` AND no config file: omit from dashboard.
 
 **yellow-composio:**
 
-The bundled MCP is native HTTP at `https://connect.composio.dev/mcp`.
-Claude Code authenticates it with browser OAuth. There is no API key and
-no credential-status file.
+The bundled MCP is native HTTP at `https://connect.composio.dev/mcp`. Claude
+Code authenticates it with browser OAuth. There is no API key and no
+credential-status file.
 
 Define `composio_tools_visible` from Step 1.5: the recorded tool
-`mcp__plugin_yellow-composio_composio-server__COMPOSIO_SEARCH_TOOLS` is
-present, OR ToolSearch also returned
-`mcp__claude_ai_composio__COMPOSIO_SEARCH_TOOLS` or
-`mcp__composio-server__COMPOSIO_SEARCH_TOOLS`. The last two are legacy
-prefixes and are not in the recorded probe list.
+`mcp__plugin_yellow-composio_composio-server__COMPOSIO_SEARCH_TOOLS` is present,
+OR ToolSearch also returned `mcp__claude_ai_composio__COMPOSIO_SEARCH_TOOLS` or
+`mcp__composio-server__COMPOSIO_SEARCH_TOOLS`. The last two are legacy prefixes
+and are not in the recorded probe list.
 
-- READY: `composio_tools_visible` AND `.claude/composio-usage.json` exists.
-  `jq` missing is degraded usage tracking, not a setup failure. Tool
-  visibility proves registration, not authentication (a rejected OAuth
-  session can still leave a stale usage file behind) — set the Detail
-  column to "tools visible; auth not verified — run `/composio:status` or
-  `/composio:setup` to probe" rather than implying a live health check
-  happened.
+- READY: `composio_tools_visible` AND `.claude/composio-usage.json` exists. `jq`
+  missing is degraded usage tracking, not a setup failure. Tool visibility
+  proves registration, not authentication (a rejected OAuth session can still
+  leave a stale usage file behind) — set the Detail column to "tools visible;
+  auth not verified — run `/composio:status` or `/composio:setup` to probe"
+  rather than implying a live health check happened.
 - PARTIAL: `composio_tools_visible` AND the usage counter
   (`.claude/composio-usage.json`) is missing → run `/composio:setup`.
 - NEEDS SETUP: not `composio_tools_visible`. Open `/mcp`, select
-  `composio-server`, and choose Authenticate. Complete the browser login,
-  then restart Claude Code if the tools are still missing. On WSL or
-  headless hosts, run `claude mcp login plugin:yellow-composio:composio-server
-  --no-browser` in a separate terminal; `/composio:setup` has the rest.
+  `composio-server`, and choose Authenticate. Complete the browser login, then
+  restart Claude Code if the tools are still missing. On WSL or headless hosts,
+  run `claude mcp login plugin:yellow-composio:composio-server --no-browser` in
+  a separate terminal; `/composio:setup` has the rest.
 
 **yellow-codex:**
 
@@ -957,33 +965,33 @@ prefixes and are not in the recorded probe list.
   (`OPENAI_API_KEY` set OR `codex_login` ok OR `~/.codex/auth.json` exists).
   Current CLIs keep ChatGPT login in the OS keyring, so `codex_login` is the
   normal signal; `auth.json` only covers pre-0.118 installs. `timeout`,
-  `probe_error` and `unverified` mean auth is unknown, not absent: report it
-  as such and point at `/codex:setup`.
+  `probe_error` and `unverified` mean auth is unknown, not absent: report it as
+  such and point at `/codex:setup`.
 - PARTIAL: `codex` binary found AND version >= 0.140.0, but auth not configured
 - NEEDS SETUP: `codex` binary not found OR version < 0.140.0
 
 **yellow-council:**
 
-Required system tools: `bash` on PATH (the council scripts run under
-`bash`, even from a zsh session), `shell_check` ok (bash 4.3+ or zsh),
-`timeout`, `jq`, `od`, `sort` and `council_extra_tools` ok (`mktemp`, `awk`,
-`sed`, `grep`, `find`, readable `/dev/urandom`), plus `yellow-core` installed (Claude
-Code disables the council without it). Reviewer CLIs: `agy` >= 1.0 (Gemini slot; a legacy
-`gemini` binary does not count), `opencode` >= 1.14, and yellow-codex
-installed. OpenRouter auth for OpenCode is not probed here; `/council:setup`
-checks it.
+Required system tools: `bash` on PATH (the council scripts run under `bash`,
+even from a zsh session), `shell_check` ok (bash 4.3+ or zsh), `timeout`, `jq`,
+`od`, `sort` and `council_extra_tools` ok (`mktemp`, `awk`, `sed`, `grep`,
+`find`, `cp`, `ln`, `chmod`, `cmp`, readable `/dev/urandom`), plus `yellow-core`
+installed (Claude Code disables the council without it). Reviewer CLIs: `agy` >=
+1.0 (Gemini slot; a legacy `gemini` binary does not count), `opencode` >= 1.14,
+and yellow-codex installed. OpenRouter auth for OpenCode is not probed here;
+`/council:setup` checks it.
 
 - READY: required system tools present AND all 3 reviewer CLIs installed
-- PARTIAL: required system tools present AND 1 or 2 of 3 reviewer CLIs
-  installed — council runs with reduced coverage
-- NEEDS SETUP: any required system tool missing, `yellow-core` NOT
-  INSTALLED, OR 0 of 3 reviewer CLIs installed
+- PARTIAL: required system tools present AND 1 or 2 of 3 reviewer CLIs installed
+  — council runs with reduced coverage
+- NEEDS SETUP: any required system tool missing, `yellow-core` NOT INSTALLED, OR
+  0 of 3 reviewer CLIs installed
 
 **yellow-goal:**
 
 Classify from Step 1's `goal-gen` row (`$GOAL_GEN_BIN` or `goal-gen`,
-`version --json`); the pin is `0.4.0` (`plugins/yellow-goal/src/pin.ts`) and `/goal:setup` is
-authoritative.
+`version --json`); the pin is `0.4.0` (`plugins/yellow-goal/src/pin.ts`) and
+`/goal:setup` is authoritative.
 
 - READY: `goal-gen` OK with version `0.4.0` AND `yellow-core` installed AND
   `node2222_lt25_check` ok (engines pin `>=22.22.0 <25.0.0`)
@@ -995,10 +1003,10 @@ authoritative.
 
 **yellow-claudemod:**
 
-- READY: Step 1's `claude:` row is OK with a version of 2.1.301 or later
-  (the hooks module needs `agent.spawn` for Agent-tool subagents)
-- PARTIAL: never — the downshift is off by default by design, and the
-  ledger needs no setup
+- READY: Step 1's `claude:` row is OK with a version of 2.1.301 or later (the
+  hooks module needs `agent.spawn` for Agent-tool subagents)
+- PARTIAL: never — the downshift is off by default by design, and the ledger
+  needs no setup
 - NEEDS SETUP: the `claude:` row is NOT FOUND OR its version is older than
   2.1.301 or unparseable
 
@@ -1006,14 +1014,15 @@ authoritative.
 
 - READY: `python37_check` ok AND `<config>/yellow-statusline.py` exists AND
   `statusLine_key` is `present` AND `disableAllHooks` is not `True`
-- PARTIAL: script exists AND `statusLine_key` is present AND `python37_check`
-  is ok, but `disableAllHooks` is `True`
+- PARTIAL: script exists AND `statusLine_key` is present AND `python37_check` is
+  ok, but `disableAllHooks` is `True`
 - NEEDS SETUP: any other READY condition not met
 <!-- setup-all-classification:end -->
 
 Display the dashboard in this order:
 
 <!-- setup-all-dashboard-example:start -->
+
 ```text
 Marketplace Setup Dashboard
 ===========================
@@ -1045,6 +1054,7 @@ Marketplace Setup Dashboard
 
   Summary: X ready, Y partial, Z need setup
 ```
+
 <!-- setup-all-dashboard-example:end -->
 
 Be specific in the Detail column. Name the missing tool, env var, config file,
@@ -1052,12 +1062,13 @@ or bundled research source count rather than using generic labels.
 
 ### Step 2.5: Alternative Provider Groups
 
-Some marketplace plugins are **alternative providers** of the same
-capability: interchangeable implementations, of which exactly one may be
-enabled at a time. Several may be installed — that is normal and supported —
-but enabling more than one is a conflict, not a redundancy.
+Some marketplace plugins are **alternative providers** of the same capability:
+interchangeable implementations, of which exactly one may be enabled at a time.
+Several may be installed — that is normal and supported — but enabling more than
+one is a conflict, not a redundancy.
 
 <!-- setup-all-provider-groups:start -->
+
 - `stacked-pr` (mutually exclusive: exactly one enabled)
   - `gt-workflow` → `graphite`
   - `github-workflow` → `github`
@@ -1065,7 +1076,7 @@ but enabling more than one is a conflict, not a redundancy.
   - `yellow-cursor` → `cursor`
   - `yellow-devin` → `devin`
   - `yellow-jules` → `jules`
-<!-- setup-all-provider-groups:end -->
+  <!-- setup-all-provider-groups:end -->
 
 `scripts/validate-provider-groups.js` gates this list against the
 `capabilityProvider` declarations in `catalog/plugins/*.json`, so it cannot
@@ -1075,44 +1086,44 @@ drift from the marketplace silently.
 member appears in the dashboard, because all can be installed and their
 readiness is worth reporting. Only the **enabled** one is offered for setup:
 
-1. Determine the group's enabled member. For `stacked-pr`, use
-   `/stack:status` (or the `stack-provider-router` skill). For
-   `remote-agent`, read Step 1's `remote_agent_state` row: the dashboard
-   already ran `lib/remote-agent-provider-state.js classify` (the classifier
+1. Determine the group's enabled member. For `stacked-pr`, use `/stack:status`
+   (or the `stack-provider-router` skill). For `remote-agent`, read Step 1's
+   `remote_agent_state` row: the dashboard already ran
+   `lib/remote-agent-provider-state.js classify` (the classifier
    `/linear:delegate` uses) with the cursor, devin, jules and agy tooling
    probes, so `PARTIAL_TOOLING` is reachable; its `detail` is on the
-   `remote_agent_detail` row. `UNKNOWN` means the classifier could not run; treat it like a missing yellow-core (item 5). Do not infer
-   either group's active member from which CLI happens to be on PATH.
+   `remote_agent_detail` row. `UNKNOWN` means the classifier could not run;
+   treat it like a missing yellow-core (item 5). Do not infer either group's
+   active member from which CLI happens to be on PATH.
 2. Offer setup for that member only. Show every other member's row with its
-   status and the annotation `(alternative provider — not enabled)`.
+status and the annotation `(alternative provider — not enabled)`.
 <!-- setup-all-remote-agent-states:start -->
-3. If the group's state is not one of its READY states or
-   `PARTIAL_TOOLING` — `stacked-pr`: not `READY_GRAPHITE`, `READY_GITHUB`,
-   or `PARTIAL_TOOLING` (no provider enabled, both enabled, an intent
-   mismatch, an unparseable `.yellow-stack.yml` i.e. `CONFIG_INVALID`, or a
-   managed-scope conflict); `remote-agent`: not `READY_CURSOR`,
-   `READY_DEVIN`, `READY_JULES`, `READY_AGY` (no remote-agent provider is
-   enabled, but the local agent yellow-agy is; it sits outside the group's
-   exactly-one rule), or `PARTIAL_TOOLING` (`UNSELECTED`,
-   `CONFLICT`, or `CONFIG_INVALID`) — do **not** pick one. Report the state and its
-   `detail` (fenced as untrusted, same as `/stack:status` and
-   `/linear:delegate` do), and point at `/stack:select` for `stacked-pr`
-   (or, for `CONFIG_INVALID`, at fixing/removing `.yellow-stack.yml` by
-   hand first) — `remote-agent` has no switch command in v1, so for that
-   group just report which provider(s) need to be enabled/disabled by
-   hand. There is no fallback between providers in either group.
+3. If the group's state is not one of its READY states or `PARTIAL_TOOLING` —
+`stacked-pr`: not `READY_GRAPHITE`, `READY_GITHUB`, or `PARTIAL_TOOLING` (no
+provider enabled, both enabled, an intent mismatch, an unparseable
+`.yellow-stack.yml` i.e. `CONFIG_INVALID`, or a managed-scope conflict);
+`remote-agent`: not `READY_CURSOR`, `READY_DEVIN`, `READY_JULES`, `READY_AGY`
+(no remote-agent provider is enabled, but the local agent yellow-agy is; it sits
+outside the group's exactly-one rule), or `PARTIAL_TOOLING` (`UNSELECTED`,
+`CONFLICT`, or `CONFIG_INVALID`) — do **not** pick one. Report the state and its
+`detail` (fenced as untrusted, same as `/stack:status` and `/linear:delegate`
+do), and point at `/stack:select` for `stacked-pr` (or, for `CONFIG_INVALID`, at
+fixing/removing `.yellow-stack.yml` by hand first) — `remote-agent` has no
+switch command in v1, so for that group just report which provider(s) need to be
+enabled/disabled by hand. There is no fallback between providers in either
+group.
 <!-- setup-all-remote-agent-states:end -->
-4. If the state is `PARTIAL_TOOLING`, the enabled provider is not ambiguous
-   — only its tooling is missing. Offer that provider's own setup command
-   rather than a provider-switch command (which only changes plugin
-   enablement and cannot install missing tooling): `/gt-setup` for
-   `gt-workflow`, `/github-stack:setup` for `github-workflow`,
-   `/cursor:setup` for `yellow-cursor`, `/devin:setup` for `yellow-devin`,
-   `/jules:setup` for `yellow-jules`, `/agy:setup` for `yellow-agy`.
-5. If `yellow-core` is not installed, neither group's status can be
-   determined (both classifiers live in `plugins/yellow-core/lib/`): report
-   every member's readiness, annotate that the active provider could not be
-   determined for either group, and offer neither.
+4. If the state is `PARTIAL_TOOLING`, the enabled provider is not ambiguous —
+   only its tooling is missing. Offer that provider's own setup command rather
+   than a provider-switch command (which only changes plugin enablement and
+   cannot install missing tooling): `/gt-setup` for `gt-workflow`,
+   `/github-stack:setup` for `github-workflow`, `/cursor:setup` for
+   `yellow-cursor`, `/devin:setup` for `yellow-devin`, `/jules:setup` for
+   `yellow-jules`, `/agy:setup` for `yellow-agy`.
+5. If `yellow-core` is not installed, neither group's status can be determined
+   (both classifiers live in `plugins/yellow-core/lib/`): report every member's
+   readiness, annotate that the active provider could not be determined for
+   either group, and offer neither.
 
 ### Step 3: Decision — Interactive Setup
 
@@ -1125,9 +1136,8 @@ Display: "No marketplace plugins are installed. Install plugins first, then run
 
 **If all installed plugins are READY:**
 
-Display: "All installed plugins are configured."
-If any plugins are NOT INSTALLED, also display: "X plugin(s) not installed:
-[list]."
+Display: "All installed plugins are configured." If any plugins are NOT
+INSTALLED, also display: "X plugin(s) not installed: [list]."
 
 If `yellow-core` is installed, use AskUserQuestion with options:
 
@@ -1142,10 +1152,9 @@ If `yellow-core` is not installed, stop after the summary.
 **If 1+ installed plugins are NEEDS SETUP or PARTIAL:**
 
 Count only installed plugins that are not READY. Exclude NOT INSTALLED plugins
-from the count and from selection lists. Also exclude the non-enabled member
-of any alternative provider group (Step 2.5) — it is reported, never offered,
-and must not inflate the "N plugins need attention" count. Use
-AskUserQuestion:
+from the count and from selection lists. Also exclude the non-enabled member of
+any alternative provider group (Step 2.5) — it is reported, never offered, and
+must not inflate the "N plugins need attention" count. Use AskUserQuestion:
 
 "N plugins need attention. How would you like to proceed?"
 
@@ -1154,8 +1163,8 @@ AskUserQuestion:
 - "Skip for now"
 
 If the user picks **"Pick which to run"**, present only the installed plugins
-that are PARTIAL or NEEDS SETUP. Label each option with the plugin name plus
-its detail.
+that are PARTIAL or NEEDS SETUP. Label each option with the plugin name plus its
+detail.
 
 If the user picks **"Skip for now"**, display the dashboard summary and stop.
 
@@ -1165,6 +1174,7 @@ For each selected plugin, invoke the corresponding setup command via the Skill
 tool in this fixed order:
 
 <!-- setup-all-delegated-commands:start -->
+
 1. `gt-setup`
 2. `github-stack:setup`
 3. `ruvector:setup`
@@ -1194,6 +1204,7 @@ plugins the user selected, and never invoke both members of an alternative
 provider group in one run (see the section below). Use this mapping:
 
 <!-- setup-all-plugin-command-map:start -->
+
 - `gt-workflow` → `gt-setup`
 - `github-workflow` → `github-stack:setup`
 - `yellow-ruvector` → `ruvector:setup`
@@ -1238,8 +1249,8 @@ the same ToolSearch probes from Step 1.5, AND the Step 1.6/1.7 probes from
 — a setup run can re-trigger userConfig prompts or restart MCP servers, so
 credential-status files may have changed mid-command; skipping 1.6/1.7 here
 would show stale before/after rows for exactly the plugins most likely to have
-changed (yellow-research, yellow-semgrep). Re-classify every
-plugin using the same rules and show only status changes:
+changed (yellow-research, yellow-semgrep). Re-classify every plugin using the
+same rules and show only status changes:
 
 ```text
 Setup Complete — Before/After
@@ -1271,11 +1282,11 @@ All installed marketplace plugins are fully configured.
 
 ## Error Handling
 
-| Error | Message | Action |
-|---|---|---|
-| Dashboard Bash call fails | "Dashboard check failed. Verify shell environment." | Stop |
-| ToolSearch probe missing expected tool | Record plugin as PARTIAL or NEEDS SETUP based on the rules above | Continue |
-| Plugin cache not found or uninspectable (no python3/jq) | "Plugin cache directory not found at ~/.claude/plugins/cache — cannot determine installed plugins." / "Plugin cache exists but cannot be inspected (need python3 or jq)." | Stop before Step 2 classification |
-| Skill invocation fails | "`<plugin>` setup: FAILED (<error>)`" | Record and continue |
-| User cancels during interactive setup | Show partial before/after for completed setups | Stop after summary |
-| All installed plugins already READY | "All installed plugins are configured." | Offer statusline refresh only when yellow-core is installed |
+| Error                                                   | Message                                                                                                                                                                   | Action                                                      |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Dashboard Bash call fails                               | "Dashboard check failed. Verify shell environment."                                                                                                                       | Stop                                                        |
+| ToolSearch probe missing expected tool                  | Record plugin as PARTIAL or NEEDS SETUP based on the rules above                                                                                                          | Continue                                                    |
+| Plugin cache not found or uninspectable (no python3/jq) | "Plugin cache directory not found at ~/.claude/plugins/cache — cannot determine installed plugins." / "Plugin cache exists but cannot be inspected (need python3 or jq)." | Stop before Step 2 classification                           |
+| Skill invocation fails                                  | "`<plugin>` setup: FAILED (<error>)`"                                                                                                                                     | Record and continue                                         |
+| User cancels during interactive setup                   | Show partial before/after for completed setups                                                                                                                            | Stop after summary                                          |
+| All installed plugins already READY                     | "All installed plugins are configured."                                                                                                                                   | Offer statusline refresh only when yellow-core is installed |
