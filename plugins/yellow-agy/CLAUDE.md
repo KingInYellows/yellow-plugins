@@ -31,6 +31,7 @@ plugins/yellow-agy/
     lifecycle.ts    # delegate / approve / reply / collect / abandon / status
     grants.ts       # owner grants, stored in the journal, checked and charged inside each reservation
     quota.ts        # the /usage quota gate
+    mcp.ts          # the `agy mcp list` gate setup runs before it records host.json
     tty.ts          # owner confirmation on the terminal (/dev/tty; CONIN$ on Windows, unverified)
     host-config.ts  # the host setup records: posix, windows-native or wsl-bridge, worktree root
     cli.ts          # one JSON envelope on stdout, exit 0/1/2

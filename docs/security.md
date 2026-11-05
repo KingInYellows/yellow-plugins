@@ -979,9 +979,15 @@ own machine to plan and then edit one task in a new git worktree. See
   children also run with `core.fsmonitor=false` and every configured git filter
   driver emptied. yellow-agy itself runs the git commands (worktree, collect)
   and never pushes.
-- **MCP servers.** agy starts every configured MCP server on every run, outside
-  the command allowlist, so `/agy:setup` refuses (`AGY_MCP`) while any is
-  enabled; the owner disables them.
+- **MCP servers.** agy starts every enabled MCP server on every run, outside the
+  command allowlist, so `/agy:setup` reads `agy mcp list` and refuses
+  (`AGY_MCP`) while any server is enabled that the owner has not allowed. The
+  owner either disables a server or allows it by name with
+  `setup --allow-mcp <name>`, confirmed by a code on their own terminal like a
+  grant. An allowed server's tools are not limited by the command allowlist and
+  can send task code to that server's service, and an unpinned
+  `npx`/`uvx`/`bunx`/`dlx` launch runs whatever version is newest; setup shows
+  both before the owner confirms.
 - **Quota and concurrency.** One run at a time, serialized by a journal claim.
   Before each model turn a free `agy -p /usage` probe must show the grant's
   quota floor is left, or the turn is refused.

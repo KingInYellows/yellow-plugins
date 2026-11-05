@@ -1,0 +1,2 @@
+NAME     TYPE   STATUS   COMMAND/URL
+GitHits  stdio  enabled  npx -y githits@latest mcp start

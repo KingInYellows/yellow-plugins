@@ -23,7 +23,8 @@ run is file edits only until agy's `--sandbox` is verified on a host.
 - None of `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`,
   `GOOGLE_CLOUD_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS` or `AGY_ADC_AUTH`
   set, in your shell or inside the WSL distro
-- No enabled MCP servers (`agy mcp list`; `agy mcp disable <name>`)
+- No enabled MCP servers (`agy mcp list`; `agy mcp disable <name>`), unless the
+  owner allows one by name with `setup --allow-mcp <name>` on their own terminal
 - `"useG1Credits": false` in `~/.gemini/antigravity-cli/settings.json`, with
   `toolPermission` not set to `always-proceed`, `allowNonWorkspaceAccess` not
   `true`, and no `agentMode` that auto-approves edits (such as `accept-edits`)

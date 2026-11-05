@@ -60,7 +60,15 @@ adapter verifies, and they fail closed until it does:
   on every run, and the command allowlist doesn't govern their tools. A
   delegated run must start with none. agy 1.4.12 has no per-run way to turn them
   off, so `setup` refuses with `AGY_MCP` while any server is enabled; the owner
-  can run `agy mcp disable <name>`.
+  can run `agy mcp disable <name>`, or allow a server by name with
+  `setup --allow-mcp <name>`, confirmed by a code on their own terminal like a
+  grant. Setup then lists each allowed server's launch line and warns that its
+  tools bypass the command allowlist and that an unpinned launcher (`npx`,
+  `uvx`, `bunx`, `dlx` without an exact version) fetches a new package each run.
+  `setup` runs `agy mcp list` through `buildInvocation` and parses its table
+  (agy 1.4.12 has no JSON flag: header `NAME TYPE STATUS COMMAND/URL`, STATUS
+  `enabled` or `disabled`); a nonzero exit or any other shape also refuses, and
+  host.json is not written.
 - **No branch code runs outside agy's sandbox.** Test and lint commands execute
   code the task wrote, with the owner's privileges. The implement profile allows
   them only when `--sandbox` is verified to confine files and network on that
@@ -379,8 +387,9 @@ The adapter probe answered five of the six open questions; the run sheet is
 
 1. **MCP:** `--settings` rejects the MCP keys as unknown and no flag turns MCP
    off for one run. The only switch is the global `agy mcp disable <name>`, so
-   `setup` refuses with `AGY_MCP` while `agy mcp list` shows an enabled server.
-   Disabling is the owner's call; the adapter never changes it.
+   `setup` refuses with `AGY_MCP` while `agy mcp list` shows an enabled server
+   the owner has not allowed with `--allow-mcp`. Disabling is the owner's call;
+   the adapter never changes it.
 2. **Sandbox: still open.** bwrap works under WSL2, but the probe was
    inconclusive. Until it is shown to confine files and network, the implement
    profile allows no test or lint commands (hard rules).
