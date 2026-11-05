@@ -46,7 +46,11 @@ plugins/yellow-agy/
   overages, and never read or copy files under `~/.gemini/` other than
   `antigravity-cli/settings.json`, which setup only reads.
 - The WSL bridge is exec-only: `wsl.exe [-d <distro>] -e …`, never the `--`
-  form, which re-parses arguments in the distro's shell.
+  form, which re-parses arguments in the distro's shell. Every bridge command
+  (agy turns and host git, mkdir, tee, rm) runs under `setsid -w` and prints
+  its Linux pgid first on stderr, so a timeout kills that group through
+  `wsl.exe … kill` and waits for it; killing wsl.exe alone leaves the Linux
+  side running.
 - Setup never runs a model turn. Quota is the owner's weekly AI Pro bucket.
 - Error codes use the `AGY_*` prefix and env vars the `YELLOW_AGY_*` prefix
   (contract-v0 "Output envelope" lists them).

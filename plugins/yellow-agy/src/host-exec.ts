@@ -16,11 +16,14 @@ import { AgyError } from './errors';
 import type { Host } from './invocation';
 import {
   assertWslPath,
+  BRIDGE_GROUP_SCRIPT,
   BRIDGE_UNSET_VARS,
+  bridgeKillCommand,
   filterDriverNames,
   hookConfig,
   scrubEnv,
 } from './invocation';
+import { splitPgidMarker } from './process';
 
 export interface ExecResult {
   readonly code: number | null;
@@ -66,6 +69,40 @@ export interface SpawnSpec {
   readonly args: readonly string[];
   readonly cwd: string | undefined;
   readonly env: Readonly<Record<string, string>>;
+  /**
+   * Set on the bridge: the command leads its own Linux process group and
+   * prints its pgid first on stderr, the same way a bridge turn does, so a
+   * timeout can kill that group (killing wsl.exe alone leaves git running).
+   */
+  readonly linuxGroup?: { readonly distro?: string };
+}
+
+/** Runs the group kill and resolves when it has finished (or failed). */
+export type GroupKill = (
+  file: string,
+  args: readonly string[]
+) => Promise<void>;
+
+/** How long to wait for `wsl.exe … kill` before rejecting anyway. */
+const GROUP_KILL_WAIT_MS = 10_000;
+
+function defaultGroupKill(
+  file: string,
+  args: readonly string[]
+): Promise<void> {
+  return new Promise((resolve) => {
+    const k = spawn(file, [...args], { stdio: 'ignore', windowsHide: true });
+    const timer = setTimeout(() => {
+      k.kill('SIGKILL');
+      resolve();
+    }, GROUP_KILL_WAIT_MS);
+    const done = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+    k.on('error', done);
+    k.on('close', done);
+  });
 }
 
 /** Pure: how `cmd args` is spawned on `host`, with git hooks off. */
@@ -109,12 +146,15 @@ export function hostCommand(
   for (const [key, value] of Object.entries({ ...extra, ...hooks })) {
     wslArgs.push(`${key}=${value}`);
   }
+  // setsid makes the shell (then cmd, via exec) lead a new Linux group.
+  wslArgs.push('setsid', '-w', 'sh', '-c', BRIDGE_GROUP_SCRIPT, 'sh');
   wslArgs.push(cmd, ...args);
   return {
     file: 'wsl.exe',
     args: wslArgs,
     cwd: undefined,
     env: scrubEnv(baseEnv),
+    linuxGroup: host.distro === undefined ? {} : { distro: host.distro },
   };
 }
 
@@ -124,7 +164,8 @@ export function runSpawn(
   timeoutMs: number,
   // AGY_BUDGET when the budget cut the timeout: the command did not fail,
   // it ran out of time, so callers must not read the result as an answer.
-  timeoutCode: 'AGY_INTERNAL' | 'AGY_BUDGET' = 'AGY_INTERNAL'
+  timeoutCode: 'AGY_INTERNAL' | 'AGY_BUDGET' = 'AGY_INTERNAL',
+  groupKill: GroupKill = defaultGroupKill
 ): Promise<ExecResult> {
   // Own process group on POSIX, so a timeout also reaches what git started
   // (a credential helper, ssh).
@@ -138,7 +179,20 @@ export function runSpawn(
       windowsHide: true,
     });
     let closed = false;
+    const bridge = spec.linuxGroup;
+    let linuxPgid: number | undefined;
+    let markerPending = bridge !== undefined;
+    // On the bridge, the Linux group dies first and we wait for that before
+    // rejecting, so nothing is still running when the caller moves on.
+    let linuxKilled: Promise<void> = Promise.resolve();
+    const killLinux = (): void => {
+      if (bridge === undefined || linuxPgid === undefined) return;
+      const cmd = bridgeKillCommand(bridge.distro, linuxPgid, 'KILL');
+      linuxPgid = undefined;
+      linuxKilled = groupKill(cmd.file, cmd.args).catch(() => undefined);
+    };
     const killAll = (): void => {
+      killLinux();
       if (child.pid === undefined || closed) return;
       try {
         if (group) process.kill(-child.pid, 'SIGKILL');
@@ -161,7 +215,19 @@ export function runSpawn(
       sink.push(chunk);
     };
     child.stdout?.on('data', collect(out));
-    child.stderr?.on('data', collect(err));
+    const collectErr = collect(err);
+    child.stderr?.on('data', (chunk: Buffer) => {
+      collectErr(chunk);
+      if (!markerPending) return;
+      const split = splitPgidMarker(Buffer.concat(err));
+      if (split === undefined) return;
+      markerPending = false;
+      linuxPgid = split.pgid;
+      err.length = 0;
+      if (split.rest.length > 0) err.push(split.rest);
+      // A timeout that fired before the pgid arrived reaches the group now.
+      if (timedOut || size > MAX_OUTPUT_BYTES) killLinux();
+    });
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
@@ -173,22 +239,28 @@ export function runSpawn(
     });
     child.on('close', (code) => {
       clearTimeout(timer);
-      killAll();
+      // A clean exit leaves no group to kill: `setsid -w` waited for it.
+      if (timedOut || size > MAX_OUTPUT_BYTES) killAll();
+      else if (bridge === undefined) killAll();
       closed = true;
       if (timedOut) {
-        reject(
-          new AgyError(
-            timeoutCode,
-            `${spec.file} did not finish within ${timeoutMs} ms`
+        void linuxKilled.then(() =>
+          reject(
+            new AgyError(
+              timeoutCode,
+              `${spec.file} did not finish within ${timeoutMs} ms`
+            )
           )
         );
         return;
       }
       if (size > MAX_OUTPUT_BYTES) {
-        reject(
-          new AgyError(
-            'AGY_INTERNAL',
-            `${spec.file} printed more than ${MAX_OUTPUT_BYTES} bytes`
+        void linuxKilled.then(() =>
+          reject(
+            new AgyError(
+              'AGY_INTERNAL',
+              `${spec.file} printed more than ${MAX_OUTPUT_BYTES} bytes`
+            )
           )
         );
         return;
@@ -209,7 +281,8 @@ export function runSpawn(
 export function createHostExec(
   host: Host,
   baseEnv: Readonly<Record<string, string | undefined>> = process.env,
-  budget?: Budget
+  budget?: Budget,
+  groupKill: GroupKill = defaultGroupKill
 ): HostExec {
   // Every host command (git, filter discovery, mkdir, tee, rm) is cut to
   // what is left of the call's budget, so slow git cannot outlive the
@@ -227,7 +300,8 @@ export function createHostExec(
       hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv),
       options.stdin,
       timeoutMs,
-      timeoutMs < wanted ? 'AGY_BUDGET' : 'AGY_INTERNAL'
+      timeoutMs < wanted ? 'AGY_BUDGET' : 'AGY_INTERNAL',
+      groupKill
     );
   };
   // Reading config runs no filter, so discovery itself needs none turned off.

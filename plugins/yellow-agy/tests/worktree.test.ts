@@ -6,7 +6,9 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { AgyError } from '../src/errors';
-import { createHostExec, hostCommand } from '../src/host-exec';
+import type { GroupKill, SpawnSpec } from '../src/host-exec';
+import { createHostExec, hostCommand, runSpawn } from '../src/host-exec';
+import { BRIDGE_GROUP_SCRIPT } from '../src/invocation';
 import {
   collectWorktree,
   createWorktree,
@@ -377,6 +379,34 @@ describe('hostCommand', () => {
     expect(spec.args).toContain('GIT_CONFIG_VALUE_1=false');
     expect(spec.args).toContain('GIT_CONFIG_KEY_10=filter.lfs.clean');
     expect(spec.args.slice(-2)).toEqual(['git', 'status']);
+    // The command leads its own Linux group and reports its pgid (CLAUDE-246).
+    expect(spec.args.slice(-8, -2)).toEqual([
+      'setsid',
+      '-w',
+      'sh',
+      '-c',
+      BRIDGE_GROUP_SCRIPT,
+      'sh',
+    ]);
+    expect(spec.linuxGroup).toEqual({});
+    expect(
+      hostCommand(
+        { kind: 'wsl-bridge', distro: 'Ubuntu' },
+        'git',
+        [],
+        { cwd: '/home/o/w', filterDrivers: [] },
+        {}
+      ).linuxGroup
+    ).toEqual({ distro: 'Ubuntu' });
+    expect(
+      hostCommand(
+        { kind: 'posix' },
+        'git',
+        [],
+        { cwd: '/x', filterDrivers: [] },
+        {}
+      ).linuxGroup
+    ).toBeUndefined();
     expect(spec.env['WSLENV']).toBeUndefined();
     expect(() =>
       hostCommand(
@@ -427,6 +457,97 @@ describe('hostCommand', () => {
       )
     ).toThrow(AgyError);
   });
+});
+
+describe('runSpawn on a bridge Linux group (CLAUDE-246)', () => {
+  // Stands in for wsl.exe: `setsid -w` puts the command in a new group that
+  // killing the spawned process (or its own group) does not reach.
+  const bridgeSpec = (cmd: string[]): SpawnSpec => ({
+    file: 'setsid',
+    args: ['-w', 'sh', '-c', BRIDGE_GROUP_SCRIPT, 'sh', ...cmd],
+    cwd: undefined,
+    env: { PATH: process.env['PATH'] ?? '' },
+    linuxGroup: { distro: 'Ubuntu' },
+  });
+  // A killed process nobody has reaped yet is a zombie: dead for this test.
+  const alive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return false;
+    }
+    try {
+      const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+      return stat.slice(stat.lastIndexOf(')') + 2)[0] !== 'Z';
+    } catch {
+      return true;
+    }
+  };
+
+  it.skipIf(process.platform === 'win32')(
+    'kills the Linux group on timeout and waits for that kill before rejecting',
+    async () => {
+      const kills: string[][] = [];
+      let killedAt = 0;
+      let pgid = 0;
+      const groupKill: GroupKill = async (file, args) => {
+        kills.push([file, ...args]);
+        pgid = Number(args[args.length - 1]?.slice(1));
+        await new Promise((r) => setTimeout(r, 100));
+        process.kill(-pgid, 'SIGKILL');
+        killedAt = Date.now();
+      };
+      const err = await runSpawn(
+        bridgeSpec(['sleep', '30']),
+        undefined,
+        500,
+        'AGY_INTERNAL',
+        groupKill
+      ).catch((e: unknown) => e);
+      expect(err).toMatchObject({ code: 'AGY_INTERNAL' });
+      expect(killedAt).toBeGreaterThan(0);
+      expect(kills).toHaveLength(1);
+      expect(kills[0]?.slice(0, 7)).toEqual([
+        'wsl.exe',
+        '-d',
+        'Ubuntu',
+        '-e',
+        'kill',
+        '-s',
+        'KILL',
+      ]);
+      expect(pgid).toBeGreaterThan(1);
+      expect(alive(pgid)).toBe(false);
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'a clean exit strips the pgid line and kills nothing',
+    async () => {
+      const kills: string[][] = [];
+      const res = await runSpawn(
+        bridgeSpec(['sh', '-c', 'echo out; echo warn >&2']),
+        undefined,
+        10_000,
+        'AGY_INTERNAL',
+        async (file, args) => {
+          kills.push([file, ...args]);
+        }
+      );
+      expect(res.code).toBe(0);
+      expect(res.stdout).toBe('out\n');
+      expect(res.stderr).toBe('warn\n');
+      expect(kills).toEqual([]);
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'passes stdin through the group wrapper',
+    async () => {
+      const res = await runSpawn(bridgeSpec(['cat']), 'hello', 10_000);
+      expect(res.stdout).toBe('hello');
+    }
+  );
 });
 
 describe('createHostExec', () => {
