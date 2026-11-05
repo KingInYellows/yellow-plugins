@@ -137,12 +137,13 @@ if [ "$LOCAL_OID" != "$PR_OID" ]; then
   printf 'Push or sync the branch first, then retry. A branch restacked by an earlier fix commit is published with the provider submit (gt submit --stack), which commit-resolve-fixes now runs itself.\n' >&2
   exit 1
 fi
+printf 'head-oid=%s\n' "$PR_OID"
 ```
 
-If the block exits non-zero, stop. Otherwise keep `PR_OID` as the literal
-`<head-oid>`: Step 6 passes it to the commit and Step 7 compares the PR head
-with it, so a push by another writer during the run is caught before anything is
-committed or posted.
+If the block exits non-zero, stop. Otherwise keep the printed `head-oid=` value
+as the literal `<head-oid>`: Step 6 passes it to the commit and Step 7 compares
+the PR head with it, so a push by another writer during the run is caught before
+anything is committed or posted.
 
 ### Step 3: Fetch Unresolved Comments
 
