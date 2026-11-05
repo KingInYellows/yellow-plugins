@@ -69,112 +69,108 @@ describe('parseMcpList', () => {
 describe('assertMcpGate', () => {
   const run =
     (res: McpListResult, seen: Invocation[] = []) =>
-    (inv: Invocation): McpListResult => {
+    async (inv: Invocation): Promise<McpListResult> => {
       seen.push(inv);
       return res;
     };
 
-  it('refuses the captured host, naming the enabled server', () => {
-    let message = '';
-    try {
+  it('refuses the captured host, naming the enabled server', async () => {
+    await expect(
       assertMcpGate(
         { kind: 'posix' },
         '/tmp',
         {},
         [],
-        run({
-          status: 0,
-          stdout: CAPTURED,
-          stderr: '',
-        })
-      );
-    } catch (e) {
-      expect(e).toBeInstanceOf(AgyError);
-      expect((e as AgyError).code).toBe('AGY_MCP');
-      message = (e as AgyError).message;
-    }
-    expect(message).toContain('GitHits');
+        run({ status: 0, stdout: CAPTURED, stderr: '' })
+      )
+    ).rejects.toMatchObject({
+      code: 'AGY_MCP',
+      message: expect.stringContaining('GitHits'),
+    });
   });
 
-  it('passes when every server is disabled', () => {
-    expect(
+  it('passes when every server is disabled', async () => {
+    await expect(
       assertMcpGate(
         { kind: 'posix' },
         '/tmp',
         {},
         [],
-        run({
-          status: 0,
-          stdout: DISABLED,
-          stderr: '',
-        })
+        run({ status: 0, stdout: DISABLED, stderr: '' })
       )
-    ).toMatchObject([{ name: 'GitHits', enabled: false }]);
+    ).resolves.toMatchObject([{ name: 'GitHits', enabled: false }]);
   });
 
-  it('refuses a nonzero exit even when stdout parses', () => {
-    expect(
-      code(() =>
-        assertMcpGate(
-          { kind: 'posix' },
-          '/tmp',
-          {},
-          [],
-          run({
-            status: 1,
-            stdout: HEADER,
-            stderr: 'boom',
-          })
-        )
+  it('refuses a nonzero exit even when stdout parses', async () => {
+    await expect(
+      assertMcpGate(
+        { kind: 'posix' },
+        '/tmp',
+        {},
+        [],
+        run({ status: 1, stdout: HEADER, stderr: 'boom' })
       )
-    ).toBe('AGY_MCP');
+    ).rejects.toMatchObject({ code: 'AGY_MCP' });
   });
 
-  it('runs agy mcp list through the bridge with a scrubbed env', () => {
+  it('runs agy mcp list through the bridge with a scrubbed env', async () => {
     const seen: Invocation[] = [];
-    assertMcpGate(
+    await assertMcpGate(
       { kind: 'wsl-bridge', distro: 'Ubuntu-24.04' },
       '/home/k/.local/share/yellow-agy/worktrees',
       { GEMINI_API_KEY: 'x', PATH: '/usr/bin' },
       [],
-      run({ status: 0, stdout: HEADER, stderr: 'yellow-agy-pgid:42\n' }, seen)
+      run({ status: 0, stdout: HEADER, stderr: '' }, seen)
     );
     const inv = seen[0] as Invocation;
     expect(inv.file).toBe('wsl.exe');
     expect(inv.args.slice(-3)).toEqual(['agy', 'mcp', 'list']);
     expect(inv.args).toContain('-u');
+    expect(inv.linuxGroup).toEqual({ distro: 'Ubuntu-24.04' });
     expect(inv.env['GEMINI_API_KEY']).toBeUndefined();
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'reports a missing agy as AGY_NOT_INSTALLED with the real runner',
+    async () => {
+      await expect(
+        assertMcpGate({ kind: 'posix' }, '/tmp', { PATH: '/nonexistent' }, [])
+      ).rejects.toMatchObject({ code: 'AGY_NOT_INSTALLED' });
+    }
+  );
 });
 
 describe('MCP allowlist', () => {
-  const ok = (stdout: string) => () => ({ status: 0, stdout, stderr: '' });
+  const ok = (stdout: string) => async () => ({
+    status: 0,
+    stdout,
+    stderr: '',
+  });
   const TWO = `${HEADER}GitHits  stdio  enabled  npx -y githits@latest mcp start\nOther  stdio  enabled  /usr/bin/other\n`;
 
-  it('passes an enabled server the owner allowed by name', () => {
-    expect(
+  it('passes an enabled server the owner allowed by name', async () => {
+    await expect(
       assertMcpGate({ kind: 'posix' }, '/tmp', {}, ['GitHits'], ok(CAPTURED))
-    ).toMatchObject([{ name: 'GitHits', enabled: true }]);
+    ).resolves.toMatchObject([{ name: 'GitHits', enabled: true }]);
   });
 
-  it('still refuses enabled servers that are not allowed, and names only those', () => {
-    let message = '';
-    try {
-      assertMcpGate({ kind: 'posix' }, '/tmp', {}, ['GitHits'], ok(TWO));
-    } catch (e) {
-      expect((e as AgyError).code).toBe('AGY_MCP');
-      message = (e as AgyError).message;
-    }
-    expect(message).toContain('Other');
-    expect(message).not.toContain('GitHits');
+  it('still refuses enabled servers that are not allowed, and names only those', async () => {
+    const err = await assertMcpGate(
+      { kind: 'posix' },
+      '/tmp',
+      {},
+      ['GitHits'],
+      ok(TWO)
+    ).catch((e: unknown) => e);
+    expect((err as AgyError).code).toBe('AGY_MCP');
+    expect((err as AgyError).message).toContain('Other');
+    expect((err as AgyError).message).not.toContain('GitHits');
   });
 
-  it('matches names exactly', () => {
-    expect(
-      code(() =>
-        assertMcpGate({ kind: 'posix' }, '/tmp', {}, ['githits'], ok(CAPTURED))
-      )
-    ).toBe('AGY_MCP');
+  it('matches names exactly', async () => {
+    await expect(
+      assertMcpGate({ kind: 'posix' }, '/tmp', {}, ['githits'], ok(CAPTURED))
+    ).rejects.toMatchObject({ code: 'AGY_MCP' });
   });
 
   it('validates --allow-mcp names', () => {

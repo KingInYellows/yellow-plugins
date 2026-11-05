@@ -266,7 +266,7 @@ async function run(ctx, op, flags) {
             // Before host.json exists, so a host with an enabled MCP server the
             // owner did not allow is never recorded (CLAUDE-254).
             const allowedMcp = (0, mcp_1.parseAllowedMcp)(flags['allow-mcp']);
-            const mcpServers = (0, mcp_1.assertMcpGate)(config.host, config.worktreeRoot, ctx.deps.env, allowedMcp, ctx.deps.runMcpList);
+            const mcpServers = await (0, mcp_1.assertMcpGate)(config.host, config.worktreeRoot, ctx.deps.env, allowedMcp, ctx.deps.runMcpList);
             const warnings = (0, mcp_1.mcpWarnings)(mcpServers, allowedMcp);
             if (allowedMcp.length > 0) {
                 // Only the owner may widen what a delegated run starts, so the

@@ -14,12 +14,10 @@
  * Anything else fails closed.
  */
 
-import { spawnSync } from 'node:child_process';
-
 import { AgyError } from './errors';
+import { runSpawn } from './host-exec';
 import type { Host, Invocation } from './invocation';
 import { buildInvocation } from './invocation';
-import { splitPgidMarker } from './process';
 
 const HEADER_RE = /^NAME\s+TYPE\s+STATUS\s+COMMAND\/URL$/;
 const ROW_RE = /^(\S+)\s+(\S+)\s+(enabled|disabled)(?:\s+(.*))?$/;
@@ -28,7 +26,6 @@ const NAME_RE = /^[A-Za-z0-9._-]{1,64}$/;
 // whatever is newest on every run.
 const LAUNCHER_RE = /\b(?:npx|uvx|bunx|dlx)\b/;
 const EXACT_VERSION_RE = /@\d+\.\d+\.\d+(?:[-+][\w.-]+)?(?:\s|$)|==\d/;
-const MAX_OUTPUT_BYTES = 64 * 1024;
 const TIMEOUT_MS = 60_000;
 
 export interface McpServer {
@@ -43,7 +40,7 @@ export interface McpListResult {
   readonly stderr: string;
 }
 
-export type RunMcpList = (inv: Invocation) => McpListResult;
+export type RunMcpList = (inv: Invocation) => Promise<McpListResult>;
 
 /** Parses `agy mcp list` stdout; throws AGY_MCP on any other shape. */
 export function parseMcpList(stdout: string): McpServer[] {
@@ -68,26 +65,25 @@ export function parseMcpList(stdout: string): McpServer[] {
   });
 }
 
-function defaultRun(inv: Invocation): McpListResult {
-  const res = spawnSync(inv.file, [...inv.args], {
-    cwd: inv.cwd,
-    env: inv.env,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: TIMEOUT_MS,
-    maxBuffer: MAX_OUTPUT_BYTES,
-    windowsHide: true,
-  });
-  if (res.error !== undefined) {
-    const code = (res.error as NodeJS.ErrnoException).code;
+/**
+ * Runs the probe like a host command: on the bridge it leads its own Linux
+ * group, which a timeout or output overflow kills (killing wsl.exe alone
+ * would leave agy running), and the pgid line is stripped from stderr.
+ */
+async function defaultRun(inv: Invocation): Promise<McpListResult> {
+  try {
+    const res = await runSpawn(inv, undefined, TIMEOUT_MS);
+    return { status: res.code, stdout: res.stdout, stderr: res.stderr };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      throw new AgyError('AGY_NOT_INSTALLED', `${inv.file} was not found`);
+    }
     throw new AgyError(
-      code === 'ENOENT' ? 'AGY_NOT_INSTALLED' : 'AGY_MCP',
-      code === 'ENOENT'
-        ? `${inv.file} was not found`
-        : `agy mcp list did not finish: ${res.error.message}`
+      'AGY_MCP',
+      `agy mcp list did not finish: ${err instanceof Error ? err.message : String(err)}`
     );
   }
-  return { status: res.status, stdout: res.stdout, stderr: res.stderr };
 }
 
 /** Validates `--allow-mcp` names; they must look like agy server names. */
@@ -136,24 +132,20 @@ export function mcpWarnings(
  * is in `allowed`. `cwd` is a directory on that host; setup passes the
  * worktree root.
  */
-export function assertMcpGate(
+export async function assertMcpGate(
   host: Host,
   cwd: string,
   baseEnv: Readonly<Record<string, string | undefined>>,
   allowed: readonly string[] = [],
   run: RunMcpList = defaultRun
-): McpServer[] {
+): Promise<McpServer[]> {
   const inv = buildInvocation(host, ['mcp', 'list'], {
     cwd,
     baseEnv,
     filterDrivers: [],
   });
-  const res = run(inv);
-  let stderr = res.stderr;
-  if (inv.linuxGroup !== undefined) {
-    const split = splitPgidMarker(Buffer.from(stderr, 'utf8'));
-    if (split !== undefined) stderr = split.rest.toString('utf8');
-  }
+  const res = await run(inv);
+  const stderr = res.stderr;
   if (res.status !== 0) {
     const detail = stderr.trim().slice(0, 500);
     throw new AgyError(

@@ -337,7 +337,7 @@ describe('setup MCP gate (CLAUDE-254)', () => {
         schemaPath: path.join(root, 'plan.schema.json'),
         sandboxVerified: false,
       }),
-      runMcpList: () => ({ status: 0, stdout, stderr: '' }),
+      runMcpList: async () => ({ status: 0, stdout, stderr: '' }),
       ...extra,
     };
     return {

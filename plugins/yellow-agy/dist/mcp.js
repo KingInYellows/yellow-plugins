@@ -20,10 +20,9 @@ exports.parseAllowedMcp = parseAllowedMcp;
 exports.isUnpinned = isUnpinned;
 exports.mcpWarnings = mcpWarnings;
 exports.assertMcpGate = assertMcpGate;
-const node_child_process_1 = require("node:child_process");
 const errors_1 = require("./errors");
+const host_exec_1 = require("./host-exec");
 const invocation_1 = require("./invocation");
-const process_1 = require("./process");
 const HEADER_RE = /^NAME\s+TYPE\s+STATUS\s+COMMAND\/URL$/;
 const ROW_RE = /^(\S+)\s+(\S+)\s+(enabled|disabled)(?:\s+(.*))?$/;
 const NAME_RE = /^[A-Za-z0-9._-]{1,64}$/;
@@ -31,7 +30,6 @@ const NAME_RE = /^[A-Za-z0-9._-]{1,64}$/;
 // whatever is newest on every run.
 const LAUNCHER_RE = /\b(?:npx|uvx|bunx|dlx)\b/;
 const EXACT_VERSION_RE = /@\d+\.\d+\.\d+(?:[-+][\w.-]+)?(?:\s|$)|==\d/;
-const MAX_OUTPUT_BYTES = 64 * 1024;
 const TIMEOUT_MS = 60_000;
 /** Parses `agy mcp list` stdout; throws AGY_MCP on any other shape. */
 function parseMcpList(stdout) {
@@ -51,23 +49,23 @@ function parseMcpList(stdout) {
         return { name: m[1], enabled: m[3] === 'enabled', command: m[4] ?? '' };
     });
 }
-function defaultRun(inv) {
-    const res = (0, node_child_process_1.spawnSync)(inv.file, [...inv.args], {
-        cwd: inv.cwd,
-        env: inv.env,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: TIMEOUT_MS,
-        maxBuffer: MAX_OUTPUT_BYTES,
-        windowsHide: true,
-    });
-    if (res.error !== undefined) {
-        const code = res.error.code;
-        throw new errors_1.AgyError(code === 'ENOENT' ? 'AGY_NOT_INSTALLED' : 'AGY_MCP', code === 'ENOENT'
-            ? `${inv.file} was not found`
-            : `agy mcp list did not finish: ${res.error.message}`);
+/**
+ * Runs the probe like a host command: on the bridge it leads its own Linux
+ * group, which a timeout or output overflow kills (killing wsl.exe alone
+ * would leave agy running), and the pgid line is stripped from stderr.
+ */
+async function defaultRun(inv) {
+    try {
+        const res = await (0, host_exec_1.runSpawn)(inv, undefined, TIMEOUT_MS);
+        return { status: res.code, stdout: res.stdout, stderr: res.stderr };
     }
-    return { status: res.status, stdout: res.stdout, stderr: res.stderr };
+    catch (err) {
+        const code = err.code;
+        if (code === 'ENOENT') {
+            throw new errors_1.AgyError('AGY_NOT_INSTALLED', `${inv.file} was not found`);
+        }
+        throw new errors_1.AgyError('AGY_MCP', `agy mcp list did not finish: ${err instanceof Error ? err.message : String(err)}`);
+    }
 }
 /** Validates `--allow-mcp` names; they must look like agy server names. */
 function parseAllowedMcp(values) {
@@ -104,19 +102,14 @@ function mcpWarnings(servers, allowed) {
  * is in `allowed`. `cwd` is a directory on that host; setup passes the
  * worktree root.
  */
-function assertMcpGate(host, cwd, baseEnv, allowed = [], run = defaultRun) {
+async function assertMcpGate(host, cwd, baseEnv, allowed = [], run = defaultRun) {
     const inv = (0, invocation_1.buildInvocation)(host, ['mcp', 'list'], {
         cwd,
         baseEnv,
         filterDrivers: [],
     });
-    const res = run(inv);
-    let stderr = res.stderr;
-    if (inv.linuxGroup !== undefined) {
-        const split = (0, process_1.splitPgidMarker)(Buffer.from(stderr, 'utf8'));
-        if (split !== undefined)
-            stderr = split.rest.toString('utf8');
-    }
+    const res = await run(inv);
+    const stderr = res.stderr;
     if (res.status !== 0) {
         const detail = stderr.trim().slice(0, 500);
         throw new errors_1.AgyError('AGY_MCP', `agy mcp list exited ${res.status ?? 'by signal'}${detail === '' ? '' : `: ${detail}`}`);

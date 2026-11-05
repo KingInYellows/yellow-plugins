@@ -326,7 +326,7 @@ async function run(ctx: Ctx, op: string, flags: Flags): Promise<unknown> {
       // Before host.json exists, so a host with an enabled MCP server the
       // owner did not allow is never recorded (CLAUDE-254).
       const allowedMcp = parseAllowedMcp(flags['allow-mcp']);
-      const mcpServers = assertMcpGate(
+      const mcpServers = await assertMcpGate(
         config.host,
         config.worktreeRoot,
         ctx.deps.env,
