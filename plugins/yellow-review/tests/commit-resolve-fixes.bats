@@ -974,6 +974,95 @@ long_file() {
   [ "$(jq -c '.out_of_range[0].old_lines' <<<"$output")" = '["1-30","over-cap"]' ]
 }
 
+# --- Per-cluster cap (--check-ranges --clusters-from) ---
+
+# Three 100-line files, each edited on 30 lines.
+three_cluster_files() {
+  for f in a b c; do seq 1 100 >| "src/$f.txt"; done
+  git add src && git commit -q -m "chore: three long files"
+  printf 'src/a.txt 1-100\nsrc/b.txt 1-100\nsrc/c.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
+  for f in a b c; do sed -i.bak -e '1,30s/$/x/' "src/$f.txt" && rm -f "src/$f.txt.bak"; done
+  printf 'src/a.txt\nsrc/b.txt\nsrc/c.txt\n' >| "$BATS_TEST_TMPDIR/files"
+}
+
+@test "--clusters-from admits clusters in rank order and defers only the ones over the cap" {
+  three_cluster_files
+  # The P2 cluster is listed first; the P1 cluster is admitted ahead of it.
+  printf '2 src/a.txt\n1 src/b.txt\n2 src/c.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '[.out_of_range[] | [.path, .old_lines]]' <<<"$output")" = '[["src/a.txt",["over-cap"]],["src/c.txt",["over-cap"]]]' ]
+  [ "$(jq -c .deferred_clusters <<<"$output")" = '[1,3]' ]
+  [ "$(jq -c .admitted_lines <<<"$output")" = 30 ]
+}
+
+@test "--clusters-from keeps trying smaller clusters after one does not fit" {
+  three_cluster_files
+  sed -i.bak -e '31,40s/$/x/' src/c.txt && rm -f src/c.txt.bak
+  seq 1 100 >| src/d.txt && git add src/d.txt && git commit -q -m "chore: fourth file"
+  sed -i.bak -e '1,5s/$/x/' src/d.txt && rm -f src/d.txt.bak
+  printf 'src/a.txt 1-100\nsrc/b.txt 1-100\nsrc/c.txt 1-100\nsrc/d.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
+  printf 'src/d.txt\n' >> "$BATS_TEST_TMPDIR/files"
+  # a=30 admitted, c=40 does not fit, b=30 does not fit, d=5 still fits.
+  printf '0 src/a.txt\n1 src/c.txt\n1 src/b.txt\n2 src/d.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c .deferred_clusters <<<"$output")" = '[2,3]' ]
+  [ "$(jq -c .admitted_lines <<<"$output")" = 35 ]
+  [ "$(jq -c '[.out_of_range[].path] | sort' <<<"$output")" = '["src/b.txt","src/c.txt"]' ]
+}
+
+@test "--clusters-from marks files in no cluster over-cap when they alone exceed the cap" {
+  three_cluster_files
+  sed -i.bak -e '31,60s/$/x/' src/a.txt && rm -f src/a.txt.bak
+  # src/a.txt (60 lines) is in no row; it is over-cap and the cluster still fits.
+  printf '1 src/b.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
+  printf 'src/a.txt\nsrc/b.txt\n' >| "$BATS_TEST_TMPDIR/files"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '[.out_of_range[] | [.path, .old_lines]]' <<<"$output")" = '[["src/a.txt",["over-cap"]]]' ]
+  [ "$(jq -c .deferred_clusters <<<"$output")" = '[]' ]
+  [ "$(jq -c .admitted_lines <<<"$output")" = 30 ]
+}
+
+@test "--clusters-from groups clusters that share a file and defers them together" {
+  three_cluster_files
+  # Rows 2 and 3 share src/c.txt: their group is 60 lines and is deferred as one.
+  printf '1 src/a.txt\n0 src/b.txt src/c.txt\n2 src/c.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c .deferred_clusters <<<"$output")" = '[2,3]' ]
+  [ "$(jq -c '[.out_of_range[].path] | sort' <<<"$output")" = '["src/b.txt","src/c.txt"]' ]
+  [ "$(jq -c .admitted_lines <<<"$output")" = 30 ]
+}
+
+@test "--clusters-from defers nothing when every cluster fits" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  printf '1 src/a.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(jq -c . <<<"$output")" = '{"out_of_range":[],"deferred_clusters":[],"admitted_lines":1}' ]
+}
+
+@test "--clusters-from refuses a malformed row, a non-canonical path and commit mode (exit 2)" {
+  printf 'src/a.txt 1-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  for row in '3 src/a.txt' 'P1 src/a.txt' '1' '1  src/a.txt'; do
+    printf '%s\n' "$row" >| "$BATS_TEST_TMPDIR/clusters"
+    run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" -- src/a.txt
+    [ "$status" -eq 2 ] || { echo "accepted: $row" >&2; return 1; }
+    [[ "$stderr" == *"malformed row"* ]]
+  done
+  printf '1 ../a.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"canonical"* ]]
+  printf '1 src/a.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
+  run_crf --provider graphite --pr 7 --message "$MSG" --clusters-from "$BATS_TEST_TMPDIR/clusters" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--clusters-from needs --check-ranges"* ]]
+}
+
 @test "a hook that adds more than 50 lines to a listed file in range makes the commit undo itself (exit 4)" {
   long_file
   printf '#!/bin/sh\nseq 2000 2060 >> src/a.txt && git add src/a.txt\n' >| .git/hooks/pre-commit

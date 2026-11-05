@@ -213,9 +213,12 @@ the resolve scripts: `references/resolve/dispositions.md`.
   fixes; both refuse worktree-resident `git`/`gh`/`jq` and screen `PATH` and git
   config (`yr_safe_path`, `harden_git_config`), `commit-resolve-fixes` also
   refuses worktree-resident `gt`/`node`/`awk`; neither pushes.
-  `run-verify-command --revert-denied` also judges trusted-config symlinks
-  (tracked, untracked or nested) and leaves FIFO, socket and device paths in
-  place, reporting them instead of opening them
+  `commit-resolve-fixes --check-ranges --clusters-from` applies the 50-line cap
+  per cluster (best rank first; a deferred cluster stays open for the next run),
+  and `--check-paths --unattended` lets `/review:resolve` skip runner-file
+  clusters before any resolver runs. `run-verify-command --revert-denied` also
+  judges trusted-config symlinks (tracked, untracked or nested) and leaves FIFO,
+  socket and device paths in place, reporting them instead of opening them
 - `head-ignore-probe`, `guard-local-config` — protect the ignored
   `yellow-plugins.local.md` for sweep and resolve-stack
 - `read-resolve-config` — the Step 1 config snapshot as JSON; never parse the
