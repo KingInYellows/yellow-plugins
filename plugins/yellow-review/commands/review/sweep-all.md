@@ -316,8 +316,11 @@ For each iteration:
      `branch mismatch`, `local branch behind the PR head`,
      `head ignore rules unreadable`,
      `config tracked here, ignored on the PR head` or
-     `config untracked here, ignored on the PR head`), not `no contract`. Item
-     4's clean-tree check still runs; the batch continues.
+     `config untracked here, ignored on the PR head`), not `no contract`. For
+     `branch mismatch`, when the sweep's stderr has a
+     `is checked out in the worktree` line, put that worktree path and its
+     `cd '<path>' && /review:sweep <PR#>` command in `Notes`. Item 4's
+     clean-tree check still runs; the batch continues.
    - If the LAST line fully matches
      `^Sweep: aborted \((local-config-changed)\)$` (`/review:sweep` "Skip
      line"), `yellow-plugins.local.md` changed during the sweep: outcome is
@@ -409,10 +412,12 @@ It prints
 for every ledger in this clone. `skipped` counts records the fold could not
 read, any of which may be a pending finding. A ledger that fails to fold emits
 `"<PR#>": null` for that entry while the command still exits 0 — a per-row
-failure, not a call failure. For each row, the `Residual` cell is
-`<pending>/<attention>`, `—` when the PR has no ledger, and `?` when its entry
-is `null` (fold failed) or the whole call failed. Exclude any `?` row from the
-pending and attention totals below — do not treat `null` as `0`.
+failure, not a call failure. A ledger pruned while the command reads it (another
+session's `prune`) is left out, like a PR with no ledger. For each row, the
+`Residual` cell is `<pending>/<attention>`, `—` when the PR has no ledger, and
+`?` when its entry is `null` (fold failed) or the whole call failed. Exclude any
+`?` row from the pending and attention totals below — do not treat `null` as
+`0`.
 
 Print a pipe-delimited markdown summary table:
 

@@ -2234,7 +2234,11 @@ cmd_summary() {
     # A review with no findings leaves only the sidecar (observe of `[]`), so
     # either file means the PR has a ledger record.
     [ -f "$d/$1.jsonl" ] || [ -f "$d/$1.pending" ] || { printf '{}\n'; return 0; }
-    one=$(rl_summary_one "$d" "$1") || exit $?
+    local rc=0
+    one=$(rl_summary_one "$d" "$1") || rc=$?
+    # A prune between the check and the read leaves no record: same as none.
+    [ -f "$d/$1.jsonl" ] || [ -f "$d/$1.pending" ] || { printf '{}\n'; return 0; }
+    [ "$rc" = 0 ] || exit "$rc"
     jq -cn --arg pr "$1" --argjson v "$one" '{($pr): $v}'
     return 0
   fi
@@ -2245,6 +2249,9 @@ cmd_summary() {
     rl_validate_pr "$pr" || continue
     [ "$(jq -r --arg pr "$pr" 'has($pr)' <<<"$out")" = false ] || continue
     one=$(rl_summary_one "$d" "$pr") || one='null'
+    # A ledger pruned mid-read (a concurrent `prune`) has no record left, so
+    # it is skipped; only a ledger that is still there can report null.
+    [ -f "$d/$pr.jsonl" ] || [ -f "$d/$pr.pending" ] || continue
     out=$(jq -c --arg pr "$pr" --argjson v "$one" '. + {($pr): $v}' <<<"$out")
   done
   printf '%s\n' "$out"
