@@ -528,9 +528,17 @@ _enabled_install_path() {
     process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");
   ' 2>/dev/null
 }
-_plugin_list_ok=no
+_agy_state=unknown
 if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
-  _plugin_list_ok=yes
+  # enabled | disabled | not_listed; anything that fails to parse stays unknown.
+  _agy_state=$(printf '%s' "$_plugin_list_json" | node -e '
+    let rows;
+    try { rows = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch { process.exit(1); }
+    if (!Array.isArray(rows)) process.exit(1);
+    const mine = rows.filter((r) => r && r.id === "yellow-agy@yellow-plugins");
+    process.stdout.write(mine.some((r) => r.enabled === true) ? "enabled" : mine.length ? "disabled" : "not_listed");
+  ' 2>/dev/null) || _agy_state=unknown
+  [ -n "$_agy_state" ] || _agy_state=unknown
   _cursor_root=$(_enabled_install_path 'yellow-cursor@yellow-plugins')
   _jules_root=$(_enabled_install_path 'yellow-jules@yellow-plugins')
   _agy_root=$(_enabled_install_path 'yellow-agy@yellow-plugins')
@@ -568,12 +576,12 @@ else
 fi
 if [ -n "$_agy_root" ] && [ -f "$_agy_root/dist/cli.js" ]; then
   printf 'agy_cli_resolved: OK (%s)\n' "$_agy_root"
-elif [ -n "$_agy_root" ]; then
-  printf 'agy_cli_resolved: NOT FOUND (enabled, dist/cli.js missing)\n'
-elif [ "$_plugin_list_ok" = yes ]; then
-  printf 'agy_cli_resolved: NOT FOUND (not enabled here)\n'
 else
-  printf 'agy_cli_resolved: NOT FOUND (plugin list unavailable)\n'
+  case "$_agy_state" in
+    enabled) printf 'agy_cli_resolved: NOT FOUND (enabled, dist/cli.js missing)\n' ;;
+    disabled|not_listed) printf 'agy_cli_resolved: NOT FOUND (not enabled here)\n' ;;
+    *) printf 'agy_cli_resolved: NOT FOUND (plugin state unknown)\n' ;;
+  esac
 fi
 # Remote-agent group state for Step 2.5, from the classifier /linear:delegate
 # uses. Tooling flags come from the probes above; devin counts only when both
@@ -613,7 +621,7 @@ process.stdin.on("data", (c) => { d += c; }).on("end", () => {
 else
   printf 'remote_agent_state: UNKNOWN (yellow-core classifier not resolved)\n'
 fi
-unset _cursor_data _cursor_sdk _core_root _agy_root _plugin_list_ok
+unset _cursor_data _cursor_sdk _core_root _agy_root _agy_state
 # setup-all-remote-agent-tooling:end
 ```
 
@@ -826,8 +834,9 @@ run.
   picks the detail: `(not enabled here)` with the plugin installed → "installed
   but disabled; enable yellow-agy", and do not offer `/agy:setup` until it is
   enabled; `(enabled, dist/cli.js missing)` → "reinstall yellow-agy";
-  `(plugin list unavailable)` → UNKNOWN, "`claude plugin list --json` failed;
-  re-run /setup:all", and offer nothing for yellow-agy.
+  `(plugin state unknown)` (`claude plugin list --json` or its parse failed) →
+  UNKNOWN, "plugin state unknown; re-run /setup:all", and offer nothing for
+  yellow-agy.
 
 **yellow-semgrep:**
 
