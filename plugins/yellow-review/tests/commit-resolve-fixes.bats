@@ -441,13 +441,16 @@ STUB
 
 @test "a local commit made on top of ours before the submit exits 8 and submits nothing" {
   real_git=$(command -v git)
-  # The second ls-remote is the pre-submit check; another process commits
-  # on the branch just before it.
+  # Once our commit exists, another process commits on the branch and
+  # publishes it, so both the local tip and the remote head move before the
+  # pre-submit check.
   cat >| "$STUB_BIN/git" <<STUB
 #!/bin/sh
-if [ "\$1" = ls-remote ]; then
-  n=\$(cat "$BATS_TEST_TMPDIR/lsr" 2>/dev/null || echo 0); n=\$((n + 1)); echo "\$n" >| "$BATS_TEST_TMPDIR/lsr"
-  [ "\$n" -ne 2 ] || "$real_git" commit -q --allow-empty -m "chore: another local commit" >/dev/null 2>&1
+if [ "\$1" = diff ] && [ ! -e "$BATS_TEST_TMPDIR/moved" ] \\
+  && [ "\$("$real_git" rev-parse -q --verify HEAD^ 2>/dev/null)" = "$FIRST_SHA" ]; then
+  : >| "$BATS_TEST_TMPDIR/moved"
+  "$real_git" commit -q --allow-empty -m "chore: another local commit" >/dev/null 2>&1
+  publish >/dev/null 2>&1
 fi
 exec "$real_git" "\$@"
 STUB

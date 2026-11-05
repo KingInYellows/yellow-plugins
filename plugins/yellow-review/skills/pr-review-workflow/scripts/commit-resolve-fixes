@@ -1587,16 +1587,17 @@ fi
 # The commit and its checks took time; a push that landed meanwhile would
 # make the submit fight a diverged remote. Undo instead (exit 8).
 if [ -n "$EXPECTED_HEAD" ]; then
-    if remote_head_moved "$BEFORE"; then
-        undo_commit "PR head moved during the run: expected=$BEFORE ($HM_WHY); commit undone, nothing submitted" 8
-    fi
     # The provider submits the branch tip: a local commit made on top of ours
-    # meanwhile would be published with it. Nothing is undone (resetting
-    # would drop that commit); the caller reverts its own fixes on exit 8.
+    # meanwhile would be published with it. Checked first, because undoing
+    # (below) resets the branch and would drop that commit. Nothing is undone
+    # here; the caller reverts its own fixes on exit 8.
     NOW_HEAD=$(git rev-parse HEAD) || NOW_HEAD=""
     if [ "$NOW_HEAD" != "$SHA" ]; then
         printf 'reason=head-moved\n' >&2
         die 8 "local HEAD moved after the commit: expected=$SHA local=${NOW_HEAD:-unreadable}; nothing submitted"
+    fi
+    if remote_head_moved "$BEFORE"; then
+        undo_commit "PR head moved during the run: expected=$BEFORE ($HM_WHY); commit undone, nothing submitted" 8
     fi
 fi
 

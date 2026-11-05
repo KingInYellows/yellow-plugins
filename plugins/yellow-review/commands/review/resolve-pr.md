@@ -732,9 +732,10 @@ The output is `<state> <head>`. If the state is not `OPEN` (including
 **Head check.** If Step 6 recorded `write_stopped=head-moved`, skip straight to
 the stop below. Otherwise the expected head is `<head-oid>` (Step 6 moves it to
 each `PUSHED` `sha`); after exit 5 or 6, the local commit (`git rev-parse HEAD`)
-is accepted too, since that submit may have landed. Another head means someone
-else pushed the branch during the run, and every reply would describe a diff the
-PR no longer has: post nothing, print
+is accepted too, since that submit may have landed, and when the PR head is that
+commit `<head-oid>` moves to it. Another head means someone else pushed the
+branch during the run, and every reply would describe a diff the PR no longer
+has: post nothing, print
 `PR #<N> head moved during the run; write phase stopped`, mark every thread
 `not attempted (PR head moved)` (blocking), record `write_stopped=head-moved`
 and go to Step 9. A later run picks the threads up against the new head.
@@ -852,8 +853,9 @@ PR_STATE=$(gh pr view "<PR#>" --json state,headRefOid -q '.state + " " + .headRe
 If the state is not `OPEN` (including `unreadable`), skip every retry and
 re-pass write, end the loop `inconclusive` with the state, and go to Step 9. If
 the head is not `<head-oid>` (another writer pushed during the poll), skip them
-too: end the loop with `end=skipped`, report that the PR head moved, and go to
-Step 9.
+too: end the loop with `end=skipped`, report that the PR head moved, record
+`write_stopped=head-moved` (so Step 9 posts no Blocking-threads comment), and go
+to Step 9.
 
 With the Write tool, write every thread ID Step 3 fetched (one per line) to a
 `mktemp` file (`<seen-file>`), and one `<path> <line>` row per `fixed` thread
