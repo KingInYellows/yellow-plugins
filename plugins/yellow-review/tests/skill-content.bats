@@ -1781,6 +1781,9 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   [[ "$text" == *'review-run-lock" release "<holder>"'* ]]
   [[ "$text" == *'Do not widen the ignored-file guard'* ]]
   [[ "$text" == *'a compound drain is writing to this checkout'* ]]
-  flat "$SWEEP_ALL" | grep -qF 'its `drain-live` check'
+  [[ "$text" == *'`drain=live` means a drain that started before this run'* ]]
+  flat "$SWEEP_ALL" | grep -qF 'its `drain=live` stop ends the batch'
+  # The holder is an opaque token, never a path pasted into a command.
+  [[ "$text" == *'an opaque `run.XXXXXX` token'* ]]
 }
 

@@ -26,11 +26,18 @@ Run once, after the command's pre-flight passes and before any review step:
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/review-run-lock" acquire
 ```
 
-Keep the printed `holder=` value as the literal `<holder>`. `holder=none` means
-this checkout has no compound-staging dir (no drain can run here); keep `none`.
-A non-zero exit is not a stop: keep `none`, add the Notes line
+It prints two lines. Keep the `holder=` value (an opaque `run.XXXXXX` token, or
+`none` when the staging dir is a symlink) as the literal `<holder>`. A non-zero
+exit is not a stop: keep `none`, add the Notes line
 `review-run lock unavailable (a compound drain may write during the run)` and
 continue.
+
+`drain=live` means a drain that started before this run is still between writes
+(yellow-core's `.drain-lock` is younger than 30 minutes); the lock cannot stop
+it. Run Release, then stop before any review step with
+`[review:<command>] Error: a compound drain is writing to this checkout; retry after it ends (at most 10 minutes), or run in another worktree.`
+`/review:resolve` stops the way a failed Step 2 check does. `drain=idle` goes
+on: from here no new drain or promotion starts.
 
 ## Release
 
@@ -51,11 +58,9 @@ A run that can outlast 120 minutes (`/review:sweep-all`,
 `review-run-lock refresh "<holder>"` (skip when `none`). Exit 1 (the holder was
 reaped) means acquire again and keep the new value.
 
-## A drain that is already running
+## Why acquire also creates the staging dir
 
-The lock stops new drains and promotions, not a drain that started earlier and
-is between writes. `/review:sweep-all`'s pre-flight therefore also runs
-`review-run-lock drain-live` after Acquire: `drain=live` (yellow-core's
-`.drain-lock` is younger than 30 minutes) stops the batch before any PR, with
-`[review:sweep-all] Error: a compound drain is writing to this checkout; retry after it ends (at most 10 minutes), or run the sweep in another worktree.`
-Release the holder first.
+When yellow-core has not staged anything in this checkout yet, Acquire creates
+the staging dir so the holder exists. A run that stages its own learnings (an
+unattended `/review:pr`) would otherwise make a drain eligible mid-run with no
+holder to see.

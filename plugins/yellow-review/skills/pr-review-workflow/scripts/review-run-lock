@@ -3,12 +3,16 @@
 # compound-staging drain does not write into the checkout under review.
 # Usage: review-run-lock acquire | release <holder> | refresh <holder> | drain-live
 #   acquire     create one holder file under
-#               <staging-dir>/.review-run-lock/ and print `holder=<path>`.
-#               Prints `holder=none` when this checkout has no compound-staging
-#               dir (yellow-core never staged here, so no drain can run).
-#               Holder files older than 120 minutes are reaped first.
+#               <staging-dir>/.review-run-lock/ (creating the staging dir when
+#               yellow-core has not yet, so a drain that starts staging later in
+#               the run still sees the holder) and print `holder=run.XXXXXX`,
+#               an opaque token, then the drain-live line below. Prints
+#               `holder=none` when the staging dir is a symlink (not ours to
+#               write into). Holder files older than 120 minutes are reaped
+#               first.
 #   release     remove the holder (and the lock dir once empty); `none` is a
-#               no-op. A path outside this checkout's lock dir is refused.
+#               no-op. Anything but a `run.XXXXXX` token is refused, so a
+#               holder never carries a path into a command line.
 #   refresh     touch the holder, for runs that last longer than 120 minutes.
 #   drain-live  print `drain=live` when a drain holds .drain-lock (a directory
 #               younger than 30 minutes, yellow-core's stale-lock age), else
@@ -40,22 +44,30 @@ reap() {
     return 0
 }
 
-# check_holder <path>: 0 when <path> is a run.* file directly in $LOCK.
+# check_holder <token>: 0 when <token> is a run.XXXXXX holder name.
 check_holder() {
-    case "$1" in
-        "$LOCK"/run.*) ;;
-        *) return 1 ;;
-    esac
-    case "${1#"$LOCK"/}" in */*) return 1 ;; esac
-    return 0
+    [[ "$1" =~ ^run\.[A-Za-z0-9]{6}$ ]]
+}
+
+drain_state() {
+    if [ -d "$STAGING/.drain-lock" ] && [ ! -L "$STAGING/.drain-lock" ] &&
+        [ -z "$(find "$STAGING/.drain-lock" -maxdepth 0 -mmin "+$DRAIN_STALE_MIN" 2>/dev/null)" ]; then
+        printf 'drain=live\n'
+    else
+        printf 'drain=idle\n'
+    fi
 }
 
 case "${1:-}" in
     acquire)
         [ $# -eq 1 ] || die 2 "acquire takes no arguments"
-        if [ ! -d "$STAGING" ] || [ -L "$STAGING" ]; then
+        if [ -L "$STAGING" ]; then
             printf 'holder=none\n'
+            drain_state
             exit 0
+        fi
+        if [ ! -d "$STAGING" ]; then
+            (umask 077 && mkdir -p -- "$STAGING") || die 1 "could not create $STAGING"
         fi
         reap
         # The reap above can rmdir an empty lock dir between another run's
@@ -67,32 +79,29 @@ case "${1:-}" in
             mkdir -- "$LOCK" 2>/dev/null || [ -d "$LOCK" ] || continue
             h=$(mktemp "$LOCK/run.XXXXXX" 2>/dev/null) || continue
             printf 'pid=%s start=%s\n' "$PPID" "$(date +%s)" >|"$h" || { rm -f -- "$h"; continue; }
-            printf 'holder=%s\n' "$h"
+            printf 'holder=%s\n' "${h##*/}"
+            drain_state
             exit 0
         done
         die 1 "could not create a holder in $LOCK"
         ;;
     release | refresh)
-        [ $# -eq 2 ] || die 2 "$1 takes one holder path"
+        [ $# -eq 2 ] || die 2 "$1 takes one holder token"
         [ "$2" = none ] && exit 0
-        check_holder "$2" || die 2 "not a holder of this checkout's review-run lock"
+        check_holder "$2" || die 2 "not a review-run lock holder token (run.XXXXXX)"
+        [ ! -L "$LOCK" ] || die 1 "$LOCK is a symlink; remove it"
         if [ "$1" = refresh ]; then
-            [ -f "$2" ] || die 1 "holder is gone (reaped?); acquire again"
-            touch -- "$2" || die 1 "could not refresh the holder"
+            [ -f "$LOCK/$2" ] || die 1 "holder is gone (reaped?); acquire again"
+            touch -- "$LOCK/$2" || die 1 "could not refresh the holder"
             exit 0
         fi
-        rm -f -- "$2" || die 1 "could not remove the holder"
+        rm -f -- "$LOCK/$2" || die 1 "could not remove the holder"
         rmdir -- "$LOCK" 2>/dev/null
         exit 0
         ;;
     drain-live)
         [ $# -eq 1 ] || die 2 "drain-live takes no arguments"
-        if [ -d "$STAGING/.drain-lock" ] && [ ! -L "$STAGING/.drain-lock" ] &&
-            [ -z "$(find "$STAGING/.drain-lock" -maxdepth 0 -mmin "+$DRAIN_STALE_MIN" 2>/dev/null)" ]; then
-            printf 'drain=live\n'
-        else
-            printf 'drain=idle\n'
-        fi
+        drain_state
         exit 0
         ;;
     *)
