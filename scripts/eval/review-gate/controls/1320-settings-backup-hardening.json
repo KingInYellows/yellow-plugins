@@ -1,0 +1,10 @@
+{
+  "id": "1320-settings-backup-hardening",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1320,
+  "base": "fdb2df22e4966631c01988f1318c8396934f71ed",
+  "head": "f89a1e9e0f4953f62155f82a03a9fc2e2cdb1c16",
+  "tier": "medium",
+  "source": "merged PR #1320 with no later fix, revert, bot P1 or post-merge CI failure (picked 2026-11-05)",
+  "notes": "Settings backups hardened and the observer deadline cancelled (Python)."
+}

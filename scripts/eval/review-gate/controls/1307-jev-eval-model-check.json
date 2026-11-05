@@ -1,0 +1,10 @@
+{
+  "id": "1307-jev-eval-model-check",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1307,
+  "base": "6f17ca697b61d473b5c3d55314ebb401ff3299bd",
+  "head": "6efb64e6ccdcc02e53db3b8177b673578dbc2979",
+  "tier": "high",
+  "source": "merged PR #1307 with no later fix, revert, bot P1 or post-merge CI failure (picked 2026-11-05)",
+  "notes": "Jev eval checks --model up front, and CI scans the criteria file for credential-shaped values (Python, workflow)."
+}

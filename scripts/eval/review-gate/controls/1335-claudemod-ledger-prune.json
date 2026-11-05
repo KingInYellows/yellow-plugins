@@ -1,0 +1,10 @@
+{
+  "id": "1335-claudemod-ledger-prune",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1335,
+  "base": "a267ae1190bfbf5f5f877d484af3326bc30ef50c",
+  "head": "4d9a767b6d0f079ae4311e2b45d93e201f2e69b6",
+  "tier": "high",
+  "source": "merged PR #1335 with no later fix, revert, bot P1 or post-merge CI failure (picked 2026-11-05)",
+  "notes": "Yellow-claudemod runs ledger pruning outside the write chain (TypeScript hook)."
+}

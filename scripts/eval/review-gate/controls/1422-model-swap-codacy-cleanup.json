@@ -1,0 +1,10 @@
+{
+  "id": "1422-model-swap-codacy-cleanup",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1422,
+  "base": "acbf6452ccaab28fd3c1a6afa1a783684a5d66fd",
+  "head": "331b4977053329b2fe12ed2961e349e7ffd5a5c1",
+  "tier": "medium",
+  "source": "merged PR #1422 with no later fix, revert, bot P1 or post-merge CI failure (picked 2026-11-05)",
+  "notes": "Behavior-preserving Codacy cleanup of the model-swap eval (Python refactor)."
+}

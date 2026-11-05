@@ -1,0 +1,10 @@
+{
+  "id": "1093-alias-hardening-plan",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1093,
+  "base": "e4b7b84aeeb6b0a2f6ec5303096b9f350b4280c1",
+  "head": "3734ffce6fcb9ee113991446cf2f13a5337eb982",
+  "tier": "low",
+  "source": "merged PR #1093 with no later fix, revert, bot P1 or post-merge CI failure (picked 2026-11-05)",
+  "notes": "A plan document for alias hardening in fenced shell blocks (docs only)."
+}

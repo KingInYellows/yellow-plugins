@@ -1,0 +1,10 @@
+{
+  "id": "1435-debt-todo-frontmatter",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1435,
+  "base": "85056c4af8b80437abe0e4b1ace51f1e9b43cb9f",
+  "head": "e0f0af615bf392dfed5db8bec92e97b4ff104740",
+  "tier": "medium",
+  "source": "merged PR #1435 with no later fix, revert, bot P1 or post-merge CI failure (picked 2026-11-05)",
+  "notes": "Yellow-debt backfills missing todo frontmatter from the file name (shell)."
+}
