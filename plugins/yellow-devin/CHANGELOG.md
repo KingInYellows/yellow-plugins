@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.0.11
+
+### Patch Changes
+
+- [#1673](https://github.com/KingInYellows/yellow-plugins/pull/1673)
+  [`e00e41c`](https://github.com/KingInYellows/yellow-plugins/commit/e00e41c8f30380f5fb1c25a9a1bb8fc5d4c74697)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Persona
+  reviewers now return anchor-25-and-below findings at that anchor instead of
+  dropping them, so `/review:pr` and `/review:all` suppress and count them at
+  the single confidence gate. `/devin:review-prs` applies the same gate after
+  collecting persona findings. (CLAUDE-256)
+
 ## 3.0.10
 
 ### Patch Changes

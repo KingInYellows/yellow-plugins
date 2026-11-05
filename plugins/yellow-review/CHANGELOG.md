@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.15.0
+
+### Minor Changes
+
+- [#1648](https://github.com/KingInYellows/yellow-plugins/pull/1648)
+  [`7aa6bfb`](https://github.com/KingInYellows/yellow-plugins/commit/7aa6bfb66b220beedf20fedaa380011df134cbea)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add a
+  `cross_model_review: auto | off` switch to `yellow-plugins.local.md`. With
+  `off`, `/review:pr` never selects `codex-reviewer` and says so in Coverage,
+  and `/council` runs only the Claude reviewer unless the user's message for
+  that run names the external reviewers. `off` in either the repo or the
+  user-level file wins, so a PR head cannot lift a user's `off`; an unrecognized
+  value counts as `off`. New `cross-model-mode` script in yellow-review
+  (CLAUDE-217).
+
+### Patch Changes
+
+- [#1673](https://github.com/KingInYellows/yellow-plugins/pull/1673)
+  [`e00e41c`](https://github.com/KingInYellows/yellow-plugins/commit/e00e41c8f30380f5fb1c25a9a1bb8fc5d4c74697)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Persona
+  reviewers now return anchor-25-and-below findings at that anchor instead of
+  dropping them, so `/review:pr` and `/review:all` suppress and count them at
+  the single confidence gate. `/devin:review-prs` applies the same gate after
+  collecting persona findings. (CLAUDE-256)
+
 ## 3.14.0
 
 ### Minor Changes

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-agy",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Local supervised delegate on the Antigravity CLI (agy) under the owner's Google AI Pro sign-in — successor to yellow-jules",
   "author": {
     "name": "KingInYellows",
