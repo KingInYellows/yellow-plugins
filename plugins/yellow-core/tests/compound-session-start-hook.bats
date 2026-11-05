@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for hooks/scripts/session-start.sh — drain dispatcher.
 
+bats_require_minimum_version 1.5.0
+
 SS_HOOK="$BATS_TEST_DIRNAME/../hooks/scripts/session-start.sh"
 
 setup() {
@@ -134,6 +136,45 @@ _wait_for_drain_done() {
     i=$((i + 1))
   done
   return 1
+}
+
+@test "session-start defers dispatch while a review run holds the checkout" {
+  _plant_pending 5
+  mkdir -p "$STAGING/.review-run-lock"
+  printf 'pid=1 start=1\n' > "$STAGING/.review-run-lock/run.abc123"
+  run --separate-stderr bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q '"continue": true'
+  [[ "$stderr" == *"review run in progress"* ]]
+  sleep 0.3
+  [ ! -f "$STUB_MARKER" ]
+  # the drain lock was released, so the next session can dispatch
+  [ ! -d "$STAGING/.drain-lock" ]
+}
+
+@test "session-start ignores a review-run holder older than two hours" {
+  _plant_pending 5
+  mkdir -p "$STAGING/.review-run-lock"
+  printf 'pid=1 start=1\n' > "$STAGING/.review-run-lock/run.stale1"
+  touch -d '3 hours ago' "$STAGING/.review-run-lock/run.stale1" 2>/dev/null \
+    || touch -t "$(date -v-3H +%Y%m%d%H%M)" "$STAGING/.review-run-lock/run.stale1"
+  run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_stub 5
+  [ -f "$STUB_MARKER" ]
+}
+
+@test "cs_review_lock_live ignores an empty or symlinked lock directory" {
+  mkdir -p "$STAGING/.review-run-lock"
+  run cs_review_lock_live "$STAGING"
+  [ "$status" -eq 1 ]
+  rmdir "$STAGING/.review-run-lock"
+  other=$(mktemp -d)
+  printf 'x\n' > "$other/run.abc"
+  ln -s "$other" "$STAGING/.review-run-lock"
+  run cs_review_lock_live "$STAGING"
+  [ "$status" -eq 1 ]
+  rm -rf "$other"
 }
 
 @test "session-start pins the drain to haiku by default and logs the exit status" {

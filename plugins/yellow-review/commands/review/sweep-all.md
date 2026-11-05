@@ -75,6 +75,11 @@ failed, `TMPDIR` is inside the worktree, or its path holds a byte outside
 the final summary or at any earlier stop (a failed check, an empty list, a
 cancel), run `rm -f -- "<marker>"` unless it is `none`.
 
+Then read `${CLAUDE_PLUGIN_ROOT}/references/review-run-lock.md` and run its
+Acquire block, keeping `<holder>`, and its `drain-live` check (a live drain
+stops the batch here, as that file says). Refresh the holder at each item 1
+Announce, and run its Release block wherever the marker is removed.
+
 `gt` is not checked here — each per-PR sweep invocation runs its own pre-flight
 and will surface a `gt` failure inline.
 

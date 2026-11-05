@@ -271,6 +271,21 @@ if [ "$RESUMING_AFTER_CRASH" = "1" ]; then
 fi
 ```
 
+**Review-run check.** Run this before every write to `docs/solutions/` (a crash
+retry included): a yellow-review resolve or sweep running in this checkout
+stops on any new gitignored file, including the `.promote-done` sentinel.
+Deferring is not a failure: report nothing written, and staging-reviewer leaves
+the entry in `processing/` for a later drain.
+
+```bash
+REVIEW_LOCK="$HOME/.claude/projects/$(printf '%s' "$GIT_ROOT" | tr '/' '-')/compound-staging/.review-run-lock"
+if [ -d "$REVIEW_LOCK" ] && [ ! -L "$REVIEW_LOCK" ] &&
+  find "$REVIEW_LOCK" -mindepth 1 -maxdepth 1 -type f -name 'run.*' -mmin -120 2>/dev/null | grep -q .; then
+  printf '[staging-promoter] a review run is active in this checkout; deferring promotion\n' >&2
+  exit 0
+fi
+```
+
 **If `PHASE_2_SKIP=0`** — perform the atomic write:
 
 1. Write the full file content to a sibling temp path `${SOLUTION_PATH}.tmp`.
@@ -418,6 +433,10 @@ Exit 0.
   (docs/solutions/) is the source of truth, MEMORY.md is just an index.
 - **Write tool fails (disk full, permission denied):** propagate the
   error. Reviewer will leave the processing file for retry.
+- **Review run active:** defer. Log
+  `[staging-promoter] a review run is active in this checkout; deferring promotion`
+  and write nothing. The reviewer leaves the processing file in place; the next
+  drain re-attempts.
 
 ## Invariants
 
