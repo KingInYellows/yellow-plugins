@@ -82,7 +82,9 @@ it before editing a script, library or command.
 - `/review:resolve` — parallel resolution of unresolved PR threads via GraphQL;
   every thread gets a disposition (`fixed`, `addressed`, `oos`,
   `disagree`/`unclear`); ends with the `Resolve:` contract line;
-  `--non-interactive` suppresses all gates
+  `--non-interactive` suppresses all gates. It re-checks the PR head before the
+  commit, the submit and the write phase, and stops with a recovery patch when
+  another writer pushed meanwhile
 - `/review:resolve-stack` — walk a Graphite stack bottom-up running
   `/review:resolve --non-interactive`, fully unattended; ends with the
   `ResolveStack:` outcome line
@@ -90,7 +92,9 @@ it before editing a script, library or command.
 - `/review:sweep` — `/review:pr` then `/review:resolve` then `/review:triage` on
   one PR, all non-interactive
 - `/review:sweep-all` — `/review:sweep` over every open non-draft PR you
-  authored; one upfront confirmation; ends with the `SweepAll:` outcome line
+  authored; one upfront confirmation; skips a PR whose head commit is newer than
+  `YELLOW_REVIEW_RECENT_PUSH_MINUTES` (another writer); ends with the
+  `SweepAll:` outcome line
 - `/review:triage` — own the review-findings ledger lifecycle for one PR
   (reconcile, apply, dismiss, restore); `rl prune` is the only ledger deletion
   path

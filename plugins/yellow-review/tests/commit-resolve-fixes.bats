@@ -439,6 +439,47 @@ STUB
   ! grep -q '^gt submit' "$STUB_LOG"
 }
 
+@test "a local commit made on top of ours before the submit exits 8 and submits nothing" {
+  real_git=$(command -v git)
+  # The second ls-remote is the pre-submit check; another process commits
+  # on the branch just before it.
+  cat >| "$STUB_BIN/git" <<STUB
+#!/bin/sh
+if [ "\$1" = ls-remote ]; then
+  n=\$(cat "$BATS_TEST_TMPDIR/lsr" 2>/dev/null || echo 0); n=\$((n + 1)); echo "\$n" >| "$BATS_TEST_TMPDIR/lsr"
+  [ "\$n" -ne 2 ] || "$real_git" commit -q --allow-empty -m "chore: another local commit" >/dev/null 2>&1
+fi
+exec "$real_git" "\$@"
+STUB
+  chmod +x "$STUB_BIN/git"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "$FIRST_SHA" -- src/a.txt
+  [ "$status" -eq 8 ]
+  [[ "$stderr" == *"reason=head-moved"* ]]
+  [[ "$stderr" == *"local HEAD moved after the commit"* ]]
+  # Both commits stay; nothing reached the provider.
+  [ "$(git rev-list --count "$FIRST_SHA"..HEAD)" = 2 ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a submit that failed after its push landed says not to resubmit (exit 5)" {
+  real_gt="$STUB_BIN/gt.real"
+  mv "$STUB_BIN/gt" "$real_gt"
+  cat >| "$STUB_BIN/gt" <<STUB
+#!/bin/sh
+if [ "\$1" = submit ]; then
+  publish >/dev/null 2>&1
+  exit 1
+fi
+exec "$real_gt" "\$@"
+STUB
+  chmod +x "$STUB_BIN/gt"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 5 ]
+  [[ "$stderr" == *"recovery: local commit $(git rev-parse HEAD) is already the remote head; the submit landed. Do not resubmit."* ]]
+}
+
 @test "an unreadable remote branch counts as a moved head (exit 8)" {
   real_git=$(command -v git)
   cat >| "$STUB_BIN/git" <<STUB

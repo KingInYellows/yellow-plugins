@@ -1036,14 +1036,17 @@ Report exit 3 as `needs permission` only for `reason=permission`, and as
 `commit-resolve-fixes` also exits 8 (stderr `reason=head-moved`) when it was
 given `--expected-head` and the PR head moved during the run: local `HEAD` or a
 push URL's branch is no longer that commit before staging, or a push URL's
-branch moved while the commit ran (that commit is undone). A branch read that
-fails or times out counts as moved. Nothing is committed or submitted; the
-orchestrator reverts as for exits 2 to 4, which saves the fixes as a recovery
-patch, and the `fixed` threads become `unclear` with evidence
-`PR head moved during the run`. Exit 5 prints a `recovery:` line on stderr: the
-local commit, the remote head (or `unknown`), and the recipe to resubmit, or to
-reset to the remote head and cherry-pick the local commit. Never force-push over
-a head someone else moved.
+branch moved while the commit ran (that commit is undone), or a local commit
+landed on top of this run's commit before the submit (both commits are kept,
+since resetting would drop the other one). A branch read that fails or times out
+counts as moved. Nothing is submitted; the orchestrator reverts as for exits 2
+to 4, which saves the fixes as a recovery patch, and the `fixed` threads become
+`unclear` with evidence `PR head moved during the run`. Exit 5 prints a
+`recovery:` line on stderr: the local commit, the remote head (or `unknown`),
+and the recipe to resubmit, or to reset to the remote head and cherry-pick the
+local commit. When the remote head already is the local commit, the line says
+the submit landed and not to resubmit. Never force-push over a head someone else
+moved.
 
 A `run-verify-command --unattended` run whose PR file listing hit a rate limit
 is `skipped` with `rateLimited: true`, which sets `ratelimited=1`, as

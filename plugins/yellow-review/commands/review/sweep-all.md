@@ -241,8 +241,9 @@ For each iteration:
    Check the PR first, with the literal PR number:
 
    ```bash
-   # <state> <head> <minutes since the head commit> <branch>; -1 when unknown.
-   Q='"\(.state) \(.headRefOid) \((.commits[-1].committedDate // null) as $d | if $d then ((now - ($d | fromdateiso8601)) / 60 | floor) else -1 end) \(.headRefName)"'
+   # <state> <head> <minutes since the head commit> <branch>; -1 when unknown,
+   # 0 for a commit date ahead of this clock.
+   Q='"\(.state) \(.headRefOid) \((.commits[-1].committedDate // null) as $d | if $d then ((now - ($d | fromdateiso8601)) / 60 | floor | if . < 0 then 0 else . end) else -1 end) \(.headRefName)"'
    OUT=$(gh pr view <PR#> --json state,headRefOid,headRefName,commits -q "$Q" 2>&1) && RC=0 || RC=$?
    RL=0 CAUSE=""
    classify() {

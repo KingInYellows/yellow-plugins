@@ -696,17 +696,20 @@ not fire after a clean pre-check: the script refuses, exit 3, any staged hunk
 outside a file's changed lines (plus the margin). Omit it only when the
 interactive user chose "Include them".
 
-`PUSHED` → `push=ok`, keep `sha`. `NOOP` → `push=noop`. Any non-zero exit →
-`push=failed` with its stderr (exit codes in the contract); exits 2, 3, 4, 7 and
-8 revert first, as above, while 5 and 6 keep the local commit. Exit 8 (stderr
-`reason=head-moved`: another writer pushed the branch during the run) commits
-nothing; the revert saves the fixes as a recovery patch, every `fixed` thread
-becomes `unclear` with evidence `PR head moved during the run`, and Step 7's
-head check stops the write phase. Exit 5 prints a `recovery:` line (local commit
-and remote head) and the redacted submit output; put both in Step 9 under
-Blocking merge, so the cause is visible without the local stderr. Exit 7 (stderr
-`reason=rate-limit`: listing the PR's changed files hit a GitHub rate limit)
-also sets `ratelimited=1`: write nothing in Step 7, mark every thread
+`PUSHED` → `push=ok`, keep `sha`, and set `<head-oid>` to it: the PR head is now
+this run's own push, which a Step 8 re-pass must expect. `NOOP` → `push=noop`.
+Any non-zero exit → `push=failed` with its stderr (exit codes in the contract);
+exits 2, 3, 4, 7 and 8 revert first, as above, while 5 and 6 keep the local
+commit. Exit 8 (stderr `reason=head-moved`: another writer pushed the branch
+during the run) commits nothing; the revert saves the fixes as a recovery patch,
+every `fixed` thread becomes `unclear` with evidence
+`PR head moved during the run`, and Step 6 records `write_stopped=head-moved`,
+so Step 7 posts nothing even when the move was an unreadable push-URL branch or
+a local commit that the PR head does not show. Exit 5 prints a `recovery:` line
+(local commit and remote head) and the redacted submit output; put both in Step
+9 under Blocking merge, so the cause is visible without the local stderr. Exit 7
+(stderr `reason=rate-limit`: listing the PR's changed files hit a GitHub rate
+limit) also sets `ratelimited=1`: write nothing in Step 7, mark every thread
 `not attempted (rate limit)`, and skip Step 8. Only `PUSHED` keeps `fixed`
 threads `fixed`; otherwise they become `unclear`. Exit 3 with stderr
 `credential-shaped` (interactive only) is handled **before** any revert, because
@@ -726,28 +729,35 @@ printf '%s\n' "$PR_STATE"
 The output is `<state> <head>`. If the state is not `OPEN` (including
 `unreadable`), print `PR #<N> is <state>; write phase stopped` and go to Step 9.
 
-**Head check.** The expected head is Step 6's `PUSHED` `sha`, or `<head-oid>`
-when nothing was pushed. Another head means someone else pushed the branch
-during the run, and every reply would describe a diff the PR no longer has: post
-nothing, print `PR #<N> head moved during the run; write phase stopped`, mark
-every thread `not attempted (PR head moved)` (blocking), record
-`write_stopped=head-moved` and go to Step 9. A later run picks the threads up
-against the new head.
+**Head check.** If Step 6 recorded `write_stopped=head-moved`, skip straight to
+the stop below. Otherwise the expected head is `<head-oid>` (Step 6 moves it to
+each `PUSHED` `sha`); after exit 5 or 6, the local commit (`git rev-parse HEAD`)
+is accepted too, since that submit may have landed. Another head means someone
+else pushed the branch during the run, and every reply would describe a diff the
+PR no longer has: post nothing, print
+`PR #<N> head moved during the run; write phase stopped`, mark every thread
+`not attempted (PR head moved)` (blocking), record `write_stopped=head-moved`
+and go to Step 9. A later run picks the threads up against the new head.
 
 **Resolved elsewhere.** Then re-read which threads are already resolved; another
 reviewer or session may have resolved some since Step 3. Give the Bash tool a
 `timeout` of 300000 ms:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" --include-resolved "<owner/repo>" "<PR#>" | jq -r '.[] | select(.isResolved == true) | .threadId'
+RESOLVED=$(mktemp "${TMPDIR:-/tmp}/resolved.XXXXXX") || exit 1
+rc=0
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" --include-resolved "<owner/repo>" "<PR#>" >|"$RESOLVED" || rc=$?
+[ "$rc" -ne 0 ] || jq -r '.[] | select(.isResolved == true) | .threadId' "$RESOLVED" || rc=$?
+rm -f -- "$RESOLVED"
+exit "$rc"
 ```
 
 A thread in this run's plan whose ID is printed gets the outcome
 `resolved elsewhere`: drop it from the plan, write nothing for it, and count it
-in neither `r` nor `b`. If the fetch fails or is partial, keep the plan as it is
-and add the Notes line `resolved-elsewhere check skipped` (a write to a resolved
-thread is harmless: the reply script skips a duplicate, and a resolve is a
-no-op).
+in neither `r` nor `b`. If it exits non-zero (a failed or partial fetch), keep
+the plan as it is and add the Notes line `resolved-elsewhere check skipped` (a
+write to a resolved thread is harmless: the reply script skips a duplicate, and
+a resolve is a no-op).
 
 Write one action plan for every thread, including Step 3c's dropped threads,
 sorted by path, line, threadId, per the contract's write order, lanes and "Batch
@@ -836,11 +846,14 @@ poll, and again after it returns, before any retry or re-pass write, capture the
 PR state with no pipe, as in Step 7:
 
 ```bash
-PR_STATE=$(gh pr view "<PR#>" --json state -q .state) || PR_STATE="unreadable"
+PR_STATE=$(gh pr view "<PR#>" --json state,headRefOid -q '.state + " " + .headRefOid') || PR_STATE="unreadable"
 ```
 
-If `PR_STATE` is not `OPEN` (including `unreadable`), skip every retry and
-re-pass write, end the loop `inconclusive` with the state, and go to Step 9.
+If the state is not `OPEN` (including `unreadable`), skip every retry and
+re-pass write, end the loop `inconclusive` with the state, and go to Step 9. If
+the head is not `<head-oid>` (another writer pushed during the poll), skip them
+too: end the loop with `end=skipped`, report that the PR head moved, and go to
+Step 9.
 
 With the Write tool, write every thread ID Step 3 fetched (one per line) to a
 `mktemp` file (`<seen-file>`), and one `<path> <line>` row per `fixed` thread
@@ -903,15 +916,15 @@ A non-zero exit (an unreadable head is exit 2) adds the Notes line
 `review delta not recorded`; it never stops the run.
 
 **Blocking-threads comment.** Skip it when Step 3's fetch failed or was partial,
-`ratelimited=1`, `write_stopped=timeout`, the PR is no longer `OPEN`, or Step
-3's `conversationResolution` is `enforced`. Otherwise use the Write tool to put
-a JSON object at a `mktemp` path mapping each thread this run leaves blocking to
-its status (`disagree`, `unclear`, `human-held`, `needs-permission`,
-`not-found`, `verify-failed`, `not-attempted`). Then classify the PR's risk tier
-the way `/review:pr` Step 3a2 does, with the policy read at the default branch's
-fetched tip so neither the PR nor a parent in its stack sets it. Every fetch
-goes to the PR's base repository (`pr-base-remote`), not `origin`, which is the
-fork in a fork checkout:
+`ratelimited=1`, any `write_stopped` (`timeout` or `head-moved`), the PR is no
+longer `OPEN`, or Step 3's `conversationResolution` is `enforced`. Otherwise use
+the Write tool to put a JSON object at a `mktemp` path mapping each thread this
+run leaves blocking to its status (`disagree`, `unclear`, `human-held`,
+`needs-permission`, `not-found`, `verify-failed`, `not-attempted`). Then
+classify the PR's risk tier the way `/review:pr` Step 3a2 does, with the policy
+read at the default branch's fetched tip so neither the PR nor a parent in its
+stack sets it. Every fetch goes to the PR's base repository (`pr-base-remote`),
+not `origin`, which is the fork in a fork checkout:
 
 ```bash
 rr_net() {
@@ -991,8 +1004,8 @@ Report, per the contract: **Resolved** (by disposition, plus
 already resolved by someone else, so the report explains why they show no reply
 from this run), **Blocking merge** (disagree/unclear, human-held, needs
 permission or not found, verify failed with the patch path, not attempted
-(cluster cap / rate limit / gh timeout), per-stage failures such as
-`oos: issue #12 filed, reply failed`, and `CHANGES_REQUESTED` reviewers from
+(cluster cap / rate limit / gh timeout / PR head moved), per-stage failures such
+as `oos: issue #12 filed, reply failed`, and `CHANGES_REQUESTED` reviewers from
 `get-pr-blockers`, or `CHANGES_REQUESTED unknown` when `lookupFailed` is true or
 `changesRequested` is null), **Follow-up issues filed** (links, with
 `tracker=`), **Reverted deny-listed paths** when Step 6's `--revert-denied`

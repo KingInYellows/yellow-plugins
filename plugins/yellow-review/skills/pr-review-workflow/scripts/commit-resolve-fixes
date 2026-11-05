@@ -1586,8 +1586,18 @@ fi
 # --- Head re-check before the submit ---
 # The commit and its checks took time; a push that landed meanwhile would
 # make the submit fight a diverged remote. Undo instead (exit 8).
-if [ -n "$EXPECTED_HEAD" ] && remote_head_moved "$BEFORE"; then
-    undo_commit "PR head moved during the run: expected=$BEFORE ($HM_WHY); commit undone, nothing submitted" 8
+if [ -n "$EXPECTED_HEAD" ]; then
+    if remote_head_moved "$BEFORE"; then
+        undo_commit "PR head moved during the run: expected=$BEFORE ($HM_WHY); commit undone, nothing submitted" 8
+    fi
+    # The provider submits the branch tip: a local commit made on top of ours
+    # meanwhile would be published with it. Nothing is undone (resetting
+    # would drop that commit); the caller reverts its own fixes on exit 8.
+    NOW_HEAD=$(git rev-parse HEAD) || NOW_HEAD=""
+    if [ "$NOW_HEAD" != "$SHA" ]; then
+        printf 'reason=head-moved\n' >&2
+        die 8 "local HEAD moved after the commit: expected=$SHA local=${NOW_HEAD:-unreadable}; nothing submitted"
+    fi
 fi
 
 # --- Submit ---
@@ -1598,8 +1608,13 @@ submit_failed() {
     if [ -n "$url" ]; then
         rh=$(bounded "$NET_TIMEOUT" "$YELLOW_REVIEW_GIT" ls-remote -- "$url" "refs/heads/$BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }') || rh=""
     fi
-    printf 'recovery: local commit %s; remote head %s. Resubmit through the provider; if the remote moved, reset the branch to the remote head, cherry-pick %s and resubmit. Never force-push.\n' \
-        "$SHA" "${rh:-unknown}" "$SHA" >&2
+    if [ -n "$rh" ] && [ "$rh" = "$SHA" ]; then
+        # The push landed before the submit failed or timed out.
+        printf 'recovery: local commit %s is already the remote head; the submit landed. Do not resubmit.\n' "$SHA" >&2
+    else
+        printf 'recovery: local commit %s; remote head %s. Resubmit through the provider; if the remote moved, reset the branch to the remote head, cherry-pick %s and resubmit. Never force-push.\n' \
+            "$SHA" "${rh:-unknown}" "$SHA" >&2
+    fi
     die 5 "$1"
 }
 case "$PROVIDER" in
