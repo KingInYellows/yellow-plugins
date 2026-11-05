@@ -93,30 +93,38 @@ printf '\n=== Global settings (AI credits, permissions) ===\n'
 # inside WSL). It reads antigravity-cli/settings.json and only the
 # userSettings.useAiCredits key of config/config.json, which agy copies into
 # useG1Credits at startup. agy saves useG1Credits with omitempty, so false is
-# written as no key: unset means off. With _AGY_CFG/_AGY_CFG2 set (WSL without
+# written as no key: an absent key or file means off, but a file that exists
+# and can't be read is UNKNOWN. With _AGY_CFG/_AGY_CFG2 set (WSL without
 # node) it parses those copies instead. The program goes in on stdin, so
 # nothing crosses the bridge as an argument.
 _agy_js='
   const fs = require("fs"), os = require("os"), path = require("path");
   const out = (s) => process.stdout.write(s + "\n");
   const read = (env, rel) => {
-    if (process.env[env] !== undefined) return process.env[env];
-    try { return fs.readFileSync(path.join(os.homedir(), rel), "utf8"); } catch { return ""; }
+    const copy = process.env[env];
+    if (copy !== undefined) return copy === "UNREADABLE" ? null : copy;
+    try { return fs.readFileSync(path.join(os.homedir(), rel), "utf8"); }
+    catch (e) { return e && e.code === "ENOENT" ? "" : null; }
   };
   const parse = (raw) => {
+    if (raw === null) return null;
     if (raw.trim() === "") return {};
     try { const v = JSON.parse(raw); return v !== null && typeof v === "object" && !Array.isArray(v) ? v : undefined; }
     catch { return undefined; }
   };
   const cfg = parse(read("_AGY_CFG", ".gemini/antigravity-cli/settings.json"));
   const user = parse(read("_AGY_CFG2", ".gemini/config/config.json"));
-  if (cfg === undefined) {
+  if (cfg === null) {
+    out("useG1Credits: UNKNOWN (settings.json unreadable)");
+  } else if (cfg === undefined) {
     out("useG1Credits: UNPARSEABLE");
   } else {
     const v = cfg.useG1Credits;
     out(v === true ? "useG1Credits: ON" : "useG1Credits: " + (v === undefined ? "not set" : String(v)) + " (ok)");
   }
-  if (user === undefined) {
+  if (user === null) {
+    out("useAiCredits: UNKNOWN (config/config.json unreadable)");
+  } else if (user === undefined) {
     out("useAiCredits: UNPARSEABLE (config/config.json)");
   } else {
     const u = user.userSettings && typeof user.userSettings === "object" ? user.userSettings.useAiCredits : undefined;
@@ -143,8 +151,9 @@ case "$_agy_mode" in
     if _agy_wsl sh -c 'command -v node' >/dev/null 2>&1; then
       printf '%s' "$_agy_js" | _agy_wsl node - 2>/dev/null | tr -d '\r'
     elif command -v node >/dev/null 2>&1; then
-      _agy_cfg=$(_agy_wsl sh -c 'cat "$HOME/.gemini/antigravity-cli/settings.json"' 2>/dev/null)
-      _agy_cfg2=$(_agy_wsl sh -c 'cat "$HOME/.gemini/config/config.json"' 2>/dev/null)
+      # A file that exists but can't be read comes back as UNREADABLE.
+      _agy_cfg=$(_agy_wsl sh -c 'f="$HOME/.gemini/antigravity-cli/settings.json"; [ ! -e "$f" ] || cat "$f" || printf UNREADABLE' 2>/dev/null)
+      _agy_cfg2=$(_agy_wsl sh -c 'f="$HOME/.gemini/config/config.json"; [ ! -e "$f" ] || cat "$f" || printf UNREADABLE' 2>/dev/null)
       printf '%s' "$_agy_js" | _AGY_CFG="$_agy_cfg" _AGY_CFG2="$_agy_cfg2" node -
     else
       printf 'settings:  UNKNOWN (node not found on the host or in WSL)\n'
