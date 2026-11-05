@@ -366,7 +366,11 @@ New codes: `AGY_NOT_INSTALLED`, `AGY_VERSION` (below the pinned floor),
 `AGY_MODEL_ERROR`, `AGY_WORKTREE`, `AGY_BRIDGE`, `AGY_MCP`,
 `AGY_PROMPT_TOO_LONG`, `AGY_QUOTA_UNKNOWN`, `AGY_SETTINGS`,
 `AGY_AUTHORITY_DENIED`, `AGY_GRANT_EXPIRED`, `AGY_GRANT_EXHAUSTED`,
-`AGY_CONFIRMATION_REQUIRED`.
+`AGY_CONFIRMATION_REQUIRED`, `AGY_BUDGET` (the call's 600 s wrapper budget
+cannot fit the quota probe and a 60 s turn; refused before the probe or the turn
+with the task or corrective round refunded, or, if time ran out after the
+pre-turn git work, a failed turn like `AGY_TIMEOUT` with nothing spawned, whose
+branch remains, so a retry needs a new branch).
 
 ## Probe answers (2026-11, agy 1.4.12 under WSL2)
 

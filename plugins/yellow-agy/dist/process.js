@@ -7,13 +7,14 @@
  * SIGKILL after a grace period.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.DEFAULT_GRACE_MS = void 0;
 exports.splitPgidMarker = splitPgidMarker;
 exports.runTurn = runTurn;
 const node_child_process_1 = require("node:child_process");
 const errors_1 = require("./errors");
 const invocation_1 = require("./invocation");
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
-const DEFAULT_GRACE_MS = 10_000;
+exports.DEFAULT_GRACE_MS = 10_000;
 const MAX_TIMER_MS = 2_147_483_647;
 function defaultSpawnKill(file, args) {
     const k = (0, node_child_process_1.spawn)(file, [...args], { stdio: 'ignore', windowsHide: true });
@@ -56,7 +57,7 @@ function splitPgidMarker(stderr) {
     return undefined;
 }
 function runTurn(inv, options) {
-    const graceMs = options.graceMs ?? DEFAULT_GRACE_MS;
+    const graceMs = options.graceMs ?? exports.DEFAULT_GRACE_MS;
     // Node clamps a delay outside 1..2^31-1 ms to 1 ms, which would kill the
     // turn at once.
     const validDelay = (ms) => Number.isFinite(ms) && ms >= 1 && ms <= MAX_TIMER_MS;

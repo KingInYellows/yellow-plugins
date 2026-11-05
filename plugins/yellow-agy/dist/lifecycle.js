@@ -45,12 +45,15 @@ exports.Lifecycle = void 0;
 const node_crypto_1 = require("node:crypto");
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
+const budget_1 = require("./budget");
 const classify_1 = require("./classify");
 const errors_1 = require("./errors");
 const grants_1 = require("./grants");
 const invocation_1 = require("./invocation");
 const plan_schema_1 = require("./plan-schema");
+const process_1 = require("./process");
 const profiles_1 = require("./profiles");
+const quota_1 = require("./quota");
 const redact_1 = require("./redact");
 const state_1 = require("./state");
 const worktree_1 = require("./worktree");
@@ -85,7 +88,10 @@ async function isWorktree(exec, worktree) {
         });
         return res.code === 0 && res.stdout.trim() === 'true';
     }
-    catch {
+    catch (err) {
+        // An unrun check is not a confirmed absence: recovery must keep the claim.
+        if (err instanceof errors_1.AgyError && err.code === 'AGY_BUDGET')
+            throw err;
         return false;
     }
 }
@@ -397,20 +403,27 @@ class Lifecycle {
         if (withSchema) {
             await this.deps.exec.writeFile(this.deps.schemaPath, `${JSON.stringify(plan_schema_1.PLAN_SCHEMA)}\n`);
         }
+        const filterDrivers = await this.deps.exec.filterDrivers(worktree);
+        // The pre-turn host commands are done: release the reserve and fit the
+        // turn into what is left of the call's budget.
+        const timing = this.turnTiming();
+        if (timing === undefined) {
+            throw new errors_1.AgyError('AGY_BUDGET', 'too little of the 600 s command budget was left to start the turn; agy did not run');
+        }
         const args = (0, profiles_1.turnArgs)({
             prompt,
             profile,
-            printTimeoutSeconds: this.deps.printTimeoutSeconds,
+            printTimeoutSeconds: timing.printTimeoutSeconds,
             ...(conversationId === undefined ? {} : { conversationId }),
             ...(withSchema ? { jsonSchemaPath: this.deps.schemaPath } : {}),
         });
         const inv = (0, invocation_1.buildInvocation)(this.deps.host, args, {
             cwd: worktree,
             baseEnv: this.deps.baseEnv,
-            filterDrivers: await this.deps.exec.filterDrivers(worktree),
+            filterDrivers,
         });
         const outcome = await this.deps.runTurn(inv, {
-            deadlineMs: this.deps.deadlineMs,
+            deadlineMs: timing.deadlineMs,
             // Durable before the turn can settle: if the owner dies, the claim
             // still names a live agy. A failed write stops the turn.
             onSpawn: (pid) => {
@@ -445,17 +458,54 @@ class Lifecycle {
             return { journal: next, result: outcome };
         });
     }
+    /** The turn's print timeout and deadline now, or undefined if none fits. */
+    turnTiming() {
+        const budget = this.deps.budget;
+        if (budget === undefined) {
+            return {
+                printTimeoutSeconds: this.deps.printTimeoutSeconds,
+                deadlineMs: this.deps.deadlineMs,
+            };
+        }
+        budget.reserveMs = 0;
+        return budget.turnTiming(this.deps.printTimeoutSeconds, this.deps.deadlineMs - this.deps.printTimeoutSeconds * 1000);
+    }
     /**
-     * Builds the turn's profile and passes the quota gate, releasing the
-     * reservation if either refuses. Runs before any worktree change.
+     * Builds the turn's profile, passes the quota gate, and checks that a
+     * minimum turn still fits the call's budget, releasing the reservation if
+     * any refuses. Runs before any worktree change. From here until the turn
+     * spawns, host commands leave the minimum turn's time free.
      */
     async prepare(requestId, build) {
         try {
             const profile = build();
+            const budget = this.deps.budget;
+            const slackMs = this.deps.deadlineMs - this.deps.printTimeoutSeconds * 1000;
+            const reserveMs = budget_1.Budget.minTurnMs(slackMs);
+            // The probe can take its full deadline and kill grace; start it only
+            // when that and a minimum turn still fit, so a slow probe can't push
+            // the refund and the envelope past the wrapper's timeout.
+            if (budget !== undefined &&
+                budget.remainingMs() < quota_1.PROBE_DEADLINE_MS + process_1.DEFAULT_GRACE_MS + reserveMs) {
+                throw new errors_1.AgyError('AGY_BUDGET', 'too little of the 600 s command budget is left for the quota probe and a turn; nothing was changed');
+            }
+            // Host commands inside the gate (filter discovery) must leave the
+            // probe and a minimum turn their time.
+            if (budget !== undefined) {
+                budget.reserveMs = quota_1.PROBE_DEADLINE_MS + process_1.DEFAULT_GRACE_MS + reserveMs;
+            }
             await this.deps.quotaGate(profile, (0, state_1.readJournal)(this.deps.dataDir));
+            if (budget !== undefined) {
+                if (budget.remainingMs() < reserveMs) {
+                    throw new errors_1.AgyError('AGY_BUDGET', 'too little of the 600 s command budget is left for a turn after the quota probe; nothing was changed');
+                }
+                budget.reserveMs = reserveMs;
+            }
             return profile;
         }
         catch (err) {
+            if (this.deps.budget !== undefined)
+                this.deps.budget.reserveMs = 0;
             await this.release(requestId);
             throw err;
         }
@@ -779,7 +829,18 @@ class Lifecycle {
         }
         catch (err) {
             const code = err instanceof errors_1.AgyError ? err.code : 'AGY_INTERNAL';
-            return this.settle(input.requestId, 'reply', task, outcomeOf(task, { code, attention: [(0, redact_1.truncateRedacted)(String(err))] }));
+            // A correction that failed before agy spawned (the pre-turn host
+            // commands ran out of budget, say) gets its round back.
+            const refund = withSchema &&
+                !this.spawned.has(input.requestId) &&
+                task.correctiveRounds > 0;
+            const settled = refund
+                ? { ...task, correctiveRounds: task.correctiveRounds - 1 }
+                : task;
+            return this.settle(input.requestId, 'reply', settled, outcomeOf(settled, {
+                code,
+                attention: [(0, redact_1.truncateRedacted)(String(err))],
+            }));
         }
         return this.settlePlanTurn(input.requestId, 'reply', task, cls, withSchema);
     }

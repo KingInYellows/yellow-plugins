@@ -14,7 +14,7 @@ import type { Invocation } from './invocation';
 import { BRIDGE_PGID_MARKER, bridgeKillCommand } from './invocation';
 
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
-const DEFAULT_GRACE_MS = 10_000;
+export const DEFAULT_GRACE_MS = 10_000;
 const MAX_TIMER_MS = 2_147_483_647;
 
 export interface RunOptions {

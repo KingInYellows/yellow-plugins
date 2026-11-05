@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import type { Budget } from './budget';
 import { AgyError } from './errors';
 import type { Host } from './invocation';
 import {
@@ -49,6 +50,11 @@ export interface HostExec {
   filterDrivers(cwd: string): Promise<string[]>;
   writeFile(filePath: string, content: string): Promise<void>;
   removeFile(filePath: string): Promise<void>;
+  /**
+   * Gives back the time held for a turn that will not run now, so rollback
+   * after a failed pre-turn step is not starved by it.
+   */
+  releaseTurnReserve?(): void;
 }
 
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
@@ -115,7 +121,10 @@ export function hostCommand(
 export function runSpawn(
   spec: SpawnSpec,
   stdin: string | undefined,
-  timeoutMs: number
+  timeoutMs: number,
+  // AGY_BUDGET when the budget cut the timeout: the command did not fail,
+  // it ran out of time, so callers must not read the result as an answer.
+  timeoutCode: 'AGY_INTERNAL' | 'AGY_BUDGET' = 'AGY_INTERNAL'
 ): Promise<ExecResult> {
   // Own process group on POSIX, so a timeout also reaches what git started
   // (a credential helper, ssh).
@@ -169,7 +178,7 @@ export function runSpawn(
       if (timedOut) {
         reject(
           new AgyError(
-            'AGY_INTERNAL',
+            timeoutCode,
             `${spec.file} did not finish within ${timeoutMs} ms`
           )
         );
@@ -199,19 +208,28 @@ export function runSpawn(
 /** The real HostExec for `host`. */
 export function createHostExec(
   host: Host,
-  baseEnv: Readonly<Record<string, string | undefined>> = process.env
+  baseEnv: Readonly<Record<string, string | undefined>> = process.env,
+  budget?: Budget
 ): HostExec {
-  const run = (
+  // Every host command (git, filter discovery, mkdir, tee, rm) is cut to
+  // what is left of the call's budget, so slow git cannot outlive the
+  // wrapper's Bash timeout.
+  const run = async (
     cmd: string,
     args: readonly string[],
     options: ExecOptions,
     filterDrivers: readonly string[] = []
-  ): Promise<ExecResult> =>
-    runSpawn(
+  ): Promise<ExecResult> => {
+    const wanted = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs =
+      budget === undefined ? wanted : budget.hostTimeoutMs(wanted);
+    return runSpawn(
       hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv),
       options.stdin,
-      options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+      timeoutMs,
+      timeoutMs < wanted ? 'AGY_BUDGET' : 'AGY_INTERNAL'
     );
+  };
   // Reading config runs no filter, so discovery itself needs none turned off.
   const discover = async (cwd: string): Promise<string[]> => {
     const res = await run(
@@ -231,6 +249,9 @@ export function createHostExec(
   };
   return {
     host,
+    releaseTurnReserve: () => {
+      if (budget !== undefined) budget.reserveMs = 0;
+    },
     async git(args, options) {
       return run('git', args, options, await discover(options.cwd));
     },

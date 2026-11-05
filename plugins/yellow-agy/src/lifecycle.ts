@@ -11,6 +11,8 @@ import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import type { TurnTiming } from './budget';
+import { Budget } from './budget';
 import type { AgyResult, TurnClass, TurnOutcome } from './classify';
 import {
   classifyTurn,
@@ -27,6 +29,7 @@ import { buildInvocation } from './invocation';
 import type { Plan } from './plan-schema';
 import { isPlan, PLAN_SCHEMA } from './plan-schema';
 import type { RunOptions } from './process';
+import { DEFAULT_GRACE_MS } from './process';
 import type { TurnProfile } from './profiles';
 import {
   assertPromptText,
@@ -34,6 +37,7 @@ import {
   readOnlyProfile,
   turnArgs,
 } from './profiles';
+import { PROBE_DEADLINE_MS } from './quota';
 import { redact, scanSecretShapes, truncateRedacted } from './redact';
 import type {
   Claim,
@@ -87,6 +91,13 @@ export interface LifecycleDeps {
   readonly printTimeoutSeconds: number;
   /** Our own deadline; a little longer than printTimeoutSeconds. */
   readonly deadlineMs: number;
+  /**
+   * The call's wall-clock budget. When set, a turn's print timeout is cut to
+   * what is left, and a call that cannot fit a minimum turn is refused
+   * before the turn (refunding the task or corrective round). The CLI always
+   * sets it; the same object caps the host commands.
+   */
+  readonly budget?: Budget;
   readonly newId?: () => string;
   /**
    * The grant every mutating call is checked and charged against, inside
@@ -147,7 +158,9 @@ async function isWorktree(exec: HostExec, worktree: string): Promise<boolean> {
       cwd: worktree,
     });
     return res.code === 0 && res.stdout.trim() === 'true';
-  } catch {
+  } catch (err) {
+    // An unrun check is not a confirmed absence: recovery must keep the claim.
+    if (err instanceof AgyError && err.code === 'AGY_BUDGET') throw err;
     return false;
   }
 }
@@ -552,20 +565,30 @@ export class Lifecycle {
         `${JSON.stringify(PLAN_SCHEMA)}\n`
       );
     }
+    const filterDrivers = await this.deps.exec.filterDrivers(worktree);
+    // The pre-turn host commands are done: release the reserve and fit the
+    // turn into what is left of the call's budget.
+    const timing = this.turnTiming();
+    if (timing === undefined) {
+      throw new AgyError(
+        'AGY_BUDGET',
+        'too little of the 600 s command budget was left to start the turn; agy did not run'
+      );
+    }
     const args = turnArgs({
       prompt,
       profile,
-      printTimeoutSeconds: this.deps.printTimeoutSeconds,
+      printTimeoutSeconds: timing.printTimeoutSeconds,
       ...(conversationId === undefined ? {} : { conversationId }),
       ...(withSchema ? { jsonSchemaPath: this.deps.schemaPath } : {}),
     });
     const inv = buildInvocation(this.deps.host, args, {
       cwd: worktree,
       baseEnv: this.deps.baseEnv,
-      filterDrivers: await this.deps.exec.filterDrivers(worktree),
+      filterDrivers,
     });
     const outcome = await this.deps.runTurn(inv, {
-      deadlineMs: this.deps.deadlineMs,
+      deadlineMs: timing.deadlineMs,
       // Durable before the turn can settle: if the owner dies, the claim
       // still names a live agy. A failed write stops the turn.
       onSpawn: (pid) => {
@@ -607,9 +630,27 @@ export class Lifecycle {
     });
   }
 
+  /** The turn's print timeout and deadline now, or undefined if none fits. */
+  private turnTiming(): TurnTiming | undefined {
+    const budget = this.deps.budget;
+    if (budget === undefined) {
+      return {
+        printTimeoutSeconds: this.deps.printTimeoutSeconds,
+        deadlineMs: this.deps.deadlineMs,
+      };
+    }
+    budget.reserveMs = 0;
+    return budget.turnTiming(
+      this.deps.printTimeoutSeconds,
+      this.deps.deadlineMs - this.deps.printTimeoutSeconds * 1000
+    );
+  }
+
   /**
-   * Builds the turn's profile and passes the quota gate, releasing the
-   * reservation if either refuses. Runs before any worktree change.
+   * Builds the turn's profile, passes the quota gate, and checks that a
+   * minimum turn still fits the call's budget, releasing the reservation if
+   * any refuses. Runs before any worktree change. From here until the turn
+   * spawns, host commands leave the minimum turn's time free.
    */
   private async prepare(
     requestId: string,
@@ -617,9 +658,40 @@ export class Lifecycle {
   ): Promise<TurnProfile> {
     try {
       const profile = build();
+      const budget = this.deps.budget;
+      const slackMs =
+        this.deps.deadlineMs - this.deps.printTimeoutSeconds * 1000;
+      const reserveMs = Budget.minTurnMs(slackMs);
+      // The probe can take its full deadline and kill grace; start it only
+      // when that and a minimum turn still fit, so a slow probe can't push
+      // the refund and the envelope past the wrapper's timeout.
+      if (
+        budget !== undefined &&
+        budget.remainingMs() < PROBE_DEADLINE_MS + DEFAULT_GRACE_MS + reserveMs
+      ) {
+        throw new AgyError(
+          'AGY_BUDGET',
+          'too little of the 600 s command budget is left for the quota probe and a turn; nothing was changed'
+        );
+      }
+      // Host commands inside the gate (filter discovery) must leave the
+      // probe and a minimum turn their time.
+      if (budget !== undefined) {
+        budget.reserveMs = PROBE_DEADLINE_MS + DEFAULT_GRACE_MS + reserveMs;
+      }
       await this.deps.quotaGate(profile, readJournal(this.deps.dataDir));
+      if (budget !== undefined) {
+        if (budget.remainingMs() < reserveMs) {
+          throw new AgyError(
+            'AGY_BUDGET',
+            'too little of the 600 s command budget is left for a turn after the quota probe; nothing was changed'
+          );
+        }
+        budget.reserveMs = reserveMs;
+      }
       return profile;
     } catch (err) {
+      if (this.deps.budget !== undefined) this.deps.budget.reserveMs = 0;
       await this.release(requestId);
       throw err;
     }
@@ -1112,11 +1184,23 @@ export class Lifecycle {
       );
     } catch (err) {
       const code = err instanceof AgyError ? err.code : 'AGY_INTERNAL';
+      // A correction that failed before agy spawned (the pre-turn host
+      // commands ran out of budget, say) gets its round back.
+      const refund =
+        withSchema &&
+        !this.spawned.has(input.requestId) &&
+        task.correctiveRounds > 0;
+      const settled: Task = refund
+        ? { ...task, correctiveRounds: task.correctiveRounds - 1 }
+        : task;
       return this.settle(
         input.requestId,
         'reply',
-        task,
-        outcomeOf(task, { code, attention: [truncateRedacted(String(err))] })
+        settled,
+        outcomeOf(settled, {
+          code,
+          attention: [truncateRedacted(String(err))],
+        })
       );
     }
     return this.settlePlanTurn(input.requestId, 'reply', task, cls, withSchema);

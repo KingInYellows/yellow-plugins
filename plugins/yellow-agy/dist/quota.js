@@ -6,7 +6,7 @@
  * the last 15 minutes are subtracted from what it reports.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UNKNOWN_TURN_COST = exports.QUOTA_WINDOW_MS = void 0;
+exports.PROBE_DEADLINE_MS = exports.UNKNOWN_TURN_COST = exports.QUOTA_WINDOW_MS = void 0;
 exports.lowestRemaining = lowestRemaining;
 exports.recentCost = recentCost;
 exports.quotaGate = quotaGate;
@@ -17,7 +17,7 @@ const state_1 = require("./state");
 exports.QUOTA_WINDOW_MS = 15 * 60 * 1000;
 /** Percentage points charged for a recent turn whose cost is unknown. */
 exports.UNKNOWN_TURN_COST = 2;
-const PROBE_DEADLINE_MS = 60_000;
+exports.PROBE_DEADLINE_MS = 60_000;
 /**
  * The lowest `remaining_fraction` (0..1) across every bucket of every group in
  * agy's `/usage` JSON (shape captured from agy 1.4.12:
@@ -79,7 +79,7 @@ function quotaGate(deps) {
         });
         let outcome;
         try {
-            outcome = await deps.runTurn(inv, { deadlineMs: PROBE_DEADLINE_MS });
+            outcome = await deps.runTurn(inv, { deadlineMs: exports.PROBE_DEADLINE_MS });
         }
         catch (err) {
             throw new errors_1.AgyError('AGY_QUOTA_UNKNOWN', `agy -p /usage could not run: ${String(err)}`);

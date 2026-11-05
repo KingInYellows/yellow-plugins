@@ -89,7 +89,10 @@ function hostCommand(host, cmd, args, options, baseEnv) {
         env: (0, invocation_1.scrubEnv)(baseEnv),
     };
 }
-function runSpawn(spec, stdin, timeoutMs) {
+function runSpawn(spec, stdin, timeoutMs, 
+// AGY_BUDGET when the budget cut the timeout: the command did not fail,
+// it ran out of time, so callers must not read the result as an answer.
+timeoutCode = 'AGY_INTERNAL') {
     // Own process group on POSIX, so a timeout also reaches what git started
     // (a credential helper, ssh).
     const group = process.platform !== 'win32';
@@ -144,7 +147,7 @@ function runSpawn(spec, stdin, timeoutMs) {
             killAll();
             closed = true;
             if (timedOut) {
-                reject(new errors_1.AgyError('AGY_INTERNAL', `${spec.file} did not finish within ${timeoutMs} ms`));
+                reject(new errors_1.AgyError(timeoutCode, `${spec.file} did not finish within ${timeoutMs} ms`));
                 return;
             }
             if (size > MAX_OUTPUT_BYTES) {
@@ -164,8 +167,15 @@ function runSpawn(spec, stdin, timeoutMs) {
     });
 }
 /** The real HostExec for `host`. */
-function createHostExec(host, baseEnv = process.env) {
-    const run = (cmd, args, options, filterDrivers = []) => runSpawn(hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv), options.stdin, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+function createHostExec(host, baseEnv = process.env, budget) {
+    // Every host command (git, filter discovery, mkdir, tee, rm) is cut to
+    // what is left of the call's budget, so slow git cannot outlive the
+    // wrapper's Bash timeout.
+    const run = async (cmd, args, options, filterDrivers = []) => {
+        const wanted = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+        const timeoutMs = budget === undefined ? wanted : budget.hostTimeoutMs(wanted);
+        return runSpawn(hostCommand(host, cmd, args, { ...options, filterDrivers }, baseEnv), options.stdin, timeoutMs, timeoutMs < wanted ? 'AGY_BUDGET' : 'AGY_INTERNAL');
+    };
     // Reading config runs no filter, so discovery itself needs none turned off.
     const discover = async (cwd) => {
         const res = await run('git', ['config', '--name-only', '--get-regexp', '^filter\\.'], { cwd });
@@ -179,6 +189,10 @@ function createHostExec(host, baseEnv = process.env) {
     };
     return {
         host,
+        releaseTurnReserve: () => {
+            if (budget !== undefined)
+                budget.reserveMs = 0;
+        },
         async git(args, options) {
             return run('git', args, options, await discover(options.cwd));
         },
