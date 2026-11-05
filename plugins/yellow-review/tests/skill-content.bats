@@ -1822,3 +1822,11 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   [[ "$text" == *'an opaque `run.XXXXXX` token'* ]]
 }
 
+@test "sweep: a branch mismatch names the worktree that holds the PR branch and the command to run there" {
+  grep -qF -- "awk -v b=\"branch refs/heads/\$EXPECTED\"" "$SWEEP"
+  grep -qF -- "is checked out in the worktree %s. Sweep it there: cd '%s' && /review:sweep <PR#>" "$SWEEP"
+  grep -qF -- "QWT=\$(printf '%s' \"\$WT\" | sed" "$SWEEP"
+  text=$(flat "$SWEEP_ALL")
+  [[ "$text" == *"put that worktree path and its \`cd '<path>' && /review:sweep <PR#>\` command in \`Notes\`"* ]]
+  [[ "$text" == *'A ledger pruned while the command reads it'* ]]
+}

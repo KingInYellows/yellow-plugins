@@ -234,6 +234,12 @@ if [ -z "$EXPECTED" ] || [ -z "$ACTUAL" ]; then
 fi
 [ "$EXPECTED" = "$ACTUAL" ] || {
   printf '[review:sweep] Error: branch mismatch (expected %s, on %s). Aborting resolve.\n' "$EXPECTED" "$ACTUAL" >&2
+  WT=$(git worktree list --porcelain 2>/dev/null |
+    awk -v b="branch refs/heads/$EXPECTED" '/^worktree /{ p = substr($0, 10) } $0 == b { print p; exit }')
+  # Quote the path for the suggested cd: each ' becomes '\''.
+  QWT=$(printf '%s' "$WT" | sed "s/'/'\\\\''/g")
+  [ -z "$WT" ] ||
+    printf "[review:sweep] %s is checked out in the worktree %s. Sweep it there: cd '%s' && /review:sweep <PR#>\n" "$EXPECTED" "$WT" "$QWT" >&2
   exit 1
 }
 N=$(git reflog show --format=%H HEAD 2>/dev/null | wc -l | tr -d ' ')
@@ -263,18 +269,20 @@ START=$(git reflog show --format='%H %gs' HEAD 2>/dev/null | head -n "$NEW" \
 ```
 
 Exit 1 means both names were read and they differ: stop before Step 3, ending
-with `Sweep: skipped (branch-mismatch)`. Exit 3 means the branch matches but the
-review did not start from `<head-sha>`: stop the same way, ending with
-`Sweep: skipped (head-mismatch)`. Exit 2 means `gh pr view`, `git rev-parse` or
-`git reflog` failed or printed nothing, so no mismatch was established (a failed
-fetch can be a rate limit): stop, but print no `Sweep:` or `Resolve:` line, so
-`/review:sweep-all` records `no contract` and stops the batch. Before any of
-these stops prints anything, and unless `<guard-dir>` is `none`, run Step 2b's
-work-tree probe. When it prints `tracked` or `unknown`, run no
-`guard-local-config` call (the checked-out branch owns the path) and print Step
-2b's `snapshot kept at <guard-dir>` line. Otherwise run the guard exit check
-(Step 3a's `check` call and its exit handling: clear only on exit `0` or `3`,
-keep and name the snapshot otherwise).
+with `Sweep: skipped (branch-mismatch)`. When another worktree holds the PR
+branch, the stderr line before it names that worktree and the
+`cd '<path>' && /review:sweep <PR#>` command to run there. Exit 3 means the
+branch matches but the review did not start from `<head-sha>`: stop the same
+way, ending with `Sweep: skipped (head-mismatch)`. Exit 2 means `gh pr view`,
+`git rev-parse` or `git reflog` failed or printed nothing, so no mismatch was
+established (a failed fetch can be a rate limit): stop, but print no `Sweep:` or
+`Resolve:` line, so `/review:sweep-all` records `no contract` and stops the
+batch. Before any of these stops prints anything, and unless `<guard-dir>` is
+`none`, run Step 2b's work-tree probe. When it prints `tracked` or `unknown`,
+run no `guard-local-config` call (the checked-out branch owns the path) and
+print Step 2b's `snapshot kept at <guard-dir>` line. Otherwise run the guard
+exit check (Step 3a's `check` call and its exit handling: clear only on exit `0`
+or `3`, keep and name the snapshot otherwise).
 
 ### Step 2b: Check the local config before resolve
 
