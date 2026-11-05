@@ -702,8 +702,11 @@ this run's own push, which a Step 8 re-pass must expect. `NOOP` → `push=noop`.
 Any non-zero exit → `push=failed` with its stderr (exit codes in the contract);
 exits 2, 3, 4, 7 and 8 revert first, as above, while 5 and 6 keep the local
 commit. Exit 8 (stderr `reason=head-moved`: another writer pushed the branch
-during the run) commits nothing; the revert saves the fixes as a recovery patch,
-every `fixed` thread becomes `unclear` with evidence
+during the run) submits nothing; the revert saves the fixes as a recovery patch,
+unless stderr has a `recovery: local commit <sha> kept below <head>` line (a
+local commit landed on top of this run's commit, so the fixes stay committed at
+`<sha>` and are not submitted; put that line in Step 9 under Blocking merge).
+Either way every `fixed` thread becomes `unclear` with evidence
 `PR head moved during the run`, and Step 6 records `write_stopped=head-moved`,
 so Step 7 posts nothing even when the move was an unreadable push-URL branch or
 a local commit that the PR head does not show. Exit 5 prints a `recovery:` line

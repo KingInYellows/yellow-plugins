@@ -64,10 +64,13 @@
 #            every push URL's branch must still be it after the commit, right
 #            before the submit. Another writer pushing the branch mid-run fails
 #            either check: exit 8 with stderr `reason=head-moved`, nothing
-#            committed (the second check undoes the commit first), so the
-#            caller keeps the edits as a recovery patch instead of submitting
-#            against a diverged remote. A branch read that fails or times out
-#            is treated the same way, because the head cannot be confirmed.
+#            submitted. The second check undoes the commit first, so the caller
+#            keeps the edits as a recovery patch instead of submitting against
+#            a diverged remote. A branch read that fails or times out is treated
+#            the same way, because the head cannot be confirmed. One case keeps
+#            the commit: a local commit landed on top of it before the submit
+#            (resetting would drop that commit too); stderr then carries
+#            `recovery: local commit <sha> kept below <head>; not submitted`.
 #   message: one line starting with a conventional `fix` prefix; carries
 #            counts and paths only, never reviewer text. It is screened like
 #            public text (rt_text_clean: credential shapes, images, mentions,
@@ -1590,10 +1593,11 @@ if [ -n "$EXPECTED_HEAD" ]; then
     # The provider submits the branch tip: a local commit made on top of ours
     # meanwhile would be published with it. Checked first, because undoing
     # (below) resets the branch and would drop that commit. Nothing is undone
-    # here; the caller reverts its own fixes on exit 8.
+    # here: the fix commit stays in history, and the recovery line names it.
     NOW_HEAD=$(git rev-parse HEAD) || NOW_HEAD=""
     if [ "$NOW_HEAD" != "$SHA" ]; then
         printf 'reason=head-moved\n' >&2
+        printf 'recovery: local commit %s kept below %s; not submitted\n' "$SHA" "${NOW_HEAD:-unknown}" >&2
         die 8 "local HEAD moved after the commit: expected=$SHA local=${NOW_HEAD:-unreadable}; nothing submitted"
     fi
     if remote_head_moved "$BEFORE"; then

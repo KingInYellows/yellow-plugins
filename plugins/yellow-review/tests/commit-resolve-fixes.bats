@@ -460,6 +460,7 @@ STUB
   [ "$status" -eq 8 ]
   [[ "$stderr" == *"reason=head-moved"* ]]
   [[ "$stderr" == *"local HEAD moved after the commit"* ]]
+  [[ "$stderr" == *"recovery: local commit $(git rev-parse HEAD^) kept below $(git rev-parse HEAD); not submitted"* ]]
   # Both commits stay; nothing reached the provider.
   [ "$(git rev-list --count "$FIRST_SHA"..HEAD)" = 2 ]
   ! grep -q '^gt submit' "$STUB_LOG"
