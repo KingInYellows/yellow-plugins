@@ -528,7 +528,9 @@ _enabled_install_path() {
     process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");
   ' 2>/dev/null
 }
+_plugin_list_ok=no
 if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+  _plugin_list_ok=yes
   _cursor_root=$(_enabled_install_path 'yellow-cursor@yellow-plugins')
   _jules_root=$(_enabled_install_path 'yellow-jules@yellow-plugins')
   _agy_root=$(_enabled_install_path 'yellow-agy@yellow-plugins')
@@ -566,8 +568,12 @@ else
 fi
 if [ -n "$_agy_root" ] && [ -f "$_agy_root/dist/cli.js" ]; then
   printf 'agy_cli_resolved: OK (%s)\n' "$_agy_root"
+elif [ -n "$_agy_root" ]; then
+  printf 'agy_cli_resolved: NOT FOUND (enabled, dist/cli.js missing)\n'
+elif [ "$_plugin_list_ok" = yes ]; then
+  printf 'agy_cli_resolved: NOT FOUND (not enabled here)\n'
 else
-  printf 'agy_cli_resolved: NOT FOUND\n'
+  printf 'agy_cli_resolved: NOT FOUND (plugin list unavailable)\n'
 fi
 # Remote-agent group state for Step 2.5, from the classifier /linear:delegate
 # uses. Tooling flags come from the probes above; devin counts only when both
@@ -607,7 +613,7 @@ process.stdin.on("data", (c) => { d += c; }).on("end", () => {
 else
   printf 'remote_agent_state: UNKNOWN (yellow-core classifier not resolved)\n'
 fi
-unset _cursor_data _cursor_sdk _core_root _agy_root
+unset _cursor_data _cursor_sdk _core_root _agy_root _plugin_list_ok
 # setup-all-remote-agent-tooling:end
 ```
 
@@ -816,11 +822,12 @@ run.
   servers and the WSL bridge"
 - NEEDS SETUP: `agy` NOT FOUND and the `wsl.exe` row is NOT FOUND; `agy` OK but
   older than 1.4.12 or with no parseable version (`AGY_VERSION`: update agy);
-  `agy_cli_resolved` NOT FOUND; or `jq` NOT FOUND. `agy_cli_resolved` only
-  counts an enabled yellow-agy: when the plugin is installed but disabled,
-  report "installed but disabled; enable yellow-agy" and do not offer
-  `/agy:setup` until it is enabled. Otherwise the detail is "reinstall
-  yellow-agy".
+  `agy_cli_resolved` NOT FOUND; or `jq` NOT FOUND. The `agy_cli_resolved` suffix
+  picks the detail: `(not enabled here)` with the plugin installed → "installed
+  but disabled; enable yellow-agy", and do not offer `/agy:setup` until it is
+  enabled; `(enabled, dist/cli.js missing)` → "reinstall yellow-agy";
+  `(plugin list unavailable)` → UNKNOWN, "`claude plugin list --json` failed;
+  re-run /setup:all", and offer nothing for yellow-agy.
 
 **yellow-semgrep:**
 
