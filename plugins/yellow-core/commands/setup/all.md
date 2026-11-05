@@ -816,7 +816,11 @@ run.
   servers and the WSL bridge"
 - NEEDS SETUP: `agy` NOT FOUND and the `wsl.exe` row is NOT FOUND; `agy` OK but
   older than 1.4.12 or with no parseable version (`AGY_VERSION`: update agy);
-  `agy_cli_resolved` NOT FOUND (reinstall yellow-agy); or `jq` NOT FOUND
+  `agy_cli_resolved` NOT FOUND; or `jq` NOT FOUND. `agy_cli_resolved` only
+  counts an enabled yellow-agy: when the plugin is installed but disabled,
+  report "installed but disabled; enable yellow-agy" and do not offer
+  `/agy:setup` until it is enabled. Otherwise the detail is "reinstall
+  yellow-agy".
 
 **yellow-semgrep:**
 
