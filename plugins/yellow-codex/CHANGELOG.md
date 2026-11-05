@@ -1,5 +1,20 @@
 # yellow-codex
 
+## 0.5.2
+
+### Patch Changes
+
+- [#1648](https://github.com/KingInYellows/yellow-plugins/pull/1648)
+  [`7aa6bfb`](https://github.com/KingInYellows/yellow-plugins/commit/7aa6bfb66b220beedf20fedaa380011df134cbea)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add a
+  `cross_model_review: auto | off` switch to `yellow-plugins.local.md`. With
+  `off`, `/review:pr` never selects `codex-reviewer` and says so in Coverage,
+  and `/council` runs only the Claude reviewer unless the user's message for
+  that run names the external reviewers. `off` in either the repo or the
+  user-level file wins, so a PR head cannot lift a user's `off`; an unrecognized
+  value counts as `off`. New `cross-model-mode` script in yellow-review
+  (CLAUDE-217).
+
 ## 0.5.1
 
 ### Patch Changes

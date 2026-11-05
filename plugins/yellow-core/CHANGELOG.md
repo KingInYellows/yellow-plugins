@@ -1,5 +1,44 @@
 # Changelog
 
+## 2.13.0
+
+### Minor Changes
+
+- [#1672](https://github.com/KingInYellows/yellow-plugins/pull/1672)
+  [`0c8bc40`](https://github.com/KingInYellows/yellow-plugins/commit/0c8bc4097877f02adbda91c65f51dc8cbb42d0ac)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/linear:delegate` can hand a Linear issue to the local agent, yellow-agy
+  (CLAUDE-261). The remote-agent classifier reports yellow-agy under
+  `localAgent` and returns the new `READY_AGY` state when no remote-agent
+  provider is enabled; yellow-agy sits outside the group's exactly-one rule, so
+  it never causes a `CONFLICT`. `--provider agy` picks it in any other state.
+  The agy branch runs a plan-only `delegate` on a new `agy/<ISSUE-ID>-r<rev>`
+  branch under the owner's grant, and prints the owner's `authorize` line when
+  none covers it. After 2026-11-11, `READY_JULES` points to yellow-agy.
+  `setup:all` probes `agy_cli_resolved`, and `validate-provider-groups` checks
+  the local agent at every consumer site.
+
+### Patch Changes
+
+- [#1648](https://github.com/KingInYellows/yellow-plugins/pull/1648)
+  [`7aa6bfb`](https://github.com/KingInYellows/yellow-plugins/commit/7aa6bfb66b220beedf20fedaa380011df134cbea)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add a
+  `cross_model_review: auto | off` switch to `yellow-plugins.local.md`. With
+  `off`, `/review:pr` never selects `codex-reviewer` and says so in Coverage,
+  and `/council` runs only the Claude reviewer unless the user's message for
+  that run names the external reviewers. `off` in either the repo or the
+  user-level file wins, so a PR head cannot lift a user's `off`; an unrecognized
+  value counts as `off`. New `cross-model-mode` script in yellow-review
+  (CLAUDE-217).
+
+- [#1673](https://github.com/KingInYellows/yellow-plugins/pull/1673)
+  [`e00e41c`](https://github.com/KingInYellows/yellow-plugins/commit/e00e41c8f30380f5fb1c25a9a1bb8fc5d4c74697)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Persona
+  reviewers now return anchor-25-and-below findings at that anchor instead of
+  dropping them, so `/review:pr` and `/review:all` suppress and count them at
+  the single confidence gate. `/devin:review-prs` applies the same gate after
+  collecting persona findings. (CLAUDE-256)
+
 ## 2.12.0
 
 ### Minor Changes

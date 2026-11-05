@@ -1,5 +1,54 @@
 # yellow-agy
 
+## 0.2.1
+
+### Patch Changes
+
+- [#1679](https://github.com/KingInYellows/yellow-plugins/pull/1679)
+  [`a74fd70`](https://github.com/KingInYellows/yellow-plugins/commit/a74fd7024179c0a8a3e2cecf3c6529f25adb642c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - On the
+  Windows/WSL bridge, a timed-out host command (git, mkdir, tee, rm) now kills
+  its Linux process group instead of only `wsl.exe`, and waits for that kill
+  before the call fails (CLAUDE-246). Host commands run under the same
+  `setsid -w` wrapper and pgid line as agy turns. The
+  `wsl.exe -e kill -s KILL -- -<pgid>` group kill was confirmed on the owner's
+  Windows PC.
+
+- [#1677](https://github.com/KingInYellows/yellow-plugins/pull/1677)
+  [`2f05dfc`](https://github.com/KingInYellows/yellow-plugins/commit/2f05dfcf6a65a2b3bc8240e3eef806185bf821b6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fit every
+  `/agy:*` call inside the wrappers' 600 s Bash timeout (CLAUDE-255). A new
+  `Budget` counts from process start: host commands (git, mkdir, tee, rm) are
+  cut to what is left and, until the turn spawns, leave a 60 s turn's worth
+  free; the turn's print timeout is shortened to fit; and a call that can no
+  longer fit a 60 s turn after the quota probe refuses with the new `AGY_BUDGET`
+  code, refunding the task or corrective round. Before, slow git could push the
+  call past the wrapper, which killed it before it settled.
+
+- [#1681](https://github.com/KingInYellows/yellow-plugins/pull/1681)
+  [`f6c4ad4`](https://github.com/KingInYellows/yellow-plugins/commit/f6c4ad44848ecf6edae8adf7c2952cdc85553776)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `setup` now
+  runs `agy mcp list` itself and refuses with `AGY_MCP` before it records
+  host.json when a server is enabled, the command fails, or its table can't be
+  parsed (pinned to the agy 1.4.12 output captured on the owner's PC). The owner
+  can keep a server by naming it with `setup --allow-mcp <name>` and typing the
+  code shown on their own terminal; setup then warns that its tools bypass the
+  command allowlist and flags an unpinned launch line.
+
+- [#1672](https://github.com/KingInYellows/yellow-plugins/pull/1672)
+  [`0c8bc40`](https://github.com/KingInYellows/yellow-plugins/commit/0c8bc4097877f02adbda91c65f51dc8cbb42d0ac)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/linear:delegate` can hand a Linear issue to the local agent, yellow-agy
+  (CLAUDE-261). The remote-agent classifier reports yellow-agy under
+  `localAgent` and returns the new `READY_AGY` state when no remote-agent
+  provider is enabled; yellow-agy sits outside the group's exactly-one rule, so
+  it never causes a `CONFLICT`. `--provider agy` picks it in any other state.
+  The agy branch runs a plan-only `delegate` on a new `agy/<ISSUE-ID>-r<rev>`
+  branch under the owner's grant, and prints the owner's `authorize` line when
+  none covers it. After 2026-11-11, `READY_JULES` points to yellow-agy.
+  `setup:all` probes `agy_cli_resolved`, and `validate-provider-groups` checks
+  the local agent at every consumer site.
+
 ## 0.2.0
 
 ### Minor Changes
