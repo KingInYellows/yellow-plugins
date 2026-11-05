@@ -600,9 +600,10 @@ merge as `<path>: changed outside the resolve set, left in place`. Nothing is
 committed either way.
 
 **Range pre-check.** Before verify, write one row per cluster that adds files to
-the expected set, `<rank> <path>...` with its `Files modified`, to a `mktemp`
-file (`<clusters-file>`) with the Write tool, and run (no network; it changes
-nothing):
+the expected set, `<rank> <path>...` with its `Files modified` normalized and
+filtered exactly as for `<files-file>` (repo-relative, changed only; leave out a
+row with no path left), to a `mktemp` file (`<clusters-file>`) with the Write
+tool, and run (no network; it changes nothing):
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --check-ranges --ranges-from "<ranges-file>" --clusters-from "<clusters-file>" --files-from "<files-file>"
