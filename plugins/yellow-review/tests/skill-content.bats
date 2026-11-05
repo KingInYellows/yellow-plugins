@@ -1093,7 +1093,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
   flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
   grep -qF '**Open-PR pre-check**' <<<"$flat4"
-  grep -qF 'gh pr view <PR#> --json state -q .state' <<<"$flat4"
+  grep -qF 'gh pr view <PR#> --json state,headRefOid,headRefName,commits -q "$Q"' <<<"$flat4"
   grep -qF 'record `state unreadable: <cause>`' <<<"$flat4"
   grep -qF 'skipped — not attempted (state unreadable)' <<<"$flat4"
   run grep -qF 'record `skipped — state unreadable`' <<<"$flat4"
@@ -1236,10 +1236,45 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 @test "resolve-pr: a timeout stop is recorded in Step 7 and blocks the Step 8 re-pass" {
   text=$(flat "$RESOLVE_PR")
   [[ "$text" == *'keep `ratelimited=0`, but also record `write_stopped=timeout` so Step 8 does not run'* ]]
-  [[ "$text" == *'no exit 4 stopped the write phase (neither `ratelimited=1` nor `write_stopped=timeout`)'* ]]
+  [[ "$text" == *'nothing stopped the write phase (neither `ratelimited=1` nor any `write_stopped`)'* ]]
   [[ "$text" == *'report that the re-pass was skipped because the write phase stopped on a timeout'* ]]
   # The old entry condition keyed on a rate limit alone.
   [[ "$text" != *'Run only when the tree is clean, no rate limit was hit,'* ]]
+}
+
+@test "resolve-pr: the Step 2c head is passed to the commit and re-checked before the write phase" {
+  text=$(flat "$RESOLVE_PR")
+  grep -qF -- "printf 'head-oid=%s\\n' \"\$PR_OID\"" "$RESOLVE_PR"
+  [[ "$text" == *'keep the printed `head-oid=` value as the literal `<head-oid>`'* ]]
+  [[ "$text" == *'--expected-head "<head-oid>" --files-from "<files-file>"'* ]]
+  [[ "$text" == *'exits 2, 3, 4, 7 and 8 revert first'* ]]
+  [[ "$text" == *'evidence `PR head moved during the run`'* ]]
+  [[ "$text" == *'gh pr view "<PR#>" --json state,headRefOid'* ]]
+  [[ "$text" == *'mark every thread `not attempted (PR head moved)` (blocking), record `write_stopped=head-moved`'* ]]
+  # resolved elsewhere: re-read before the plan, excluded from r and b
+  [[ "$text" == *'get-pr-comments" --include-resolved "<owner/repo>" "<PR#>"'* ]]
+  [[ "$text" == *'gets the outcome `resolved elsewhere`'* ]]
+  [[ "$text" == *'count it in neither `r` nor `b`'* ]]
+  [[ "$text" == *'**Resolved elsewhere**'* ]]
+  # the head check comes before the action plan is written
+  head=$(grep -n '^\*\*Head check\.\*\*' "$RESOLVE_PR" | cut -d: -f1)
+  plan=$(grep -n '^Write one action plan for every thread' "$RESOLVE_PR" | cut -d: -f1)
+  [ -n "$head" ] && [ -n "$plan" ] && [ "$head" -lt "$plan" ]
+}
+
+@test "dispositions: commit-resolve-fixes exit 8 is a head-moved refusal that reverts" {
+  text=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" == *'a `commit-resolve-fixes` exit 2, 3, 4 or 8'* ]]
+  [[ "$text" == *'`commit-resolve-fixes` also exits 8 (stderr `reason=head-moved`)'* ]]
+  [[ "$text" == *'Never force-push over a head someone else moved.'* ]]
+  [[ "$text" == *'120 s with `--unattended`'* ]]
+}
+
+@test "sweep-all: a PR another writer pushed recently is skipped before the sweep" {
+  text=$(flat "$SWEEP_ALL")
+  [[ "$text" == *'YELLOW_REVIEW_RECENT_PUSH_MINUTES:-15'* ]]
+  [[ "$text" == *'`Skip Reason` `recent push (another writer)`'* ]]
+  [[ "$text" == *'Only `exit=0` with `state=OPEN` and `recent_push=0` proceeds to item 2.'* ]]
 }
 
 @test "dispositions: the re-pass is skipped after any exit 4, rate limit or timeout" {
