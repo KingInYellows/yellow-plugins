@@ -403,16 +403,17 @@ other_writer_sha() {
   ! grep -q '^gt submit' "$STUB_LOG"
 }
 
-@test "the head checks share one deadline across push URLs (CLAUDE-270)" {
-  # A date stand-in that advances 40 s per +%s call: the 60 s budget (two
-  # 30 s net timeouts) is spent by the time the pre-submit check runs.
+@test "the head checks share one budget across push URLs (CLAUDE-270)" {
+  # A date stand-in that advances 70 s per +%s call: the first ls-remote
+  # spends more than the 60 s budget (two 30 s net timeouts), so the
+  # pre-submit check finds nothing left.
   real_date=$(command -v date)
   cat >| "$STUB_BIN/date" <<STUB
 #!/bin/sh
 if [ "\$1" = +%s ]; then
   n=\$(cat "$BATS_TEST_TMPDIR/date.n" 2>/dev/null || echo 0)
   echo \$((n + 1)) >| "$BATS_TEST_TMPDIR/date.n"
-  echo \$((1000 + n * 40))
+  echo \$((1000 + n * 70))
   exit 0
 fi
 exec "$real_date" "\$@"
@@ -427,6 +428,22 @@ STUB
   # commit is undone and nothing is submitted.
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
   ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a slow commit between the head checks does not spend their budget (CLAUDE-270)" {
+  real_gt="$STUB_BIN/gt.real"
+  mv "$STUB_BIN/gt" "$real_gt"
+  cat >| "$STUB_BIN/gt" <<STUB
+#!/bin/sh
+[ "\$1" = modify ] && sleep 3
+exec "$real_gt" "\$@"
+STUB
+  chmod +x "$STUB_BIN/gt"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  YELLOW_REVIEW_NET_TIMEOUT=1 run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "$FIRST_SHA" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [[ "$stderr" != *"budget"* ]]
+  grep -q '^gt submit' "$STUB_LOG"
 }
 
 @test "a local HEAD that is not --expected-head exits 8 with nothing committed" {
