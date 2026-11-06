@@ -403,6 +403,32 @@ other_writer_sha() {
   ! grep -q '^gt submit' "$STUB_LOG"
 }
 
+@test "the head checks share one deadline across push URLs (CLAUDE-270)" {
+  # A date stand-in that advances 40 s per +%s call: the 60 s budget (two
+  # 30 s net timeouts) is spent by the time the pre-submit check runs.
+  real_date=$(command -v date)
+  cat >| "$STUB_BIN/date" <<STUB
+#!/bin/sh
+if [ "\$1" = +%s ]; then
+  n=\$(cat "$BATS_TEST_TMPDIR/date.n" 2>/dev/null || echo 0)
+  echo \$((n + 1)) >| "$BATS_TEST_TMPDIR/date.n"
+  echo \$((1000 + n * 40))
+  exit 0
+fi
+exec "$real_date" "\$@"
+STUB
+  chmod +x "$STUB_BIN/date"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --expected-head "$FIRST_SHA" -- src/a.txt
+  [ "$status" -eq 8 ]
+  [[ "$stderr" == *"reason=head-moved"* ]]
+  [[ "$stderr" == *"the head checks used their 60s budget"* ]]
+  # The first check fits; the pre-submit check finds the budget spent, so the
+  # commit is undone and nothing is submitted.
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
 @test "a local HEAD that is not --expected-head exits 8 with nothing committed" {
   other=$(other_writer_sha)
   printf 'one\nfeature\nfix\n' >| src/a.txt
