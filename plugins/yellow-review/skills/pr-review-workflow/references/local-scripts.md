@@ -8,7 +8,11 @@ that walk several PRs. Exit codes and markers are defined in
   `[--unattended]` `[--allow-credential-shaped]` `[--expected-head <oid>]`
   `[--files-from <f>] [-- <files...>]` — Stage, new commit, submit, verify
   remote head; never runs a push itself. With `--expected-head`, exits 8
-  (`reason=head-moved`) when the PR head moved during the run
+  (`reason=head-moved`) when the PR head moved during the run.
+  `--check-ranges --ranges-from <f> [--clusters-from <f>]` reports out-of-range
+  files and the clusters the 50-line cap defers; `--check-paths [--unattended]`
+  reports paths the commit would refuse (reason `runner` marks a cluster for an
+  attended run)
 - **run-verify-command** — prints `{result, patch, log, treeClean}` plus a
   `reason` that is non-empty when something was skipped or only partly reverted:
   - `--pr <N> --timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker> [--files-from <f>]`

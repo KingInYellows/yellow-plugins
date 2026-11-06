@@ -61,7 +61,7 @@ export const ERROR_CATALOG: Readonly<Record<AgyErrorCode, CatalogEntry>> = {
   AGY_OVERAGES: {
     exit: 2,
     recoveryAction:
-      'Set "useG1Credits": false in ~/.gemini/antigravity-cli/settings.json by hand.',
+      'Turn Use AI Credits off in agy /config, or set useG1Credits and userSettings.useAiCredits to false by hand, then run /agy:setup.',
   },
   AGY_AUTH_REQUIRED: {
     exit: 1,

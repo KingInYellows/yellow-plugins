@@ -485,6 +485,14 @@ every root-level file is a runner (nested files are not). When `git config`
 fails for any reason other than the key being unset, the hooks directory is
 unknown and every path counts as a runner.
 
+An unattended run would always refuse a fix to a runner file, so non-interactive
+Step 4 checks each cluster's path with
+`commit-resolve-fixes --check-paths --unattended` before dispatch. A cluster
+refused with reason `runner` gets no resolver; its threads become `unclear` with
+evidence `needs an attended /review:resolve (runner file <path>)` and stay open
+for an attended run. A cluster with a `null` path is not checked; Step 6 still
+refuses its runner-file edits.
+
 ## File set
 
 The expected file set comes from the resolvers' `Files modified`, but the
@@ -551,25 +559,33 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   missing accepts no hunk. The listed files together may change at most
   `MAX_CHANGED_LINES` (50, the resolver's scope limit; the larger side of each
   hunk, so an insertion counts its length): a run over it is refused at commit,
-  and the pre-check marks every listed file with the entry `over-cap`. It is
-  enforced twice, with `<ranges-file>` the Step 4 `pr-changed-ranges` capture:
-  - `commit-resolve-fixes --check-ranges --ranges-from <ranges-file> --files-from <files-file>`
+  and the pre-check applies it per cluster. It is enforced twice, with
+  `<ranges-file>` the Step 4 `pr-changed-ranges` capture:
+  - `commit-resolve-fixes --check-ranges --ranges-from <ranges-file> --clusters-from <clusters-file> --files-from <files-file>`
     is the pre-check, run before verify. It stages and commits nothing, makes no
     network call, and prints
-    `{"out_of_range":[{"path","old_lines":["a-b",...]}]}` for the files with an
-    out-of-range hunk (`old_lines` also holds `over-cap` on every listed file
-    when the total changed lines exceed the cap). Exit 0 means the check ran; a
-    missing, unreadable or malformed ranges file or a non-canonical path is exit
-    2; a failed diff is exit 3 (a refusal: revert and downgrade as below).
+    `{"out_of_range":[{"path","old_lines":["a-b",...]}],"deferred_clusters":[<row>...],"admitted_lines":<n>}`
+    for the files with an out-of-range hunk. `<clusters-file>` has one
+    `<rank> <path>...` row per cluster (clusters.md "Rank"); clusters that share
+    a file form one group, and groups are admitted best rank first, then in row
+    order, while the admitted total stays within the cap. A group that does not
+    fit is deferred and later, smaller ones are still tried; its files gain the
+    `old_lines` entry `over-cap`, and `deferred_clusters` lists its 1-based
+    rows. Without `--clusters-from` every listed file is marked `over-cap` when
+    the run total exceeds the cap. Exit 0 means the check ran; a missing,
+    unreadable or malformed ranges or clusters file or a non-canonical path is
+    exit 2; a failed diff is exit 3 (a refusal: revert and downgrade as below).
     Non-interactive runs revert every listed file; interactive runs ask once per
-    run to include them or revert them. Reverting a file makes every cluster
-    that modified it `unclear` with evidence `edit outside PR-changed lines`
-    (blocking, the threads stay open), exactly like a rolled-back conflict: the
-    shared-file rule applies and the cluster's other files fall under the
-    no-`fixed` revert. Verify and the commit then run on the remaining files
-    only. Reverting before verify matters: dropping files after verification
-    would commit a subset nobody verified. Non-interactive never includes an
-    out-of-range edit;
+    run to include them or revert them. Reverting a file with an old-line span
+    makes every cluster that modified it `unclear` with evidence
+    `edit outside PR-changed lines`; any other deferred cluster becomes
+    `unclear` with evidence `over the 50-line run cap (deferred)` and is picked
+    up by the next run (both blocking, the threads stay open), exactly like a
+    rolled-back conflict: the shared-file rule applies and the cluster's other
+    files fall under the no-`fixed` revert. Verify and the commit then run on
+    the remaining files only. Reverting before verify matters: dropping files
+    after verification would commit a subset nobody verified. Non-interactive
+    never includes an out-of-range edit;
   - `commit-resolve-fixes --ranges-from <ranges-file>` is the backstop at
     commit: it refuses, exit 3 with nothing committed, any staged hunk outside
     the range, and a malformed ranges file is exit 2. After a clean pre-check it

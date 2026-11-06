@@ -25,9 +25,12 @@ run is file edits only until agy's `--sandbox` is verified on a host.
   set, in your shell or inside the WSL distro
 - No enabled MCP servers (`agy mcp list`; `agy mcp disable <name>`), unless the
   owner allows one by name with `setup --allow-mcp <name>` on their own terminal
-- `"useG1Credits": false` in `~/.gemini/antigravity-cli/settings.json`, with
-  `toolPermission` not set to `always-proceed`, `allowNonWorkspaceAccess` not
-  `true`, and no `agentMode` that auto-approves edits (such as `accept-edits`)
+- AI credits off: `useG1Credits` not `true` in
+  `~/.gemini/antigravity-cli/settings.json` (agy drops a `false` value, so an
+  absent key is off) and `userSettings.useAiCredits` not `true` in
+  `~/.gemini/config/config.json`, with `toolPermission` not set to
+  `always-proceed`, `allowNonWorkspaceAccess` not `true`, and no `agentMode`
+  that auto-approves edits (such as `accept-edits`)
 
 ## Commands
 

@@ -245,6 +245,9 @@ reduction:
   ...
 ```
 
+Give each cluster its `rank` (clusters.md "Rank"); Step 6's per-cluster cap
+admits clusters in rank order.
+
 ### Step 3e: Resolve the Stack Provider
 
 Before any agent runs, invoke the `Skill` tool with
@@ -286,6 +289,21 @@ than the tool state the guard skips (dispositions.md, Known limits) is the
 ignored-file stop, and the fixes are reverted.
 
 ### Step 4: Spawn Parallel Resolvers
+
+**Runner files (non-interactive only).** An unattended commit refuses runner
+files, so a resolver editing one only produces a revert. Write every cluster's
+non-null `path`, one per line, to a `mktemp` file with the Write tool and run:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --check-paths --unattended --files-from "<paths-file>"
+```
+
+A cluster whose path is refused with reason `runner` is not dispatched and does
+not count toward the cluster cap: each of its threads becomes `unclear` with
+evidence `needs an attended /review:resolve (runner file <path>)`, which Step 7
+replies with and leaves open. Other reasons dispatch as before (Step 6 refuses
+them at commit). A non-zero exit skips this check; Step 6 still refuses runner
+files.
 
 **Spawn-cap gate (M3 pattern).**
 
@@ -581,18 +599,28 @@ Non-interactive: leave them in place and report each in Step 9 under Blocking
 merge as `<path>: changed outside the resolve set, left in place`. Nothing is
 committed either way.
 
-**Range pre-check.** Before verify, run (no network; it changes nothing):
+**Range pre-check.** Before verify, write one row per cluster that adds files to
+the expected set, `<rank> <path>...` with its `Files modified` normalized and
+filtered exactly as for `<files-file>` (repo-relative, changed only; leave out a
+row with no path left), to a `mktemp` file (`<clusters-file>`) with the Write
+tool, and run (no network; it changes nothing):
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --check-ranges --ranges-from "<ranges-file>" --files-from "<files-file>"
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --check-ranges --ranges-from "<ranges-file>" --clusters-from "<clusters-file>" --files-from "<files-file>"
 ```
 
 `<ranges-file>` is the Step 4 capture the resolvers were bounded by, never a
-re-capture. It prints `{"out_of_range":[{"path","old_lines"}]}`: files with an
-edit outside the PR-changed lines plus `RANGE_MARGIN` (the script's constant,
-`clusters.md`), and every listed file when the run changes more than 50 lines in
-total (its `old_lines` then holds `over-cap`). A non-zero exit is a refusal
-(above). An empty list continues to Verify. Otherwise:
+re-capture. It prints
+`{"out_of_range":[{"path","old_lines"}],"deferred_clusters":[...],"admitted_lines":<n>}`:
+files with an edit outside the PR-changed lines plus `RANGE_MARGIN` (the
+script's constant, `clusters.md`), and the files of every cluster deferred by
+the 50-line run cap (its `old_lines` then holds `over-cap`). Clusters are
+admitted best rank first, then in row order, while the total stays within 50
+lines; clusters sharing a file are admitted or deferred together, and
+`deferred_clusters` holds their 1-based row numbers. A listed file in no row
+counts first and, when such files alone pass 50 lines, is itself marked
+`over-cap`. A non-zero exit is a refusal (above). An empty list continues to
+Verify. Otherwise:
 
 - **Non-interactive:** revert the listed files.
 - **Interactive:** one `AskUserQuestion` (part of the push-confirmation gate)
@@ -601,12 +629,14 @@ total (its `old_lines` then holds `over-cap`). A non-zero exit is a refusal
   (the file checks still run). Revert is below.
 
 To revert, run Step 5's per-file `--revert-only` on the listed files (shared
-files too). Every cluster that modified one becomes `unclear` with evidence
-`edit outside PR-changed lines` (blocking, threads stay open), the no-`fixed`
-revert above covers its other files, and `<files-file>` is rewritten without
-them. The check runs before verify because dropping files afterwards would
-commit an unverified subset. With no `fixed` thread left, skip Verify and Push
-(`verify=none`, `push=skipped`).
+files too). Every cluster that modified a file with an old-line span becomes
+`unclear` with evidence `edit outside PR-changed lines`; every other cluster in
+`deferred_clusters` becomes `unclear` with evidence
+`over the 50-line run cap (deferred)` (both blocking, threads stay open, and the
+next run picks the deferred ones up). The no-`fixed` revert above covers its
+other files, and `<files-file>` is rewritten without them. The check runs before
+verify because dropping files afterwards would commit an unverified subset. With
+no `fixed` thread left, skip Verify and Push (`verify=none`, `push=skipped`).
 
 **Verify.** Apply the contract's Verify table to the Step 1 snapshot
 (interactive: one `AskUserQuestion` with the command and `git diff --stat`,
