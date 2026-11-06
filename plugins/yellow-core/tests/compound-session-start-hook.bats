@@ -152,6 +152,20 @@ _wait_for_drain_done() {
   [ ! -d "$STAGING/.drain-lock" ]
 }
 
+@test "session-start does not drain a symlinked staging dir (CLAUDE-271)" {
+  _plant_pending 5
+  real="$STAGING_TEST_HOME/real-staging"
+  mv "$STAGING" "$real"
+  ln -s "$real" "$STAGING"
+  run --separate-stderr bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q '"continue": true'
+  [[ "$stderr" == *"compound-staging dir is a symlink; not draining"* ]]
+  sleep 0.3
+  [ ! -f "$STUB_MARKER" ]
+  [ ! -d "$real/.drain-lock" ]
+}
+
 @test "session-start ignores a review-run holder older than two hours" {
   _plant_pending 5
   mkdir -p "$STAGING/.review-run-lock"

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Run the /review:resolve write phase (Step 7) for one PR from a JSONL plan.
-# Usage: apply-thread-actions [--issue-cap <n>] <owner/repo> <pr-number> <plan.jsonl> <results.jsonl>
+# Usage: apply-thread-actions [--issue-cap <n>] [--expected-head <oid>] <owner/repo> <pr-number> <plan.jsonl> <results.jsonl>
 #   plan.jsonl: one JSON object per thread, in write order (path, line,
 #     threadId), no thread twice, no other keys:
 #       {"threadId":"PRRT_...","disposition":"fixed|addressed|oos|disagree|unclear",
@@ -17,21 +17,28 @@
 #   --issue-cap <n>: issues this PR may still create this run (created=false
 #     dedupe hits do not count). Over the cap the thread gets the contract's
 #     over-cap reply as unclear. Default: no cap (interactive runs).
+#   --expected-head <oid>: the PR head the plan was written against. Before
+#     each thread the PR head is read again (one bounded gh call); when it
+#     differs or cannot be read, that thread and the rest get rows with
+#     outcome not-attempted and the run stops with exit 4 and
+#     reason=head-moved (a rate-limited read stops with reason=rate-limit).
+#     A push that lands while a long batch runs then gets no replies that
+#     describe a diff the PR no longer has.
 # Per thread it runs file-followup-issue, then reply-pr-thread, then
 # resolve-pr-thread, each only after the previous stage exited 0, with the
 # fallbacks the contract gives for exit 6, exit 7 and an already-replied skip.
 # A "handback" thread runs handback-pr-thread just before its resolve; that
 # stage is best effort: only its exit 4 stops anything.
 # Stdout: one final line
-#   apply threads=<n> done=<n> skipped=<n> issues_created=<n> stopped=<none|rate-limit|timeout|budget>
+#   apply threads=<n> done=<n> skipped=<n> issues_created=<n> stopped=<none|rate-limit|timeout|head-moved|budget>
 # Exit codes: 0 every thread has a final row (stage failures are in the rows),
 #             1 other failure (mktemp, unwritable results file),
 #             2 usage: bad arguments, unreadable or invalid plan, a symlinked
 #               or unparseable results file; nothing was written to GitHub,
 #             4 a stage exited 4: the current thread's row records it, the
 #               rest are rows with outcome not-attempted, and stderr carries
-#               reason=rate-limit|timeout (missing or unknown counts as
-#               rate-limit). Stop mutating, as after any exit 4,
+#               reason=rate-limit|timeout|head-moved (missing or unknown
+#               counts as rate-limit). Stop mutating, as after any exit 4,
 #             5 time budget reached: re-run the same command to continue. A
 #               thread stopped between stages gets a partial row, and the
 #               re-run resumes it after its last finished stage.
@@ -53,22 +60,37 @@ OVER_CAP_TEXT='Out of scope for this PR. The automatic follow-up issue limit for
 NOT_FILED_TEXT='Not filed: follow-up issues cannot be created in this repository. Leaving open for a human.'
 
 usage() {
-    printf 'Usage: apply-thread-actions [--issue-cap <n>] <owner/repo> <pr-number> <plan.jsonl> <results.jsonl>\n' >&2
+    printf 'Usage: apply-thread-actions [--issue-cap <n>] [--expected-head <oid>] <owner/repo> <pr-number> <plan.jsonl> <results.jsonl>\n' >&2
     exit 2
 }
 
 command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
 
 ISSUE_CAP=-1
-if [ "${1:-}" = "--issue-cap" ]; then
-    [ $# -ge 2 ] || usage
-    case "$2" in
-        ''|*[!0-9]*) printf 'Error: --issue-cap needs a whole number, got: %s\n' "$2" >&2; exit 2 ;;
+EXPECTED_HEAD=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --issue-cap)
+            [ $# -ge 2 ] || usage
+            case "$2" in
+                ''|*[!0-9]*) printf 'Error: --issue-cap needs a whole number, got: %s\n' "$2" >&2; exit 2 ;;
+            esac
+            [ ${#2} -le 4 ] || { printf 'Error: --issue-cap is too large: %s\n' "$2" >&2; exit 2; }
+            ISSUE_CAP=$2
+            shift 2
+            ;;
+        --expected-head)
+            [ $# -ge 2 ] || usage
+            case "$2" in
+                *[!0-9a-f]*|'') printf 'Error: --expected-head must be a full lowercase commit id\n' >&2; exit 2 ;;
+            esac
+            [ ${#2} -eq 40 ] || [ ${#2} -eq 64 ] || { printf 'Error: --expected-head must be a full lowercase commit id\n' >&2; exit 2; }
+            EXPECTED_HEAD=$2
+            shift 2
+            ;;
+        *) break ;;
     esac
-    [ ${#2} -le 4 ] || { printf 'Error: --issue-cap is too large: %s\n' "$2" >&2; exit 2; }
-    ISSUE_CAP=$2
-    shift 2
-fi
+done
 [ $# -eq 4 ] || usage
 REPO="$1"
 PR="$2"
@@ -216,6 +238,46 @@ stop_budget() {
     exit 5
 }
 
+# Seconds for the head read (YELLOW_REVIEW_GH_TIMEOUT, as lib/resolve-gh.sh
+# reads it: default 30, clamped to 1..60).
+HEAD_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
+case "$HEAD_TIMEOUT" in ''|*[!0-9]*) HEAD_TIMEOUT=30 ;; esac
+[ ${#HEAD_TIMEOUT} -le 4 ] || HEAD_TIMEOUT=30
+[ "$HEAD_TIMEOUT" -gt 0 ] || HEAD_TIMEOUT=30
+[ "$HEAD_TIMEOUT" -le 60 ] || HEAD_TIMEOUT=60
+HEAD_TIMEOUT_BIN=""
+for _t in timeout gtimeout; do
+    if command -v "$_t" >/dev/null 2>&1; then HEAD_TIMEOUT_BIN=$_t; break; fi
+done
+
+# head_still_expected: 0 when the PR head is EXPECTED_HEAD. Otherwise it stops
+# the run: this thread and the rest get not-attempted rows, exit 4.
+head_still_expected() {
+    [ -n "$EXPECTED_HEAD" ] || return 0
+    budget_allows "$HEAD_TIMEOUT" || stop_budget
+    set +e
+    if [ -n "$HEAD_TIMEOUT_BIN" ]; then
+        _head=$("$HEAD_TIMEOUT_BIN" "$HEAD_TIMEOUT" gh api "repos/$REPO/pulls/$PR" --jq .head.sha 2>"$WORK/head-err" </dev/null)
+    else
+        _head=$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha 2>"$WORK/head-err" </dev/null)
+    fi
+    _rc=$?
+    set -e
+    [ "$_rc" -eq 0 ] && [ "$_head" = "$EXPECTED_HEAD" ] && return 0
+    _why=head-moved
+    if [ "$_rc" -ne 0 ] && grep -qiE 'rate limit|abuse|HTTP 429' "$WORK/head-err"; then
+        _why=rate-limit
+    fi
+    STOPPED=$_why
+    jq -c --arg r "$STOPPED" --rawfile done "$WORK/done-ids" \
+        'select(.threadId as $t | ($done | split("\n") | index($t)) | not)
+         | {threadId: .threadId, disposition: .disposition, outcome: "not-attempted", reason: $r}' \
+        "$WORK/rest-with-current" >>"$RESULTS"
+    summary
+    printf 'reason=%s\n' "$STOPPED" >&2
+    exit 4
+}
+
 # post_reply <disposition> <text-file>: one reply stage; 0 posted or skipped.
 post_reply() {
     run_stage reply-pr-thread "$TID" "$1" "$2"
@@ -254,6 +316,7 @@ while IFS= read -r LINE; do
         continue
     fi
     sed -n "$((N + 1)),\$p" "$WORK/lines" >"$WORK/rest"
+    sed -n "$N,\$p" "$WORK/lines" >"$WORK/rest-with-current"
     FINAL=$DISP
     ISSUE_J=null
     REPLY_J=null
@@ -269,6 +332,7 @@ while IFS= read -r LINE; do
     OK=1
     FIXED_REPLY=""
     REPLY_DONE=0
+    head_still_expected
 
     # --- Resume after a budget stop: keep the stages that finished ---
     PREV=$(jq -c --arg t "$TID" 'select(.threadId == $t and .outcome == "partial")' "$RESULTS" | tail -n 1)

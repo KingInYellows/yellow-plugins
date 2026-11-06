@@ -133,9 +133,16 @@ Use this when:
 
 5. **Acquire drain lock.** Atomic `mkdir`. If lock exists, another drain
    is in flight (or a stale lock not yet reaped) — refuse to spawn a
-   concurrent dispatch.
+   concurrent dispatch. A yellow-review resolve or sweep holding the
+   review-run lock in this checkout refuses it too: the promoter would only
+   defer, leaving the entries in `processing/` until the next drain.
 
    ```bash
+   . "${CLAUDE_PLUGIN_ROOT}/lib/compound-staging.sh"
+   if cs_review_lock_live "$STAGING_DIR"; then
+     printf '[compound:review-staged] A review run holds this checkout (review-run lock). Try again after it ends.\n' >&2
+     exit 1
+   fi
    if ! mkdir "$STAGING_DIR/.drain-lock" 2>/dev/null; then
      printf '[compound:review-staged] Concurrent drain already in flight (.drain-lock exists). Try again in a few minutes.\n' >&2
      exit 1
