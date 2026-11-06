@@ -250,6 +250,14 @@ new PRs at a single 2.3 s overall deadline inside the 3 s catalog timeout, and
 always exits with valid `{"continue": true}` JSON, so a busy or corrupt ledger
 can block nothing. It is not carried into the Codex or Cursor manifests.
 
+**yellow-core SessionStart drain deferral.** The staging-queue drain writes
+`docs/solutions/` files and gitignored sentinels into the checkout. While a
+yellow-review resolve or sweep holds the review-run lock
+(`<staging-dir>/.review-run-lock/`), `hooks/scripts/session-start.sh` starts no
+drain, manual `/compound:review-staged` refuses to start one, and
+staging-promoter writes nothing. A symlinked staging dir is never drained,
+because the review side cannot hold a lock there.
+
 **yellow-core PreCompact.** `hooks/scripts/pre-compact.sh` prints a plain-text
 compaction-preservation instruction that Claude Code appends to the compaction
 prompt. It is read-only — no network, no file writes — and always exits 0, so it
