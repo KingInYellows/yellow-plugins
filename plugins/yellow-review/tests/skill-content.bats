@@ -1184,7 +1184,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   clusters=$(flat "$RESOLVE_REFS/clusters.md")
   [[ "$text" == *'`<rank> <path>...` with its `Files modified`'* ]]
   [[ "$text" == *'In non-interactive mode add `--unattended`: only unattended runs have a line cap.'* ]]
-  [[ "$text" == *'Add `--over-cap-draft` to this run'* ]]
+  [[ "$text" == *'add `--over-cap-draft` to this run'* ]]
   [[ "$text" == *'`over the 50-line cap; pushed for human review (PR set to draft)`'* ]]
   [[ "$disp" == *'`over the 50-line cap; pushed for human review (PR set to draft)`'* ]]
   [[ "$disp" == *'Attended runs have no line cap.'* ]]
