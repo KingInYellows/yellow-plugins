@@ -578,14 +578,15 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
     missing, unreadable or malformed ranges or clusters file or a non-canonical
     path is exit 2; a failed diff is exit 3 (a refusal: revert and downgrade as
     below). Non-interactive runs revert every file with an old-line span and
-    keep the files of the deferred clusters, committing them with
-    `--over-cap-draft`; interactive runs ask once per run to include or revert
-    the out-of-range files. Reverting a file with an old-line span makes every
-    cluster that modified it `unclear` with evidence
-    `edit outside PR-changed lines` (blocking, the thread stays open), exactly
-    like a rolled-back conflict: the shared-file rule applies and the cluster's
-    other files fall under the no-`fixed` revert. After a `PUSHED` over-cap
-    commit, every thread of a deferred cluster becomes `unclear` with evidence
+    keep every file marked only `over-cap` (deferred clusters' files and
+    over-cap files in no cluster), committing them with `--over-cap-draft`;
+    interactive runs ask once per run to include or revert the out-of-range
+    files. Reverting a file with an old-line span makes every cluster that
+    modified it `unclear` with evidence `edit outside PR-changed lines`
+    (blocking, the thread stays open), exactly like a rolled-back conflict: the
+    shared-file rule applies and the cluster's other files fall under the
+    no-`fixed` revert. After a `PUSHED` over-cap commit, every thread of a
+    deferred cluster becomes `unclear` with evidence
     `over the 50-line cap; pushed for human review (PR set to draft)` (blocking,
     the thread stays open for the person who reviews it). Verify and the commit
     then run on the remaining files only. Reverting before verify matters:

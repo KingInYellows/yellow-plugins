@@ -626,9 +626,10 @@ refusal (above). An empty list continues to Verify. Otherwise:
 - **Non-interactive:** revert the files with an old-line span. Keep the files
   whose only entry is `over-cap`: the cap is a reviewability limit, not a
   security control, so an over-cap fix is pushed for a person to review instead
-  of being thrown away. Add `--over-cap-draft` to this run's commit call (Push,
-  below), which lifts the cap and converts the PR to a draft once the push is
-  verified.
+  of being thrown away. When any kept file carries `over-cap` (a deferred
+  cluster's file, or a file in no cluster that alone exceeds the cap), add
+  `--over-cap-draft` to this run's commit call (Push, below), which lifts the
+  cap and converts the PR to a draft once the push is verified.
 - **Interactive:** one `AskUserQuestion` (part of the push-confirmation gate)
   naming each file and its old-line spans, with "Include them / Revert them".
   Include keeps the edits and drops `--ranges-from` from this run's commit call
@@ -640,10 +641,10 @@ evidence `edit outside PR-changed lines` (blocking, the thread stays open). The
 no-`fixed` revert above covers its other files, and `<files-file>` is rewritten
 without them. A deferred cluster that lost a file this way is reverted with it:
 its other files are reverted too and the cluster gets the same evidence. If no
-deferred cluster is left, the commit call takes no `--over-cap-draft`. The check
-runs before verify because dropping files afterwards would commit an unverified
-subset. With no `fixed` thread left, skip Verify and Push (`verify=none`,
-`push=skipped`).
+kept file carries `over-cap`, the commit call takes no `--over-cap-draft`. The
+check runs before verify because dropping files afterwards would commit an
+unverified subset. With no `fixed` thread left, skip Verify and Push
+(`verify=none`, `push=skipped`).
 
 **Verify.** Apply the contract's Verify table to the Step 1 snapshot
 (interactive: one `AskUserQuestion` with the command and `git diff --stat`,
@@ -730,8 +731,8 @@ the files were reverted and a patch saved, every `fixed` thread becomes blocking
 **Push.** Interactive: show `git diff --stat` and ask "Push these changes to
 resolve PR #X comments?"; rejection → `push=skipped`, edits stay uncommitted,
 `fixed` threads become `unclear`. In non-interactive mode add `--unattended`,
-and `--over-cap-draft` when the range pre-check kept a deferred cluster. Give
-the Bash tool a `timeout` of 600000 ms. Then run, with Step 3e's provider:
+and `--over-cap-draft` when any kept file carries `over-cap`. Give the Bash tool
+a `timeout` of 600000 ms. Then run, with Step 3e's provider:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --provider "<graphite|github>" --pr "<PR#>" --message "fix: resolve PR #<PR#> review comments (<n> files)" --expected-head "<head-oid>" --files-from "<files-file>" --ranges-from "<ranges-file>"
