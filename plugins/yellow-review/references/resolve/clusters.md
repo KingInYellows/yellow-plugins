@@ -42,7 +42,8 @@ upstream `EveryInc/compound-engineering-plugin` PR #480 at locked SHA
 
 ## Rank
 
-A cluster's rank orders Step 6's per-cluster line cap: rank 0 first, and
+A cluster's rank orders Step 6's per-cluster line cap (unattended runs only;
+the clusters past it are pushed with the PR set to draft): rank 0 first, and
 within a rank the cluster order of this step. It is 0 when any thread carries a
 bot-authored P0 badge, 2 when every thread is a bot thread whose badge is P2 or
 P3, and 1 otherwise (a P1 badge, no badge, or any human thread). Badges are

@@ -1071,6 +1071,27 @@ stub_failing_flock() {
   chmod +x "$BATS_TEST_TMPDIR/stub-bin/flock"
 }
 
+# A flock stand-in that removes PR 12's ledger files (a concurrent prune
+# finishing first) and then grants the lock, so the fold itself succeeds.
+stub_pruning_flock() {
+  mkdir -p "$BATS_TEST_TMPDIR/stub-bin"
+  printf '#!/bin/sh\nrm -f "%s/12.jsonl" "%s/12.pending"\nexit 0\n' \
+    "$LEDGER_DIR" "$LEDGER_DIR" >|"$BATS_TEST_TMPDIR/stub-bin/flock"
+  chmod +x "$BATS_TEST_TMPDIR/stub-bin/flock"
+}
+
+@test "CLAUDE-273: a prune that lands before a successful fold leaves no record" {
+  observe "$BASE" "[$(finding a.sh 2 '{"severity":"P1"}')]" >/dev/null
+  stub_pruning_flock
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/stub-bin:$PATH" "$RL" summary --all
+  [ "$status" -eq 0 ]
+  [ "$output" = '{}' ]
+  observe "$BASE" "[$(finding a.sh 2 '{"severity":"P1"}')]" >/dev/null
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/stub-bin:$PATH" "$RL" summary 12
+  [ "$status" -eq 0 ]
+  [ "$output" = '{}' ]
+}
+
 @test "CLAUDE-269: summary skips a ledger pruned mid-read instead of reporting null" {
   observe "$BASE" "[$(finding a.sh 2)]" >/dev/null
   printf 'garbage-line\n' >>"$LEDGER_DIR/$LEDGER_PR.jsonl"

@@ -2,12 +2,13 @@
 # Stage the resolver-touched files, commit them as a NEW commit, submit via
 # the active stacked-PR provider, and verify the remote head.
 # Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg>
-#                             [--unattended] [--allow-credential-shaped]
+#                             [--unattended [--over-cap-draft]]
+#                             [--allow-credential-shaped]
 #                             [--expected-head <oid>]
 #                             [--files-from <file>] [--ranges-from <file>]
 #                             [-- <files...>]
 #        commit-resolve-fixes --check-ranges --ranges-from <file>
-#                             [--clusters-from <file>]
+#                             [--unattended] [--clusters-from <file>]
 #                             [--files-from <file>] [-- <files...>]
 #        commit-resolve-fixes --check-paths [--unattended]
 #                             [--files-from <file>] [-- <files...>]
@@ -23,26 +24,32 @@
 #            hunk must lie inside its file's changed new-side ranges, widened
 #            by RANGE_MARGIN lines (the resolver's "minimal adjacent lines"),
 #            else exit 3 with nothing committed. A listed file whose row is
-#            missing, "none" or "unknown" accepts no hunk. The listed files may
-#            change at most MAX_CHANGED_LINES lines in total (the larger side
-#            of each hunk), else exit 3 too: an insertion cannot be
-#            smuggled past the range check by its length. The ranges describe
+#            missing, "none" or "unknown" accepts no hunk. With --unattended
+#            the listed files may change at most MAX_CHANGED_LINES lines in
+#            total (the larger side of each hunk), else exit 3 too: an
+#            insertion cannot be smuggled past the range check by its length.
+#            Attended runs have no line cap: a person reviews the push. The
+#            cap is a reviewability limit for unattended pushes, not a
+#            security boundary (the range bound and path lists are). The
+#            ranges describe
 #            the local HEAD, so capture them from the same head the resolvers
 #            edited. Without the flag no range check runs (membership only).
 #   check:   --check-ranges runs that same hunk check on the working tree
 #            against HEAD and nothing else: it stages and commits nothing, needs
 #            no --provider, --pr or --message, makes no network call, and prints
 #            {"out_of_range":[{"path":"<file>","old_lines":["<a>-<b>",...]}]}
-#            (an empty list when every hunk is inside; when the files change
-#            more than MAX_CHANGED_LINES lines in total, every listed file
-#            also carries the entry "over-cap"). Exit 0 when the check
+#            (an empty list when every hunk is inside; with --unattended, when
+#            the files change more than MAX_CHANGED_LINES lines in total, every
+#            listed file also carries the entry "over-cap"). Exit 0 when the check
 #            ran, 2 for a missing, unreadable or malformed --ranges-from or a
 #            non-canonical path, 3 when git could not produce the diff. The
 #            caller runs it before verification so out-of-range files can be
 #            reverted first; the check on the staged set (above) stays as the
 #            backstop.
 #   clusters: --clusters-from (with --check-ranges) applies the line cap per
-#            cluster instead of per run. Each row is "<rank> <path>..." for one
+#            cluster instead of per run. Without --unattended no cap applies:
+#            the rows are still validated, "deferred_clusters" is [] and
+#            "admitted_lines" is the total. Each row is "<rank> <path>..." for one
 #            resolver cluster, rank 0 (P0), 1 (P1 or unbadged) or 2 (P2 and
 #            lower). Clusters that share a file form one group (a file cannot
 #            be half reverted). Groups are admitted by best rank, then row
@@ -55,6 +62,13 @@
 #            counts toward the admitted total first; when those files alone
 #            exceed MAX_CHANGED_LINES, each is marked "over-cap" and they count
 #            nothing. A malformed row or a non-canonical path is exit 2.
+#   draft:   --over-cap-draft (commit mode, needs --unattended and
+#            --ranges-from) lifts the line cap for this commit; the range,
+#            path and credential checks still apply. After the head is
+#            verified, the PR is converted to a draft (`gh pr ready --undo`)
+#            so a person reviews the over-cap fix before it can merge, and the
+#            output gains "draft":"set" or "draft":"failed" (the push stands
+#            either way; the caller reports a failed conversion).
 #   paths:   --check-paths reports which listed paths the commit would refuse
 #            by path alone, before anything is edited: it stages and commits
 #            nothing, needs no --provider, --pr or --message, makes no network
@@ -97,6 +111,7 @@
 #            `resolve-text: refused rule=... line=...` token on stderr, never
 #            the text. --allow-credential-shaped does not excuse it.
 # Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
+#         (plus "draft" after a push with --over-cap-draft)
 # Exit codes: 2 usage (including --allow-credential-shaped with
 #             --unattended and a message that fails the screen above),
 #             3 a plugin library that is modified or hidden (see Libraries),
@@ -235,9 +250,9 @@ MAX_MESSAGE_CHARS=200
 # --check-ranges). The resolver prompt and references/resolve/clusters.md state
 # the same number; change all three together.
 RANGE_MARGIN=3
-# Changed lines (the larger side of each hunk, summed over the listed files) a
-# run may commit with --ranges-from. The resolver prompt's 50-line scope limit
-# is the same number; change both together.
+# Changed lines (the larger side of each hunk, summed over the listed files) an
+# unattended run may commit with --ranges-from before the push needs
+# --over-cap-draft. A reviewability limit, not a security control.
 MAX_CHANGED_LINES=50
 
 # The libraries below run before any dirty-set check. In a source checkout they
@@ -729,7 +744,7 @@ yr_adopt_path || die 3 "no PATH directory is left once those that reach into the
 PLUGIN_ROOT=$(cd -- "$CRF_DIR/../../.." && pwd) || { printf '[commit-resolve-fixes] Error: cannot resolve the plugin root\n' >&2; exit 2; }
 
 usage() {
-    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--expected-head <oid>] [--files-from <file>] [--ranges-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-ranges --ranges-from <file> [--clusters-from <file>] [--files-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-paths [--unattended] [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended [--over-cap-draft]] [--allow-credential-shaped] [--expected-head <oid>] [--files-from <file>] [--ranges-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-ranges --ranges-from <file> [--unattended] [--clusters-from <file>] [--files-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-paths [--unattended] [--files-from <file>] [-- <files...>]\n' >&2
     exit 2
 }
 
@@ -745,12 +760,14 @@ CHECK_RANGES=0
 CHECK_PATHS=0
 CLUSTERS_FROM=""
 CLUSTER_ROWS=""
+OVER_CAP_DRAFT=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --provider) [ $# -ge 2 ] || usage; PROVIDER="$2"; shift 2 ;;
         --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
         --message) [ $# -ge 2 ] || usage; MESSAGE="$2"; shift 2 ;;
         --unattended) UNATTENDED=1; shift ;;
+        --over-cap-draft) OVER_CAP_DRAFT=1; shift ;;
         --allow-credential-shaped) ALLOW_CREDENTIAL=1; shift ;;
         --expected-head) [ $# -ge 2 ] || usage; EXPECTED_HEAD="$2"; shift 2 ;;
         --files-from)
@@ -778,6 +795,14 @@ while [ $# -gt 0 ]; do
 done
 FILES=(${RP_FILES[@]+"${RP_FILES[@]}"})
 [ -z "$CLUSTERS_FROM" ] || [ "$CHECK_RANGES" = 1 ] || die 2 "--clusters-from needs --check-ranges"
+if [ "$OVER_CAP_DRAFT" = 1 ]; then
+    [ "$CHECK_RANGES" = 0 ] && [ "$CHECK_PATHS" = 0 ] || die 2 "--over-cap-draft is a commit-mode flag"
+    [ "$UNATTENDED" = 1 ] || die 2 "--over-cap-draft needs --unattended (attended runs have no line cap)"
+    [ -n "$RANGES_FROM" ] || die 2 "--over-cap-draft needs --ranges-from"
+fi
+# The line cap applies to unattended runs only (see the header); -1 is none.
+LINE_CAP=-1
+[ "$UNATTENDED" = 1 ] && [ "$OVER_CAP_DRAFT" = 0 ] && LINE_CAP=$MAX_CHANGED_LINES
 
 # --- Path-check mode: report the listed paths the commit would refuse ---
 if [ "$CHECK_PATHS" = 1 ]; then
@@ -898,7 +923,7 @@ check_clusters() {
     out=$( { printf '%s' "$counts" | yr_awk 'NF { print "L", $1, $2 }'
              printf '%s\n' ${FILES[@]+"${FILES[@]}"} | yr_awk 'NF { print "F", $1 }'
              printf '%s\n' "$CLUSTER_ROWS" | yr_awk 'NF { print "C", $0 }'; } \
-        | yr_awk -v cap="$MAX_CHANGED_LINES" '
+        | yr_awk -v cap="$LINE_CAP" '
             function find(x) { while (par[x] != x) x = par[x]; return x }
             $1 == "L" { lines[$2] = $3; next }
             $1 == "F" { listed[$2] = 1; next }
@@ -916,7 +941,7 @@ check_clusters() {
                 # Files in no cluster that alone exceed the cap are over-cap
                 # themselves and count nothing; the clusters are then admitted
                 # as if those files were absent.
-                if (adm > cap) { for (p in listed) if (!(p in named)) print "O", p; adm = 0 }
+                if (cap >= 0 && adm > cap) { for (p in listed) if (!(p in named)) print "O", p; adm = 0 }
                 # Groups by root: best rank, then the root (its first row).
                 for (k = 1; k <= n; k++) { r = find(k); if (!(r in best) || rank[k] < best[r]) best[r] = rank[k] }
                 for (rk = 0; rk <= 2; rk++) for (r = 1; r <= n; r++) {
@@ -926,7 +951,7 @@ check_clusters() {
                         if (find(k) != r) continue
                         for (i = 1; i <= np[k]; i++) { p = path[k, i]; if (!(p in seen)) { seen[p] = 1; tot += lines[p]; fl = fl " " p } }
                     }
-                    if (adm + tot <= cap) { adm += tot; continue }
+                    if (cap < 0 || adm + tot <= cap) { adm += tot; continue }
                     for (k = 1; k <= n; k++) if (find(k) == r) print "D", k
                     m = split(fl, fs, " "); for (i = 1; i <= m; i++) print "O", fs[i]
                 }
@@ -967,9 +992,9 @@ if [ "$CHECK_RANGES" = 1 ]; then
     }
     if [ -n "$CLUSTERS_FROM" ]; then
         check_clusters
-    elif [ "${#FILES[@]}" -gt 0 ]; then
+    elif [ "$LINE_CAP" -ge 0 ] && [ "${#FILES[@]}" -gt 0 ]; then
         total=$(changed_lines worktree "${FILES[@]}") || die 3 "could not count the changed lines"
-        if [ "$total" -gt "$MAX_CHANGED_LINES" ]; then
+        if [ "$total" -gt "$LINE_CAP" ]; then
             for f in "${FILES[@]}"; do
                 mark_over_cap "$f"
             done
@@ -1580,13 +1605,15 @@ if [ -n "$RANGES_FROM" ]; then
             die 3 "staged change outside the PR's changed line ranges: $f (old lines $bad); nothing committed"
         fi
     done
-    total=$(changed_lines staged "${EXPECTED[@]}") || {
-        lgit reset -q -- "${EXPECTED[@]}" || true
-        die 3 "could not count the staged changed lines; nothing committed"
-    }
-    if [ "$total" -gt "$MAX_CHANGED_LINES" ]; then
-        lgit reset -q -- "${EXPECTED[@]}" || true
-        die 3 "staged change of $total lines exceeds the $MAX_CHANGED_LINES-line cap; nothing committed"
+    if [ "$LINE_CAP" -ge 0 ]; then
+        total=$(changed_lines staged "${EXPECTED[@]}") || {
+            lgit reset -q -- "${EXPECTED[@]}" || true
+            die 3 "could not count the staged changed lines; nothing committed"
+        }
+        if [ "$total" -gt "$LINE_CAP" ]; then
+            lgit reset -q -- "${EXPECTED[@]}" || true
+            die 3 "staged change of $total lines exceeds the $LINE_CAP-line cap; nothing committed"
+        fi
     fi
 fi
 
@@ -1672,10 +1699,12 @@ if [ -n "$RANGES_FROM" ]; then
         [ -z "$bad" ] \
             || undo_commit "committed change outside the PR's changed line ranges: $f (old lines $bad; a hook changed it); nothing submitted"
     done
-    total=$(changed_lines commit "${EXPECTED[@]}") \
-        || undo_commit "could not count the committed changed lines; nothing submitted"
-    [ "$total" -le "$MAX_CHANGED_LINES" ] \
-        || undo_commit "committed change of $total lines exceeds the $MAX_CHANGED_LINES-line cap (a hook changed it); nothing submitted"
+    if [ "$LINE_CAP" -ge 0 ]; then
+        total=$(changed_lines commit "${EXPECTED[@]}") \
+            || undo_commit "could not count the committed changed lines; nothing submitted"
+        [ "$total" -le "$LINE_CAP" ] \
+            || undo_commit "committed change of $total lines exceeds the $LINE_CAP-line cap (a hook changed it); nothing submitted"
+    fi
 fi
 git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
     | rt_added_lines >|"$ADDED" \
@@ -1810,4 +1839,15 @@ if [ "$PR_HEAD" != "$SHA" ]; then
     die 6 "head not verified: local=$SHA pr=${PR_HEAD:-none}${why:+ ($why)}"
 fi
 
+if [ "$OVER_CAP_DRAFT" = 1 ]; then
+    # The push stands either way; the caller reports a failed conversion.
+    DRAFT=set
+    if ! gh pr ready "$PR" --undo >/dev/null 2>&1; then
+        # Already a draft also fails the call; read the state before blaming it.
+        IS_DRAFT=$(gh pr view "$PR" --json isDraft 2>/dev/null | jq -r '.isDraft // empty' 2>/dev/null || true)
+        [ "$IS_DRAFT" = true ] || DRAFT=failed
+    fi
+    jq -nc --arg s PUSHED --arg sha "$SHA" --arg b "$BRANCH" --arg d "$DRAFT" '{status: $s, sha: $sha, branch: $b, draft: $d}'
+    exit 0
+fi
 emit PUSHED "$SHA"

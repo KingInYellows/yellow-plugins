@@ -953,7 +953,7 @@ STUB
   ! grep -q '^gt submit' "$STUB_LOG"
 }
 
-# --- The changed-line cap (MAX_CHANGED_LINES = 50) ---
+# --- The changed-line cap (MAX_CHANGED_LINES = 50, unattended runs only) ---
 
 # long_file: src/a.txt of 100 lines, committed and pushed; every line is in the changed range.
 long_file() {
@@ -966,7 +966,7 @@ long_file() {
   long_file
   base=$(git rev-parse HEAD)
   { head -n 5 src/a.txt; seq 1000 1050; tail -n +6 src/a.txt; } >| "$BATS_TEST_TMPDIR/new.txt" && cp "$BATS_TEST_TMPDIR/new.txt" src/a.txt
-  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
   [ "$status" -eq 3 ]
   [[ "$stderr" == *"exceeds the 50-line cap"* ]]
   [ "$(git rev-parse HEAD)" = "$base" ]
@@ -976,14 +976,14 @@ long_file() {
 @test "--ranges-from accepts an insertion of exactly 50 lines" {
   long_file
   { head -n 5 src/a.txt; seq 1000 1049; tail -n +6 src/a.txt; } >| "$BATS_TEST_TMPDIR/new.txt" && cp "$BATS_TEST_TMPDIR/new.txt" src/a.txt
-  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
   [ "$status" -eq 0 ]
 }
 
 @test "--ranges-from counts many small hunks together against the cap" {
   long_file
   sed -i.bak -e 's/^\([0-9]*[0-5]\)$/x\1/' src/a.txt && rm -f src/a.txt.bak
-  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
   [ "$status" -eq 3 ]
   [[ "$stderr" == *"exceeds the 50-line cap"* ]]
 }
@@ -994,7 +994,7 @@ long_file() {
   git add src/b.txt && git commit -q -m "chore: second file" && git push -q origin feature 2>/dev/null
   printf 'src/a.txt 1-100\nsrc/b.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
   sed -i.bak -e '1,30s/$/x/' src/a.txt && sed -i.bak -e '1,30s/$/x/' src/b.txt && rm -f src/a.txt.bak src/b.txt.bak
-  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt src/b.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt src/b.txt
   [ "$status" -eq 3 ]
   [[ "$stderr" == *"exceeds the 50-line cap"* ]]
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt src/b.txt
@@ -1008,13 +1008,87 @@ long_file() {
   printf 'src/a.txt 1-100\nsrc/b.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
   sed -i.bak -e '1,30s/$/x/' src/a.txt && sed -i.bak -e '1,30s/$/x/' src/b.txt && rm -f src/a.txt.bak src/b.txt.bak
   printf 'src/a.txt\nsrc/b.txt\n' >| "$BATS_TEST_TMPDIR/files"
-  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
+  run_check --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
   [ "$status" -eq 0 ]
   [ "$(jq -c '[.out_of_range[] | [.path, .old_lines]]' <<<"$output")" = '[["src/a.txt",["over-cap"]],["src/b.txt",["over-cap"]]]' ]
   # a file that is also out of range keeps its span and gains the marker
   printf 'src/a.txt 1-5\nsrc/b.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
-  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
+  run_check --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
   [ "$(jq -c '.out_of_range[0].old_lines' <<<"$output")" = '["1-30","over-cap"]' ]
+}
+
+@test "an attended commit has no line cap: --ranges-from without --unattended accepts 51 lines" {
+  long_file
+  { head -n 5 src/a.txt; seq 1000 1050; tail -n +6 src/a.txt; } >| "$BATS_TEST_TMPDIR/new.txt" && cp "$BATS_TEST_TMPDIR/new.txt" src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .status <<<"$output")" = PUSHED ]
+  [ "$(jq -r '.draft // "absent"' <<<"$output")" = absent ]
+  ! grep -q '^gh pr ready' "$STUB_LOG"
+}
+
+@test "an attended --check-ranges marks nothing over-cap and defers no cluster" {
+  long_file
+  sed -i.bak -e '1,80s/$/x/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt\n' >| "$BATS_TEST_TMPDIR/files"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c . <<<"$output")" = '{"out_of_range":[]}' ]
+  printf '1 src/a.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c . <<<"$output")" = '{"out_of_range":[],"deferred_clusters":[],"admitted_lines":80}' ]
+}
+
+@test "--over-cap-draft lifts the unattended cap, pushes, and converts the PR to a draft" {
+  long_file
+  { head -n 5 src/a.txt; seq 1000 1050; tail -n +6 src/a.txt; } >| "$BATS_TEST_TMPDIR/new.txt" && cp "$BATS_TEST_TMPDIR/new.txt" src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --over-cap-draft --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .status <<<"$output")" = PUSHED ]
+  [ "$(jq -r .draft <<<"$output")" = set ]
+  grep -q '^gh pr ready 7 --undo$' "$STUB_LOG"
+  # the draft conversion comes after the push is verified
+  [ "$(grep -n '^gt submit' "$STUB_LOG" | head -1 | cut -d: -f1)" -lt "$(grep -n '^gh pr ready' "$STUB_LOG" | cut -d: -f1)" ]
+}
+
+@test "--over-cap-draft reports draft=failed when the conversion fails, set when the PR already is one" {
+  long_file
+  sed -i.bak -e '1,60s/$/x/' src/a.txt && rm -f src/a.txt.bak
+  export STUB_PR_READY_FAIL=1
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --over-cap-draft --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .draft <<<"$output")" = failed ]
+  sed -i.bak -e '61,70s/$/y/' src/a.txt && rm -f src/a.txt.bak
+  export STUB_PR_IS_DRAFT=true
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --over-cap-draft --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .draft <<<"$output")" = set ]
+}
+
+@test "--over-cap-draft still refuses an edit outside the PR's changed ranges (exit 3)" {
+  long_file
+  base=$(git rev-parse HEAD)
+  sed -i.bak -e '1,60s/$/x/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-50\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --over-cap-draft --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"outside the PR's changed line ranges"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  ! grep -q '^gh pr ready' "$STUB_LOG"
+}
+
+@test "--over-cap-draft needs --unattended and --ranges-from and is a commit-mode flag (exit 2)" {
+  printf 'src/a.txt 1-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --over-cap-draft --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"needs --unattended"* ]]
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --over-cap-draft -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"needs --ranges-from"* ]]
+  run_check --unattended --over-cap-draft --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"commit-mode flag"* ]]
 }
 
 # --- Per-cluster cap (--check-ranges --clusters-from) ---
@@ -1032,7 +1106,7 @@ three_cluster_files() {
   three_cluster_files
   # The P2 cluster is listed first; the P1 cluster is admitted ahead of it.
   printf '2 src/a.txt\n1 src/b.txt\n2 src/c.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
-  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
+  run_check --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
   [ "$status" -eq 0 ]
   [ "$(jq -c '[.out_of_range[] | [.path, .old_lines]]' <<<"$output")" = '[["src/a.txt",["over-cap"]],["src/c.txt",["over-cap"]]]' ]
   [ "$(jq -c .deferred_clusters <<<"$output")" = '[1,3]' ]
@@ -1048,7 +1122,7 @@ three_cluster_files() {
   printf 'src/d.txt\n' >> "$BATS_TEST_TMPDIR/files"
   # a=30 admitted, c=40 does not fit, b=30 does not fit, d=5 still fits.
   printf '0 src/a.txt\n1 src/c.txt\n1 src/b.txt\n2 src/d.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
-  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
+  run_check --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
   [ "$status" -eq 0 ]
   [ "$(jq -c .deferred_clusters <<<"$output")" = '[2,3]' ]
   [ "$(jq -c .admitted_lines <<<"$output")" = 35 ]
@@ -1061,7 +1135,7 @@ three_cluster_files() {
   # src/a.txt (60 lines) is in no row; it is over-cap and the cluster still fits.
   printf '1 src/b.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
   printf 'src/a.txt\nsrc/b.txt\n' >| "$BATS_TEST_TMPDIR/files"
-  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
+  run_check --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
   [ "$status" -eq 0 ]
   [ "$(jq -c '[.out_of_range[] | [.path, .old_lines]]' <<<"$output")" = '[["src/a.txt",["over-cap"]]]' ]
   [ "$(jq -c .deferred_clusters <<<"$output")" = '[]' ]
@@ -1072,7 +1146,7 @@ three_cluster_files() {
   three_cluster_files
   # Rows 2 and 3 share src/c.txt: their group is 60 lines and is deferred as one.
   printf '1 src/a.txt\n0 src/b.txt src/c.txt\n2 src/c.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
-  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
+  run_check --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" --files-from "$BATS_TEST_TMPDIR/files"
   [ "$status" -eq 0 ]
   [ "$(jq -c .deferred_clusters <<<"$output")" = '[2,3]' ]
   [ "$(jq -c '[.out_of_range[].path] | sort' <<<"$output")" = '["src/b.txt","src/c.txt"]' ]
@@ -1083,7 +1157,7 @@ three_cluster_files() {
   printf 'one\nfeature2\n' >| src/a.txt
   printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
   printf '1 src/a.txt\n' >| "$BATS_TEST_TMPDIR/clusters"
-  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" -- src/a.txt
+  run_check --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" --clusters-from "$BATS_TEST_TMPDIR/clusters" -- src/a.txt
   [ "$status" -eq 0 ]
   [ "$(jq -c . <<<"$output")" = '{"out_of_range":[],"deferred_clusters":[],"admitted_lines":1}' ]
 }
@@ -1106,14 +1180,14 @@ three_cluster_files() {
   [[ "$stderr" == *"--clusters-from needs --check-ranges"* ]]
 }
 
-@test "a hook that adds more than 50 lines to a listed file in range makes the commit undo itself (exit 4)" {
+@test "a hook that adds more than 50 lines to a listed file in range makes an unattended commit undo itself (exit 4)" {
   long_file
   printf '#!/bin/sh\nseq 2000 2060 >> src/a.txt && git add src/a.txt\n' >| .git/hooks/pre-commit
   chmod +x .git/hooks/pre-commit
   track_git_hooks pre-commit
   printf 'src/a.txt 1-200\n' >| "$BATS_TEST_TMPDIR/ranges"
   sed -i.bak 's/^3$/three/' src/a.txt && rm -f src/a.txt.bak
-  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
   [ "$status" -eq 4 ]
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
 }

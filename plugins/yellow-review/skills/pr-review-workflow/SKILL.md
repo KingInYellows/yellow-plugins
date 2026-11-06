@@ -239,9 +239,9 @@ This rule applies to:
   before interpolation.
 
 The fence + advisory pattern is the _naive-injection-attack_ mitigation. The
-**load-bearing controls** (path deny lists, no Bash tool, 50-line scope cap,
-no-rollback rule) are documented in `pr-comment-resolver.md` and must not be
-removed without an explicit threat model justification.
+**load-bearing controls** (path deny lists, no Bash tool, the edit range bound)
+are in `pr-comment-resolver.md` and must not be removed without an explicit
+threat model justification; the unattended 50-line cap is not one of them.
 
 When authoring new agents in this plugin: copy the `## CRITICAL SECURITY RULES`
 block from `pr-comment-resolver.md` verbatim — do not paraphrase. Paraphrasing

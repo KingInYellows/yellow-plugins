@@ -12,7 +12,7 @@ resolve_repo_init() {
   export PATH="$STUB_BIN:$PATH"
   export STUB_LOG="$BATS_TEST_TMPDIR/stub.log"
   : >| "$STUB_LOG"
-  unset STUB_GT_CHILD STUB_GT_RESTACK_FAIL STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD STUB_PR_FILES_FAIL STUB_PR_DIFF_FAIL STUB_GT_REMOTE STUB_PR_HEAD_REPO STUB_PR_URL GH_HOST
+  unset STUB_GT_CHILD STUB_GT_RESTACK_FAIL STUB_GT_MODIFY_FAIL STUB_SUBMIT_FAIL STUB_SUBMIT_SKIP_PUBLISH STUB_PR_HEAD STUB_PR_FILES_FAIL STUB_PR_DIFF_FAIL STUB_GT_REMOTE STUB_PR_HEAD_REPO STUB_PR_URL STUB_PR_READY_FAIL STUB_PR_IS_DRAFT GH_HOST
   export YELLOW_REVIEW_VERIFY_BACKOFF="0 0"
   # Fixture repos must not inherit the developer's or CI's git config.
   # GIT_CONFIG_GLOBAL needs git 2.32; sandboxing HOME works on every
@@ -176,10 +176,15 @@ case "$*" in
     url="${STUB_PR_URL:-https://github.com/acme/widgets/pull/7}"
     [ "$url" = none ] && url=""
     if [ "$repo" = none ]; then
-      printf '{"headRefOid":"%s","headRefName":"feature","isCrossRepository":false,"headRepository":null,"headRepositoryOwner":null,"url":"%s"}\n' "$oid" "$url"
+      printf '{"headRefOid":"%s","headRefName":"feature","isCrossRepository":false,"headRepository":null,"headRepositoryOwner":null,"url":"%s","isDraft":%s}\n' "$oid" "$url" "${STUB_PR_IS_DRAFT:-false}"
     else
-      printf '{"headRefOid":"%s","headRefName":"feature","isCrossRepository":false,"headRepository":{"name":"%s"},"headRepositoryOwner":{"login":"%s"},"url":"%s"}\n' "$oid" "${repo#*/}" "${repo%%/*}" "$url"
+      printf '{"headRefOid":"%s","headRefName":"feature","isCrossRepository":false,"headRepository":{"name":"%s"},"headRepositoryOwner":{"login":"%s"},"url":"%s","isDraft":%s}\n' "$oid" "${repo#*/}" "${repo%%/*}" "$url" "${STUB_PR_IS_DRAFT:-false}"
     fi
+    exit 0
+    ;;
+  "pr ready "*)
+    # --over-cap-draft converts the PR to a draft (STUB_PR_READY_FAIL=1 fails).
+    [ "${STUB_PR_READY_FAIL:-0}" = 1 ] && exit 1
     exit 0
     ;;
   "api --paginate repos/{owner}/{repo}/pulls/"*"/files"*)

@@ -213,8 +213,10 @@ the resolve scripts: `references/resolve/dispositions.md`.
   fixes; both refuse worktree-resident `git`/`gh`/`jq` and screen `PATH` and git
   config (`yr_safe_path`, `harden_git_config`), `commit-resolve-fixes` also
   refuses worktree-resident `gt`/`node`/`awk`; neither pushes.
-  `commit-resolve-fixes --check-ranges --clusters-from` applies the 50-line cap
-  per cluster (best rank first; a deferred cluster stays open for the next run),
+  `commit-resolve-fixes --check-ranges --unattended --clusters-from` applies the
+  50-line cap per cluster (best rank first); interactive runs have no cap, and
+  an unattended run commits over-cap clusters with `--over-cap-draft`, which
+  converts the PR to a draft for human review,
   and `--check-paths --unattended` lets `/review:resolve` skip runner-file
   clusters before any resolver runs. `run-verify-command --revert-denied` also
   judges trusted-config symlinks (tracked, untracked or nested) and leaves FIFO,

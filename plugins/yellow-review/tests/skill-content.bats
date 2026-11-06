@@ -1168,7 +1168,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   ver=$(grep -n '^\*\*Verify\.\*\*' "$RESOLVE_PR" | cut -d: -f1)
   [ -n "$pre" ] && [ -n "$ver" ] && [ "$pre" -lt "$ver" ]
   grep -qF -- 'commit-resolve-fixes" --check-ranges --ranges-from "<ranges-file>" --clusters-from "<clusters-file>" --files-from "<files-file>"' "$RESOLVE_PR"
-  [[ "$text" == *'**Non-interactive:** revert the listed files'* ]]
+  [[ "$text" == *'**Non-interactive:** revert the files with an old-line span.'* ]]
   [[ "$text" == *'**Interactive:** one `AskUserQuestion`'* ]]
   [[ "$text" == *'"Include them / Revert them"'* ]]
   [[ "$text" == *'drops `--ranges-from` from this run'* ]]
@@ -1178,13 +1178,18 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$text" == *'It is a backstop that does not fire after a clean pre-check'* ]]
 }
 
-@test "resolve-pr: the 50-line cap defers whole clusters by rank instead of the whole run" {
+@test "resolve-pr: the 50-line cap is unattended only and over-cap clusters are pushed for review as a draft" {
   text=$(flat "$RESOLVE_PR")
   disp=$(flat "$RESOLVE_REFS/dispositions.md")
   clusters=$(flat "$RESOLVE_REFS/clusters.md")
   [[ "$text" == *'`<rank> <path>...` with its `Files modified`'* ]]
-  [[ "$text" == *'`unclear` with evidence `over the 50-line run cap (deferred)`'* ]]
-  [[ "$disp" == *'`over the 50-line run cap (deferred)`'* ]]
+  [[ "$text" == *'In non-interactive mode add `--unattended`: only unattended runs have a line cap.'* ]]
+  [[ "$text" == *'add `--over-cap-draft` to this run'* ]]
+  [[ "$text" == *'`over the 50-line cap; pushed for human review (PR set to draft)`'* ]]
+  [[ "$disp" == *'`over the 50-line cap; pushed for human review (PR set to draft)`'* ]]
+  [[ "$disp" == *'Attended runs have no line cap.'* ]]
+  [[ "$text" != *'over the 50-line run cap (deferred)'* ]]
+  [[ "$disp" != *'over the 50-line run cap (deferred)'* ]]
   [[ "$clusters" == *'## Rank'* ]]
   [[ "$clusters" == *'rank only orders admission'* ]]
 }
@@ -1846,7 +1851,7 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
 
 @test "sweep: a branch mismatch names the worktree that holds the PR branch and the command to run there" {
   grep -qF -- "awk -v b=\"branch refs/heads/\$EXPECTED\"" "$SWEEP"
-  grep -qF -- "is checked out in the worktree %s. Sweep it there: cd '%s' && /review:sweep <PR#>" "$SWEEP"
+  grep -qF -- "is checked out in the worktree %s. Sweep it there: cd '%s', start Claude Code, then run /review:sweep <PR#>" "$SWEEP"
   grep -qF -- "QWT=\$(printf '%s' \"\$WT\" | sed" "$SWEEP"
   text=$(flat "$SWEEP_ALL")
   [[ "$text" == *"put that worktree path and its \`cd '<path>' && /review:sweep <PR#>\` command in \`Notes\`"* ]]
