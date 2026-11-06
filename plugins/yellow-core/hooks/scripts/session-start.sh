@@ -57,6 +57,13 @@ if [ -z "$PROJECT_SLUG" ]; then
 fi
 STAGING_DIR=$(cs_staging_dir_for_slug "$PROJECT_SLUG")
 
+# A symlinked staging dir is not ours to drain: yellow-review's review-run lock
+# refuses to write a holder there (`holder=none`), so a review could not keep a
+# drain out of it.
+if [ -L "$STAGING_DIR" ]; then
+  json_exit "compound-staging dir is a symlink; not draining"
+fi
+
 # First-run fast-exit: if pending/ doesn't exist yet, there's nothing to
 # drain and nothing to reap.
 if [ ! -d "${STAGING_DIR}/pending" ]; then

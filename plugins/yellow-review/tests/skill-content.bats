@@ -571,7 +571,7 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   grep -q -- '--allow-credential-shaped' "$RESOLVE_PR"
   grep -qF -- '--ranges-from "<ranges-file>"' "$RESOLVE_PR"
   grep -q 'scripts/file-followup-issue"' "$RESOLVE_PR"
-  grep -qF 'scripts/apply-thread-actions" --issue-cap "<n>"' "$RESOLVE_PR"
+  grep -qF 'scripts/apply-thread-actions" --issue-cap "<n>" --expected-head "<head-oid>"' "$RESOLVE_PR"
   grep -q 'scripts/resolve-pr-thread"' "$RESOLVE_PR"
   grep -q 'scripts/poll-new-threads"' "$RESOLVE_PR"
 }
@@ -1856,4 +1856,12 @@ sweep_mark() { printf '%s %s' "$(git rev-parse HEAD)" "$(git reflog show --forma
   text=$(flat "$SWEEP_ALL")
   [[ "$text" == *"put that worktree path and its \`cd '<path>' && /review:sweep <PR#>\` command in \`Notes\`"* ]]
   [[ "$text" == *'A ledger pruned while the command reads it'* ]]
+}
+
+@test "resolve-pr: the write phase passes the head to apply-thread-actions and handles reason=head-moved (CLAUDE-270)" {
+  text=$(flat "$RESOLVE_PR")
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" == *'Every run passes `--expected-head` with the head the head check above accepted'* ]]
+  [[ "$text" == *'For `reason=head-moved`'* ]]
+  [[ "$disp" == *'`reason=head-moved` (from `apply-thread-actions --expected-head`)'* ]]
 }

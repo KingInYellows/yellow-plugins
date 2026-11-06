@@ -151,6 +151,8 @@ Read `${CLAUDE_PLUGIN_ROOT}/references/review-run-lock.md` and run its Acquire
 block, keeping `<holder>`. From here on, every stop and the end of Step 9 run
 its Release block before printing the `Resolve:` line: a compound-staging drain
 must not write into this checkout while the ignored-file guard is watching it.
+Run its Refresh block before Step 6 and before each Step 8 re-pass, so a long
+run keeps its holder past the 120-minute expiry.
 
 ### Step 3: Fetch Unresolved Comments
 
@@ -864,10 +866,12 @@ thread, so no text reaches a command line:
 Then apply the plan with a Bash `timeout` of 600000 ms. Unattended runs pass
 `--issue-cap` with the issues this PR may still create this run: 3 minus every
 issue created this run, in earlier passes and on Linear for this plan.
-Interactive runs omit it:
+Interactive runs omit it. Every run passes `--expected-head` with the head the
+head check above accepted, so a push that lands while the batch runs stops it
+before the next thread:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/apply-thread-actions" --issue-cap "<n>" "<owner/repo>" "<PR#>" "<plan-file>" "<results-file>"
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/apply-thread-actions" --issue-cap "<n>" --expected-head "<head-oid>" "<owner/repo>" "<PR#>" "<plan-file>" "<results-file>"
 ```
 
 It runs `file-followup-issue`, `reply-pr-thread`, `handback-pr-thread` and
@@ -877,13 +881,17 @@ row per thread to `<results-file>` (a fresh `mktemp` path per pass). Then:
 - Exit 5 means its time budget ran out. Run the same command again, same plan
   and results file, until it exits 0 or 4.
 - Exit 2 means the plan was rejected before any write. Fix the plan and re-run.
-- Exit 4 prints a stderr line `reason=rate-limit` or `reason=timeout`, and the
-  rows after the failed stage are `not-attempted`. For `reason=rate-limit` mark
-  the rest `not attempted (rate limit)` and set `ratelimited=1`. For
-  `reason=timeout` mark the rest `not attempted (gh timeout)`, count them
-  blocking, and keep `ratelimited=0`, but also record `write_stopped=timeout` so
-  Step 8 does not run. Treat a missing or unrecognized reason as `rate-limit`.
-  Never re-run the plan in this run (a timed-out call may have posted).
+- Exit 4 prints a stderr line `reason=rate-limit`, `reason=timeout` or
+  `reason=head-moved`, and the rows after the failed stage are `not-attempted`.
+  For `reason=head-moved` (the PR head moved, or could not be read, before a
+  thread) mark that thread and the rest `not attempted (PR head moved)`
+  (blocking), record `write_stopped=head-moved`, and keep `ratelimited=0`. For
+  `reason=rate-limit` mark the rest `not attempted (rate limit)` and set
+  `ratelimited=1`. For `reason=timeout` mark the rest
+  `not attempted (gh timeout)`, count them blocking, and keep `ratelimited=0`,
+  but also record `write_stopped=timeout` so Step 8 does not run. Treat a
+  missing or unrecognized reason as `rate-limit`. Never re-run the plan in this
+  run (a timed-out call may have posted).
 
 Read each thread's outcome from its last row, per the contract's "Batch apply":
 a `withheld` resolve after an `already-replied` skip is

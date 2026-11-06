@@ -390,3 +390,74 @@ resolve-pr-thread PRRT_b" ]
   [ "$runs" -eq 5 ]
   [ "$(jq -r 'select(.threadId=="PRRT_b" and .outcome=="complete") | .resolve.status' "$RESULTS")" = "resolved" ]
 }
+
+# --- --expected-head (CLAUDE-270) ---
+
+H1=1111111111111111111111111111111111111111
+H2=2222222222222222222222222222222222222222
+
+# stub_gh_heads <head>...: successive `gh api .../pulls/7` reads print these
+# heads; "fail" exits 1, "ratelimit" exits 1 with a rate-limit message.
+stub_gh_heads() {
+  printf '%s\n' "$@" >"$STUB_DIR/gh.heads"
+  cat >"$BIN/gh" <<'STUB'
+#!/bin/sh
+printf 'gh %s\n' "$*" >>"$CALL_LOG"
+n=$(cat "$STUB_DIR/gh.n" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" >"$STUB_DIR/gh.n"
+h=$(sed -n "${n}p" "$STUB_DIR/gh.heads")
+case "$h" in
+  fail) echo "HTTP 502" >&2; exit 1 ;;
+  ratelimit) echo "API rate limit exceeded" >&2; exit 1 ;;
+esac
+printf '%s\n' "$h"
+STUB
+  chmod +x "$BIN/gh"
+}
+
+@test "--expected-head reads the PR head before each thread and runs them all while it holds" {
+  printf '%s\n' '{"threadId":"PRRT_a","disposition":"fixed","resolve":true}' '{"threadId":"PRRT_b","disposition":"fixed","resolve":true}' >"$PLAN"
+  stub_gh_heads "$H1" "$H1"
+  PATH="$BIN:$PATH" run "$SCRIPT" --issue-cap 3 --expected-head "$H1" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^gh api repos/o/r/pulls/7 --jq .head.sha$' "$CALL_LOG")" -eq 2 ]
+  [ "$(jq -r .outcome "$RESULTS" | sort -u)" = complete ]
+}
+
+@test "--expected-head stops before a thread when the head moved: that thread and the rest are not attempted" {
+  printf '%s\n' '{"threadId":"PRRT_a","disposition":"fixed","resolve":true}' '{"threadId":"PRRT_b","disposition":"fixed","resolve":true}' '{"threadId":"PRRT_c","disposition":"fixed","resolve":true}' >"$PLAN"
+  stub_gh_heads "$H1" "$H2"
+  PATH="$BIN:$PATH" run --separate-stderr "$SCRIPT" --expected-head "$H1" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"reason=head-moved"* ]]
+  [[ "$output" == *"stopped=head-moved"* ]]
+  grep -qx 'resolve-pr-thread PRRT_a' "$CALL_LOG"
+  ! grep -q 'PRRT_b\|PRRT_c' "$CALL_LOG"
+  [ "$(jq -r 'select(.threadId=="PRRT_b") | [.outcome, .reason] | join(",")' "$RESULTS")" = "not-attempted,head-moved" ]
+  [ "$(jq -r 'select(.threadId=="PRRT_c") | [.outcome, .reason] | join(",")' "$RESULTS")" = "not-attempted,head-moved" ]
+  [ "$(wc -l <"$RESULTS" | tr -d ' ')" -eq 3 ]
+}
+
+@test "--expected-head treats an unreadable head as moved, and a rate-limited read as a rate limit" {
+  printf '%s\n' '{"threadId":"PRRT_a","disposition":"fixed","resolve":true}' >"$PLAN"
+  stub_gh_heads fail
+  PATH="$BIN:$PATH" run --separate-stderr "$SCRIPT" --expected-head "$H1" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"reason=head-moved"* ]]
+  ! grep -q 'resolve-pr-thread' "$CALL_LOG"
+  rm -f "$RESULTS" "$STUB_DIR/gh.n"
+  stub_gh_heads ratelimit
+  PATH="$BIN:$PATH" run --separate-stderr "$SCRIPT" --expected-head "$H1" o/r 7 "$PLAN" "$RESULTS"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"reason=rate-limit"* ]]
+  [ "$(jq -r .reason "$RESULTS")" = rate-limit ]
+}
+
+@test "--expected-head refuses a value that is not a full commit id" {
+  : >"$PLAN"
+  for bad in abc "${H1}0" "$(printf '%s' "$H1" | tr 1 A)" ''; do
+    run "$SCRIPT" --expected-head "$bad" o/r 7 "$PLAN" "$RESULTS"
+    [ "$status" -eq 2 ] || { echo "accepted: $bad" >&2; return 1; }
+  done
+}

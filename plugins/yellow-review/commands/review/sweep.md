@@ -347,6 +347,7 @@ esac
 
 ### Step 3: Run /review:resolve --non-interactive
 
+Run the review-run lock's Refresh block first (the review step can be long).
 Before invoking the skill, Read
 `${CLAUDE_PLUGIN_ROOT}/references/review-sweep/resolve-contract.md` (the
 "Reading `ratelimited` (callers)" section), which defines the contract Step 4

@@ -341,7 +341,7 @@ addressed: reply posted, resolve failed
 
 ## Batch apply
 
-`apply-thread-actions [--issue-cap <n>] <owner/repo> <pr> <plan.jsonl> <results.jsonl>`
+`apply-thread-actions [--issue-cap <n>] [--expected-head <oid>] <owner/repo> <pr> <plan.jsonl> <results.jsonl>`
 runs Phase C for one PR in one Bash call. The orchestrator decides every
 disposition, lane and text first and writes them as a JSONL plan, one object per
 thread in write order:
@@ -385,6 +385,12 @@ after the previous one exited 0, with these fallbacks:
   `reason=rate-limit` or `reason=timeout` on stderr (a missing or unknown child
   reason counts as `rate-limit`). Pacing and rate limits below then applies as
   for a single script.
+- `--expected-head`: before each thread the script reads the PR head once (one
+  `gh api` call, bounded like the stages). A head that differs or cannot be read
+  gives that thread and every remaining one an `outcome` `not-attempted` row
+  with `reason` `head-moved`, and exit 4 with `reason=head-moved`; a
+  rate-limited read stops the same way with `reason=rate-limit`. Nothing is
+  written after the move, so no reply describes a diff the PR no longer has.
 
 Each row is
 `{threadId, disposition, finalDisposition, issue, reply, handback, resolve, outcome}`.
@@ -396,7 +402,7 @@ hand-back never ran), else has a `status` (`filed`, `found`, `over-cap`,
 `outcome` is `complete`, `stopped` (a stage did not succeed), `partial` or
 `not-attempted`. `finalDisposition` is `unclear` after any issue fallback. The
 last stdout line is
-`apply threads=<n> done=<n> skipped=<n> issues_created=<n> stopped=<none|rate-limit|timeout|budget>`.
+`apply threads=<n> done=<n> skipped=<n> issues_created=<n> stopped=<none|rate-limit|timeout|head-moved|budget>`.
 
 **Time budget.** Stage worst cases (Bash timeouts below, plus 60 s each) are 420
 s for an issue, 340 s for a reply or hand-back and 280 s for a resolve. A stage
@@ -1017,6 +1023,10 @@ one PR comment listing every unresolved thread (outdated included, as in
     `not attempted (gh timeout)` and counts as blocking. `ratelimited` stays
     `0`: no limit occurred, so batch callers keep working through their other
     PRs. Step 7 also records `write_stopped=timeout`.
+  - `reason=head-moved` (from `apply-thread-actions --expected-head`): every
+    remaining thread is reported as `not attempted (PR head moved)`, counts as
+    blocking, keeps `ratelimited=0`, and Step 7 records
+    `write_stopped=head-moved`, which also skips the re-pass.
   - The re-pass (Step 8) runs only when no exit 4 stopped the write phase: after
     `reason=rate-limit` (`ratelimited=1`) or `reason=timeout`
     (`write_stopped=timeout`) it is skipped, because a timed-out call may have

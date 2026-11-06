@@ -96,7 +96,11 @@
 #            submitted. The second check undoes the commit first, so the caller
 #            keeps the edits as a recovery patch instead of submitting against
 #            a diverged remote. A branch read that fails or times out is treated
-#            the same way, because the head cannot be confirmed. One case keeps
+#            the same way, because the head cannot be confirmed. Both checks
+#            share one budget of two YELLOW_REVIEW_NET_TIMEOUTs of ls-remote
+#            time (the commit between them is not counted), so several push
+#            URLs cannot stretch them; a spent budget reads as unconfirmed.
+#            One case keeps
 #            the commit: a local commit landed on top of it before the submit
 #            (resetting would drop that commit too); stderr then carries
 #            `recovery: local commit <sha> kept below <head>; not submitted`.
@@ -1532,15 +1536,30 @@ runtime_override_check() {
 # thread, an autofix bot) can push the branch between the caller's Step 2c
 # check and this commit; submitting then would fight a diverged remote.
 HM_WHY=""
+# Both head checks share one budget, HM_BUDGET seconds (two NET_TIMEOUTs) of
+# ls-remote time, so several push URLs cannot push the run past the caller's
+# 600 s Bash budget; each call gets what is left, at most NET_TIMEOUT. Only the
+# reads count: the commit and restack between the checks spend none of it.
+# Running out reads as an unconfirmed head (fail safe).
+HM_BUDGET=$((NET_TIMEOUT * 2))
+HM_LEFT=$HM_BUDGET
 remote_head_moved() {
-    local want="$1" url rc out got
+    local want="$1" url rc out got start left
     for url in "${PUSH_URLS[@]}"; do
+        left=$HM_LEFT
+        if [ "$left" -le 0 ]; then
+            HM_WHY="the head checks used their ${HM_BUDGET}s budget"
+            return 0
+        fi
+        [ "$left" -le "$NET_TIMEOUT" ] || left=$NET_TIMEOUT
+        start=$(date +%s)
         rc=0
-        out=$(bounded "$NET_TIMEOUT" "$YELLOW_REVIEW_GIT" ls-remote -- "$url" "refs/heads/$BRANCH" 2>"$NET_ERR") || rc=$?
+        out=$(bounded "$left" "$YELLOW_REVIEW_GIT" ls-remote -- "$url" "refs/heads/$BRANCH" 2>"$NET_ERR") || rc=$?
+        HM_LEFT=$((HM_LEFT - ($(date +%s) - start)))
         got=$(printf '%s\n' "$out" | awk 'NR == 1 { print $1 }')
         if [ "$rc" -ne 0 ] || [ -z "$got" ]; then
             HM_WHY="the remote branch could not be read"
-            [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ] && HM_WHY="ls-remote timed out after ${NET_TIMEOUT}s"
+            [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ] && HM_WHY="ls-remote timed out after ${left}s"
             return 0
         fi
         if [ "$got" != "$want" ]; then
