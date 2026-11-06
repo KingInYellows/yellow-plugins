@@ -756,7 +756,9 @@ name `over-cap fix pushed; converting the PR to draft failed` instead. `NOOP` â†
 `push=noop`. Any non-zero exit â†’ `push=failed` with its stderr (exit codes in
 the contract); exits 2, 3, 4, 7 and 8 revert first, as above, while 5 and 6 keep
 the local commit. A 5 or 6 whose stderr has `draft=set` left the PR a draft:
-Step 9 also names `PR set to draft: over-cap fix needs human review`. Exit 8
+Step 9 also names `PR set to draft: over-cap fix needs human review`; with
+`draft=failed` it names
+`over-cap push may have landed; converting the PR to draft failed`. Exit 8
 (stderr `reason=head-moved`: another writer pushed the branch during the run)
 submits nothing; the revert saves the fixes as a recovery patch, unless stderr
 has a `recovery: local commit <sha> kept below <head>` line (a local commit
