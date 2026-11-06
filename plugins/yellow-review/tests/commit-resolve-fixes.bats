@@ -1048,8 +1048,19 @@ long_file() {
   [ "$(jq -r .status <<<"$output")" = PUSHED ]
   [ "$(jq -r .draft <<<"$output")" = set ]
   grep -q '^gh pr ready 7 --undo$' "$STUB_LOG"
-  # the draft conversion comes after the push is verified
-  [ "$(grep -n '^gt submit' "$STUB_LOG" | head -1 | cut -d: -f1)" -lt "$(grep -n '^gh pr ready' "$STUB_LOG" | cut -d: -f1)" ]
+  [[ "$stderr" == *"draft=set"* ]]
+  # the draft conversion comes before the push (CLAUDE-278)
+  [ "$(grep -n '^gh pr ready' "$STUB_LOG" | cut -d: -f1)" -lt "$(grep -n '^gt submit' "$STUB_LOG" | head -1 | cut -d: -f1)" ]
+}
+
+@test "--over-cap-draft leaves the PR a draft when the push lands but is not verified (CLAUDE-278)" {
+  long_file
+  { head -n 5 src/a.txt; seq 1000 1050; tail -n +6 src/a.txt; } >| "$BATS_TEST_TMPDIR/new.txt" && cp "$BATS_TEST_TMPDIR/new.txt" src/a.txt
+  export STUB_PR_HEAD=0000000000000000000000000000000000000000
+  run_crf --provider graphite --pr 7 --message "$MSG" --unattended --over-cap-draft --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"draft=set"* ]]
+  grep -q '^gh pr ready 7 --undo$' "$STUB_LOG"
 }
 
 @test "--over-cap-draft reports draft=failed when the conversion fails, set when the PR already is one" {

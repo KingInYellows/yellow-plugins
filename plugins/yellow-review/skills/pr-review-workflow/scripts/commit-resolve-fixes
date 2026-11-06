@@ -64,11 +64,13 @@
 #            nothing. A malformed row or a non-canonical path is exit 2.
 #   draft:   --over-cap-draft (commit mode, needs --unattended and
 #            --ranges-from) lifts the line cap for this commit; the range,
-#            path and credential checks still apply. After the head is
-#            verified, the PR is converted to a draft (`gh pr ready --undo`)
-#            so a person reviews the over-cap fix before it can merge, and the
-#            output gains "draft":"set" or "draft":"failed" (the push stands
-#            either way; the caller reports a failed conversion).
+#            path and credential checks still apply. Right before the push,
+#            the PR is converted to a draft (`gh pr ready --undo`) so a person
+#            reviews the over-cap fix before it can merge, even if the push
+#            lands and a later check fails; stderr carries `draft=set|failed`
+#            and a PUSHED result gains "draft":"set" or "draft":"failed" (the
+#            push goes ahead either way; the caller reports a failed
+#            conversion).
 #   paths:   --check-paths reports which listed paths the commit would refuse
 #            by path alone, before anything is edited: it stages and commits
 #            nothing, needs no --provider, --pr or --message, makes no network
@@ -1755,6 +1757,21 @@ if [ -n "$EXPECTED_HEAD" ]; then
     fi
 fi
 
+# --- Over-cap draft ---
+# Converted before the push, so the gate is in place even when the push lands
+# but a later check fails (exit 5 or 6). A push that never lands leaves the PR
+# a draft with nothing new on it, which only asks a person to look sooner.
+# The push goes ahead either way; the caller reports a failed conversion.
+if [ "$OVER_CAP_DRAFT" = 1 ]; then
+    DRAFT=set
+    if ! gh pr ready "$PR" --undo >/dev/null 2>&1; then
+        # Already a draft also fails the call; read the state before blaming it.
+        IS_DRAFT=$(gh pr view "$PR" --json isDraft 2>/dev/null | jq -r '.isDraft // empty' 2>/dev/null || true)
+        [ "$IS_DRAFT" = true ] || DRAFT=failed
+    fi
+    printf 'draft=%s\n' "$DRAFT" >&2
+fi
+
 # --- Submit ---
 # submit_failed: exit 5 with a recovery recipe. The local commit exists and
 # the remote did not take it; never force over a remote someone else moved.
@@ -1840,13 +1857,6 @@ if [ "$PR_HEAD" != "$SHA" ]; then
 fi
 
 if [ "$OVER_CAP_DRAFT" = 1 ]; then
-    # The push stands either way; the caller reports a failed conversion.
-    DRAFT=set
-    if ! gh pr ready "$PR" --undo >/dev/null 2>&1; then
-        # Already a draft also fails the call; read the state before blaming it.
-        IS_DRAFT=$(gh pr view "$PR" --json isDraft 2>/dev/null | jq -r '.isDraft // empty' 2>/dev/null || true)
-        [ "$IS_DRAFT" = true ] || DRAFT=failed
-    fi
     jq -nc --arg s PUSHED --arg sha "$SHA" --arg b "$BRANCH" --arg d "$DRAFT" '{status: $s, sha: $sha, branch: $b, draft: $d}'
     exit 0
 fi

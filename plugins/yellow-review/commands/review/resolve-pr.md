@@ -631,7 +631,7 @@ refusal (above). An empty list continues to Verify. Otherwise:
   of being thrown away. When any kept file carries `over-cap` (a deferred
   cluster's file, or a file in no cluster that alone exceeds the cap), add
   `--over-cap-draft` to this run's commit call (Push, below), which lifts the
-  cap and converts the PR to a draft once the push is verified.
+  cap and converts the PR to a draft right before the push.
 - **Interactive:** one `AskUserQuestion` (part of the push-confirmation gate)
   naming each file and its old-line spans, with "Include them / Revert them".
   Include keeps the edits and drops `--ranges-from` from this run's commit call
@@ -755,12 +755,14 @@ evidence `over the 50-line cap; pushed for human review (PR set to draft)`
 name `over-cap fix pushed; converting the PR to draft failed` instead. `NOOP` →
 `push=noop`. Any non-zero exit → `push=failed` with its stderr (exit codes in
 the contract); exits 2, 3, 4, 7 and 8 revert first, as above, while 5 and 6 keep
-the local commit. Exit 8 (stderr `reason=head-moved`: another writer pushed the
-branch during the run) submits nothing; the revert saves the fixes as a recovery
-patch, unless stderr has a `recovery: local commit <sha> kept below <head>` line
-(a local commit landed on top of this run's commit, so the fixes stay committed
-at `<sha>` and are not submitted; put that line in Step 9 under Blocking merge).
-Either way every `fixed` thread becomes `unclear` with evidence
+the local commit. A 5 or 6 whose stderr has `draft=set` left the PR a draft:
+Step 9 also names `PR set to draft: over-cap fix needs human review`. Exit 8
+(stderr `reason=head-moved`: another writer pushed the branch during the run)
+submits nothing; the revert saves the fixes as a recovery patch, unless stderr
+has a `recovery: local commit <sha> kept below <head>` line (a local commit
+landed on top of this run's commit, so the fixes stay committed at `<sha>` and
+are not submitted; put that line in Step 9 under Blocking merge). Either way
+every `fixed` thread becomes `unclear` with evidence
 `PR head moved during the run`, and Step 6 records `write_stopped=head-moved`,
 so Step 7 posts nothing even when the move was an unreadable push-URL branch or
 a local commit that the PR head does not show. Exit 5 prints a `recovery:` line
