@@ -53,10 +53,11 @@ stops counting and the next `acquire` reaps it.
 
 ## Refresh
 
-A run that can outlast 120 minutes (`/review:sweep-all`,
-`/review:resolve-stack`) refreshes its holder before each PR with
-`review-run-lock refresh "<holder>"` (skip when `none`). Exit 1 (the holder was
-reaped) means acquire again and keep the new value.
+A run that can outlast 120 minutes refreshes its holder with
+`review-run-lock refresh "<holder>"` (skip when `none`): `/review:sweep-all` and
+`/review:resolve-stack` before each PR, `/review:sweep` before its resolve step,
+and `/review:resolve` before Step 6 and before each Step 8 re-pass. Exit 1 (the
+holder was reaped) means acquire again and keep the new value.
 
 ## Why acquire also creates the staging dir
 
