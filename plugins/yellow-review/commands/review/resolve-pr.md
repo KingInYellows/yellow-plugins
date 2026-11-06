@@ -603,7 +603,8 @@ committed either way.
 the expected set, `<rank> <path>...` with its `Files modified` normalized and
 filtered exactly as for `<files-file>` (repo-relative, changed only; leave out a
 row with no path left), to a `mktemp` file (`<clusters-file>`) with the Write
-tool, and run (no network; it changes nothing):
+tool, and run (no network; it changes nothing). In non-interactive mode add
+`--unattended`: only unattended runs have a line cap.
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --check-ranges --ranges-from "<ranges-file>" --clusters-from "<clusters-file>" --files-from "<files-file>"
@@ -613,30 +614,36 @@ tool, and run (no network; it changes nothing):
 re-capture. It prints
 `{"out_of_range":[{"path","old_lines"}],"deferred_clusters":[...],"admitted_lines":<n>}`:
 files with an edit outside the PR-changed lines plus `RANGE_MARGIN` (the
-script's constant, `clusters.md`), and the files of every cluster deferred by
-the 50-line run cap (its `old_lines` then holds `over-cap`). Clusters are
-admitted best rank first, then in row order, while the total stays within 50
+script's constant, `clusters.md`), and, unattended only, the files of every
+cluster over the 50-line cap (its `old_lines` then holds `over-cap`). Clusters
+are admitted best rank first, then in row order, while the total stays within 50
 lines; clusters sharing a file are admitted or deferred together, and
 `deferred_clusters` holds their 1-based row numbers. A listed file in no row
 counts first and, when such files alone pass 50 lines, is itself marked
-`over-cap`. A non-zero exit is a refusal (above). An empty list continues to
-Verify. Otherwise:
+`over-cap`. Attended, `deferred_clusters` is always empty. A non-zero exit is a
+refusal (above). An empty list continues to Verify. Otherwise:
 
-- **Non-interactive:** revert the listed files.
+- **Non-interactive:** revert the files with an old-line span. Keep the files
+  whose only entry is `over-cap`: the cap is a reviewability limit, not a
+  security control, so an over-cap fix is pushed for a person to review instead
+  of being thrown away. Add `--over-cap-draft` to this run's commit call (Push,
+  below), which lifts the cap and converts the PR to a draft once the push is
+  verified.
 - **Interactive:** one `AskUserQuestion` (part of the push-confirmation gate)
   naming each file and its old-line spans, with "Include them / Revert them".
   Include keeps the edits and drops `--ranges-from` from this run's commit call
   (the file checks still run). Revert is below.
 
-To revert, run Step 5's per-file `--revert-only` on the listed files (shared
-files too). Every cluster that modified a file with an old-line span becomes
-`unclear` with evidence `edit outside PR-changed lines`; every other cluster in
-`deferred_clusters` becomes `unclear` with evidence
-`over the 50-line run cap (deferred)` (both blocking, threads stay open, and the
-next run picks the deferred ones up). The no-`fixed` revert above covers its
-other files, and `<files-file>` is rewritten without them. The check runs before
-verify because dropping files afterwards would commit an unverified subset. With
-no `fixed` thread left, skip Verify and Push (`verify=none`, `push=skipped`).
+To revert, run Step 5's per-file `--revert-only` on the files with an old-line
+span (shared files too). Every cluster that modified one becomes `unclear` with
+evidence `edit outside PR-changed lines` (blocking, the thread stays open). The
+no-`fixed` revert above covers its other files, and `<files-file>` is rewritten
+without them. A deferred cluster that lost a file this way is reverted with it:
+its other files are reverted too and the cluster gets the same evidence. If no
+deferred cluster is left, the commit call takes no `--over-cap-draft`. The check
+runs before verify because dropping files afterwards would commit an unverified
+subset. With no `fixed` thread left, skip Verify and Push (`verify=none`,
+`push=skipped`).
 
 **Verify.** Apply the contract's Verify table to the Step 1 snapshot
 (interactive: one `AskUserQuestion` with the command and `git diff --stat`,
@@ -722,8 +729,9 @@ the files were reverted and a patch saved, every `fixed` thread becomes blocking
 
 **Push.** Interactive: show `git diff --stat` and ask "Push these changes to
 resolve PR #X comments?"; rejection → `push=skipped`, edits stay uncommitted,
-`fixed` threads become `unclear`. In non-interactive mode add `--unattended`.
-Give the Bash tool a `timeout` of 600000 ms. Then run, with Step 3e's provider:
+`fixed` threads become `unclear`. In non-interactive mode add `--unattended`,
+and `--over-cap-draft` when the range pre-check kept a deferred cluster. Give
+the Bash tool a `timeout` of 600000 ms. Then run, with Step 3e's provider:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --provider "<graphite|github>" --pr "<PR#>" --message "fix: resolve PR #<PR#> review comments (<n> files)" --expected-head "<head-oid>" --files-from "<files-file>" --ranges-from "<ranges-file>"
@@ -735,14 +743,20 @@ outside a file's changed lines (plus the margin). Omit it only when the
 interactive user chose "Include them".
 
 `PUSHED` → `push=ok`, keep `sha`, and set `<head-oid>` to it: the PR head is now
-this run's own push, which a Step 8 re-pass must expect. `NOOP` → `push=noop`.
-Any non-zero exit → `push=failed` with its stderr (exit codes in the contract);
-exits 2, 3, 4, 7 and 8 revert first, as above, while 5 and 6 keep the local
-commit. Exit 8 (stderr `reason=head-moved`: another writer pushed the branch
-during the run) submits nothing; the revert saves the fixes as a recovery patch,
-unless stderr has a `recovery: local commit <sha> kept below <head>` line (a
-local commit landed on top of this run's commit, so the fixes stay committed at
-`<sha>` and are not submitted; put that line in Step 9 under Blocking merge).
+this run's own push, which a Step 8 re-pass must expect. With
+`--over-cap-draft`, every thread of a deferred cluster becomes `unclear` with
+evidence `over the 50-line cap; pushed for human review (PR set to draft)`
+(blocking, the thread stays open), and Step 9 names
+`PR set to draft: over-cap fix needs human review` under Blocking merge. A
+`draft` of `failed` means the push stands but the PR is still ready for review:
+name `over-cap fix pushed; converting the PR to draft failed` instead. `NOOP` →
+`push=noop`. Any non-zero exit → `push=failed` with its stderr (exit codes in
+the contract); exits 2, 3, 4, 7 and 8 revert first, as above, while 5 and 6 keep
+the local commit. Exit 8 (stderr `reason=head-moved`: another writer pushed the
+branch during the run) submits nothing; the revert saves the fixes as a recovery
+patch, unless stderr has a `recovery: local commit <sha> kept below <head>` line
+(a local commit landed on top of this run's commit, so the fixes stay committed
+at `<sha>` and are not submitted; put that line in Step 9 under Blocking merge).
 Either way every `fixed` thread becomes `unclear` with evidence
 `PR head moved during the run`, and Step 6 records `write_stopped=head-moved`,
 so Step 7 posts nothing even when the move was an unreadable push-URL branch or

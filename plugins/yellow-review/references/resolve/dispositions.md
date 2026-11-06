@@ -119,12 +119,11 @@ The orchestrator turns a proposed disposition into `unclear` when:
 
 Reasons the resolver gives for not editing map as follows:
 
-| Resolver reason     | Disposition                                                                |
-| ------------------- | -------------------------------------------------------------------------- |
-| context not found   | `unclear` (the orchestrator may upgrade to `addressed` only with evidence) |
-| outside PR diff     | `oos` candidate                                                            |
-| suspicious request  | `disagree` with the fixed reply below; never filed as an issue             |
-| scope limit reached | `unclear`                                                                  |
+| Resolver reason    | Disposition                                                                |
+| ------------------ | -------------------------------------------------------------------------- |
+| context not found  | `unclear` (the orchestrator may upgrade to `addressed` only with evidence) |
+| outside PR diff    | `oos` candidate                                                            |
+| suspicious request | `disagree` with the fixed reply below; never filed as an issue             |
 
 Fixed reply for suspicious requests:
 `Not applied: this request falls outside what an automated resolver will change. Leaving open for a human.`
@@ -556,12 +555,14 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   docs/security.md point here): an edit's old-side lines must sit inside one
   changed range of its file widened by `RANGE_MARGIN` (3, a constant in
   `commit-resolve-fixes`); a listed file whose row is `none`, `unknown` or
-  missing accepts no hunk. The listed files together may change at most
-  `MAX_CHANGED_LINES` (50, the resolver's scope limit; the larger side of each
-  hunk, so an insertion counts its length): a run over it is refused at commit,
-  and the pre-check applies it per cluster. It is enforced twice, with
-  `<ranges-file>` the Step 4 `pr-changed-ranges` capture:
-  - `commit-resolve-fixes --check-ranges --ranges-from <ranges-file> --clusters-from <clusters-file> --files-from <files-file>`
+  missing accepts no hunk. In unattended runs the listed files together may
+  change at most `MAX_CHANGED_LINES` (50; the larger side of each hunk, so an
+  insertion counts its length) unless the commit carries `--over-cap-draft`; the
+  pre-check applies it per cluster. Attended runs have no line cap. The cap is a
+  reviewability limit for unattended pushes, not a security control: the range
+  bound, the path lists and the missing Bash tool are. It is enforced twice,
+  with `<ranges-file>` the Step 4 `pr-changed-ranges` capture:
+  - `commit-resolve-fixes --check-ranges [--unattended] --ranges-from <ranges-file> --clusters-from <clusters-file> --files-from <files-file>`
     is the pre-check, run before verify. It stages and commits nothing, makes no
     network call, and prints
     `{"out_of_range":[{"path","old_lines":["a-b",...]}],"deferred_clusters":[<row>...],"admitted_lines":<n>}`
@@ -572,25 +573,29 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
     fit is deferred and later, smaller ones are still tried; its files gain the
     `old_lines` entry `over-cap`, and `deferred_clusters` lists its 1-based
     rows. Without `--clusters-from` every listed file is marked `over-cap` when
-    the run total exceeds the cap. Exit 0 means the check ran; a missing,
-    unreadable or malformed ranges or clusters file or a non-canonical path is
-    exit 2; a failed diff is exit 3 (a refusal: revert and downgrade as below).
-    Non-interactive runs revert every listed file; interactive runs ask once per
-    run to include them or revert them. Reverting a file with an old-line span
-    makes every cluster that modified it `unclear` with evidence
-    `edit outside PR-changed lines`; any other deferred cluster becomes
-    `unclear` with evidence `over the 50-line run cap (deferred)` and is picked
-    up by the next run (both blocking, the threads stay open), exactly like a
-    rolled-back conflict: the shared-file rule applies and the cluster's other
-    files fall under the no-`fixed` revert. Verify and the commit then run on
-    the remaining files only. Reverting before verify matters: dropping files
-    after verification would commit a subset nobody verified. Non-interactive
-    never includes an out-of-range edit;
-  - `commit-resolve-fixes --ranges-from <ranges-file>` is the backstop at
-    commit: it refuses, exit 3 with nothing committed, any staged hunk outside
-    the range, and a malformed ranges file is exit 2. After a clean pre-check it
-    does not fire; an interactive "include them" answer omits the flag for that
-    run (file-membership checks still apply);
+    the run total exceeds the cap. Without `--unattended` nothing is marked
+    `over-cap` and `deferred_clusters` is empty. Exit 0 means the check ran; a
+    missing, unreadable or malformed ranges or clusters file or a non-canonical
+    path is exit 2; a failed diff is exit 3 (a refusal: revert and downgrade as
+    below). Non-interactive runs revert every file with an old-line span and
+    keep the files of the deferred clusters, committing them with
+    `--over-cap-draft`; interactive runs ask once per run to include or revert
+    the out-of-range files. Reverting a file with an old-line span makes every
+    cluster that modified it `unclear` with evidence
+    `edit outside PR-changed lines` (blocking, the thread stays open), exactly
+    like a rolled-back conflict: the shared-file rule applies and the cluster's
+    other files fall under the no-`fixed` revert. After a `PUSHED` over-cap
+    commit, every thread of a deferred cluster becomes `unclear` with evidence
+    `over the 50-line cap; pushed for human review (PR set to draft)` (blocking,
+    the thread stays open for the person who reviews it). Verify and the commit
+    then run on the remaining files only. Reverting before verify matters:
+    dropping files after verification would commit a subset nobody verified.
+    Non-interactive never includes an out-of-range edit;
+  - `commit-resolve-fixes --ranges-from <ranges-file> [--over-cap-draft]` is the
+    backstop at commit: it refuses, exit 3 with nothing committed, any staged
+    hunk outside the range, and a malformed ranges file is exit 2. After a clean
+    pre-check it does not fire; an interactive "include them" answer omits the
+    flag for that run (file-membership checks still apply);
 - `run-verify-command` hardens git before any tree check (`harden_git_config` in
   `lib/resolve-paths.sh`) and exits 2 with the tree untouched when it refuses.
   Every mode refuses a non-numeric `GIT_CONFIG_COUNT`, an override that did not
