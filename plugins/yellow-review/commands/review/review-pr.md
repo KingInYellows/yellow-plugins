@@ -1251,6 +1251,11 @@ helper); the default routing is human review.
 Persist the simplifier's findings with ledger.md's "After Step 8" section
 (`--step 8 --anchor-source worktree`).
 
+This pass reviews the fixes this run applied, so it stays when `/flow:work`'s
+simplify pass already ran: that pass cleaned the author's code before
+submission, and `/flow:work` Phase 5 calls this command with `--report-only`,
+which skips this step anyway.
+
 Then re-partition the theme groups as `themes.md` says: number the
 simplifier's findings after the last `#` and add each one that shares a
 group's signal, drop applied findings, and drop groups left with fewer than two.

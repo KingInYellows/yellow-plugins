@@ -145,6 +145,13 @@ flags, exit codes, trust-boundary rules and library behavior.
   pass)
 - `type-design-analyzer` — Type design, encapsulation, invariants
 - `silent-failure-hunter` — Silent failure and error handling analysis
+- `test-value-reviewer` — Tests that protect nothing (false-confidence,
+  implementation-coupled, duplicate, test-only seams). Dispatched only by
+  `/flow:work`'s simplify pass; `/review:pr` never selects it. Adapted from CE
+  `b405537`.
+- `comment-reviewer` — Comments to delete or reshape away, code files only.
+  Dispatched only by `/flow:work`'s simplify pass; `/review:pr` never selects
+  it. Adapted from CE `b405537`.
 
 **Workflow** — orchestration helpers:
 

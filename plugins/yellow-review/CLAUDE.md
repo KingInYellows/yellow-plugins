@@ -102,7 +102,7 @@ it before editing a script, library or command.
   mergeability, ledger P0-P2); ends with the `MergeReady:` contract line and
   never writes to GitHub or adds ledger records
 
-### Agents (19)
+### Agents (21)
 
 Review agents report findings and never edit files; the orchestrating command
 applies fixes.
@@ -120,6 +120,9 @@ applies fixes.
   `reviewer_set.force_depth` names it)
 - Specialists: `pr-test-analyzer`, `comment-analyzer`, `code-simplifier` (final
   pass), `type-design-analyzer`, `silent-failure-hunter`
+- Simplify pass only, never selected by `/review:pr`: `test-value-reviewer`,
+  `comment-reviewer` (yellow-core `/flow:work` Phase 3 step 8 dispatches them
+  with `code-simplifier`)
 - Workflow: `pr-comment-resolver` — one fix per comment cluster plus a proposed
   per-thread disposition; no Bash tool. `review-gate-verifier` — the
   `review-gate` workflow's read-only voter (Read, Grep, Glob only)
@@ -216,11 +219,11 @@ the resolve scripts: `references/resolve/dispositions.md`.
   `commit-resolve-fixes --check-ranges --unattended --clusters-from` applies the
   50-line cap per cluster (best rank first); interactive runs have no cap, and
   an unattended run commits over-cap clusters with `--over-cap-draft`, which
-  converts the PR to a draft for human review,
-  and `--check-paths --unattended` lets `/review:resolve` skip runner-file
-  clusters before any resolver runs. `run-verify-command --revert-denied` also
-  judges trusted-config symlinks (tracked, untracked or nested) and leaves FIFO,
-  socket and device paths in place, reporting them instead of opening them
+  converts the PR to a draft for human review, and `--check-paths --unattended`
+  lets `/review:resolve` skip runner-file clusters before any resolver runs.
+  `run-verify-command --revert-denied` also judges trusted-config symlinks
+  (tracked, untracked or nested) and leaves FIFO, socket and device paths in
+  place, reporting them instead of opening them
 - `head-ignore-probe`, `guard-local-config` — protect the ignored
   `yellow-plugins.local.md` for sweep and resolve-stack
 - `read-resolve-config` — the Step 1 config snapshot as JSON; never parse the
