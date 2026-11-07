@@ -57,13 +57,15 @@ below and supporting utilities:
   normalizing Codex's absolute code_location paths
 - `mktemp`, `timeout`, `rm -f` — Step 4 temp-file lifecycle and timeout
   wrapping
+- `sleep` — Step 4's bounded wait loop when Claude Code moves the Codex
+  call to the background
 - `wc -c` — Step 3's diff-size pre-flight and Step 6's `FINDINGS` byte-cap
   check
 - `grep` — Step 4's exit-code diagnosis (parse-error / model-rejection /
   rate-limit pattern matching against `$STDERR_FILE` and the API error
   event extracted from it) and Step 6's `FINDINGS_LINES` count
-- `head` — Step 4's `ERR_PEEK` truncation and Step 6's `FINDINGS` byte-cap
-  truncation
+- `head` — Step 4's `ERR_PEEK` truncation and background-wait read, and
+  Step 6's `FINDINGS` byte-cap truncation
 - `tr` — Step 4's `ERR_PEEK` newline flattening, the quota-ETA flatten and
   character whitelist, and Step 6's `SUMMARY` newline flattening
 - `awk` — Step 4's `ERR_PEEK` redaction; Step 6's `FINDINGS`/`SUMMARY`
@@ -210,9 +212,10 @@ to `360000` (6 minutes). Codex usually needs 3-4 minutes, and the tool's
 default 120 s timeout moves the command to the background mid-run. If the
 tool still reports that the command was moved to the background, do not
 re-run it and do not finish yet: wait for it with Bash calls of the form
-`i=0; while [ "$i" -lt 150 ] && ! grep -qE '^(verdict|OUTPUT_FILE)=' '<output path>'; do sleep 1; i=$((i+1)); done; sleep 1; cat '<output path>'`,
-using the output path the tool reported, until the file holds a `verdict=` or
-`OUTPUT_FILE=` line. That text is this step's result.
+`i=0; while [ "$i" -lt 100 ] && ! command grep -qE '^(verdict|OUTPUT_FILE)=' '<output path>'; do sleep 1; i=$((i+1)); done; sleep 1; head -n 50 '<output path>'`,
+using the output path the tool reported. Each call stays under the 120 s
+default; repeat it until the output holds a `verdict=` or `OUTPUT_FILE=` line.
+That output is this step's result.
 
 ```bash
 OUTPUT_FILE=$(mktemp /tmp/codex-reviewer-XXXXXX.txt)
