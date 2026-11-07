@@ -2,6 +2,7 @@
 name: knowledge-compounder
 description: 'Extract and document recently solved engineering problems using parallel subagents. Use when spawned by /flow:compound to capture solutions, or after /review:pr to compound review findings into docs/solutions/ and MEMORY.md.'
 model: sonnet
+effort: medium
 memory: project
 tools:
   - Agent
