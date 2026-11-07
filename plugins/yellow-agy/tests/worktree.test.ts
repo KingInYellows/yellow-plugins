@@ -472,32 +472,27 @@ describe('runSpawn on a bridge Linux group (CLAUDE-246)', () => {
   // True while any member of the group is still running. A killed process
   // nobody has reaped yet is a zombie: dead for this test. Matching on the
   // group (field 5 of /proc/<pid>/stat) rather than probing the leader's pid
-  // keeps an unrelated process that reuses that pid from counting.
-  const groupRunning = (pgid: number): boolean => {
-    let pids: string[];
-    try {
-      pids = fs.readdirSync('/proc').filter((d) => /^\d+$/.test(d));
-    } catch {
-      // No /proc (macOS): fall back to the group probe.
-      try {
-        process.kill(-pgid, 0);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-    return pids.some((pid) => {
-      try {
-        const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+  // keeps an unrelated process that reuses that pid from counting. `setsid`
+  // makes this suite Linux-only, so /proc is always there.
+  const groupRunning = (pgid: number): boolean =>
+    fs
+      .readdirSync('/proc')
+      .filter((d) => /^\d+$/.test(d))
+      .some((pid) => {
+        let stat: string;
+        try {
+          stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+        } catch (e) {
+          // Exited while we looked; anything else is a real error.
+          const code = (e as NodeJS.ErrnoException).code;
+          if (code === 'ENOENT' || code === 'ESRCH') return false;
+          throw e;
+        }
         const [state, , pgrp] = stat
           .slice(stat.lastIndexOf(')') + 2)
           .split(' ');
         return Number(pgrp) === pgid && state !== 'Z';
-      } catch {
-        return false; // exited while we looked
-      }
-    });
-  };
+      });
   // SIGKILL is queued when kill() returns; the members leave the run queue a
   // moment later, so give a busy runner a bounded window to show that.
   const groupGone = async (pgid: number): Promise<boolean> => {
