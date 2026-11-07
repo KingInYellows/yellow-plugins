@@ -215,7 +215,10 @@ re-run it and do not finish yet: wait for it with Bash calls of the form
 `i=0; while [ "$i" -lt 100 ] && ! command grep -qE '^(verdict|OUTPUT_FILE)=' '<output path>'; do sleep 1; i=$((i+1)); done; sleep 1; head -n 50 '<output path>'`,
 using the output path the tool reported. Each call stays under the 120 s
 default; repeat it until the output holds a `verdict=` or `OUTPUT_FILE=` line.
-That output is this step's result.
+That output is this step's result. Stop after 4 such calls: if neither line
+has appeared, return `verdict=TIMEOUT`, `confidence=N/A` and
+`summary=Codex did not finish after it was moved to the background. Review ran without a Codex verdict.`
+and stop.
 
 ```bash
 OUTPUT_FILE=$(mktemp /tmp/codex-reviewer-XXXXXX.txt)
