@@ -98,7 +98,7 @@ Action: <delete | merge | rewrite | report as defect>
 Catches: <the failure this test can catch, or "nothing">
 Still covered by: <file:line of the remaining test, or "asserts nothing that could fail">
 Seam unlocked: <production code its deletion frees, or "none">
-Run: <exact command that runs this test>
+Test: <repo-relative test file path> — <test name>
 Checked: <what you read>
 ```
 
