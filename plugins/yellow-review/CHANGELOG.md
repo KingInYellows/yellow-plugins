@@ -1,5 +1,89 @@
 # Changelog
 
+## 3.16.0
+
+### Minor Changes
+
+- [#1704](https://github.com/KingInYellows/yellow-plugins/pull/1704)
+  [`253aebe`](https://github.com/KingInYellows/yellow-plugins/commit/253aebe56316a0f53ca9a5adcd05d70d767f84ad)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make the
+  resolve line cap unattended-only (CLAUDE-272, CLAUDE-273). Interactive
+  `/review:resolve` runs have no line cap, and the resolver agent no longer
+  stops itself at 50 lines. An unattended run whose clusters go over the 50-line
+  cap now pushes them with `commit-resolve-fixes --over-cap-draft`, which
+  converts the PR to a draft and leaves those threads open for human review,
+  instead of reverting the fix. The cap is documented as a reviewability limit,
+  not a security control. Also: a ledger test for a prune that lands before a
+  successful fold, and the sweep worktree hint now reads as two steps.
+
+- [#1689](https://github.com/KingInYellows/yellow-plugins/pull/1689)
+  [`3b4e6be`](https://github.com/KingInYellows/yellow-plugins/commit/3b4e6bef7f87ce61e7833e2549fcf5c5d3bacba5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:resolve` applies the 50-line run cap per cluster:
+  `commit-resolve-fixes --check-ranges --clusters-from` admits clusters by
+  severity rank and defers only the ones that do not fit
+  (`over the 50-line run cap (deferred)`), instead of reverting the whole run.
+  Non-interactive runs no longer dispatch a resolver for a cluster on a runner
+  file; its threads stay open with `needs an attended /review:resolve`.
+
+- [#1687](https://github.com/KingInYellows/yellow-plugins/pull/1687)
+  [`61a6f7e`](https://github.com/KingInYellows/yellow-plugins/commit/61a6f7eb788fdda594256924c21d4e67bdbd3205)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:resolve` now stops another writer's push from turning into a failed
+  or stale run (CLAUDE-266). It passes the PR head it checked in Step 2c to
+  `commit-resolve-fixes --expected-head`, which re-reads the head before staging
+  and again before the submit and exits 8 (`reason=head-moved`) with nothing
+  committed when it moved. Step 7 re-checks the head before posting anything and
+  reports threads another actor resolved as `resolved elsewhere` instead of
+  blocking. An unattended submit now times out after 120 s, and a failed submit
+  prints a recovery line with the local commit and the remote head.
+  `/review:sweep-all` skips a PR whose head commit is less than 15 minutes old
+  (`YELLOW_REVIEW_RECENT_PUSH_MINUTES`). It reads the commit date, not the push
+  time, so a fresh push of an older commit is not caught.
+
+- [#1706](https://github.com/KingInYellows/yellow-plugins/pull/1706)
+  [`e31af49`](https://github.com/KingInYellows/yellow-plugins/commit/e31af4926180264f50dd067688c7dc7e5894f138)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Narrow the
+  remaining resolve races and review-run lock gaps (CLAUDE-270, CLAUDE-271).
+  `apply-thread-actions --expected-head` re-reads the PR head before each thread
+  and stops with `reason=head-moved` when another writer pushed mid-batch;
+  `/review:resolve` passes it. `commit-resolve-fixes` gives its two head checks
+  one shared ls-remote budget so several push URLs cannot stretch the run.
+  `/review:resolve` and `/review:sweep` refresh their review-run holder during
+  long runs. In yellow-core, manual `/compound:review-staged` refuses to start a
+  drain while a review holds the checkout, and the SessionStart hook never
+  drains a symlinked staging dir.
+
+- [#1688](https://github.com/KingInYellows/yellow-plugins/pull/1688)
+  [`18fec53`](https://github.com/KingInYellows/yellow-plugins/commit/18fec53094be0b1e262a8b6d39aae09ec3c33aaa)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The
+  compound-staging drain no longer writes into a checkout that a review is
+  resolving (CLAUDE-267). `/review:resolve`, `/review:sweep`,
+  `/review:sweep-all` and `/review:resolve-stack` hold a review-run lock
+  (yellow-review's new `review-run-lock` script). While it is held,
+  yellow-core's SessionStart hook starts no drain and `staging-promoter` defers
+  its write, so the drain's `.promote-done` sentinels can no longer trip
+  resolve's ignored-file stop. `/review:sweep-all` also stops before the first
+  PR when a drain is already running.
+
+### Patch Changes
+
+- [#1690](https://github.com/KingInYellows/yellow-plugins/pull/1690)
+  [`3b3db54`](https://github.com/KingInYellows/yellow-plugins/commit/3b3db543dca9c3ce5ae1fa011d848c83747d5db6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `review-ledger.sh summary` leaves out a ledger that another session pruned
+  while it was being read, instead of reporting it as `null`. `/review:sweep`
+  names the worktree that holds a PR branch on a branch mismatch, with the
+  `cd '<path>' && /review:sweep <PR#>` command to run there, and
+  `/review:sweep-all` puts it in the summary's Notes.
+
+- [#1710](https://github.com/KingInYellows/yellow-plugins/pull/1710)
+  [`6388d45`](https://github.com/KingInYellows/yellow-plugins/commit/6388d45aa17dadf6956ef31c9eb1aa2d56159b28)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `commit-resolve-fixes --over-cap-draft` converts the PR to a draft right
+  before the push instead of after the head is verified, so an over-cap fix that
+  lands while a later check fails still waits for human review (CLAUDE-278).
+
 ## 3.15.0
 
 ### Minor Changes
