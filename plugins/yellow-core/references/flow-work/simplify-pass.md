@@ -64,10 +64,10 @@ fixed or the responsible change is reverted. Never weaken or delete a test to
 make a check pass. If nothing changed, skip this step.
 
 Commit any changes as one commit, the same way Phase 3 step 6 does. On Graphite,
-`gt modify -m` replaces the branch commit's whole message, so build the message
-file from the current message (`git log -1 --format=%B`) and keep its body
-intact: the Linear closing line and any deferred P1/P2 list from step 7's "Stop
-and ship as-is" branch must survive. On GitHub, write a new commit with a
+step 6 amends the branch commit and replaces its whole message, so build the
+message file from the current message (`git log -1 --format=%B`) and keep its
+body intact: the Linear closing line and any deferred P1/P2 list from step 7's
+"Stop and ship as-is" branch must survive. On GitHub, write a new commit with a
 message like `refactor: simplify pass before review`, keeping the Linear closing
 line.
 
