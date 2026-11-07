@@ -13,6 +13,47 @@ and this project adheres to
 
 ---
 
+## [2.1.32] - 2026-11-07
+
+### Added
+
+- **yellow-review 3.16.0, yellow-core 2.14.0** — A review-run lock keeps the
+  compound-staging drain out of a checkout that `/review:resolve`,
+  `/review:sweep`, `/review:sweep-all` or `/review:resolve-stack` is resolving,
+  so drain sentinels no longer trip resolve's ignored-file stop (CLAUDE-267,
+  #1688).
+
+### Changed
+
+- **yellow-review 3.16.0** — The resolve line cap applies only to unattended
+  runs, per cluster: interactive `/review:resolve` has no cap, and an unattended
+  run pushes over-cap clusters with `--over-cap-draft`, which converts the PR to
+  a draft for human review instead of reverting the fix (CLAUDE-272, CLAUDE-273,
+  #1689, #1704, #1710).
+- **yellow-review 3.16.0, yellow-core 2.14.0** — `/review:resolve` re-checks the
+  PR head before staging, submitting and each thread write, and stops with
+  `reason=head-moved` when another writer pushed; `/review:sweep-all` skips PRs
+  whose head commit is under 15 minutes old (CLAUDE-266, CLAUDE-270, CLAUDE-271,
+  #1687, #1706).
+- **yellow-core 2.14.0** — `/setup:all` matches the current per-plugin setup
+  checks for yellow-agy, yellow-council and yellow-review (#1695);
+  `knowledge-compounder` pins `effort: medium` (#1713).
+
+### Fixed
+
+- **yellow-codex 0.5.3** — `codex-reviewer` runs Codex with a 6-minute Bash
+  timeout and waits for it when backgrounded, so it always returns a verdict
+  (CLAUDE-286, #1713).
+- **yellow-agy 0.2.2** — `/agy:setup` treats an absent `useG1Credits` key as off
+  and also checks `useAiCredits`, so agy's own settings rewrites no longer make
+  setup ask for a manual edit (#1697). The bridge process-group timeout test no
+  longer flakes on busy runners (CLAUDE-284, #1719).
+- **yellow-review 3.16.0** — `review-ledger.sh summary` skips ledgers pruned
+  mid-read, and `/review:sweep` names the worktree that holds a PR branch on a
+  branch mismatch (#1690).
+
+---
+
 ## [2.1.31] - 2026-11-05
 
 ### Added
