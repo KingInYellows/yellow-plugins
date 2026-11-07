@@ -1,5 +1,53 @@
 # Changelog
 
+## 2.14.0
+
+### Minor Changes
+
+- [#1688](https://github.com/KingInYellows/yellow-plugins/pull/1688)
+  [`18fec53`](https://github.com/KingInYellows/yellow-plugins/commit/18fec53094be0b1e262a8b6d39aae09ec3c33aaa)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The
+  compound-staging drain no longer writes into a checkout that a review is
+  resolving (CLAUDE-267). `/review:resolve`, `/review:sweep`,
+  `/review:sweep-all` and `/review:resolve-stack` hold a review-run lock
+  (yellow-review's new `review-run-lock` script). While it is held,
+  yellow-core's SessionStart hook starts no drain and `staging-promoter` defers
+  its write, so the drain's `.promote-done` sentinels can no longer trip
+  resolve's ignored-file stop. `/review:sweep-all` also stops before the first
+  PR when a drain is already running.
+
+### Patch Changes
+
+- [#1713](https://github.com/KingInYellows/yellow-plugins/pull/1713)
+  [`c353b6b`](https://github.com/KingInYellows/yellow-plugins/commit/c353b6b909e7d57b1146e4f1a48035b10253d638)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Pin
+  `effort: medium` on the `knowledge-compounder` agent. Since Claude Code
+  2.1.317 a subagent on a different model from the session uses that model's
+  saved effort setting, or its default when none is saved, so from an Opus
+  session the Sonnet compounder no longer inherited the session's effort level.
+
+- [#1706](https://github.com/KingInYellows/yellow-plugins/pull/1706)
+  [`e31af49`](https://github.com/KingInYellows/yellow-plugins/commit/e31af4926180264f50dd067688c7dc7e5894f138)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Narrow the
+  remaining resolve races and review-run lock gaps (CLAUDE-270, CLAUDE-271).
+  `apply-thread-actions --expected-head` re-reads the PR head before each thread
+  and stops with `reason=head-moved` when another writer pushed mid-batch;
+  `/review:resolve` passes it. `commit-resolve-fixes` gives its two head checks
+  one shared ls-remote budget so several push URLs cannot stretch the run.
+  `/review:resolve` and `/review:sweep` refresh their review-run holder during
+  long runs. In yellow-core, manual `/compound:review-staged` refuses to start a
+  drain while a review holds the checkout, and the SessionStart hook never
+  drains a symlinked staging dir.
+
+- [#1695](https://github.com/KingInYellows/yellow-plugins/pull/1695)
+  [`670b485`](https://github.com/KingInYellows/yellow-plugins/commit/670b48595aa8d24debc9ccc613cf6466041fd555)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Bring
+  `/setup:all` in line with the current per-plugin setup commands: yellow-agy
+  now needs agy 1.4.12+, its resolved CLI and `jq`, and the detail names the
+  MCP-server opt-in check `/agy:setup` runs; the council tool probe adds `cp`,
+  `ln`, `chmod` and `cmp`; yellow-review reports a degraded review-findings
+  ledger when `flock` or `realpath` is missing.
+
 ## 2.13.0
 
 ### Minor Changes

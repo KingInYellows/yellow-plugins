@@ -1,5 +1,17 @@
 # yellow-codex
 
+## 0.5.3
+
+### Patch Changes
+
+- [#1713](https://github.com/KingInYellows/yellow-plugins/pull/1713)
+  [`c353b6b`](https://github.com/KingInYellows/yellow-plugins/commit/c353b6b909e7d57b1146e4f1a48035b10253d638)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `codex-reviewer` now runs its Codex step with a 6-minute Bash tool timeout and
+  waits on the command if Claude Code moves it to the background. Codex reviews
+  take 3-4 minutes, and at the tool's default 120 s timeout the background agent
+  returned before Codex finished, with no verdict.
+
 ## 0.5.2
 
 ### Patch Changes

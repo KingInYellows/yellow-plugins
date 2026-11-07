@@ -1,5 +1,19 @@
 # yellow-agy
 
+## 0.2.2
+
+### Patch Changes
+
+- [#1697](https://github.com/KingInYellows/yellow-plugins/pull/1697)
+  [`98a4b9d`](https://github.com/KingInYellows/yellow-plugins/commit/98a4b9d4d843d42438a94b3f1e43496fd15b5a62)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/agy:setup` no
+  longer asks the owner to add `"useG1Credits": false` by hand. agy saves that
+  key with omitempty, so it drops `false` whenever it rewrites `settings.json`
+  (seen when agy self-updated to 1.5.1), and an absent key now counts as off.
+  Setup refuses with `AGY_OVERAGES` only when `useG1Credits` is `true`, or when
+  `userSettings.useAiCredits` in `~/.gemini/config/config.json`, which agy
+  copies into `useG1Credits` at startup, is `true`.
+
 ## 0.2.1
 
 ### Patch Changes
