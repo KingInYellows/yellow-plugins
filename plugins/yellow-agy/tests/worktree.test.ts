@@ -469,19 +469,44 @@ describe('runSpawn on a bridge Linux group (CLAUDE-246)', () => {
     env: { PATH: process.env['PATH'] ?? '' },
     linuxGroup: { distro: 'Ubuntu' },
   });
-  // A killed process nobody has reaped yet is a zombie: dead for this test.
-  const alive = (pid: number): boolean => {
+  // True while any member of the group is still running. A killed process
+  // nobody has reaped yet is a zombie: dead for this test. Matching on the
+  // group (field 5 of /proc/<pid>/stat) rather than probing the leader's pid
+  // keeps an unrelated process that reuses that pid from counting.
+  const groupRunning = (pgid: number): boolean => {
+    let pids: string[];
     try {
-      process.kill(pid, 0);
+      pids = fs.readdirSync('/proc').filter((d) => /^\d+$/.test(d));
     } catch {
-      return false;
+      // No /proc (macOS): fall back to the group probe.
+      try {
+        process.kill(-pgid, 0);
+        return true;
+      } catch {
+        return false;
+      }
     }
-    try {
-      const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
-      return stat.slice(stat.lastIndexOf(')') + 2)[0] !== 'Z';
-    } catch {
-      return true;
+    return pids.some((pid) => {
+      try {
+        const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+        const [state, , pgrp] = stat
+          .slice(stat.lastIndexOf(')') + 2)
+          .split(' ');
+        return Number(pgrp) === pgid && state !== 'Z';
+      } catch {
+        return false; // exited while we looked
+      }
+    });
+  };
+  // SIGKILL is queued when kill() returns; the members leave the run queue a
+  // moment later, so give a busy runner a bounded window to show that.
+  const groupGone = async (pgid: number): Promise<boolean> => {
+    const deadline = Date.now() + 2000;
+    while (groupRunning(pgid)) {
+      if (Date.now() > deadline) return false;
+      await new Promise((r) => setTimeout(r, 20));
     }
+    return true;
   };
 
   it.skipIf(process.platform === 'win32')(
@@ -517,7 +542,7 @@ describe('runSpawn on a bridge Linux group (CLAUDE-246)', () => {
         'KILL',
       ]);
       expect(pgid).toBeGreaterThan(1);
-      expect(alive(pgid)).toBe(false);
+      expect(await groupGone(pgid)).toBe(true);
     }
   );
 
