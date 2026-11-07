@@ -205,6 +205,15 @@ not proceed to Step 4 (Codex invocation) or any subsequent steps.
 
 ### 4. Invoke Codex Review
 
+Run this block as one Bash call with the Bash tool's `timeout` parameter set
+to `360000` (6 minutes). Codex usually needs 3-4 minutes, and the tool's
+default 120 s timeout moves the command to the background mid-run. If the
+tool still reports that the command was moved to the background, do not
+re-run it and do not finish yet: wait for it with Bash calls of the form
+`i=0; while [ "$i" -lt 150 ] && ! grep -qE '^(verdict|OUTPUT_FILE)=' '<output path>'; do sleep 1; i=$((i+1)); done; sleep 1; cat '<output path>'`,
+using the output path the tool reported, until the file holds a `verdict=` or
+`OUTPUT_FILE=` line. That text is this step's result.
+
 ```bash
 OUTPUT_FILE=$(mktemp /tmp/codex-reviewer-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-reviewer-err-XXXXXX.txt)
