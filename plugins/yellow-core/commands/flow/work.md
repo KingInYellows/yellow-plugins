@@ -883,7 +883,7 @@ it at a Phase 1b checkpoint.
 
    - **Clean pass → done.** If the iteration's review found zero P1/P2 findings
      REMAINING (not merely zero NEW ones), the work is polished — exit the loop
-     and proceed to Phase 4.
+     and proceed to step 8.
    - **Progress, under cap → loop.** If P1/P2 findings remain, a file changed
      this iteration, and the iteration count is below the cap (3), start another
      iteration: re-run steps 3a–6. Step 3a re-runs `mktemp -d` for a fresh run
@@ -900,7 +900,7 @@ it at a Phase 1b checkpoint.
      for cross-lineage review]."
      - **Continue another pass:** run one more iteration (steps 3a–6); the cap
        does not reset, so this same gate fires again afterward if P1/P2 remain.
-     - **Stop and ship as-is:** exit the loop and proceed to Phase 4, AND list
+     - **Stop and ship as-is:** exit the loop and proceed to step 8, AND list
        the outstanding P1/P2 findings in the commit/PR body so the Phase 5
        `/review:pr` pass and human reviewers see they were knowingly deferred,
        not missed.
@@ -913,6 +913,13 @@ it at a Phase 1b checkpoint.
    - The Step 3 trivial-skip gate is evaluated once on entry to the polish loop
      — a doc/comment/rename-only change for the whole task skips the loop
      entirely; it is not re-evaluated per iteration.
+
+8. **Simplify pass (single-branch mode only).** Read
+   `${CLAUDE_PLUGIN_ROOT}/references/flow-work/simplify-pass.md` and follow it.
+   It applies reuse, test-value and comment fixes to what this branch added or
+   changed, deletes a test only after running it green, and skips with "nothing
+   to simplify" on a docs- or Markdown-only diff. Stack mode skips this step:
+   its items were already submitted in Phase 1b. Then go to Phase 4.
 
 ## Phase 4: Ship It
 

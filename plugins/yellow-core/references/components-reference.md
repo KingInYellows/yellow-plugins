@@ -130,12 +130,12 @@ pipeline.
   one of eight states (`UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`,
   `CONFLICT`, `CONFIG_MISMATCH`, `CONFIG_INVALID`, `MANAGED_CONFLICT`,
   `PARTIAL_TOOLING`). Reads `claude plugin list --json` plus the repository's
-  optional `.yellow-stack.yml` intent through `lib/stack-provider-state.js`.
-  A failed `claude plugin list --json` is UNKNOWN before any library runs.
-  Otherwise the library root is `CLAUDE_PLUGIN_ROOT`, then the first
-  enabled `yellow-core@yellow-plugins` `installPath` with the library
-  (`local`, `project`, `user`, `managed`; project and local rows only when
-  `realpath` of `projectPath` is the git toplevel). The open repository's
+  optional `.yellow-stack.yml` intent through `lib/stack-provider-state.js`. A
+  failed `claude plugin list --json` is UNKNOWN before any library runs.
+  Otherwise the library root is `CLAUDE_PLUGIN_ROOT`, then the first enabled
+  `yellow-core@yellow-plugins` `installPath` with the library (`local`,
+  `project`, `user`, `managed`; project and local rows only when `realpath` of
+  `projectPath` is the git toplevel). The open repository's
   `plugins/yellow-core` is never used: it is repository-controlled. A missed
   root is `stack_provider_error`, not a provider guess
 - `/stack:select` — switch the active stacked-PR provider (`graphite` /
@@ -417,10 +417,12 @@ contract is also in the README's "Quote grounding" section.
 - **yellow-codex** — `/flow:work` offers Codex rescue (`codex-executor`) when
   tests fail during stack execution. Without yellow-codex, the rescue option is
   silently omitted.
-- **yellow-review** — `/flow:work` invokes `/review:pr` after submission;
-  `/flow:review` falls back to `/review:pr` redirect for PR number/URL/branch
-  arguments. Without yellow-review, the redirect fallback shows an install
-  notice.
+- **yellow-review** — `/flow:work` invokes `/review:pr` after submission, and
+  its Phase 3 simplify pass dispatches yellow-review's `code-simplifier`,
+  `test-value-reviewer` and `comment-reviewer` (without them it reports which
+  reviewers did not run and continues); `/flow:review` falls back to
+  `/review:pr` redirect for PR number/URL/branch arguments. Without
+  yellow-review, the redirect fallback shows an install notice.
 - **yellow-linear** — `/flow:work` can invoke `/linear:sync --after-submit` as a
   fallback when native Linear GitHub automation is unavailable or needs repair.
   `/flow:plan` detects Linear issue context in brainstorm docs and includes a

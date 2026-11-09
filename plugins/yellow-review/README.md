@@ -163,7 +163,7 @@ thresholds; interactive review behavior is unchanged.
 
 ## Agents
 
-### Review (17)
+### Review (19)
 
 | Agent                          | Description                                                                                                                                                                                                                                                    |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -182,6 +182,8 @@ thresholds; interactive review behavior is unchanged.
 | `code-simplifier`              | Simplification preserving functionality (final pass)                                                                                                                                                                                                           |
 | `type-design-analyzer`         | Type design, encapsulation, invariants                                                                                                                                                                                                                         |
 | `silent-failure-hunter`        | Silent failure and error handling analysis                                                                                                                                                                                                                     |
+| `test-value-reviewer`          | Tests that cost maintenance without protecting anything (dispatched by `/flow:work`'s simplify pass only)                                                                                                                                                      |
+| `comment-reviewer`             | Code comments to delete or reshape away, `.js`/`.ts`/`.sh`/`.bats`/`.py` only (simplify pass only)                                                                                                                                                             |
 | `previous-comments-reviewer`   | Earlier review feedback (bot and human, resolved threads included) that the code still does not address (conditional: the PR has prior reviews or comments)                                                                                                    |
 | `thermonuclear-reviewer`       | Strict structural-quality lane: code-judo restructurings, spaghetti-condition growth, weak type/module boundaries, misplaced ownership, evidence-gated file-size threshold crossings. **Opt-in only** — never auto-selected; enable via `reviewer_set.include` |
 
