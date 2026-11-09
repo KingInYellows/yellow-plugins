@@ -744,6 +744,28 @@ review sends diff or code content to a non-Anthropic model.
   (`reviewer_selection` plus `reviewer_selection_private_repos`) and is not
   gated by this switch.
 
+### Rule Packs (yellow-review / yellow-core)
+
+Rule packs (`docs/rule-packs.md`) put repository-authored text into reviewer and
+planner prompts.
+
+- **Rule text is untrusted.** One builder script, shipped as byte-identical
+  copies in yellow-review (`rule-pack-context`) and yellow-core
+  (`lib/rule-pack-context.sh`), loads every rule. It removes control and bidi
+  characters, defangs lines that open a `--- begin`/`--- end` fence, escapes XML
+  metacharacters, and wraps the result in a reference-only `rule-packs` fence.
+  `project-standards-reviewer` and `learnings-researcher` quote rules and never
+  follow them. Neither agent reads pack files itself.
+- **A PR cannot change the rules it is judged by.** `/review:pr` reads committed
+  packs from the PR's base ref. `/flow:plan` reads the working tree, because the
+  planner is the author.
+- **Machine-local folders.** `rule_pack_dirs` is honored from the user-level
+  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md` and from an
+  untracked repo file only, so a branch cannot point a session at arbitrary
+  folders. Entries must be absolute, without `.`/`..` segments, and not
+  symlinks. Symlinked pack folders and rule files are skipped, and the size caps
+  (25 rules per pack, 16 KiB per rule, 96 KiB total) bound what enters a prompt.
+
 ### Persona Selection Shadow Log (yellow-review)
 
 Off by default. When `yellow-plugins.local.md` sets `reviewer_selection: shadow`

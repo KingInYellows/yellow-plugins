@@ -150,6 +150,10 @@ the reference.
 - Sourceable shell: `credential-status.sh`, `compound-staging.sh`,
   `plan-gate-provenance.sh`, `jev-prefilter.sh`, `validate-fs.sh`,
   `repo-profile.sh`, `plugin-identity.sh`, `context-observer.sh`
+- `rule-pack-context.sh` — `/flow:plan`'s fenced rule-packs block for
+  `learnings-researcher` (`--worktree`); executed, never sourced. A
+  byte-identical copy of yellow-review's `rule-pack-context` script, so edit
+  both (`docs/rule-packs.md`)
 - `quote-ground.sh` is executed with bash 4.4+, never sourced, and is not on the
   Tier 4 dual-shell list
 

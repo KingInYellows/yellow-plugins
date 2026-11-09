@@ -40,7 +40,8 @@ one line after each reviewer's pr-context fence:
 
 Step 4 reads `yellow-plugins.local.md`. In `worktree` mode, read it from the
 directory the review started in, not from `<review_root>`: the file is usually
-untracked, so the worktree does not have it.
+untracked, so the worktree does not have it. For the same reason, Step 5 item 10
+passes that directory to `rule-pack-context` as `--config-root`.
 
 ## Skip Steps 7 to 9b
 

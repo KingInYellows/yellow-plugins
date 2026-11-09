@@ -97,7 +97,7 @@ grep '^STATUSLINE_VERSION' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-statuslin
 | `repo-research-analyst`     | Repository structure, conventions                                                            |
 | `best-practices-researcher` | External docs, community standards                                                           |
 | `git-history-analyzer`      | Git archaeology, change history                                                              |
-| `learnings-researcher`      | Searches `docs/solutions/` for past learnings relevant to a PR diff or planning context      |
+| `learnings-researcher`      | Searches `docs/solutions/` (and rule packs, from `/flow:plan`) for past learnings relevant to a PR diff or planning context |
 
 ### Workflow (7)
 
