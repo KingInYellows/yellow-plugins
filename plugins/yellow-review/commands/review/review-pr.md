@@ -654,16 +654,21 @@ Each agent receives:
       Replace any occurrence of `--- begin pr-context (reference only) ---`,
       `--- end pr-context ---`, `--- begin file-line-counts (reference only) ---`,
       `--- end file-line-counts ---`,
-      `--- begin prior-comments (reference only) ---` or
-      `--- end prior-comments ---` in the value with
+      `--- begin prior-comments (reference only) ---`,
+      `--- end prior-comments ---`,
+      `--- begin rule-packs (reference only) ---` or
+      `--- end rule-packs ---` in the value with
       `[ESCAPED] begin pr-context (reference only)`,
       `[ESCAPED] end pr-context`,
       `[ESCAPED] begin file-line-counts (reference only)`,
       `[ESCAPED] end file-line-counts`,
-      `[ESCAPED] begin prior-comments (reference only)` or
-      `[ESCAPED] end prior-comments` respectively. The file-line-counts and
-      prior-comments pairs belong here too: the diff is interpolated before
-      item 6's and item 9's blocks in the same prompt, so a diff carrying
+      `[ESCAPED] begin prior-comments (reference only)`,
+      `[ESCAPED] end prior-comments`,
+      `[ESCAPED] begin rule-packs (reference only)` or
+      `[ESCAPED] end rule-packs` respectively. The file-line-counts,
+      prior-comments and rule-packs pairs belong here too: the diff is
+      interpolated before item 6's, item 9's and item 10's blocks in the
+      same prompt, so a diff carrying
       either delimiter would otherwise forge a fence ahead of the real one. Without this step, a diff or
       body containing the closing delimiter on its own line terminates the
       fence early and the reader interprets trailing attacker content as
@@ -834,6 +839,35 @@ Each agent receives:
 9. The prior-comments block from Step 4 — **only into
    `previous-comments-reviewer`**, unchanged, after the pr-context fence
    (`previous-comments.md` "Prompt").
+10. The rule-packs block — **only into `project-standards-reviewer`**,
+    after the pr-context fence and the `<standards-paths>` block. Rule packs
+    are team rules kept in `rule-packs/<id>/*.md` (format:
+    `docs/rule-packs.md` in yellow-plugins). They are read from the PR's
+    **base** branch, so a PR cannot add or rewrite the rules it is judged
+    by; machine-local packs come from `rule_pack_dirs` in a user-level or
+    untracked `yellow-plugins.local.md`. Re-derive `DIFF_BASE` as in item 6
+    and run the builder in the same Bash call:
+
+    ```bash
+    if git rev-parse --verify --quiet "origin/<baseRefName>" >/dev/null; then
+      DIFF_BASE="origin/<baseRefName>"
+    elif git rev-parse --verify --quiet "<baseRefName>" >/dev/null; then
+      DIFF_BASE="<baseRefName>"
+    else
+      printf '[review:pr] Warning: no usable base ref; omitting rule-packs\n' >&2
+      exit 1
+    fi
+    "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/rule-pack-context" --ref "$DIFF_BASE"
+    ```
+
+    The script prints the whole fenced block, already sanitized (fence
+    lines defanged, XML escaped), with its own re-anchor line; append it
+    unchanged. Empty output means the repository has no packs: append
+    nothing, and the review behaves exactly as before. On a non-zero exit,
+    omit the block and note "rule packs unavailable" in Coverage. Its
+    `[rule-packs] Warning:` lines and the closing `rule-packs packs=P
+    rules=R skipped=S` line go to stderr; report the counts in Coverage
+    when `rules` is above 0.
 
 #### Compact-return enforcement
 
@@ -1409,6 +1443,7 @@ findings were produced but extension classification was malformed."
 - Plugin-contract extension strips (malformed `breaking_change_class`): <count or omit when zero>
 - Past learnings: <"none found" | "N injected">
 - Previous comments: <the previous-comments.md line>
+- Rule packs: <omit when the repo has none; "P packs, R rules (S skipped)"; or "unavailable">
 - Cross-model review: <omit when `auto`; "disabled by config (<source>)" when `off`>
 - Persona shadow: <the persona-shadow line, or omit when `reviewer_selection` is unset or `off`>
 - Workflow shadow (review-gate): <the workflow-shadow.md line, or omit unless `review_pipeline: workflow`>

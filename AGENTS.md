@@ -51,6 +51,13 @@ validators in `scripts/`, the schemas in `schemas/`, and this file.
 - `docs/`, `docs/solutions/`, and `plans/`: Architecture, operations, audits,
   solved-problem writeups, and active plans. Treat old plans as historical
   unless code and validators confirm they still apply.
+- `rule-packs/`: Team rule packs, judgment rules that no validator checks.
+  `/review:pr` gives them to `project-standards-reviewer` (read from the PR's
+  base branch) and `/flow:plan` searches them. Each `<id>/` folder holds a
+  `README.md` and up to 25 rule files with `title` and `applies_when`
+  frontmatter; format in `docs/rule-packs.md`. Add a rule there when review
+  keeps catching the same judgment call; add a validator when the rule is
+  mechanical.
 - `tools/`: Local wrappers such as `install.cjs`, `lint.cjs`, `run.cjs`, and
   `test.cjs`.
 
