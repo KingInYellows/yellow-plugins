@@ -54,7 +54,8 @@ research, analysis, and structured documentation.
 2a. Settled decisions: Read
    `${CLAUDE_PLUGIN_ROOT}/references/flow-plan/settled-decisions.md` and
    collect entries from its three sources: annotated `## Key Decisions` in the
-   brainstorm doc, a `Settled decisions:` block in the arguments (remove it
+   brainstorm doc (or `## Settled Decisions` in a spec or shell passed as
+   input), a `Settled decisions:` block in the arguments (remove it
    from the feature description), and this conversation before `/flow:plan`
    started. Print each once as `Carrying forward: <decision>` and never ask
    about it again. Note directives for their one Phase 2 challenge. With

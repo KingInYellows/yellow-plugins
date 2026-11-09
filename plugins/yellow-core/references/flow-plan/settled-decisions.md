@@ -64,7 +64,9 @@ Omit the section when nothing is settled. Never write an empty one.
 
 ## Sources `/flow:plan` reads
 
-1. Annotated entries in the brainstorm doc's `## Key Decisions`.
+1. Annotated entries in the brainstorm doc's `## Key Decisions`, or in the
+   `## Settled Decisions` section of a spec or shell passed as input (the
+   `/flow:decompose` single-shell bail-out hands a spec to `/flow:plan`).
 2. A brief in the arguments: a `Settled decisions:` block, one entry per line in
    the annotation format. Check each entry for a class and a rejected
    alternative, and demote any that lack them.
