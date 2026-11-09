@@ -212,6 +212,11 @@ class PipelineTest(Tmp):
         self.assertEqual((args["repo"], args["pr"], args["tier"]), ("test/demo", 3, "high"))
         self.assertEqual(args["changed_files"], ["REVIEW.md", "lib/x.sh"])
         self.assertEqual(args["review_md"], "# Review rules at base\n")  # base, not the PR's
+        # No include in the case: the CI driver's pick for the tier, never empty
+        # (review-gate refuses an empty include).
+        self.assertEqual(args["include"], rg.ci.select_hunters("high", args["changed_files"], None,
+                                                               "+cp $path /tmp"))
+        self.assertIn("security-reviewer", args["include"])
         self.assertTrue(os.path.isabs(args["diff_path"]))
         with open(args["diff_path"], encoding="utf-8") as handle:
             self.assertIn("+cp $path /tmp", handle.read())

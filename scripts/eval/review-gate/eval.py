@@ -48,6 +48,9 @@ def _load(name, path):
 # REPO is this checkout. origin_repo() is harvest.py's.
 ms = _load("model_swap_eval", os.path.join(HERE, "..", "model-swap", "eval.py"))
 hv = _load("review_gate_harvest", os.path.join(HERE, "harvest.py"))
+# select_hunters() is the CI driver's, so a row without its own include runs
+# the reviewer set CI would pick. ci.py loads this file only lazily.
+ci = _load("review_gate_ci", os.path.join(HERE, "..", "..", "ci", "review-gate", "ci.py"))
 REPO = ms.REPO
 
 WORKFLOW = "yellow-review:review-gate"
@@ -306,8 +309,9 @@ def prepare(work, items, dirs, model, only=None):
         ms.fresh_worktree(wt, doc["head"], cwd=repo_dir)
         span = "%s...%s" % (doc["base"], doc["head"])
         diff_path = os.path.join(work, "prompts", rid + ".diff")
+        diff_text = ms.git("diff", "--no-color", "--no-ext-diff", span, cwd=repo_dir)
         with open(diff_path, "w", encoding="utf-8") as handle:
-            handle.write(ms.git("diff", "--no-color", "--no-ext-diff", span, cwd=repo_dir))
+            handle.write(diff_text)
         changed = [f for f in ms.git("diff", "--name-only", span, cwd=repo_dir).splitlines() if f]
         risk = classify(repo_dir, doc["base"], doc["head"])
         if risk["tier"] != doc["tier"]:
@@ -322,7 +326,9 @@ def prepare(work, items, dirs, model, only=None):
             "diff_path": diff_path,
             "changed_files": changed,
             "review_md": review_md_at(repo_dir, doc["base"]),
-            "include": doc.get("include", []),
+            # review-gate refuses an empty include, so default to CI's pick.
+            "include": doc.get("include") or ci.select_hunters(
+                risk["tier"], changed, risk.get("lines"), diff_text),
             "exclude": doc.get("exclude", []),
             "dismissed": [],
         }
