@@ -229,19 +229,20 @@ elif ! rr_net git fetch --no-tags --quiet "$BASE_REMOTE" "refs/heads/$BASE_BRANC
   printf '[review:pr] Warning: base branch fetch failed; risk tier unknown\n' >&2
 elif ! BASE_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
   printf '[review:pr] Warning: fetched base branch unreadable; risk tier unknown\n' >&2
+elif ! printf 'base_sha=%s\n' "$BASE_SHA"; then
+  :
 elif ! rr_net git fetch --no-tags --quiet "$BASE_REMOTE" "refs/heads/$DEFAULT_BRANCH"; then
   printf '[review:pr] Warning: default branch fetch failed; risk tier unknown\n' >&2
 elif ! POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
   printf '[review:pr] Warning: fetched default branch unreadable; risk tier unknown\n' >&2
 else
-  printf 'base_sha=%s\n' "$BASE_SHA"
   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
     --policy-ref "$POLICY_SHA" "$BASE_SHA" HEAD |
     jq -r '"tier=\(.tier) policy=\(.policy) rules=\([.reasons[].rule] | unique | join("; "))"'
 fi
 ```
 
-When nothing is printed, record the tier as `unknown` and continue.
+When no `tier=` line is printed, record the tier as `unknown` and continue.
 
 ### Step 3b: Query institutional memory (optional)
 
