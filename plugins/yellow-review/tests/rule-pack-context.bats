@@ -122,10 +122,34 @@ setup() {
   [[ "$stderr" == *'tracked yellow-plugins.local.md is ignored'* ]]
 }
 
+@test "committed packs load when run from a subdirectory" {
+  rule rule-packs/team/a.md "Base rule"
+  mkdir -p sub/dir
+  git add rule-packs && git commit -q -m base
+  cd sub/dir
+  run --separate-stderr "$SCRIPT" --ref main
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Base rule'* ]]
+}
+
+@test "--config-root reads the untracked config of another checkout" {
+  rule "$BATS_TEST_TMPDIR/local/mine/l.md" "Local rule"
+  printf -- '---\nrule_pack_dirs:\n  - %s\n---\n' "$BATS_TEST_TMPDIR/local" >yellow-plugins.local.md
+  git worktree add -q --detach "$BATS_TEST_TMPDIR/wt" main
+  cd "$BATS_TEST_TMPDIR/wt"
+  run --separate-stderr "$SCRIPT" --ref main
+  [ -z "$output" ]
+  run --separate-stderr "$SCRIPT" --ref main --config-root "$REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Local rule'* ]]
+}
+
 @test "bad usage exits 2 and a bad ref exits 1" {
   run "$SCRIPT"
   [ "$status" -eq 2 ]
   run "$SCRIPT" --ref --upload-pack=x
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --ref main --worktree
   [ "$status" -eq 2 ]
   run "$SCRIPT" --ref no-such-ref
   [ "$status" -eq 1 ]

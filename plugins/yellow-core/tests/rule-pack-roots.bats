@@ -28,7 +28,7 @@ setup() {
   printf -- '---\nrule_pack_dirs:\n  - %s\n---\n' "$BATS_TEST_TMPDIR/local" >"$CLAUDE_CONFIG_DIR/yellow-plugins.local.md"
   run --separate-stderr bash "$SCRIPT"
   [ "$status" -eq 0 ]
-  [ "$output" = "$(printf 'rule-packs\n%s' "$BATS_TEST_TMPDIR/local")" ]
+  [ "$output" = "$(printf '%s/rule-packs\n%s' "$(git rev-parse --show-toplevel)" "$BATS_TEST_TMPDIR/local")" ]
 }
 
 @test "relative, dot-dot, missing and symlinked entries are skipped" {

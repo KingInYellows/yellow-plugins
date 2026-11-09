@@ -4,8 +4,14 @@
 # sanitized block for project-standards-reviewer (/review:pr) or for
 # learnings-researcher's search roots.
 #
-# Usage: rule-pack-context --ref <git-ref>    read packs committed at <ref>
-#        rule-pack-context --worktree         read packs in the working tree
+# Usage: rule-pack-context --ref <git-ref> [--config-root <dir>]
+#        rule-pack-context --worktree [--config-root <dir>]
+#   --ref       read packs committed at <ref>
+#   --worktree  read packs in the working tree
+#   --config-root  the checkout whose repo-level yellow-plugins.local.md is
+#               read (default: this repository's top level). /review:pr
+#               --report-only passes the checkout it started in, because its
+#               detached review worktree lacks the untracked file.
 # /review:pr passes the PR's base ref, so a PR cannot add or rewrite the rules
 # it is judged by. Machine-local folders are added in both modes.
 #
@@ -46,24 +52,45 @@ FILE_RE='^[A-Za-z0-9][A-Za-z0-9._-]*\.md$'
 warn() { printf '[rule-packs] Warning: %s\n' "$1" >&2; }
 die() { printf '[rule-packs] Error: %s\n' "$2" >&2; exit "$1"; }
 
+USAGE='usage: rule-pack-context --ref <git-ref> | --worktree [--config-root <dir>]'
 MODE=""
 REF=""
-case "${1:-}" in
-    --ref)
-        [ $# -eq 2 ] && [ -n "$2" ] || die 2 'usage: rule-pack-context --ref <git-ref> | --worktree'
-        case "$2" in -*) die 2 'ref must not start with -' ;; esac
-        MODE=ref
-        REF=$2
-        ;;
-    --worktree)
-        [ $# -eq 1 ] || die 2 'usage: rule-pack-context --ref <git-ref> | --worktree'
-        MODE=worktree
-        ;;
-    *) die 2 'usage: rule-pack-context --ref <git-ref> | --worktree' ;;
-esac
+CONFIG_ROOT=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --ref)
+            [ $# -ge 2 ] && [ -n "$2" ] && [ -z "$MODE" ] || die 2 "$USAGE"
+            case "$2" in -*) die 2 'ref must not start with -' ;; esac
+            MODE=ref
+            REF=$2
+            shift 2
+            ;;
+        --worktree)
+            [ -z "$MODE" ] || die 2 "$USAGE"
+            MODE=worktree
+            shift
+            ;;
+        --config-root)
+            [ $# -ge 2 ] && [ -n "$2" ] && [ -z "$CONFIG_ROOT" ] || die 2 "$USAGE"
+            CONFIG_ROOT=$2
+            shift 2
+            ;;
+        *) die 2 "$USAGE" ;;
+    esac
+done
+[ -n "$MODE" ] || die 2 "$USAGE"
 
 command -v git >/dev/null 2>&1 || die 1 'git not found'
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 1 'not inside a git work tree'
+# git ls-tree limits its listing to the current directory, even for a tree
+# object; run every git call from the top level.
+cd "$TOP" || die 1 'cannot enter the repository top level'
+if [ -n "$CONFIG_ROOT" ]; then
+    CONFIG_ROOT=$(git -C "$CONFIG_ROOT" rev-parse --show-toplevel 2>/dev/null) ||
+        die 1 '--config-root is not inside a git work tree'
+else
+    CONFIG_ROOT=$TOP
+fi
 if [ "$MODE" = ref ]; then
     git rev-parse --verify --quiet "$REF^{commit}" >/dev/null || die 1 'ref does not name a commit'
 fi
@@ -236,13 +263,13 @@ else
 fi
 
 CONFIGS=("${CLAUDE_CONFIG_DIR:-${HOME:-/nonexistent}/.claude}/yellow-plugins.local.md")
-if [ -e "$TOP/yellow-plugins.local.md" ]; then
+if [ -e "$CONFIG_ROOT/yellow-plugins.local.md" ]; then
     rc=0
-    git -C "$TOP" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1 || rc=$?
+    git -C "$CONFIG_ROOT" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1 || rc=$?
     if [ "$rc" -eq 1 ]; then
-        CONFIGS+=("$TOP/yellow-plugins.local.md")
+        CONFIGS+=("$CONFIG_ROOT/yellow-plugins.local.md")
     else
-        local_dirs "$TOP/yellow-plugins.local.md" | grep -q . &&
+        local_dirs "$CONFIG_ROOT/yellow-plugins.local.md" | grep -q . &&
             warn 'rule_pack_dirs in a tracked yellow-plugins.local.md is ignored'
     fi
 fi

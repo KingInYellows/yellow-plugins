@@ -6,9 +6,9 @@
 #
 #   rule-pack-roots.sh
 #
-# Prints one folder per line, each laid out like `rule-packs/` (holding
-# `<id>/` pack folders): `rule-packs` (relative to the repository root) when
-# the working tree has one, then every machine-local folder from a
+# Prints one absolute folder per line, each laid out like `rule-packs/`
+# (holding `<id>/` pack folders): the repository's `rule-packs` when the
+# working tree has one, then every machine-local folder from a
 # `rule_pack_dirs:` block list in yellow-plugins.local.md. Prints nothing when
 # there are none. Exit 0 always, except 2 for usage.
 #
@@ -45,7 +45,7 @@ local_dirs() {
 }
 
 if [ -n "$TOP" ] && [ -d "$TOP/rule-packs" ] && [ ! -L "$TOP/rule-packs" ]; then
-    printf 'rule-packs\n'
+    printf '%s/rule-packs\n' "$TOP"
 fi
 
 CONFIGS=("${CLAUDE_CONFIG_DIR:-${HOME:-/nonexistent}/.claude}/yellow-plugins.local.md")

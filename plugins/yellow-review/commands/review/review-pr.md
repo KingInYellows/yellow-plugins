@@ -860,6 +860,11 @@ Each agent receives:
     "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/rule-pack-context" --ref "$DIFF_BASE"
     ```
 
+    In `--report-only` worktree mode, append
+    `--config-root '<the directory the review started in>'`, so the
+    untracked config the worktree lacks is still read
+    (`references/review-pr/report-only.md`).
+
     The script prints the whole fenced block, already sanitized (fence
     lines defanged, XML escaped), with its own re-anchor line; append it
     unchanged. Empty output means the repository has no packs: append
