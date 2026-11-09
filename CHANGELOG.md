@@ -13,6 +13,31 @@ and this project adheres to
 
 ---
 
+## [2.1.33] - 2026-11-09
+
+### Added
+
+- **yellow-core 2.15.0, yellow-review 3.17.0** — Rule packs: team rules that
+  need judgment, kept as one `.md` file each under `rule-packs/<id>/` with
+  `title` and `applies_when` frontmatter. `/review:pr` gives them to
+  `project-standards-reviewer`, read from the PR's base branch, and reports a
+  contradiction as a finding citing `(pack: <id>, <file>)`; `/flow:plan` passes
+  the matching ones to `learnings-researcher`. Rule text is sanitized and fenced
+  as reference data, and machine-local packs come from `rule_pack_dirs`. Ships a
+  seed `yellow-plugins` pack; format in `docs/rule-packs.md` (CLAUDE-211,
+  #1732).
+- **yellow-core 2.15.0** — Settled decisions carry across the flow workflow: a
+  decision the user made with a tradeoff in view is recorded as
+  `(session-settled: …)` in brainstorm docs, specs and plans, so later steps
+  build on it instead of reopening it. `/flow:plan --non-interactive` returns
+  `settled-decision-invalidated` when one cannot work (CLAUDE-212, #1729).
+- **yellow-core 2.15.0, yellow-review 3.17.0** — `/flow:work` runs a simplify
+  pass at the end of Phase 3 with `code-simplifier` and two new agents,
+  `test-value-reviewer` and `comment-reviewer`; docs- and Markdown-only diffs
+  are skipped (CLAUDE-214, #1721).
+
+---
+
 ## [2.1.32] - 2026-11-07
 
 ### Added
