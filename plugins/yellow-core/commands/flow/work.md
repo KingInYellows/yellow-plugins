@@ -58,6 +58,9 @@ assurance.
    - Note file paths to modify
    - Identify dependencies
    - Understand acceptance criteria
+   - Note any `## Settled Decisions` entries. They are constraints the user
+     already chose (`${CLAUDE_PLUGIN_ROOT}/references/flow-plan/settled-decisions.md`,
+     "Downstream steps"). Never switch away from one silently.
 
 2a. Detect stack decomposition:
 
@@ -699,6 +702,8 @@ Phase 3 (Quality Check) in stack summary mode.
 
 5. **Handle Blockers:**
    - If stuck, use AskUserQuestion
+   - If the work shows a settled decision cannot work, stop and ask with
+     AskUserQuestion before taking another approach
    - Document assumptions made
    - Note technical debt introduced
    - Flag items for follow-up

@@ -127,12 +127,21 @@ Write `plans/specs/<slug>.md` using this structure. Mandatory sections:
 <Decisions (not options): architecture, data model, integrations, key flows.
  Every design element traces to >=1 requirement; every component traces to a consumer.>
 
+## Settled Decisions
+<Decisions the user made with a tradeoff in view, in the annotation format
+ from references/flow-plan/settled-decisions.md. Omit if none.>
+
 ## MVP Scope
 <What ships first vs. deferred. Omit if not staged.>
 
 ## Open Questions
 <Unresolved decisions. Omit if none remain.>
 ```
+
+For `## Settled Decisions`, Read
+`${CLAUDE_PLUGIN_ROOT}/references/flow-plan/settled-decisions.md` and apply its
+settlement test to the Step 2, Step 3 and Step 5 answers: an option the user
+picked from trade-off choices is `user-directed` over the options they passed on.
 
 Assign stable `R<N>` IDs (bare, flat-sequential — `R1, R2, R3`; both EARS and
 user-story forms may co-exist). Every design element must trace to >=1
