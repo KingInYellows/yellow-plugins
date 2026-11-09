@@ -180,8 +180,8 @@ the resolve scripts: `references/resolve/dispositions.md`.
 - `rule-pack-context` — `/review:pr`'s fenced rule-packs block for
   `project-standards-reviewer`, read from the base ref (`--ref`) plus
   machine-local `rule_pack_dirs`; prints nothing without packs. yellow-core's
-  `lib/rule-pack-roots.sh` applies the same `rule_pack_dirs` trust rules; change
-  both together
+  `lib/rule-pack-context.sh` is a byte-identical copy (`/flow:plan`,
+  `--worktree`); `rule-pack-context.bats` fails when they differ
 - `check-merge-ready` — read-only `/review:merge-ready` gate combining the
   readers above with a PR-state and CI read and the ledger summary; exits 0
   ready, 1 blocked, 3 unknown. Its `approval` section (CLAUDE-234) runs

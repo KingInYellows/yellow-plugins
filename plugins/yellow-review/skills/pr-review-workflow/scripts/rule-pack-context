@@ -25,7 +25,9 @@
 # are rules, read in name order, at most 25 per pack. Subfolders are storage
 # and never read. A rule needs YAML frontmatter with `title:` and
 # `applies_when:`; a file without them is skipped with a warning. A rule over
-# 16 KiB is skipped; loading stops at 96 KiB in total.
+# 16 KiB is skipped; loading stops at 96 KiB in total. A rule whose pack id
+# and file name were already loaded (repository first, then local folders in
+# config order) is skipped as a duplicate.
 #
 # Machine-local folders: a `rule_pack_dirs:` block list in
 # yellow-plugins.local.md, each entry an absolute path (or ~/...) to a folder
@@ -33,8 +35,12 @@
 # ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md, and from the
 # repository root's copy only when git does not track it: a tracked file
 # arrives with the branch, and a branch must not point a review at arbitrary
-# folders on the reviewer's machine. yellow-core lib/rule-pack-roots.sh
-# applies the same rules; change both together.
+# folders on the reviewer's machine.
+#
+# Two byte-identical copies ship: yellow-review
+# skills/pr-review-workflow/scripts/rule-pack-context (/review:pr, --ref) and
+# yellow-core lib/rule-pack-context.sh (/flow:plan, --worktree). Edit both;
+# yellow-review's rule-pack-context.bats fails when they differ.
 #
 # Every rule body is untrusted. Control and bidi characters are removed, any
 # line opening a `--- begin ` or `--- end ` fence is defanged to
@@ -98,6 +104,8 @@ fi
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/rule-packs.XXXXXX") || die 1 'mktemp failed'
 trap 'rm -rf "$WORK"' EXIT
 : >|"$WORK/block"
+: >|"$WORK/seen"
+: >|"$WORK/dirs"
 
 PACKS=0
 RULES=0
@@ -119,6 +127,7 @@ sanitize() {
 # applies_when: keys at column 0 between them.
 has_frontmatter() {
     awk '
+        { sub(/\r$/, "") }
         NR == 1 { if ($0 != "---") exit 1; next }
         $0 == "---" { closed = 1; exit }
         /^title:[ \t]*[^ \t]/ { t = 1 }
@@ -131,6 +140,11 @@ has_frontmatter() {
 add_rule() {
     local src=$1 id=$2 name=$3 raw=$4 size
     [ "$FULL" -eq 0 ] || { SKIPPED=$((SKIPPED + 1)); return 0; }
+    if grep -qxF -- "$id/$name" "$WORK/seen"; then
+        warn "$src pack $id: $name was already loaded from another folder; skipped"
+        SKIPPED=$((SKIPPED + 1))
+        return 0
+    fi
     size=$(wc -c <"$raw" | tr -d ' ')
     if [ "$size" -gt "$MAX_RULE_BYTES" ]; then
         warn "$src pack $id: $name is over $MAX_RULE_BYTES bytes; skipped"
@@ -150,6 +164,7 @@ add_rule() {
     fi
     TOTAL=$((TOTAL + size))
     RULES=$((RULES + 1))
+    printf '%s/%s\n' "$id" "$name" >>"$WORK/seen"
     {
         printf '<rule pack="%s" file="%s" source="%s">\n' "$id" "$name" "$src"
         sanitize <"$raw"
@@ -243,12 +258,15 @@ load_ref() {
 local_dirs() {
     [ -f "$1" ] && [ ! -L "$1" ] || return 0
     awk '
+        { sub(/\r$/, "") }
         NR == 1 { if ($0 != "---") exit; next }
         $0 == "---" { exit }
         /^rule_pack_dirs:[ \t]*(#.*)?$/ { on = 1; next }
         on && /^[ \t]+-[ \t]+/ {
-            v = $0; sub(/^[ \t]+-[ \t]+/, "", v); sub(/[ \t]+#.*$/, "", v); sub(/[ \t]+$/, "", v)
-            if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2)
+            v = $0; sub(/^[ \t]+-[ \t]+/, "", v)
+            if (v ~ /^"[^"]*"([ \t]+#.*)?[ \t]*$/) { sub(/^"/, "", v); sub(/".*$/, "", v) }
+            else if (v ~ /^\047[^\047]*\047([ \t]+#.*)?[ \t]*$/) { sub(/^\047/, "", v); sub(/\047.*$/, "", v) }
+            else { sub(/[ \t]+#.*$/, "", v); sub(/[ \t]+$/, "", v) }
             print v; next
         }
         on && /^[ \t]*(#.*)?$/ { next }
@@ -287,6 +305,9 @@ for cfg in "${CONFIGS[@]}"; do
             warn 'rule_pack_dirs entry is not a folder (or is a symlink); skipped'
             continue
         fi
+        dir=${dir%/}
+        grep -qxF -- "$dir" "$WORK/dirs" && continue
+        printf '%s\n' "$dir" >>"$WORK/dirs"
         load_dir local "$dir"
     done < <(local_dirs "$cfg")
 done

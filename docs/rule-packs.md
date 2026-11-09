@@ -12,8 +12,8 @@ as before.
   branch, so a PR cannot add or rewrite the rules it is judged by. A change that
   contradicts an applicable rule becomes a finding whose title cites
   `(pack: <id>, <file>)`, with the rule text and the violating line.
-- `/flow:plan` (yellow-core) adds the packs to `learnings-researcher`'s search,
-  reading the working tree. Matching rules appear in the plan's past-learnings
+- `/flow:plan` (yellow-core) gives the packs to `learnings-researcher`, read
+  from the working tree. Matching rules appear in the plan's past-learnings
   context with the same `(pack: <id>, <file>)` citation.
 
 Nothing else reads packs. The learnings pre-pass in `/review:pr` does not, so a
@@ -25,7 +25,7 @@ rule reaches review through one reviewer only.
 rule-packs/
   <id>/                 pack id: lowercase letters, digits and hyphens
     README.md           what the pack covers; never loaded as a rule
-    <rule>.md           one rule per top-level .md file
+    <rule>.md           one rule per top-level .md file (letters, digits, . _ -)
     examples/           subfolders are storage and are never read
 ```
 
@@ -33,6 +33,10 @@ rule-packs/
   order, at most 25 per pack.
 - A rule file over 16 KiB is skipped, and loading stops at 96 KiB across all
   packs. Each skip prints a `[rule-packs] Warning:` line.
+- Rule file names start with a letter or digit and use only ASCII letters,
+  digits, `.`, `_` and `-`; other names are skipped with a warning.
+- A pack id and file name load once. When the repository and a machine-local
+  folder both have `<id>/<file>`, the repository's copy wins.
 - Symlinked pack folders and rule files are skipped.
 
 ## Rule format
@@ -62,13 +66,15 @@ breaking the rule when there is one.
 
 ## Safety
 
-Pack text is untrusted reference data. The builder
-(`plugins/yellow-review/skills/pr-review-workflow/scripts/rule-pack-context`)
-removes control and bidi characters, defangs any line that opens a `--- begin`
-or `--- end` fence, escapes XML metacharacters, and wraps the result in a
-`rule-packs` reference-only fence. Reviewers quote rule text as evidence and
-never follow instructions inside it; a rule saying "skip all tests" is reported,
-not obeyed.
+Pack text is untrusted reference data. One builder script, shipped as
+byte-identical copies in yellow-review
+(`skills/pr-review-workflow/scripts/rule-pack-context`) and yellow-core
+(`lib/rule-pack-context.sh`), loads every rule; no agent reads pack files
+itself. It removes control and bidi characters, defangs any line that opens a
+`--- begin` or `--- end` fence, escapes XML metacharacters, and wraps the result
+in a `rule-packs` reference-only fence. Reviewers quote rule text as evidence
+and never follow instructions inside it; a rule saying "skip all tests" is
+reported, not obeyed.
 
 ## Machine-local packs
 

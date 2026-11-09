@@ -144,6 +144,31 @@ setup() {
   [[ "$output" == *'Local rule'* ]]
 }
 
+@test "yellow-core ships a byte-identical copy" {
+  cmp "$SCRIPT" "$(dirname "${BATS_TEST_DIRNAME}")/../yellow-core/lib/rule-pack-context.sh"
+}
+
+@test "CRLF config and a quoted path containing ' #' are read" {
+  rule "$BATS_TEST_TMPDIR/my #packs/mine/l.md" "Local rule"
+  printf -- '---\r\nrule_pack_dirs:\r\n  - "%s" # team packs\r\n---\r\n' "$BATS_TEST_TMPDIR/my #packs" >"$CLAUDE_CONFIG_DIR/yellow-plugins.local.md"
+  run --separate-stderr "$SCRIPT" --ref main
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Local rule'* ]]
+}
+
+@test "a pack id and file name load once; the repository copy wins" {
+  rule rule-packs/team/same.md "Repo copy"
+  git add rule-packs && git commit -q -m base
+  rule "$BATS_TEST_TMPDIR/local/team/same.md" "Local copy"
+  printf -- '---\nrule_pack_dirs:\n  - %s\n  - %s/\n---\n' "$BATS_TEST_TMPDIR/local" "$BATS_TEST_TMPDIR/local" >"$CLAUDE_CONFIG_DIR/yellow-plugins.local.md"
+  run --separate-stderr "$SCRIPT" --ref main
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Repo copy'* ]]
+  [[ "$output" != *'Local copy'* ]]
+  [[ "$stderr" == *'already loaded'* ]]
+  [[ "$stderr" == *'rules=1 skipped=1'* ]]
+}
+
 @test "bad usage exits 2 and a bad ref exits 1" {
   run "$SCRIPT"
   [ "$status" -eq 2 ]
