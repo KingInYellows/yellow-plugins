@@ -2,8 +2,8 @@
 
 A rule pack is a folder of team rules that need judgment to apply: the
 conventions a reviewer keeps pointing out but no validator can check. Packs are
-optional. A repository without a `rule-packs/` folder reviews and plans exactly
-as before.
+optional. When no rules load, from the repository or from a machine-local
+`rule_pack_dirs` folder, reviews and plans run exactly as before.
 
 ## Where packs are used
 
@@ -13,8 +13,9 @@ as before.
   contradicts an applicable rule becomes a finding whose title cites
   `(pack: <id>, <file>)`, with the rule text and the violating line.
 - `/flow:plan` (yellow-core) gives the packs to `learnings-researcher`, read
-  from the working tree. Matching rules appear in the plan's past-learnings
-  context with the same `(pack: <id>, <file>)` citation.
+  from the working tree. The three most relevant matching rules appear in the
+  plan's past-learnings context with the same `(pack: <id>, <file>)` citation;
+  the reviewer still checks every rule at review time.
 
 Nothing else reads packs. The learnings pre-pass in `/review:pr` does not, so a
 rule reaches review through one reviewer only.

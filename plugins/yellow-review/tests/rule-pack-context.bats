@@ -156,6 +156,14 @@ setup() {
   [[ "$output" == *'Local rule'* ]]
 }
 
+@test "an unindented list item under rule_pack_dirs is read" {
+  rule "$BATS_TEST_TMPDIR/local/mine/l.md" "Unindented rule"
+  printf -- '---\nrule_pack_dirs:\n- %s\n---\n' "$BATS_TEST_TMPDIR/local" >"$CLAUDE_CONFIG_DIR/yellow-plugins.local.md"
+  run --separate-stderr "$SCRIPT" --ref main
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'Unindented rule'* ]]
+}
+
 @test "a pack id and file name load once; the repository copy wins" {
   rule rule-packs/team/same.md "Repo copy"
   git add rule-packs && git commit -q -m base

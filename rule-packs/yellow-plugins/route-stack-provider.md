@@ -7,10 +7,12 @@ applies_when:
 tags: [stack, graphite, github, workflow]
 ---
 
-Never hardcode Graphite (`gt`) or GitHub-native stacks (`gh stack`). Run
-`/stack:status` first and route through the enabled provider's own commands only
-on `READY_GRAPHITE` or `READY_GITHUB`. Every other state stops with the
-classifier's detail. Never fall back to raw `git push` or `gh pr create`.
+In provider-neutral orchestration, never hardcode Graphite (`gt`) or
+GitHub-native stacks (`gh stack`). Run `/stack:status` first and route through
+the enabled provider's own commands only on `READY_GRAPHITE` or `READY_GITHUB`.
+Every other state stops with the classifier's detail. Never fall back to raw
+`git push` or `gh pr create`.
 
 `plugins/yellow-core/lib/stack-operation-registry.js` maps operations to
-providers.
+providers. A provider's own implementation commands (in `gt-workflow` or
+`github-workflow`) name that provider's CLI by design and are exempt.

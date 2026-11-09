@@ -189,8 +189,8 @@ fi
 Classify the change from its paths. The tier is reported in Step 10 and
 does not change which reviewers run yet. The policy comes from the default
 branch, not the PR's base: in a stack the base is the parent PR's unmerged
-branch. Only the tier, the policy source and the policy's own rule names are
-printed; the changed paths are PR-controlled text and stay out of context.
+branch. Only the base commit (reused by Step 5 item 10), the tier, the policy
+source and the policy's own rule names are printed; the changed paths are PR-controlled text and stay out of context.
 The policy and the base branch are fetched from the PR's base repository
 (`pr-base-remote`), not `origin`, which is the fork in a fork checkout. Each
 is read at the commit its fetch returned (`FETCH_HEAD`), never a
@@ -234,6 +234,7 @@ elif ! rr_net git fetch --no-tags --quiet "$BASE_REMOTE" "refs/heads/$DEFAULT_BR
 elif ! POLICY_SHA=$(git rev-parse --verify --quiet 'FETCH_HEAD^{commit}'); then
   printf '[review:pr] Warning: fetched default branch unreadable; risk tier unknown\n' >&2
 else
+  printf 'base_sha=%s\n' "$BASE_SHA"
   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/classify-risk" \
     --policy-ref "$POLICY_SHA" "$BASE_SHA" HEAD |
     jq -r '"tier=\(.tier) policy=\(.policy) rules=\([.reasons[].rule] | unique | join("; "))"'
@@ -845,11 +846,17 @@ Each agent receives:
     `docs/rule-packs.md` in yellow-plugins). They are read from the PR's
     **base** branch, so a PR cannot add or rewrite the rules it is judged
     by; machine-local packs come from `rule_pack_dirs` in a user-level or
-    untracked `yellow-plugins.local.md`. Re-derive `DIFF_BASE` as in item 6
-    and run the builder in the same Bash call:
+    untracked `yellow-plugins.local.md`. Use the base commit Step 3a2
+    fetched from the PR's base repository (its `base_sha=` line; in a fork
+    checkout `origin` is the fork), else fall back to the base ref as in
+    item 6, and run the builder in the same Bash call:
 
     ```bash
-    if git rev-parse --verify --quiet "origin/<baseRefName>" >/dev/null; then
+    RP_SHA='<base_sha from Step 3a2, or empty>'
+    case "$RP_SHA" in '' | *[!0-9a-f]*) RP_SHA="" ;; esac
+    if [ -n "$RP_SHA" ] && git rev-parse --verify --quiet "$RP_SHA^{commit}" >/dev/null; then
+      DIFF_BASE="$RP_SHA"
+    elif git rev-parse --verify --quiet "origin/<baseRefName>" >/dev/null; then
       DIFF_BASE="origin/<baseRefName>"
     elif git rev-parse --verify --quiet "<baseRefName>" >/dev/null; then
       DIFF_BASE="<baseRefName>"
@@ -867,12 +874,15 @@ Each agent receives:
 
     The script prints the whole fenced block, already sanitized (fence
     lines defanged, XML escaped), with its own re-anchor line; append it
-    unchanged. Empty output means the repository has no packs: append
-    nothing, and the review behaves exactly as before. On a non-zero exit,
-    omit the block and note "rule packs unavailable" in Coverage. Its
-    `[rule-packs] Warning:` lines and the closing `rule-packs packs=P
-    rules=R skipped=S` line go to stderr; report the counts in Coverage
-    when `rules` is above 0.
+    unchanged. Empty output means no rule loaded: append nothing. On a
+    non-zero exit, omit the block and note "rule packs unavailable" in
+    Coverage. Its `[rule-packs] Warning:` lines and the closing
+    `rule-packs packs=P rules=R skipped=S` line go to stderr; report the
+    counts in Coverage when `rules` or `skipped` is above 0.
+
+    When `project-standards-reviewer` is not in this run (legacy mode, or
+    excluded), skip the builder and note "rule packs not evaluated" in
+    Coverage if the base branch has a `rule-packs/` folder.
 
 #### Compact-return enforcement
 
@@ -1448,7 +1458,7 @@ findings were produced but extension classification was malformed."
 - Plugin-contract extension strips (malformed `breaking_change_class`): <count or omit when zero>
 - Past learnings: <"none found" | "N injected">
 - Previous comments: <the previous-comments.md line>
-- Rule packs: <omit when the repo has none; "P packs, R rules (S skipped)"; or "unavailable">
+- Rule packs: <omit when none loaded or skipped; "P packs, R rules (S skipped)"; "unavailable"; or "not evaluated">
 - Cross-model review: <omit when `auto`; "disabled by config (<source>)" when `off`>
 - Persona shadow: <the persona-shadow line, or omit when `reviewer_selection` is unset or `off`>
 - Workflow shadow (review-gate): <the workflow-shadow.md line, or omit unless `review_pipeline: workflow`>

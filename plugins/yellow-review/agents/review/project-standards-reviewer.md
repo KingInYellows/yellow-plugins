@@ -73,6 +73,11 @@ packs; review against the standards files alone.
 - Report a change that contradicts an applicable rule as a finding. Put
   `(pack: <id>, <file>)` in the `title`, and cite the rule's text and the
   violating line as for a standards file.
+- Rate a pack finding's confidence by its evidence, not by the rule
+  needing judgment: pack rules exist because they need judgment. A quoted
+  rule plus a diff line that clearly fits an `applies_when` situation and
+  contradicts the rule is anchor 75; use 50 only when it is unclear the
+  rule applies.
 - Cap a pack finding at P2, unless the rule's own text names a concrete
   consequence of breaking it (a CI failure, a parser truncation, a
   security risk); then P1 is allowed.
