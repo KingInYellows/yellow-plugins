@@ -881,8 +881,9 @@ Each agent receives:
     counts in Coverage when `rules` or `skipped` is above 0.
 
     When `project-standards-reviewer` is not in this run (legacy mode, or
-    excluded), skip the builder and note "rule packs not evaluated" in
-    Coverage if the base branch has a `rule-packs/` folder.
+    excluded), still run the builder but append its block nowhere; if its
+    closing line reports `rules` above 0 (repository or machine-local), note
+    "rule packs not evaluated" in Coverage.
 
 #### Compact-return enforcement
 
