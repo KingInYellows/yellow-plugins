@@ -54,12 +54,15 @@ research, analysis, and structured documentation.
 2a. Settled decisions: Read
    `${CLAUDE_PLUGIN_ROOT}/references/flow-plan/settled-decisions.md` and
    collect entries from its three sources: annotated `## Key Decisions` in the
-   brainstorm doc (or `## Settled Decisions` in a spec or shell passed as
-   input), a `Settled decisions:` block in the arguments (remove it
-   from the feature description), and this conversation before `/flow:plan`
-   started. Print each once as `Carrying forward: <decision>` and never ask
-   about it again. Note directives for their one Phase 2 challenge. With
-   nothing settled, carry no brief and skip this.
+   brainstorm doc for this feature (or `## Settled Decisions` in a spec or
+   shell passed as input), a `Settled decisions:` block in the arguments
+   (remove it from the feature description), and this conversation before
+   `/flow:plan` started. Use a brainstorm doc only when its topic matches this
+   feature; when several match, ask which one, and in non-interactive mode
+   collect from none and list the candidates under `## Open Questions`. Print
+   each entry once as `Carrying forward: <decision>` and never ask about it
+   again. Note directives for their one Phase 2 challenge. With nothing
+   settled, carry no brief and skip this.
 
 3. Parse the feature description from `#$ARGUMENTS`. If vague or missing, use
    AskUserQuestion to gather:

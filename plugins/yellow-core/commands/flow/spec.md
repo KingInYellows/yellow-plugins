@@ -140,8 +140,8 @@ Write `plans/specs/<slug>.md` using this structure. Mandatory sections:
 
 For `## Settled Decisions`, Read
 `${CLAUDE_PLUGIN_ROOT}/references/flow-plan/settled-decisions.md` and apply its
-settlement test to the Step 3 and Step 5 answers: an option the user picked
-from trade-off choices is `user-directed` over the options they passed on.
+settlement test to the Step 2, Step 3 and Step 5 answers: an option the user
+picked from trade-off choices is `user-directed` over the options they passed on.
 
 Assign stable `R<N>` IDs (bare, flat-sequential — `R1, R2, R3`; both EARS and
 user-story forms may co-exist). Every design element must trace to >=1

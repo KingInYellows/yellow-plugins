@@ -184,7 +184,7 @@ Invariants enforced at write time:
   shell named in `depends_on`) or is marked "from existing codebase".
 - `## Open Questions` is always present (write `None` when empty) so structure
   stays consistent.
-- Every settled entry in the spec appears, unchanged, in at least one shell it
+- Every settled entry in the spec appears, unchanged, in every shell it
   constrains (`references/flow-plan/settled-decisions.md`). Never upgrade,
   reword or invent one.
 - Shells use numbered lists / R-ids — never `- [ ]` checkboxes.
