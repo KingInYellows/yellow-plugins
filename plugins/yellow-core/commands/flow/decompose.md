@@ -162,6 +162,10 @@ depends_on: []
 ## Consumes
 - <Dependency — "from Shell <dep-slug>" (must be in depends_on) OR "from existing codebase">
 
+## Settled Decisions
+- <Copied verbatim from the spec's `## Settled Decisions` when the decision
+  constrains this shell. Omit the section when none apply.>
+
 ## Covers Spec Requirements
 - R<N>
 - R<M> (partial: <kebab-slice>)
@@ -180,6 +184,9 @@ Invariants enforced at write time:
   shell named in `depends_on`) or is marked "from existing codebase".
 - `## Open Questions` is always present (write `None` when empty) so structure
   stays consistent.
+- Every settled entry in the spec appears, unchanged, in at least one shell it
+  constrains (`references/flow-plan/settled-decisions.md`). Never upgrade,
+  reword or invent one.
 - Shells use numbered lists / R-ids — never `- [ ]` checkboxes.
 
 ## Step 7: Present + Finalize

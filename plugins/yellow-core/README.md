@@ -30,7 +30,7 @@ skills from Claude command wrappers. See
 | `/flow:decompose`  | Break a spec into dependency-ordered shell files in `plans/shells/` with a blocking R-id coverage gate; single-shell specs bail out to `/flow:plan` |
 | `/flow:pick-next-shell` | Pick the lowest-numbered shell whose `depends_on` are archived in `plans/complete/`, expand it, and halt for a fresh `/flow:work` session; reports cycles and the terminal state |
 | `/flow:expand-shell` | Expand one shell into a concrete `- [ ]` checkbox plan in `plans/`, verifying `Consumes` against the live codebase and deleting the shell only after approval |
-| `/flow:plan`       | Transform feature descriptions into structured plans               |
+| `/flow:plan`       | Transform feature descriptions into structured plans; carries settled decisions forward and stops when research invalidates one |
 | `/flow:work`       | Execute work plans systematically                                  |
 | `/flow:review`     | Session-level review of plan adherence, cross-PR coherence, and scope drift |
 | `/flow:compound`   | Document a recently solved problem to compound knowledge. Pass `--in-pr` while on a feature branch with an open PR to draft the doc + MEMORY.md line from the PR body and commits (the default pattern in CONTRIBUTING.md "Solution Docs") |

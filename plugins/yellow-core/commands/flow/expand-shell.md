@@ -88,7 +88,8 @@ before continuing to Step 5.
 
 ## Step 5: Escalate Open Questions
 
-Resolve only the shell's `## Open Questions` (AskUserQuestion). Do not re-open
+Resolve only the shell's `## Open Questions` (AskUserQuestion). Settled
+entries (`session-settled:`) are never questions. Do not re-open
 spec-level or design-level decisions.
 
 ## Step 6: Write the Expanded Plan
@@ -101,6 +102,9 @@ Write `plans/<shell-slug>.md` using yellow's standard plan shape so
 
 ## Overview
 <Shell Context, preserved or lightly edited — do not reinterpret.>
+
+## Settled Decisions
+<The shell's `## Settled Decisions` entries, unchanged. Omit if the shell has none.>
 
 ## Origin
 - Spec: `plans/specs/<spec-slug>.md`
@@ -131,7 +135,8 @@ steps.
 Re-read both files and confirm: every `Produces` item is created by >=1
 Implementation step; every `Consumes` item is referenced (Implementation,
 Context Files, or Pattern Survey); every `Covers` R-id is addressed; `Context`
-is preserved faithfully; no scope creep beyond `Produces`. Revise the plan until
+is preserved faithfully; the shell's `## Settled Decisions` entries are
+carried over unchanged; no scope creep beyond `Produces`. Revise the plan until
 all pass.
 
 ## Step 8: Approve, Then Delete the Shell

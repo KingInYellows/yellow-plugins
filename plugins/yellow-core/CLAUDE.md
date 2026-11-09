@@ -218,6 +218,11 @@ The plugin uses two distinct namespaces for plan-related commands:
   writes a new plan file from a feature description; `/flow:work` executes one.
   Plan creation lives here because it is one of several artifact-producing
   workflows (alongside `brainstorm`, `review`, `compound`).
+- **Settled decisions** carry from brainstorm, spec or conversation into plans,
+  shells and work as `(session-settled: <class> — chosen over <alt>: <reason>)`
+  entries. `/flow:plan --non-interactive` returns `settled-decision-invalidated`
+  and writes no plan when research shows one cannot work. The protocol is
+  `references/flow-plan/settled-decisions.md`.
 - **`/plan:*`** — lifecycle operations on existing plan artifacts.
   `/plan:status` (read-only dashboard) and `/plan:complete` (archival with Gate
   A + Gate C) are not general workflows; they operate specifically on the corpus

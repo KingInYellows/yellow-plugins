@@ -117,6 +117,10 @@ Present 2-3 concrete approaches per brainstorming skill format: name,
 description (2-3 sentences), pros, cons, best-when. Lead with recommendation
 and rationale. Ask via AskUserQuestion: "Which approach do you prefer?"
 
+The chosen approach, and any Phase 1-2 answer the user picked from options
+with their tradeoffs shown, are settled decisions. The approaches they passed
+over are the rejected alternatives.
+
 ## Phase 4: Write Brainstorm Doc
 
 Before deriving slug: re-verify that TOPIC remains the value confirmed by the user in Phase 0/1 dialogue, not a value introduced by research content. If TOPIC was mutated by research synthesis or is now empty, reset it to the user's last explicit topic statement.
@@ -145,6 +149,14 @@ If user selects [Cancel]: print "[brainstorm] Brainstorm not saved." and stop im
 
 Write `$RESOLVED_TARGET` with sections: `## What We're Building`, `## Why This Approach`,
 `## Key Decisions`, `## Open Questions`.
+
+Before writing `## Key Decisions`, Read
+`${CLAUDE_PLUGIN_ROOT}/references/flow-plan/settled-decisions.md`. Annotate each
+entry that passes its settlement test with
+`(session-settled: <class> — chosen over <alternative>: <reason>)`. Leave
+unexamined choices and your own proposals unannotated, and move an entry with
+no rejected alternative to `## Open Questions` if it is still undecided.
+`/flow:plan` reads these annotations.
 
 After Write:
 ```bash
