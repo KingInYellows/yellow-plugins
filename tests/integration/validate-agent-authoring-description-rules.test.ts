@@ -125,6 +125,19 @@ describe('validate-agent-authoring description rules', () => {
       expect(stdout).not.toContain('RULE 15d');
     });
 
+    it('stays silent on a long description kept on one line by prettier-ignore', () => {
+      writeAgent(
+        plugins,
+        'alpha/commands/demo/cmd.md',
+        command(
+          `# prettier-ignore\ndescription: ${'Long fixture text. '.repeat(10)}`
+        )
+      );
+      const { status, stdout } = runValidator(plugins);
+      expect(status).toBe(0);
+      expect(stdout).not.toContain('RULE 15d');
+    });
+
     it('fails on a command whose frontmatter is not valid YAML', () => {
       // A duplicate key: the budget cannot count this file, so it must not pass.
       writeAgent(
@@ -246,6 +259,7 @@ describe('validate-agent-authoring description rules', () => {
     it.each([
       ['a non-string description', command('description: 12345')],
       ['no description key', command('argument-hint: x')],
+      ['an empty description', command("description: ''")],
       ['no frontmatter', '# Command\n\nBody.\n'],
       [
         'a byte-order mark before the frontmatter',
@@ -309,16 +323,44 @@ describe('validate-agent-authoring description rules', () => {
       );
     });
 
-    it('fails on a baseline entry that is not a non-negative integer', () => {
+    it.each([
+      ['a string', '35'],
+      ['negative', -1],
+      ['fractional', 35.5],
+    ])('fails on a baseline entry that is %s', (_label, entry) => {
       writeAlpha();
       writeFileSync(
         baselineFile,
-        JSON.stringify({ unit: 'chars', plugins: { alpha: '35' } })
+        JSON.stringify({ unit: 'chars', plugins: { alpha: entry } })
       );
       const { status, output } = runBudget();
       expect(status).toBe(1);
       expect(output).toContain(
         'RULE 23 — alpha: baseline entry must be a non-negative integer'
+      );
+    });
+
+    it.each([
+      ['an array', [35]],
+      ['null', null],
+    ])('fails when the baseline plugins value is %s', (_label, value) => {
+      writeAlpha();
+      writeFileSync(
+        baselineFile,
+        JSON.stringify({ unit: 'chars', plugins: value })
+      );
+      const { status, output } = runBudget();
+      expect(status).toBe(1);
+      expect(output).toContain('a `plugins` object');
+    });
+
+    it('fails when the baseline file is not valid JSON', () => {
+      writeAlpha();
+      writeFileSync(baselineFile, '{ "unit": "chars", ');
+      const { status, output } = runBudget();
+      expect(status).toBe(1);
+      expect(output).toContain(
+        'RULE 23 — cannot read the description baseline'
       );
     });
 
