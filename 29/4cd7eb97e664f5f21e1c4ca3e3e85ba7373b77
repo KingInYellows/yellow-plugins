@@ -1,0 +1,33 @@
+AGENTS.md
+  s_3301212c34e55d::t_ee1cb73de6b2eb 333-343
+CLAUDE.md
+  s_3301212c34e55d::t_bfa35679076bc6 32,140-141
+CONTRIBUTING.md
+  s_3301212c34e55d::t_9686b3d91f1e7c 103-106,778-785,804-806,816-821
+docs/plugin-template.md
+  s_3301212c34e55d::t_18b3c6ea7a101d 412-414
+plans/claude-code-quality-and-cost-roadmap.md
+  s_3301212c34e55d::t_2f10131bc7f063 190-192
+plans/description-validators.md
+  s_3301212c34e55d::t_52d5c22cd750d7 15-17,176-177
+scripts/validate-agent-authoring.js
+  s_3301212c34e55d::t_96f234295ab317 249-253,1734,1794-1804,1823,1825,1839-1844,1849-1854,1862,1864,1908-1909,1920,1932-1949,1951,1953,1956,2020-2036
+tests/integration/validate-agent-authoring-description-rules.test.ts
+  s_3301212c34e55d::t_993a3ae5f1b1eb 368-446
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "294cd7eb97e664f5f21e1c4ca3e3e85ba7373b77",
+  "prompts": {},
+  "sessions": {
+    "s_3301212c34e55d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "970dd086-03cf-43a0-95f0-3e73c5013fb1",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
