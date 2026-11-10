@@ -12,8 +12,9 @@ each Claude Code session. Two things about it are unguarded:
 - The single-line rule (RULE 15d) is checked only on `SKILL.md`. Two commands
   already carry Prettier-wrapped multi-line descriptions, and only review
   would catch a third.
-- Nothing measures the total. It is 71,248 characters today and can grow
-  without anyone seeing it.
+- Nothing measures the total. It was 71,248 characters at plan time (70,817
+  as shipped, after excluding manual-only commands) and can grow without
+  anyone seeing it.
 
 This PR adds both guards. It changes no model-visible behaviour.
 
@@ -172,7 +173,8 @@ PR, and it is derivable.
   - Generated `codex/skills` copy is not counted.
   - `disable-model-invocation: true` is excluded; the string `"true"` and an
     absent key are counted.
-  - Non-string description counts 0; CRLF file counts the same as its LF twin.
+  - A command, skill or agent with no string description fails (changed in
+    review from "counts 0"); a CRLF file counts the same as its LF twin.
   - Budget check is skipped when `VALIDATE_DESCRIPTION_BASELINE` is unset in
     a fixture run.
   - `--update-description-baseline` writes sorted keys and a trailing

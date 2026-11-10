@@ -29,6 +29,7 @@ pnpm test:integration         # vitest run --dir tests/integration (validator te
 
 pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + provider-groups + codex + cursor + jules + flow-namespace + provider-neutral-commands + council-roster + compact-return + doc-counts + shell-compat
 pnpm validate:agents          # agent-authoring rules only (fast; run after any plugin markdown edit)
+pnpm update:description-baseline  # rewrite scripts/description-budget-baseline.json after adding or removing description text (RULE 23)
 pnpm validate:shell-compat    # bash/zsh lint of fenced shell blocks + tier 4 libs (run after any shell edit)
 pnpm check:shell-parse        # blocks bash parses but zsh does not (skips locally without zsh; CI fails)
 pnpm test:shell-compat        # tests/shell-compat bats suite: libraries under bash, zsh, zsh+noclobber
@@ -136,7 +137,8 @@ the colon.
 3. Adding or removing a plugin: update `catalog/` (then
    `pnpm generate:manifests` regenerates `.claude-plugin/marketplace.json`)
    AND `plugins/yellow-core/commands/setup/all.md` together, or
-   `validate-setup-all.js` fails.
+   `validate-setup-all.js` fails. Then run `pnpm update:description-baseline`:
+   a plugin with no baseline entry fails RULE 23.
 4. Update the plugin's `README.md` and `CLAUDE.md` if behaviour changed.
 
 ### Authoring gotchas the validators do not catch

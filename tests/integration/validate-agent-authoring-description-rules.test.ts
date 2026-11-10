@@ -365,5 +365,84 @@ describe('validate-agent-authoring description rules', () => {
         '{\n  "unit": "chars",\n  "plugins": {\n    "alpha": 35,\n    "beta": 10\n  }\n}\n'
       );
     });
+
+    it('names the largest descriptions when a plugin is over its baseline', () => {
+      writeAlpha();
+      writeBaseline({ alpha: 34 });
+      const { output } = runBudget();
+      expect(output).toContain('Largest: ');
+      expect(output).toContain('skills/demo-skill/SKILL.md (15)');
+    });
+
+    it.each([
+      ['no description', agent('model: sonnet')],
+      ['a non-string description', agent('description: 12345')],
+    ])('fails on an agent with %s', (_label, body) => {
+      writeAgent(plugins, 'alpha/agents/demo-agent.md', body);
+      writeBaseline({ alpha: 0 });
+      const { status, output } = runBudget();
+      expect(status).toBe(1);
+      expect(output).toContain(
+        'agents/demo-agent.md: no string `description:`'
+      );
+    });
+
+    it('does not count or flag a skill with disable-model-invocation: true', () => {
+      writeAgent(
+        plugins,
+        'alpha/skills/demo-skill/SKILL.md',
+        skill('disable-model-invocation: true')
+      );
+      writeBaseline({ alpha: 0 });
+      const { status, output } = runBudget();
+      expect(status).toBe(0);
+      expect(output).not.toContain('RULE 23');
+    });
+
+    it('reports a command with malformed YAML once, as malformed', () => {
+      writeAgent(
+        plugins,
+        'alpha/commands/demo/cmd.md',
+        command('description: "unclosed')
+      );
+      writeBaseline({ alpha: 0 });
+      const { status, output } = runBudget();
+      expect(status).toBe(1);
+      expect(output.match(/malformed YAML frontmatter/g)).toHaveLength(1);
+      expect(output).not.toContain('no string `description:`');
+    });
+
+    describe('--update-description-baseline refuses to write', () => {
+      const updateFlag = ['--update-description-baseline'];
+
+      it.each([
+        ['an undescribed command', command('argument-hint: x'), 'no string'],
+        [
+          'a command with malformed YAML',
+          command('description: "unclosed'),
+          'malformed YAML frontmatter',
+        ],
+      ])('over %s', (_label, body, message) => {
+        writeAlpha();
+        writeAgent(plugins, 'alpha/commands/demo/broken.md', body);
+        writeBaseline({ alpha: 35 });
+        const before = readFileSync(baselineFile, 'utf8');
+        const { status, output } = runBudget(updateFlag);
+        expect(status).toBe(1);
+        expect(output).toContain(message);
+        expect(output).toContain('Baseline not written');
+        expect(readFileSync(baselineFile, 'utf8')).toBe(before);
+      });
+
+      it('in a fixture run that names no baseline', () => {
+        writeAlpha();
+        const result = spawnSync('node', [VALIDATOR, ...updateFlag], {
+          env: { ...process.env, VALIDATE_PLUGINS_DIR: plugins },
+          encoding: 'utf8',
+        });
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain('needs VALIDATE_DESCRIPTION_BASELINE');
+      });
+    });
   });
 });

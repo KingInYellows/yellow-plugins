@@ -187,7 +187,9 @@ Each initiative lists its check. "Gate" means the eval gate applies.
 
 - [ ] **R2.1 Description-budget validator.** Print description characters per
   plugin and in total, in warn-and-ratchet mode: fail only when the total
-  grows. Check: validator in `pnpm validate:schemas`; baseline 72.0k chars.
+  grows. Check: validator in `pnpm validate:schemas`. Shipped baseline:
+  70,817 chars, below the 72.0k measured at plan time because commands that
+  set `disable-model-invocation` are excluded.
   The single-line description rule for agents and commands is the existing
   CLAUDE-291, folded into this track.
 - [ ] **R2.2 Resolve the 8 gt-workflow collisions.** Test which side Claude

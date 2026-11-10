@@ -100,7 +100,10 @@ directory scaffold).
    lockfile was not updated and committed.
 4. Run `pnpm generate:manifests`. It emits
    `plugins/<name>/.claude-plugin/plugin.json` and the marketplace entry
-   (`source` `./plugins/<name>`). See `catalog/README.md`.
+   (`source` `./plugins/<name>`). See `catalog/README.md`. Once the plugin has
+   commands, agents or skills, run `pnpm update:description-baseline` and
+   commit `scripts/description-budget-baseline.json`: a plugin with no entry
+   is allowed 0 characters (RULE 23).
 5. Create the plugin's own setup command if it does not have one yet (for
    example `plugins/<name>/commands/<name>/setup.md` with frontmatter
    `name: <name>:setup`) — `validate-setup-all.js` requires every marketplace
@@ -772,8 +775,14 @@ of context, 8,000-char fallback). Each individual skill's combined
 `description` + `when_to_use` is officially capped at **1,536 characters**;
 yellow-plugins skill descriptions are all well under that limit. None of
 the yellow-plugins SKILL.md files currently use `when_to_use:`; the
-guidance below covers `description:` only. If `when_to_use:` is adopted
-in a future PR, revisit the budget arithmetic.
+guidance below covers `description:` only.
+
+Separately, RULE 23 keeps a per-plugin character total for command, agent and
+skill descriptions (`description` plus `when_to_use`) in
+`scripts/description-budget-baseline.json`. It is a growth ratchet, not a
+trimming target: a plugin over its number fails until the baseline is raised
+in the same PR. AGENTS.md "Command, Agent, And Skill Authoring" has the
+procedure and the counted set.
 
 **Trim for selection clarity, not for budget.** Two principles, both
 load-bearing:
@@ -792,8 +801,9 @@ load-bearing:
 
 The two are compatible: you can have short descriptions AND accurate
 selection by keeping the differentiating clause and cutting the noise.
-The only hard limit is the official per-skill cap of **1,536 characters**,
-and all yellow-plugins descriptions sit well under it. The community
+The only hard per-skill limit is the official cap of **1,536 characters**,
+and all yellow-plugins descriptions sit well under it; RULE 23 above limits
+growth per plugin, not length per skill. The community
 threshold cited in
 [anthropics/claude-code#44780](https://github.com/anthropics/claude-code/issues/44780)
 (observed 2026-05-09; behavior reported by users, not documented in the
@@ -803,10 +813,12 @@ time. The implication is positional, not a budget to cut toward: keep
 the differentiating clause and "Use when..." trigger inside the first
 ~200 chars regardless of total description length.
 
-This guidance does NOT apply to `user-invocable: false` skills — those
-descriptions are loaded only by agents that preload them via `skills:`
-frontmatter, never rendered in the listing budget. The positional
-~250-char threshold above does not apply. Trim them only when the
+The positional ~250-char threshold above matters less for
+`user-invocable: false` skills, which are hidden from the `/` menu and mostly
+reached by agents that preload them via `skills:` frontmatter. Their
+descriptions still count toward RULE 23: only
+`disable-model-invocation: true` removes a description from the model's
+listing. Trim them only when the
 description has obvious documentation-style bloat (capability
 enumerations, methodology names, body-content repetition that the
 reader can recover from the skill body) — as the audit did for

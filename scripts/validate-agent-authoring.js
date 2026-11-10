@@ -246,7 +246,11 @@ const DURABLE_BAR_FILES = [
   'yellow-core/agents/workflow/staging-scorer.md',
 ];
 
-// RULE 15 (a–d) — SKILL.md authoring lint, ALL warning-tier. AGENTS.md and
+// RULE 23 — description budget (error tier). Documented beside its code;
+// search for "RULE 23 — description budget".
+//
+// RULE 15 (a–d) — authoring lint, ALL warning-tier: 15a–c on SKILL.md, 15d
+// (single-line description) on SKILL.md, agents and commands. AGENTS.md and
 // the root CLAUDE.md document these skill-authoring conventions but until
 // this rule nothing enforced them (docs/optimization/analysis.md §3.4 calls
 // the authoring standard "partly aspirational"). Warning tier is deliberate:
@@ -1727,7 +1731,7 @@ function checkDescriptionSingleLine(frontmatter, filePath, warnings) {
       `[RULE 15d advisory] ${relative(filePath)}: \`description:\` spans ` +
         `multiple lines (block scalar, multi-line quoted string, or wrapped ` +
         `plain scalar) — Prettier rewrapping produces this form, an ` +
-        `unindented continuation drops the whole frontmatter, and other ` +
+        `unindented continuation can drop the whole frontmatter, and other ` +
         `parsers may read only the first line; keep it on one line with ` +
         `\`# prettier-ignore\` above it.`
     );
@@ -1787,11 +1791,17 @@ function validateSizeCeilings(commandFiles, agentFiles, warnings) {
 // fail each other. No overall total is stored: it would conflict in every
 // parallel PR and is derivable.
 //
-// Counted: parsed `description` plus `when_to_use`, in characters, for files
-// directly under a plugin's commands/, agents/ or skills/ directory. That
-// placement test also drops the generated codex/skills and cursor/skills
-// copies. A command or skill with `disable-model-invocation: true` is not
-// listed to the model and is skipped; Codex and Cursor still list it.
+// Counted: parsed `description` plus `when_to_use`, in characters, for
+// markdown at any depth under a plugin's commands/ or agents/ directory and
+// for skills/<name>/SKILL.md. Classifying by the directory directly under the
+// plugin also drops the generated codex/skills and cursor/skills copies. A
+// command or skill with `disable-model-invocation: true` is not listed to the
+// model and is skipped; Codex and Cursor still list it.
+//
+// A counted file the budget cannot measure is an error, never a silent zero:
+// malformed YAML is reported by the per-file rules, and a file with no string
+// description is reported here. The update flag refuses to write while either
+// exists, so a broken file cannot lower the committed number.
 const DESCRIPTION_KINDS = ['commands', 'agents', 'skills'];
 const UPDATE_DESCRIPTION_BASELINE_FLAG = '--update-description-baseline';
 const UPDATE_DESCRIPTION_BASELINE_COMMAND = 'pnpm update:description-baseline';
@@ -1810,7 +1820,9 @@ function collectDescriptionBudget(pluginNames, files) {
   const plugins = Object.create(null);
   for (const name of [...pluginNames].sort()) plugins[name] = 0;
   const kinds = { commands: 0, agents: 0, skills: 0 };
+  const perFile = Object.create(null);
   const undescribed = [];
+  const malformed = [];
   // A Set: the callers' lists overlap for a path that has both a commands/
   // and an agents/ segment, and each file counts once, under its top-level
   // directory.
@@ -1824,21 +1836,22 @@ function collectDescriptionBudget(pluginNames, files) {
     }
     const frontmatter = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
     const data = parseFrontmatter(frontmatter);
-    // Malformed YAML: the per-file rules raise an error for all three kinds.
-    if (frontmatter !== null && !data) continue;
-    // Claude Code lists a command or skill that has no description by its
-    // first body text, which this count cannot see, so those are reported.
-    // An agent without frontmatter is already an error in validateAgentFile.
+    if (frontmatter !== null && !data) {
+      malformed.push(filePath);
+      continue;
+    }
+    // No frontmatter. For an agent that is already an error in
+    // validateAgentFile; a command or skill is reported as undescribed.
     if (!data) {
       if (kind !== 'agents') undescribed.push(filePath);
       continue;
     }
-    if (kind !== 'agents') {
-      if (data['disable-model-invocation'] === true) continue;
-      if (typeof data.description !== 'string' || !data.description) {
-        undescribed.push(filePath);
-        continue;
-      }
+    if (kind !== 'agents' && data['disable-model-invocation'] === true) {
+      continue;
+    }
+    if (typeof data.description !== 'string' || !data.description) {
+      undescribed.push(filePath);
+      continue;
     }
     let chars = 0;
     for (const key of ['description', 'when_to_use']) {
@@ -1846,8 +1859,9 @@ function collectDescriptionBudget(pluginNames, files) {
     }
     plugins[pluginName] += chars;
     kinds[kind] += chars;
+    (perFile[pluginName] ||= []).push({ filePath, chars });
   }
-  return { plugins, kinds, undescribed };
+  return { plugins, kinds, perFile, undescribed, malformed };
 }
 
 function checkDescriptionBudget(budget, baselinePath, errors, notices) {
@@ -1891,7 +1905,8 @@ function checkDescriptionBudget(budget, baselinePath, errors, notices) {
         `RULE 23 — ${name}: description total ${current} chars is over its ` +
           `baseline ${allowed} (+${current - allowed}). Shorten the ` +
           `descriptions, or run \`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\` ` +
-          `and commit the baseline so the growth is reviewed.`
+          `and commit the baseline so the growth is reviewed. Largest: ` +
+          `${largestDescriptions(budget.perFile[name])}.`
       );
     } else if (current < allowed) {
       notices.push(
@@ -1902,11 +1917,7 @@ function checkDescriptionBudget(budget, baselinePath, errors, notices) {
     }
   }
   for (const filePath of budget.undescribed) {
-    errors.push(
-      `RULE 23 — ${relative(filePath)}: no string \`description:\` in the ` +
-        `frontmatter. Claude Code would list its first body text instead, ` +
-        `which the budget cannot count; add a description.`
-    );
+    errors.push(undescribedError(filePath));
   }
   for (const name of Object.keys(entries).sort()) {
     if (!Object.prototype.hasOwnProperty.call(budget.plugins, name)) {
@@ -1918,11 +1929,31 @@ function checkDescriptionBudget(budget, baselinePath, errors, notices) {
   }
 }
 
+function undescribedError(filePath) {
+  return (
+    `RULE 23 — ${relative(filePath)}: no string \`description:\` in the ` +
+    `frontmatter. Claude Code may list its first body text instead, which ` +
+    `the budget cannot count; add a description.`
+  );
+}
+
+function largestDescriptions(entries = []) {
+  return [...entries]
+    .sort((a, b) => b.chars - a.chars)
+    .slice(0, 3)
+    .map(({ filePath, chars }) => `${relative(filePath)} (${chars})`)
+    .join(', ');
+}
+
+// Temp file then rename, so an interrupted run cannot leave a truncated
+// baseline that the next run reports as unreadable.
 function writeDescriptionBaseline(budget, baselinePath) {
+  const tmpPath = `${baselinePath}.${process.pid}.tmp`;
   fs.writeFileSync(
-    baselinePath,
+    tmpPath,
     `${JSON.stringify({ unit: 'chars', plugins: budget.plugins }, null, 2)}\n`
   );
+  fs.renameSync(tmpPath, baselinePath);
 }
 
 function describeDescriptionBudget(budget) {
@@ -1986,7 +2017,23 @@ function main() {
       );
       process.exit(1);
     }
-    writeDescriptionBaseline(budget, baselinePath);
+    const blockers = [
+      ...budget.malformed.map(
+        (filePath) => `${relative(filePath)}: malformed YAML frontmatter`
+      ),
+      ...budget.undescribed.map(undescribedError),
+    ];
+    if (blockers.length > 0) {
+      for (const blocker of blockers) logError(blocker);
+      logError('Baseline not written: fix the files above first.');
+      process.exit(1);
+    }
+    try {
+      writeDescriptionBaseline(budget, baselinePath);
+    } catch (e) {
+      logError(`cannot write ${relative(baselinePath)} (${e.code || e.name})`);
+      process.exit(1);
+    }
     logSuccess(
       `Wrote ${relative(baselinePath)} — ${describeDescriptionBudget(budget)}`
     );

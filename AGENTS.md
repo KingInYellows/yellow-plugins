@@ -330,10 +330,17 @@ rule id in parentheses is what the failure message cites.
   growth is reviewed; run it after removing text too. The count covers
   `description` and `when_to_use` in a plugin's own `commands/`, `agents/` and
   `skills/`, and skips commands and skills that set
-  `disable-model-invocation: true`. A command or skill with no string
-  `description` fails, because Claude Code would list its first body text,
-  which the count cannot see. The budget measures Claude Code's listing: Codex
-  and Cursor still list the skipped commands.
+  `disable-model-invocation: true`. The budget measures Claude Code's listing:
+  Codex and Cursor still list the skipped commands. On a baseline merge
+  conflict, or a RULE 23 failure after two PRs grew the same plugin, re-run
+  the update command on the merged tree.
+- Every markdown file under a plugin's `commands/` registers as a command, so
+  each needs valid YAML frontmatter with a string `description`; so does every
+  agent and `skills/<name>/SKILL.md`. Malformed frontmatter is an error. A
+  missing description is a RULE 23 error unless the command or skill sets
+  `disable-model-invocation: true`, because Claude Code may list the file's
+  first body text instead, which the budget cannot count. The update command
+  refuses to write the baseline while either problem exists.
 - SKILL.md body headings are `## What It Does`, `## When to Use`, `## Usage`
   (RULE 15b); keep SKILL.md under 500 lines (RULE 15a), commands under 500
   and agents under 300 (RULE 21) — all warning tier.
