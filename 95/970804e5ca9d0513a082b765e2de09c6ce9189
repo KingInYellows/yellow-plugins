@@ -1,0 +1,71 @@
+plugins/yellow-linear/commands/linear/work.md
+  s_3301212c34e55d::t_ae457e30b9a079 241
+scripts/description-budget-baseline.json
+  s_3301212c34e55d::t_c01beccef5c2e0 5
+plugins/gt-workflow/skills/gt-amend/SKILL.md
+  s_3301212c34e55d::t_52c35ea9157309 4-10
+plugins/gt-workflow/README.md
+  s_3301212c34e55d::t_fb5dcc24498646 7-11,13
+scripts/validate-setup-all.js
+  s_3301212c34e55d::t_6c296d76fa54c7 335-349,352,356
+plugins/gt-workflow/skills/gt-cleanup/SKILL.md
+  s_3301212c34e55d::t_95873aa9bdad03 4-9
+CLAUDE.md
+  s_3301212c34e55d::t_aa0667f46a400c 110-114
+AGENTS.md
+  s_3301212c34e55d::t_399580714ccc64 321-325
+plugins/gt-workflow/skills/gt-stack-plan/SKILL.md
+  s_3301212c34e55d::t_1289dc31931c7a 4-15
+plugins/gt-workflow/skills/smart-submit/SKILL.md
+  s_3301212c34e55d::t_6b6e968cfbf85e 4-13
+plugins/gt-workflow/skills/gt-sync/SKILL.md
+  s_3301212c34e55d::t_765105c7341dcd 4-7
+scripts/validate-codex.js
+  s_3301212c34e55d::t_cddccf9befe377 467-468,473-491
+tests/integration/validate-setup-all.test.ts
+  s_3301212c34e55d::t_05aaaa1ae2ee21 262-290
+scripts/validate-agent-authoring.js
+  s_3301212c34e55d::t_55e589f554af7d 252-258,1768-1809,2119
+plugins/yellow-core/commands/flow/plan.md
+  s_3301212c34e55d::t_bb8aedd61e21d0 647
+tests/integration/generate-manifests-codex.test.ts
+  s_3301212c34e55d::t_7ca727adc7a9fe 1495-1536
+.changeset/gt-workflow-skills-only.md
+  s_3301212c34e55d::t_b752c5ce83efa5 2-4,7-12,14-16
+plugins/gt-workflow/CLAUDE.md
+  s_3301212c34e55d::t_342b7cc0309ebc 34-37,98-111,127-129,317-319,328-329
+plans/gt-workflow-name-collisions.md
+  s_3301212c34e55d::t_4df8d78124d7d5 1-226
+tests/integration/stack-operation-registry.test.ts
+  s_3301212c34e55d::t_cc194102504397 35-39,43-45
+plugins/gt-workflow/skills/gt-setup/SKILL.md
+  s_3301212c34e55d::t_6bbb6e5edd8dcf 5-10
+plugins/yellow-core/commands/flow/work.md
+  s_3301212c34e55d::t_5134bcbadf5a98 966
+tests/integration/validate-agent-authoring-rule24.test.ts
+  s_3301212c34e55d::t_1b1762a94bb9b5 1-99
+plugins/gt-workflow/skills/gt-nav/SKILL.md
+  s_3301212c34e55d::t_7bab9a54440ad2 4-8
+README.md
+  s_3301212c34e55d::t_27b9c66e6600fa 25,313
+plugins/yellow-core/lib/stack-operation-registry.js
+  s_3301212c34e55d::t_189f51a26075a5 45-47,97
+plugins/gt-workflow/skills/gt-merge/SKILL.md
+  s_3301212c34e55d::t_1511d0962e21f2 4-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "95970804e5ca9d0513a082b765e2de09c6ce9189",
+  "prompts": {},
+  "sessions": {
+    "s_3301212c34e55d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "970dd086-03cf-43a0-95f0-3e73c5013fb1",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
