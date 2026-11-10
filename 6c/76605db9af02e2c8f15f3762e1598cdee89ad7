@@ -1,0 +1,19 @@
+tests/integration/validate-agent-authoring-description-rules.test.ts
+  s_3301212c34e55d::t_b555a9f7676c01 128-140,262,326-330,334,343-366
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6c76605db9af02e2c8f15f3762e1598cdee89ad7",
+  "prompts": {},
+  "sessions": {
+    "s_3301212c34e55d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "970dd086-03cf-43a0-95f0-3e73c5013fb1",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
