@@ -1493,7 +1493,7 @@ describe('exposure lint registry-gated sibling-path detection (true-positive pat
 });
 
 describe('exposure lint slash-command registry includes user-invocable skills', () => {
-  function lintWithSiblingSkill(userInvocable: boolean): string[] {
+  function lintWithSiblingSkill(extraFrontmatter: string): string[] {
     const root = makeCodexFixtureRoot([
       {
         name: 'talkative-plugin',
@@ -1512,7 +1512,7 @@ describe('exposure lint slash-command registry includes user-invocable skills', 
     mkdirSync(join(root, 'plugins', 'sibling-plugin', 'skills', 'sibling-sync'), { recursive: true });
     writeFileSync(
       join(root, 'plugins', 'sibling-plugin', 'skills', 'sibling-sync', 'SKILL.md'),
-      `---\nname: sibling-sync\ndescription: fixture\nuser-invocable: ${userInvocable}\n---\n\nBody.\n`,
+      `---\nname: sibling-sync\ndescription: fixture\n${extraFrontmatter}---\n\nBody.\n`,
       'utf8'
     );
     expect(generateManifests({ mode: 'apply', rootDir: root }).status).toBe('ok');
@@ -1523,14 +1523,20 @@ describe('exposure lint slash-command registry includes user-invocable skills', 
     );
   }
 
-  it('flags a slash reference to a user-invocable skill', () => {
-    const findings = lintWithSiblingSkill(true);
+  it.each([
+    ['sets user-invocable: true', 'user-invocable: true\n'],
+    ['omits the key', ''],
+  ])('flags a slash reference to a skill that %s', (_label, extra) => {
+    const findings = lintWithSiblingSkill(extra);
     expect(findings.length).toBe(1);
     expect(findings[0]).toContain('/sibling-sync');
   });
 
-  it('does not flag the name of a skill that sets user-invocable: false', () => {
-    expect(lintWithSiblingSkill(false)).toEqual([]);
+  it.each([
+    ['false', 'user-invocable: false\n'],
+    ['a quoted false', "user-invocable: 'false'\n"],
+  ])('does not flag the name of a skill that sets user-invocable to %s', (_label, extra) => {
+    expect(lintWithSiblingSkill(extra)).toEqual([]);
   });
 });
 

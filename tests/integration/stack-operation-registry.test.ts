@@ -18,6 +18,8 @@ import { describe, it, expect } from 'vitest';
 const registry = require('../../plugins/yellow-core/lib/stack-operation-registry.js');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const providerState = require('../../plugins/yellow-core/lib/stack-provider-state.js');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { isUserInvocableSkill } = require('../../scripts/lib/skill-frontmatter.js');
 
 const {
   PROVIDER_IDS,
@@ -106,8 +108,10 @@ describe('every command-type registry entry resolves to a real file whose frontm
 
   it.each(commandEntries)('$op / $providerId -> $entry.plugin:$entry.ref', ({ entry }) => {
     const filePath = commandFilePath(entry.plugin, entry.ref);
-    expect(existsSync(filePath)).toBe(true);
+    expect(existsSync(filePath), `no command file or skill at ${filePath}`).toBe(true);
     const frontmatter = readFileSync(filePath, 'utf8');
+    // An internal skill exists on disk but cannot be invoked by name.
+    expect(isUserInvocableSkill(frontmatter)).toBe(true);
     const nameMatch = /^name:\s*(.+)$/m.exec(frontmatter);
     expect(nameMatch).not.toBeNull();
     expect((nameMatch as RegExpExecArray)[1].trim()).toBe(entry.ref);

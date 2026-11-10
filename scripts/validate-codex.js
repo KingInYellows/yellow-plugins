@@ -70,6 +70,7 @@ const {
 const { isClaudeEnabled } = require('./lib/generate/emit-claude');
 const { isCodexEnabled, REF_FILE_RE } = require('./lib/generate/emit-codex');
 const { assertWithinRoot } = require('./lib/generate/write');
+const { isUserInvocableSkill } = require('./lib/skill-frontmatter');
 
 const DEFAULT_ROOT = resolve(__dirname, '..');
 const SCHEMAS_DIR_NAME = 'schemas';
@@ -454,11 +455,11 @@ function parseFrontmatterName(markdown) {
 }
 
 /**
- * Build the real Claude slash-command-name registry by reading every
- * plugin's commands/ directory (recursively) for each *.md file's
- * frontmatter `name:` field — the literal
- * invocation token (e.g. "ci:setup", "gt-amend") Claude Code slash-command
- * syntax refers to, independent of directory nesting depth.
+ * Build the real Claude slash-command-name registry: the frontmatter
+ * `name:` of every *.md under each plugin's commands/ directory
+ * (recursively) and of every user-invocable skills/<name>/SKILL.md. That
+ * name is the literal invocation token (e.g. "ci:setup", "gt-amend") Claude
+ * Code slash syntax refers to, independent of directory nesting depth.
  */
 function buildCommandNameRegistry(rootDir, pluginOrder) {
   const names = new Set();
@@ -479,11 +480,7 @@ function collectInvocableSkillNames(skillsDir, names) {
     const skillPath = join(skillsDir, entry.name, 'SKILL.md');
     if (!existsSync(skillPath)) continue;
     const text = readFileSync(skillPath, 'utf8');
-    // Frontmatter only: a skill body may quote the key in an example.
-    // validate-setup-all.js loadCommandPlugins applies the same test.
-    const frontmatter =
-      (text.match(/^---\r?\n([\s\S]*?)\r?\n---/) || [])[1] || '';
-    if (/^user-invocable:\s*false\s*$/m.test(frontmatter)) continue;
+    if (!isUserInvocableSkill(text)) continue;
     const skillName = parseFrontmatterName(text);
     if (skillName) names.add(skillName);
   }

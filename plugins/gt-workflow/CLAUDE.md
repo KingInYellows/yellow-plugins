@@ -33,28 +33,28 @@ installed, tracked as a major version bump.
 
 The eight user-invocable skills shipped by gt-workflow (`gt-amend`, `gt-sync`,
 `gt-nav`, `gt-stack-plan`, `gt-cleanup`, `gt-setup`, `gt-merge`,
-`smart-submit`; command files until the name collision described under
-"Plugin Commands" was removed) are **un-namespaced** — they do NOT carry the `namespace:verb` prefix that
-later marketplace conventions adopted (where `namespace` is the
-`commands/<namespace>/` directory the file ships under, producing forms
-like `/ci:diagnose` or `/review:plan`). This is intentional, not a bug:
+`smart-submit`) are **un-namespaced**: their names do not carry the
+`namespace:verb` form that later marketplace conventions adopted for commands
+(`/ci:diagnose`, `/review:plan`). This is intentional, not a bug:
 
-1. **Historical:** these commands predate the `namespace:verb`
-   namespacing convention and shipped under their bare names.
+1. **Historical:** these names predate the `namespace:verb` convention and
+   shipped bare.
 2. **Low collision risk:** seven of the eight are `gt-`-prefixed and no other
    marketplace plugin would plausibly register them. `smart-submit` is the
    only generic name; no observed competing plugin ships it.
 3. **No re-flagging without a trigger:** future contributors and auditors
-   should not propose renaming these commands without a concrete trigger —
+   should not propose renaming these skills without a concrete trigger —
    either an actual collision in the marketplace or an incoming plugin that
    would clash. Theoretical collision concerns alone are not sufficient
    justification for the rename churn across user habits, documentation,
    and external references.
 
-If a real collision arises, the migration path is to relocate the files
-under `commands/gt/` (yielding `/gt:amend`, `/gt:nav`, etc.) and
-dual-publish under both the new `gt:<verb>` and the bare `<name>` for
-one minor release, then remove the bare form in the next major.
+If a real collision arises, rename the colliding skill (its directory and its
+`name:`) and update the callers that dispatch it. Do not add a command file
+that shares a skill's name to bridge the rename: RULE 24 rejects that pair,
+and it is the shadowing this plugin removed. The qualified
+`/gt-workflow:<name>` form already separates a skill from another plugin's
+or a user's entry point of the same name.
 
 ## Conventions
 
@@ -104,8 +104,9 @@ was unreachable. RULE 24 in `scripts/validate-agent-authoring.js` now rejects
 a same-name command and skill in one plugin. Claude and Codex run the same
 skill body.
 
-Type `/gt-workflow:<name>` when a bare name is ambiguous (for example a
-user-level `smart-submit` command). Other plugins pass the same qualified
+Type `/gt-workflow:<name>`. A bare `/<name>` was not verified for a plugin
+skill and is ambiguous when a user-level command shares the name (for example
+`smart-submit`). Other plugins pass the same qualified
 name to the `Skill` tool. Arguments typed after the name reach the skill
 as appended `ARGUMENTS:` text; the bodies read them as context and do not use
 a `$ARGUMENTS` placeholder, which Codex would not substitute.

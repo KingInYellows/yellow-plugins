@@ -22,7 +22,7 @@ Add the marketplace, then install individual plugins:
 
 | Plugin                | Description                                                                                                                            | Components                                     |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                                           | 8 user-invocable skills, 2 hooks, 1 MCP                     |
+| `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                                           | 11 skills, 2 hooks, 1 MCP                      |
 | `github-workflow`     | GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)               | 9 commands, 9 skills, 2 hooks                  |
 | `yellow-agy`          | Local delegate on the Antigravity CLI (`agy`) under your Google AI Pro sign-in — yellow-jules successor (experimental)                  | 8 commands                                     |
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting                                    | 3 agents, 4 commands, 2 skills                 |
@@ -310,7 +310,7 @@ yellow-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json       # Plugin catalog
 ├── plugins/
-│   ├── gt-workflow/           # Graphite workflow (8 user-invocable skills, 2 hooks, 1 MCP)
+│   ├── gt-workflow/           # Graphite workflow (11 skills, 2 hooks, 1 MCP)
 │   ├── github-workflow/       # GitHub-native stacked-PR provider (9 commands, 9 skills, 2 hooks)
 │   ├── yellow-agy/            # Antigravity CLI local delegate (8 commands)
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)

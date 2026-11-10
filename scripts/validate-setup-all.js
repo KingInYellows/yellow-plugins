@@ -9,8 +9,9 @@
  *   - all seven marker-delimited sections exist (-001)
  *   - dashboard loop / classification / delegated plugins == marketplace (-002)
  *   - delegated commands and the plugin-command map are mutually consistent,
- *     and every mapped command resolves to a real command file owned by the
- *     plugin the markdown map claims (-003)
+ *     and every mapped command resolves to a real command file, or a
+ *     user-invocable skill named as <plugin>:<skill>, owned by the plugin
+ *     the markdown map claims (-003)
  *   - dashboard order == delegated setup order (-004)
  *   - Step 1.5 probe list internally consistent (counts match, every query
  *     corresponds to a recorded tool name), plugins known, and every
@@ -32,6 +33,8 @@
 
 const fs = require('fs');
 const path = require('path');
+
+const { isUserInvocableSkill } = require('./lib/skill-frontmatter');
 
 const ROOT = path.resolve(__dirname, '..');
 // Each input path is overridable so integration tests can point the validator
@@ -312,8 +315,9 @@ function parseSetupAllData(sections) {
   };
 }
 
-// Maps each command `name:` frontmatter value to the plugin directory that
-// actually owns the command file — the ground truth the markdown map is
+// Maps each setup entry point to the plugin directory that owns its file: a
+// command by its `name:` frontmatter value, a user-invocable skill by
+// `<plugin>:<name>`. This is the ground truth the markdown map is
 // checked against (previously the script cross-checked the markdown against
 // a hand-duplicated copy of the same map, which could not catch a mapping
 // that was wrong in both places). The directory name IS the plugin name:
@@ -335,25 +339,23 @@ function loadCommandPlugins() {
     if (!filePath.endsWith('.md')) continue;
     const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
     const isCommand = filePath.includes(`${path.sep}commands${path.sep}`);
-    // A user-invocable skill is typed and dispatched by name like a command
+    // A user-invocable skill is dispatched by name like a command
     // (gt-workflow ships no command files). Only skills/<name>/SKILL.md
     // counts, which leaves out the generated codex/ and cursor/ copies.
     const isSkill =
       parts.length === 4 && parts[1] === 'skills' && parts[3] === 'SKILL.md';
     if (!isCommand && !isSkill) continue;
     const text = readText(filePath);
-    // Frontmatter only: a skill body may quote the key in an example.
-    // validate-codex.js collectInvocableSkillNames applies the same test.
-    const frontmatter =
-      (text.match(/^---\r?\n([\s\S]*?)\r?\n---/) || [])[1] || '';
-    if (isSkill && /^user-invocable:\s*false\s*$/m.test(frontmatter)) {
-      continue;
-    }
-    const name = parseFrontmatterName(text);
-    if (!name) {
+    if (isSkill && !isUserInvocableSkill(text)) continue;
+    const ownName = parseFrontmatterName(text);
+    if (!ownName) {
       continue;
     }
     const pluginDir = parts[0];
+    // Skill names are namespaced by plugin, so two plugins may ship the same
+    // one. Keying a skill by its qualified name keeps it out of the
+    // cross-plugin duplicate check below, which is about command names.
+    const name = isSkill ? `${pluginDir}:${ownName}` : ownName;
     const existing = commandPlugins.get(name);
     if (existing !== undefined && existing !== pluginDir) {
       // Silent last-writer-wins would make the wrongOwner check depend on
@@ -469,7 +471,7 @@ function validateDelegation(data, commandPlugins, errors) {
   );
   if (missingCommandFiles.length > 0) {
     errors.push(
-      `${SETUP_DELEGATION_DRIFT}: delegated commands missing command file: ${missingCommandFiles.join(', ')}`
+      `${SETUP_DELEGATION_DRIFT}: delegated entries not found as a command file or as a user-invocable skill named <plugin>:<skill>: ${missingCommandFiles.join(', ')}`
     );
   }
 
@@ -480,11 +482,11 @@ function validateDelegation(data, commandPlugins, errors) {
     )
     .map(
       ([command, plugin]) =>
-        `${command} maps to ${plugin} but its command file lives in ${commandPlugins.get(command)}`
+        `${command} maps to ${plugin} but its file lives in ${commandPlugins.get(command)}`
     );
   if (wrongOwner.length > 0) {
     errors.push(
-      `${SETUP_DELEGATION_DRIFT}: plugin-command map does not match command file locations: ${wrongOwner.join('; ')}`
+      `${SETUP_DELEGATION_DRIFT}: plugin-command map does not match command or skill file locations: ${wrongOwner.join('; ')}`
     );
   }
 }
