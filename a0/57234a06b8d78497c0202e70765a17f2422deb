@@ -1,0 +1,45 @@
+.changeset/gt-workflow-skills-only.md
+  s_3301212c34e55d::t_8cfa88af38903d 5,12-14,18-19
+README.md
+  s_3301212c34e55d::t_48e32352b0f2e3 25,313
+plugins/gt-workflow/CLAUDE.md
+  s_3301212c34e55d::t_a420b9962e6597 36-41,46,52-57,107-109
+plugins/yellow-core/commands/setup/all.md
+  s_3301212c34e55d::t_bfeb4195994af0 691,1144,1203,1233
+plugins/yellow-core/commands/stack/status.md
+  s_3301212c34e55d::t_2ed4103ecd1827 223
+plugins/yellow-core/commands/worktree/cleanup.md
+  s_3301212c34e55d::t_57ae0cbf628e9d 532
+plugins/yellow-core/skills/stack-provider-router/SKILL.md
+  s_3301212c34e55d::t_d19ad32f483091 179-180,217
+plugins/yellow-review/commands/review/setup.md
+  s_3301212c34e55d::t_ffee607c33ae2a 123
+scripts/lib/skill-frontmatter.js
+  s_3301212c34e55d::t_3ec9140e2d9238 1-22
+scripts/validate-codex.js
+  s_3301212c34e55d::t_0c18110348f2d8 73,458-462,483
+scripts/validate-setup-all.js
+  s_3301212c34e55d::t_a09ba8c7541d2b 12-14,37-38,318-320,342,349-351,355-358,474,485,489
+tests/integration/generate-manifests-codex.test.ts
+  s_3301212c34e55d::t_dc725157fa6a5c 1496,1515,1526-1530,1535-1539
+tests/integration/stack-operation-registry.test.ts
+  s_3301212c34e55d::t_28e08f3f835a9d 21-22,111,113-114
+tests/integration/validate-setup-all.test.ts
+  s_3301212c34e55d::t_8b1b02714fff39 259,263-275,280-283,285-290,295-299,303-314,317-345
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a057234a06b8d78497c0202e70765a17f2422deb",
+  "prompts": {},
+  "sessions": {
+    "s_3301212c34e55d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "970dd086-03cf-43a0-95f0-3e73c5013fb1",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
