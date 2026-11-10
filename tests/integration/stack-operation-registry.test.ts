@@ -32,11 +32,17 @@ const {
 
 const REPO_ROOT = join(__dirname, '..', '..');
 
-/** Resolve a `{plugin, ref}` command entry to the .md file it names. */
+/**
+ * Resolve a `{plugin, ref}` command entry to the file it names: a command
+ * file, or the user-invocable skill of that name (gt-workflow ships skills
+ * and no command files).
+ */
 function commandFilePath(plugin: string, ref: string): string {
   const segments = ref.split(':');
   const fileName = `${segments[segments.length - 1]}.md`;
-  return join(REPO_ROOT, 'plugins', plugin, 'commands', ...segments.slice(0, -1), fileName);
+  const commandPath = join(REPO_ROOT, 'plugins', plugin, 'commands', ...segments.slice(0, -1), fileName);
+  if (existsSync(commandPath)) return commandPath;
+  return join(REPO_ROOT, 'plugins', plugin, 'skills', ref, 'SKILL.md');
 }
 
 describe('registry shape', () => {

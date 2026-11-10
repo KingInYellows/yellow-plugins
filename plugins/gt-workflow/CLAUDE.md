@@ -31,9 +31,10 @@ installed, tracked as a major version bump.
 
 ## Namespace exception
 
-The eight commands shipped by gt-workflow (`gt-amend`, `gt-sync`, `gt-nav`,
-`gt-stack-plan`, `gt-cleanup`, `gt-setup`, `gt-merge`, `smart-submit`) are
-**un-namespaced** — they do NOT carry the `namespace:verb` prefix that
+The eight user-invocable skills shipped by gt-workflow (`gt-amend`, `gt-sync`,
+`gt-nav`, `gt-stack-plan`, `gt-cleanup`, `gt-setup`, `gt-merge`,
+`smart-submit`; command files until the name collision described under
+"Plugin Commands" was removed) are **un-namespaced** — they do NOT carry the `namespace:verb` prefix that
 later marketplace conventions adopted (where `namespace` is the
 `commands/<namespace>/` directory the file ships under, producing forms
 like `/ci:diagnose` or `/review:plan`). This is intentional, not a bug:
@@ -94,13 +95,20 @@ one minor release, then remove the bare form in the next major.
 
 ## Plugin Commands
 
-Each command below is a thin wrapper (`commands/<name>.md`) that invokes a
-same-named canonical skill (`skills/<name>/SKILL.md`) via the `Skill` tool —
-the shell-03 wrapper idiom (see
-`plugins/yellow-core/commands/plan/status.md` for the precedent this repo's
-RULE 17 validator checks against). The skill body is the actual
-implementation and is what both Claude (via the command) and Codex (skill
-invoked directly, no command layer) execute.
+Each entry below is a user-invocable skill (`skills/<name>/SKILL.md`,
+`user-invocable: true`, with its own `argument-hint` and `allowed-tools`).
+There is no `commands/` directory. The plugin used to ship a same-named
+wrapper command for each skill; Claude Code 2.1.321 resolved each pair to the
+wrapper, for the typed slash form and for the `Skill` tool, so the skill body
+was unreachable. RULE 24 in `scripts/validate-agent-authoring.js` now rejects
+a same-name command and skill in one plugin. Claude and Codex run the same
+skill body.
+
+Type `/gt-workflow:<name>` when a bare name is ambiguous (for example a
+user-level `smart-submit` command). Other plugins pass the same qualified
+name to the `Skill` tool. Arguments typed after the name reach the skill
+as appended `ARGUMENTS:` text; the bodies read them as context and do not use
+a `$ARGUMENTS` placeholder, which Codex would not substitute.
 
 - `/gt-setup` — validate Graphite CLI, configure AI agent settings, generate `.graphite.yml` convention file
 - `/smart-submit` — Audit + commit + submit in one flow
@@ -116,10 +124,9 @@ invoked directly, no command layer) execute.
   `merge` operation for Graphite — see
   `plugins/yellow-core/lib/stack-operation-registry.js`
 
-Three additional skills exist with no command wrapper (Claude Code reaches
-them only via cross-references from the eight skills above, or the `Skill`
-tool directly; Codex reaches all eleven identically since it has no command
-layer):
+Three additional skills are internal (`user-invocable: false`; Claude Code
+reaches them through cross-references from the eight skills above or the
+`Skill` tool directly; Codex reaches all eleven identically):
 
 - `audit-review` — the `quick-code-review`/`quick-security-scan`/
   `quick-error-check` audit prompts, consolidated out of `smart-submit` and
@@ -307,8 +314,9 @@ executed as a script, and cannot be exercised in bats.
 
 ## Codex Distribution
 
-The generated Codex manifest sets `commands: []` to prevent automatic
-conversion of Claude command wrappers into additional skills. Codex exposes
+The generated Codex manifest sets `commands: []`, which stops Codex
+discovering any `commands/` directory as extra skills (this plugin no longer
+has one). Codex exposes
 only the skills selected by the catalog allowlist.
 
 `targets.codex.enabled: true` in `catalog/plugins/gt-workflow.json` — the
@@ -317,8 +325,8 @@ yellow-core's narrow read-only allowlist, gt-workflow exposes its **entire**
 skill surface: all eleven skills are allowlisted —
 `gt-setup`, `gt-nav`, `gt-stack-plan`, `gt-sync`, `smart-submit`, `gt-amend`,
 `gt-cleanup`, `gt-merge`, `audit-review`, `stack-decomposition-format`,
-`stack-plan-style` — since gt-workflow's commands are thin wrappers with no
-Claude-only logic of their own (contrast yellow-core, which excludes 19 of
+`stack-plan-style` — since gt-workflow's skills carry no Claude-only logic
+of their own (contrast yellow-core, which excludes 19 of
 its 22 skills along with all 21 agents and both hooks). `includeHooks` is
 left at its default (`true`, not `false` like yellow-core) — see "Hooks"
 above for the verified 0.157.0 lifecycle and trust boundary.

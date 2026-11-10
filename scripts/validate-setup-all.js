@@ -332,17 +332,28 @@ function loadCommandPlugins() {
     process.exit(1);
   }
   for (const filePath of files) {
-    if (
-      !filePath.endsWith('.md') ||
-      !filePath.includes(`${path.sep}commands${path.sep}`)
-    ) {
+    if (!filePath.endsWith('.md')) continue;
+    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
+    const isCommand = filePath.includes(`${path.sep}commands${path.sep}`);
+    // A user-invocable skill is typed and dispatched by name like a command
+    // (gt-workflow ships no command files). Only skills/<name>/SKILL.md
+    // counts, which leaves out the generated codex/ and cursor/ copies.
+    const isSkill =
+      parts.length === 4 && parts[1] === 'skills' && parts[3] === 'SKILL.md';
+    if (!isCommand && !isSkill) continue;
+    const text = readText(filePath);
+    // Frontmatter only: a skill body may quote the key in an example.
+    // validate-codex.js collectInvocableSkillNames applies the same test.
+    const frontmatter =
+      (text.match(/^---\r?\n([\s\S]*?)\r?\n---/) || [])[1] || '';
+    if (isSkill && /^user-invocable:\s*false\s*$/m.test(frontmatter)) {
       continue;
     }
-    const name = parseFrontmatterName(readText(filePath));
+    const name = parseFrontmatterName(text);
     if (!name) {
       continue;
     }
-    const pluginDir = path.relative(PLUGINS_DIR, filePath).split(path.sep)[0];
+    const pluginDir = parts[0];
     const existing = commandPlugins.get(name);
     if (existing !== undefined && existing !== pluginDir) {
       // Silent last-writer-wins would make the wrongOwner check depend on

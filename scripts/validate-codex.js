@@ -464,10 +464,29 @@ function buildCommandNameRegistry(rootDir, pluginOrder) {
   const names = new Set();
   for (const name of pluginOrder) {
     const commandsDir = join(rootDir, 'plugins', name, 'commands');
-    if (!existsSync(commandsDir)) continue;
-    collectCommandNames(commandsDir, names);
+    if (existsSync(commandsDir)) collectCommandNames(commandsDir, names);
+    collectInvocableSkillNames(join(rootDir, 'plugins', name, 'skills'), names);
   }
   return names;
+}
+
+// A user-invocable skill is typed as `/name` too, so its name is a slash
+// command for the exposure lint (gt-workflow ships skills and no commands).
+function collectInvocableSkillNames(skillsDir, names) {
+  if (!existsSync(skillsDir)) return;
+  for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const skillPath = join(skillsDir, entry.name, 'SKILL.md');
+    if (!existsSync(skillPath)) continue;
+    const text = readFileSync(skillPath, 'utf8');
+    // Frontmatter only: a skill body may quote the key in an example.
+    // validate-setup-all.js loadCommandPlugins applies the same test.
+    const frontmatter =
+      (text.match(/^---\r?\n([\s\S]*?)\r?\n---/) || [])[1] || '';
+    if (/^user-invocable:\s*false\s*$/m.test(frontmatter)) continue;
+    const skillName = parseFrontmatterName(text);
+    if (skillName) names.add(skillName);
+  }
 }
 
 function collectCommandNames(dir, names) {

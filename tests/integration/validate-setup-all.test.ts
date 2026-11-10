@@ -259,6 +259,35 @@ describe('validate-setup-all', () => {
     expect(result.stderr).toContain('missing command file: gamma:setup');
   });
 
+  describe('a setup entry point shipped as a skill instead of a command file', () => {
+    function replaceBetaCommandWithSkill(userInvocable: boolean) {
+      rmSync(join(fixture.pluginsDir, 'beta', 'commands'), {
+        recursive: true,
+        force: true,
+      });
+      mkdirSync(join(fixture.pluginsDir, 'beta', 'skills', 'beta-setup'), {
+        recursive: true,
+      });
+      writeFileSync(
+        join(fixture.pluginsDir, 'beta', 'skills', 'beta-setup', 'SKILL.md'),
+        `---\nname: beta-setup\ndescription: fixture\nuser-invocable: ${userInvocable}\n---\n\nBody.\n`,
+        'utf8'
+      );
+    }
+
+    it('passes when the skill is user-invocable', () => {
+      replaceBetaCommandWithSkill(true);
+      expect(runValidator(fixture).status).toBe(0);
+    });
+
+    it('fails with -003 when the skill sets user-invocable: false', () => {
+      replaceBetaCommandWithSkill(false);
+      const result = runValidator(fixture);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('missing command file: beta-setup');
+    });
+  });
+
   it('fails with -004 when dashboard and delegated order diverge', () => {
     writeFileSync(
       fixture.commandPath,
