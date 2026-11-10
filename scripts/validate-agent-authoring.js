@@ -263,10 +263,12 @@ const DURABLE_BAR_FILES = [
 //        (## What It Does / ## When to Use / ## Usage).
 //   15c: `description:` without a "Use when" trigger clause — weak
 //        descriptions make Claude Code's skill selection unreliable.
-//   15d: multi-line `description:` value — block scalars (`>` / `|`),
-//        multi-line quoted strings, and wrapped plain scalars are ALL
-//        silently truncated by Claude Code's frontmatter parser (see
-//        docs/solutions/code-quality/skill-frontmatter-attribute-and-format-requirements.md).
+//   15d: multi-line `description:` value (block scalars `>` / `|`,
+//        multi-line quoted strings, wrapped plain scalars). Runs on SKILL.md,
+//        agents and commands. Prettier produces this form when it rewraps a
+//        long description; an unindented continuation line drops the whole
+//        frontmatter, and other parsers may read only the first line (see
+//        docs/solutions/code-quality/prettier-description-wrap-silent-truncation.md).
 //
 // RULE 20 — ERROR tier, same walk. `user-invokable` (k) is not a Claude
 // Code frontmatter key: the CLI (verified against 2.1.259) parses only
@@ -521,6 +523,8 @@ function validateAgentFile(filePath, ctx) {
     );
     return;
   }
+
+  checkDescriptionSingleLine(frontmatter, filePath, warnings);
 
   // Derive plugin name from the path relative to PLUGINS_DIR so the validator
   // works with VALIDATE_PLUGINS_DIR fixture trees that are not under a
@@ -1693,44 +1697,60 @@ function validateSkillFiles(skillFiles, ctx) {
       );
     }
 
-    // 15d — multi-line description. Checked against the RAW frontmatter
-    // text (not the parsed value): YAML folds block scalars, multi-line
-    // quoted strings, and wrapped plain scalars into one normal string, so
-    // only the raw form reveals the truncation hazard. Two shapes:
-    //   (a) block scalar — value starts with `>` or `|`;
-    //   (b) continuation — an indented line follows `description:`, which
-    //       in a top-level frontmatter mapping can only be a continuation
-    //       of the description value (covers multi-line quoted strings and
-    //       wrapped plain scalars — the forms this repo has actually been
-    //       bitten by; both parse to a folded string, so 15c alone cannot
-    //       catch them when the folded text contains "use when"). Blank
-    //       lines between `description:` and the indented continuation are
-    //       tolerated — YAML permits them inside a quoted scalar, so a
-    //       blank separator must not let the continuation slip past.
-    // `[ \t]*` not `\s*` — \s matches the newline and would false-positive
-    // on the next line's first character. `.` in the capture tolerates a
-    // trailing `\r` on CRLF input.
-    if (frontmatter) {
-      const descLine = frontmatter.match(/^description:[ \t]*(.*)$/m);
-      if (descLine) {
-        const isBlockScalar = /^[>|]/.test(descLine[1]);
-        const afterDescLine = frontmatter.slice(
-          descLine.index + descLine[0].length
-        );
-        const hasContinuation = /^\r?\n(?:[ \t]*\r?\n)*[ \t]+\S/.test(
-          afterDescLine
-        );
-        if (isBlockScalar || hasContinuation) {
-          warnings.push(
-            `[RULE 15d advisory] ${relative(filePath)}: \`description:\` ` +
-              `spans multiple lines (block scalar, multi-line quoted ` +
-              `string, or wrapped plain scalar) — Claude Code silently ` +
-              `truncates multi-line descriptions; use a single-line ` +
-              `description.`
-          );
-        }
-      }
+    checkDescriptionSingleLine(frontmatter, filePath, warnings);
+  }
+}
+
+// RULE 15d — multi-line description. Checked against the RAW frontmatter
+// text (not the parsed value): YAML folds block scalars, multi-line quoted
+// strings, and wrapped plain scalars into one normal string, so only the raw
+// form shows the shape. Two shapes:
+//   (a) block scalar — value starts with `>` or `|`;
+//   (b) continuation — an indented line follows `description:`, which in a
+//       top-level frontmatter mapping can only be a continuation of the
+//       description value. Blank lines between `description:` and the
+//       indented continuation are tolerated — YAML permits them inside a
+//       quoted scalar, so a blank separator must not let the continuation
+//       slip past.
+// `[ \t]*` not `\s*` — \s matches the newline and would false-positive on
+// the next line's first character. `.` in the capture tolerates a trailing
+// `\r` on CRLF input.
+function checkDescriptionSingleLine(frontmatter, filePath, warnings) {
+  if (!frontmatter) return;
+  const descLine = frontmatter.match(/^description:[ \t]*(.*)$/m);
+  if (!descLine) return;
+  const isBlockScalar = /^[>|]/.test(descLine[1]);
+  const afterDescLine = frontmatter.slice(descLine.index + descLine[0].length);
+  const hasContinuation = /^\r?\n(?:[ \t]*\r?\n)*[ \t]+\S/.test(afterDescLine);
+  if (isBlockScalar || hasContinuation) {
+    warnings.push(
+      `[RULE 15d advisory] ${relative(filePath)}: \`description:\` spans ` +
+        `multiple lines (block scalar, multi-line quoted string, or wrapped ` +
+        `plain scalar) — Prettier rewrapping produces this form, an ` +
+        `unindented continuation drops the whole frontmatter, and other ` +
+        `parsers may read only the first line; keep it on one line with ` +
+        `\`# prettier-ignore\` above it.`
+    );
+  }
+}
+
+// RULE 15d for commands. Agents get it in validateAgentFile and skills in
+// validateSkillFiles, which already hold the raw frontmatter. Malformed YAML
+// is an error here as it is there: RULE 23 skips a file it cannot parse, so
+// an unreported parse failure would take a command out of the budget.
+function validateCommandDescriptions(commandFiles, errors, warnings) {
+  for (const filePath of commandFiles) {
+    const frontmatter = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
+    if (frontmatter === null) continue;
+    try {
+      YAML.parse(frontmatter);
+    } catch (e) {
+      errors.push(
+        `${relative(filePath)}: malformed YAML frontmatter — ${String(e.message).split('\n')[0]}`
+      );
+      continue;
     }
+    checkDescriptionSingleLine(frontmatter, filePath, warnings);
   }
 }
 
@@ -1756,6 +1776,161 @@ function validateSizeCeilings(commandFiles, agentFiles, warnings) {
       }
     }
   }
+}
+
+// RULE 23 — description budget, ERROR tier on growth. Every command, agent
+// and skill `description:` is loaded into each Claude Code session, so the
+// total is a standing context cost. The committed baseline holds one number
+// per plugin; a plugin above its number fails until the author raises it in
+// the same PR, which makes growth a reviewable diff. A plugin below its
+// number only prints a notice, so two PRs that shrink the same plugin cannot
+// fail each other. No overall total is stored: it would conflict in every
+// parallel PR and is derivable.
+//
+// Counted: parsed `description` plus `when_to_use`, in characters, for files
+// directly under a plugin's commands/, agents/ or skills/ directory. That
+// placement test also drops the generated codex/skills and cursor/skills
+// copies. A command or skill with `disable-model-invocation: true` is not
+// listed to the model and is skipped; Codex and Cursor still list it.
+const DESCRIPTION_KINDS = ['commands', 'agents', 'skills'];
+const UPDATE_DESCRIPTION_BASELINE_FLAG = '--update-description-baseline';
+const UPDATE_DESCRIPTION_BASELINE_COMMAND = 'pnpm update:description-baseline';
+// Fixture runs (VALIDATE_PLUGINS_DIR set) skip the check unless they name
+// their own baseline, so a fixture tree is never compared with the real one.
+function descriptionBaselinePath() {
+  if (process.env.VALIDATE_DESCRIPTION_BASELINE) {
+    return path.resolve(process.env.VALIDATE_DESCRIPTION_BASELINE);
+  }
+  if (process.env.VALIDATE_PLUGINS_DIR) return null;
+  return path.join(ROOT, 'scripts', 'description-budget-baseline.json');
+}
+
+function collectDescriptionBudget(pluginNames, files) {
+  // No prototype, so a directory named `__proto__` is an ordinary key.
+  const plugins = Object.create(null);
+  for (const name of [...pluginNames].sort()) plugins[name] = 0;
+  const kinds = { commands: 0, agents: 0, skills: 0 };
+  const undescribed = [];
+  // A Set: the callers' lists overlap for a path that has both a commands/
+  // and an agents/ segment, and each file counts once, under its top-level
+  // directory.
+  for (const filePath of new Set(files)) {
+    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
+    const [pluginName, kind] = parts;
+    if (!DESCRIPTION_KINDS.includes(kind)) continue;
+    // Only skills/<name>/SKILL.md is a skill manifest.
+    if (kind === 'skills' && (parts.length !== 4 || parts[3] !== 'SKILL.md')) {
+      continue;
+    }
+    const frontmatter = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
+    const data = parseFrontmatter(frontmatter);
+    // Malformed YAML: the per-file rules raise an error for all three kinds.
+    if (frontmatter !== null && !data) continue;
+    // Claude Code lists a command or skill that has no description by its
+    // first body text, which this count cannot see, so those are reported.
+    // An agent without frontmatter is already an error in validateAgentFile.
+    if (!data) {
+      if (kind !== 'agents') undescribed.push(filePath);
+      continue;
+    }
+    if (kind !== 'agents') {
+      if (data['disable-model-invocation'] === true) continue;
+      if (typeof data.description !== 'string' || !data.description) {
+        undescribed.push(filePath);
+        continue;
+      }
+    }
+    let chars = 0;
+    for (const key of ['description', 'when_to_use']) {
+      if (typeof data[key] === 'string') chars += data[key].length;
+    }
+    plugins[pluginName] += chars;
+    kinds[kind] += chars;
+  }
+  return { plugins, kinds, undescribed };
+}
+
+function checkDescriptionBudget(budget, baselinePath, errors, notices) {
+  let baseline;
+  try {
+    baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+  } catch (e) {
+    errors.push(
+      `RULE 23 — cannot read the description baseline ` +
+        `${relative(baselinePath)} (${e.code || e.name}); run ` +
+        `\`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\`.`
+    );
+    return;
+  }
+  const entries = baseline && baseline.plugins;
+  if (
+    !entries ||
+    baseline.unit !== 'chars' ||
+    typeof entries !== 'object' ||
+    Array.isArray(entries)
+  ) {
+    errors.push(
+      `RULE 23 — ${relative(baselinePath)} must have \`"unit": "chars"\` and ` +
+        `a \`plugins\` object; run \`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\`.`
+    );
+    return;
+  }
+  for (const name of Object.keys(budget.plugins)) {
+    const current = budget.plugins[name];
+    const hasEntry = Object.prototype.hasOwnProperty.call(entries, name);
+    if (hasEntry && !(Number.isInteger(entries[name]) && entries[name] >= 0)) {
+      errors.push(
+        `RULE 23 — ${name}: baseline entry must be a non-negative integer; ` +
+          `run \`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\`.`
+      );
+      continue;
+    }
+    const allowed = hasEntry ? entries[name] : 0;
+    if (current > allowed) {
+      errors.push(
+        `RULE 23 — ${name}: description total ${current} chars is over its ` +
+          `baseline ${allowed} (+${current - allowed}). Shorten the ` +
+          `descriptions, or run \`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\` ` +
+          `and commit the baseline so the growth is reviewed.`
+      );
+    } else if (current < allowed) {
+      notices.push(
+        `[RULE 23 notice] ${name}: description total ${current} chars is ` +
+          `under its baseline ${allowed} (-${allowed - current}); run ` +
+          `\`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\` to lower it.`
+      );
+    }
+  }
+  for (const filePath of budget.undescribed) {
+    errors.push(
+      `RULE 23 — ${relative(filePath)}: no string \`description:\` in the ` +
+        `frontmatter. Claude Code would list its first body text instead, ` +
+        `which the budget cannot count; add a description.`
+    );
+  }
+  for (const name of Object.keys(entries).sort()) {
+    if (!Object.prototype.hasOwnProperty.call(budget.plugins, name)) {
+      notices.push(
+        `[RULE 23 notice] baseline entry "${name}" has no plugin directory; ` +
+          `run \`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\` to drop it.`
+      );
+    }
+  }
+}
+
+function writeDescriptionBaseline(budget, baselinePath) {
+  fs.writeFileSync(
+    baselinePath,
+    `${JSON.stringify({ unit: 'chars', plugins: budget.plugins }, null, 2)}\n`
+  );
+}
+
+function describeDescriptionBudget(budget) {
+  const { commands, agents, skills } = budget.kinds;
+  return (
+    `Description budget: ${commands + agents + skills} chars ` +
+    `(commands ${commands}, agents ${agents}, skills ${skills})`
+  );
 }
 
 function main() {
@@ -1797,12 +1972,34 @@ function main() {
       path.basename(filePath) === 'SKILL.md'
   );
 
+  const baselinePath = descriptionBaselinePath();
+  const budget = collectDescriptionBudget(pluginNames, [
+    ...commandFiles,
+    ...agentFiles,
+    ...skillFiles,
+  ]);
+  if (process.argv.includes(UPDATE_DESCRIPTION_BASELINE_FLAG)) {
+    if (!baselinePath) {
+      logError(
+        `${UPDATE_DESCRIPTION_BASELINE_FLAG} needs VALIDATE_DESCRIPTION_BASELINE ` +
+          `when VALIDATE_PLUGINS_DIR is set`
+      );
+      process.exit(1);
+    }
+    writeDescriptionBaseline(budget, baselinePath);
+    logSuccess(
+      `Wrote ${relative(baselinePath)} — ${describeDescriptionBudget(budget)}`
+    );
+    return;
+  }
+
   logInfo(
     `Validating ${agentFiles.length} agents and ${markdownFiles.length} markdown files...`
   );
 
   const errors = [];
   const warnings = [];
+  const notices = [];
   const pluginAgents = new Set();
 
   for (const filePath of agentFiles) {
@@ -1822,16 +2019,26 @@ function main() {
   validateSkillToolGrant(commandFiles, errors, { toolsKey: 'allowed-tools' });
   validateSkillToolGrant(agentFiles, errors, { toolsKey: 'tools' });
   validateSkillFiles(skillFiles, { errors, warnings });
+  validateCommandDescriptions(commandFiles, errors, warnings);
   validateSizeCeilings(commandFiles, agentFiles, warnings);
   validateMemoryProtocolSentinel(markdownFiles, errors);
   validateDurableBar(markdownFiles, errors);
   validateStagingPromoterFrontmatter(agentFiles, errors);
   validateMemoryWriteSectionGate(agentFiles, errors);
+  if (baselinePath) {
+    checkDescriptionBudget(budget, baselinePath, errors, notices);
+  }
 
   // Print warnings first so they remain visible above the trailing
   // success/error block. Warnings do NOT affect exit code; only errors do.
   for (const warning of warnings) {
     logWarning(warning);
+  }
+  if (baselinePath) {
+    logInfo(describeDescriptionBudget(budget));
+    for (const notice of notices) {
+      logInfo(notice);
+    }
   }
 
   if (errors.length > 0) {

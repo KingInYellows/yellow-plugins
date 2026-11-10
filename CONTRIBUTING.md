@@ -137,7 +137,11 @@ See `docs/plugin-validation-guide.md` for detailed validation rules.
 
 ### Plugin Conventions
 
-- SKILL.md `description:` must be single-line (no YAML folded scalars)
+- Every skill, agent and command `description:` must be single-line (no YAML
+  folded scalars; RULE 15d warns)
+- Adding description text raises a plugin's character budget: run
+  `pnpm update:description-baseline` and commit
+  `scripts/description-budget-baseline.json` (RULE 23)
 - SKILL.md frontmatter uses `user-invocable` (with c — the older `user-invokable`
   spelling is ignored by Claude Code and rejected by RULE 20)
 - Agent `.md` files should focus on project-specific rules, not generic LLM
