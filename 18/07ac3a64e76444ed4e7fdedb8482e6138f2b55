@@ -1,0 +1,60 @@
+tests/integration/validate-agent-authoring-skill-rules.test.ts
+  s_3301212c34e55d::t_234fb5572e97f4 15-17
+plans/description-validators.md
+  s_3301212c34e55d::t_db252078f929be 1-243
+package.json
+  s_3301212c34e55d::t_96f7bcda838161 22
+AGENTS.md
+  s_3301212c34e55d::t_6552c948161a6e 321-334
+tests/integration/validate-agent-authoring-description-rules.test.ts
+  s_3301212c34e55d::t_68a73c5d696eaa 1-99,102-122,135-245,298-342
+  s_3301212c34e55d::t_bf0bbe3a5141f6 100-101
+  s_3301212c34e55d::t_623c7fec0aee4d 123-134
+  s_3301212c34e55d::t_96119d12719269 246-297
+  s_3301212c34e55d::t_682280af18bc30 343-351
+plugins/yellow-goal/commands/goal/setup.md
+  s_3301212c34e55d::t_daf41d863fdf5f 3-4
+CONTRIBUTING.md
+  s_3301212c34e55d::t_9648225c238ccd 140-144
+.changeset/single-line-goal-descriptions.md
+  s_3301212c34e55d::t_d1e5c2bcfb57c0 1-6
+plugins/yellow-goal/commands/goal/request.md
+  s_3301212c34e55d::t_2c469643596645 3-4
+docs/plugin-validation-guide.md
+  s_3301212c34e55d::t_5c6f016b2b5bf3 66-68
+plans/claude-code-quality-and-cost-roadmap.md
+  s_3301212c34e55d::t_1de8abc004532d 1-394
+scripts/description-budget-baseline.json
+  s_3301212c34e55d::t_949d535752a685 1-27
+scripts/validate-agent-authoring.js
+  s_3301212c34e55d::t_8201ffc6bc2e7b 1738-1741,1744-1751
+  s_3301212c34e55d::t_967d0456bf9cf4 1781-1808,1813,1820,1830-1861,1863-1871,1873,1883-1910,1912-1919,1960,2023
+  s_3301212c34e55d::t_358ef9e525074f 1862
+  s_3301212c34e55d::t_b48b144cd1bfa9 1809,1812,1814-1819,1821-1827
+  s_3301212c34e55d::t_1cd77b7a1136f7 1828-1829
+  s_3301212c34e55d::t_6498c0b4dd4194 1962-1979
+  s_3301212c34e55d::t_b7025693272f80 1810-1811
+  s_3301212c34e55d::t_7d8788db52e3b2 2024-2026
+  s_3301212c34e55d::t_1cf1356876ea17 266-271
+  s_3301212c34e55d::t_be2948b821f6f9 1700-1737,1742-1743,1753
+  s_3301212c34e55d::t_fa7b84324dff2c 1872,1874-1882
+  s_3301212c34e55d::t_a2380af7e3c127 527-528
+  s_3301212c34e55d::t_a889886620d285 1911
+  s_3301212c34e55d::t_e4ae26dcd97bc5 1959,1961,1986,2006,2012-2014,2021-2022
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1807ac3a64e76444ed4e7fdedb8482e6138f2b55",
+  "prompts": {},
+  "sessions": {
+    "s_3301212c34e55d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "970dd086-03cf-43a0-95f0-3e73c5013fb1",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": null
+    }
+  }
+}
