@@ -1,0 +1,62 @@
+plans/description-validators.md
+  s_3301212c34e55d::t_db252078f929be 1-248
+AGENTS.md
+  s_3301212c34e55d::t_6552c948161a6e 321-335
+  s_3301212c34e55d::t_c72adb0d1d3ecb 336
+CONTRIBUTING.md
+  s_3301212c34e55d::t_9648225c238ccd 140-144
+plugins/yellow-goal/commands/goal/request.md
+  s_3301212c34e55d::t_2c469643596645 3-4
+plans/claude-code-quality-and-cost-roadmap.md
+  s_3301212c34e55d::t_1de8abc004532d 1-394
+scripts/validate-agent-authoring.js
+  s_3301212c34e55d::t_967d0456bf9cf4 1781-1808,1813,1821,1829-1871,1873-1881,1883,1893-1927,1929-1936,1977,2040
+  s_3301212c34e55d::t_1cf1356876ea17 266-271
+  s_3301212c34e55d::t_b7025693272f80 1810-1811
+  s_3301212c34e55d::t_358ef9e525074f 1872
+  s_3301212c34e55d::t_fa7b84324dff2c 1882,1884-1892
+  s_3301212c34e55d::t_be2948b821f6f9 1700-1737,1742-1743,1753
+  s_3301212c34e55d::t_a889886620d285 1928
+  s_3301212c34e55d::t_e4ae26dcd97bc5 1976,1978,2003,2023,2029-2031,2038-2039
+  s_3301212c34e55d::t_8201ffc6bc2e7b 1738-1741,1744-1751
+  s_3301212c34e55d::t_6498c0b4dd4194 1979-1996
+  s_3301212c34e55d::t_a2380af7e3c127 527-528
+  s_3301212c34e55d::t_7d8788db52e3b2 2041-2043
+  s_3301212c34e55d::t_b48b144cd1bfa9 1809,1812,1815-1820,1822-1828
+  s_3301212c34e55d::t_f8a59ba7dc661a 1814
+.changeset/single-line-goal-descriptions.md
+  s_3301212c34e55d::t_d1e5c2bcfb57c0 1-6
+scripts/description-budget-baseline.json
+  s_3301212c34e55d::t_949d535752a685 1-27
+tests/integration/validate-agent-authoring-skill-rules.test.ts
+  s_3301212c34e55d::t_234fb5572e97f4 15-17
+docs/plugin-validation-guide.md
+  s_3301212c34e55d::t_5c6f016b2b5bf3 66-68
+package.json
+  s_3301212c34e55d::t_96f7bcda838161 22
+plugins/yellow-goal/commands/goal/setup.md
+  s_3301212c34e55d::t_daf41d863fdf5f 3-4
+tests/integration/validate-agent-authoring-description-rules.test.ts
+  s_3301212c34e55d::t_68a73c5d696eaa 1-94,97-117,130-238,291-333
+  s_3301212c34e55d::t_96119d12719269 239-290
+  s_3301212c34e55d::t_623c7fec0aee4d 118-129
+  s_3301212c34e55d::t_682280af18bc30 334-342
+  s_3301212c34e55d::t_bf0bbe3a5141f6 95-96
+  s_3301212c34e55d::t_0a61ac2e0483a4 343-369
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d594c4aaf361cee8e92e114a5d298dc8be14ee9f",
+  "prompts": {},
+  "sessions": {
+    "s_3301212c34e55d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "970dd086-03cf-43a0-95f0-3e73c5013fb1",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": null
+    }
+  }
+}
