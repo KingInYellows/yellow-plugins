@@ -476,6 +476,18 @@ describe('validate-agent-authoring description rules', () => {
         expect(readFileSync(baselineFile, 'utf8')).toBe(before);
       });
 
+      it('over an agent with no frontmatter', () => {
+        writeAlpha();
+        writeAgent(plugins, 'alpha/agents/bare.md', '# Agent\n\nBody.\n');
+        writeBaseline({ alpha: 35 });
+        const before = readFileSync(baselineFile, 'utf8');
+        const { status, output } = runBudget(updateFlag);
+        expect(status).toBe(1);
+        expect(output).toContain('agents/bare.md: no YAML frontmatter');
+        expect(output).toContain('Baseline not written');
+        expect(readFileSync(baselineFile, 'utf8')).toBe(before);
+      });
+
       it('in a fixture run that names no baseline', () => {
         writeAlpha();
         const result = spawnSync('node', [VALIDATOR, ...updateFlag], {

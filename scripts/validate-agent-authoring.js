@@ -1823,6 +1823,7 @@ function collectDescriptionBudget(pluginNames, files) {
   const perFile = Object.create(null);
   const undescribed = [];
   const malformed = [];
+  const unparsedAgents = [];
   // A Set: the callers' lists overlap for a path that has both a commands/
   // and an agents/ segment, and each file counts once, under its top-level
   // directory.
@@ -1841,9 +1842,11 @@ function collectDescriptionBudget(pluginNames, files) {
       continue;
     }
     // No frontmatter. For an agent that is already an error in
-    // validateAgentFile; a command or skill is reported as undescribed.
+    // validateAgentFile, which update mode never reaches, so the file is
+    // kept apart to block a baseline write. A command or skill is reported
+    // as undescribed.
     if (!data) {
-      if (kind !== 'agents') undescribed.push(filePath);
+      (kind === 'agents' ? unparsedAgents : undescribed).push(filePath);
       continue;
     }
     if (kind !== 'agents' && data['disable-model-invocation'] === true) {
@@ -1861,7 +1864,7 @@ function collectDescriptionBudget(pluginNames, files) {
     kinds[kind] += chars;
     (perFile[pluginName] ||= []).push({ filePath, chars });
   }
-  return { plugins, kinds, perFile, undescribed, malformed };
+  return { plugins, kinds, perFile, undescribed, malformed, unparsedAgents };
 }
 
 function checkDescriptionBudget(budget, baselinePath, errors, notices) {
@@ -2022,6 +2025,9 @@ function main() {
         (filePath) => `${relative(filePath)}: malformed YAML frontmatter`
       ),
       ...budget.undescribed.map(undescribedError),
+      ...budget.unparsedAgents.map(
+        (filePath) => `${relative(filePath)}: no YAML frontmatter`
+      ),
     ];
     if (blockers.length > 0) {
       for (const blocker of blockers) logError(blocker);
