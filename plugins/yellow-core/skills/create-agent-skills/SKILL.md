@@ -80,7 +80,7 @@ Additional details, links.
 | `name`                     | Yes      | Kebab-case identifier matching filename                       |
 | `description`              | Yes      | WHAT it does + WHEN to use it (see below)                     |
 | `argument-hint`            | No       | UI hint for arguments, e.g. `"[branch-name]"`                 |
-| `disable-model-invocation` | No       | If `true`, prints markdown only (no LLM call)                 |
+| `disable-model-invocation` | No       | If `true`, only a typed `/name` runs it; hidden from Claude   |
 | `user-invocable`           | No       | If `false`, skill is internal-only (callable by other skills) |
 | `allowed-tools`            | No       | Array of tool names to restrict access                        |
 | `model`                    | No       | Override default model (e.g. `fable`, `claude-opus-5`)        |
@@ -89,12 +89,16 @@ Additional details, links.
 
 ### Invocation Control Matrix
 
-| Config                           | User can call? | LLM invoked? | Use case               |
+| Config                           | User can call? | Model calls? | Use case               |
 | -------------------------------- | -------------- | ------------ | ---------------------- |
 | Default                          | Yes            | Yes          | Standard skill         |
-| `disable-model-invocation: true` | Yes            | No           | Static reference docs  |
+| `disable-model-invocation: true` | Yes            | No           | Typed-only side effect |
 | `user-invocable: false`          | No             | Yes          | Internal helper skill  |
-| Both set                         | No             | No           | Private reference docs |
+| Both set                         | No             | No           | Unreachable (RULE 25)  |
+
+With `disable-model-invocation: true` the description leaves the session
+listing and the Skill tool refuses the entry point, so no command, skill or
+agent can dispatch it; the body still runs normally when the user types it.
 
 ## Dynamic Features
 
