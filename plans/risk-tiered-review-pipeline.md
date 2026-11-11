@@ -1,9 +1,47 @@
 # Risk-tiered PR review pipeline for yellow-plugins and yellow-goal
 
-Date: 2026-11-02 · Status: approved by the user 2026-11-02; Phase 0 in progress
-· Source: the "Anthropic's official code review setup" infographic the user
-shared, current Claude Code and Anthropic prompting docs, and an inventory of
-both repos at yellow-plugins `06af4d6` and yellow-goal `main`.
+Date: 2026-11-02 · Status: approved by the user 2026-11-02; Phases 0, 1, 3 and 4
+are on `main`, Phase 2 is half done (see "Status on main" below; reconciled
+2026-11-11 at `8d9762e`) · Source: the "Anthropic's official code review setup"
+infographic the user shared, current Claude Code and Anthropic prompting docs,
+and an inventory of both repos at yellow-plugins `06af4d6` and yellow-goal
+`main`.
+
+## Status on main (2026-11-11)
+
+The umbrella CLAUDE-231 is Done. The plan stays in `plans/` because the items
+under "Still open" are part of it.
+
+| Phase | State                                                                                                                                      | Landed in                                                                                                                                        |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0     | Done. `REVIEW.md`, `.github/review-risk.json`, `classify-risk`, tier in the sticky comment.                                                | #1610 (CLAUDE-232), #1629 (CLAUDE-241), #1652 (CLAUDE-247)                                                                                       |
+| 1     | Done. `review-gate.js` runs in shadow behind `review_pipeline: workflow`.                                                                  | #1612 (CLAUDE-233), #1632 (CLAUDE-243)                                                                                                           |
+| 2     | Half done. Approval by risk tier is enforced in `check-merge-ready`. `review_pipeline: workflow` is not the default yet (it is `persona`). | #1626 (CLAUDE-234). The default switch is CLAUDE-318, after CLAUDE-285.                                                                          |
+| 3     | Done. The headless CI job runs on non-draft PRs in shadow (`REVIEW_GATE_MODE` unset).                                                      | #1645 (CLAUDE-235), #1659 (CLAUDE-259)                                                                                                           |
+| 4     | Done. Eval runner and grader, harvest script, ten cases, ten controls, weekly run.                                                         | #1611 (CLAUDE-236), #1630 (CLAUDE-237, CLAUDE-239), #1631 (CLAUDE-240, CLAUDE-244), #1675 (CLAUDE-263), #1678 (CLAUDE-264); first run 2026-11-09 |
+
+yellow-goal is one phase behind as planned: `REVIEW.md` and the risk policy
+(yellow-goal #123) and shadow mode (yellow-goal #125) are in under GOAL-45.
+
+Still open:
+
+- **Shadow exit** (CLAUDE-285, due 2026-11-18): read the 2026-11-09 and
+  2026-11-16 weekly runs and two weeks of shadow merge-gate decisions, then
+  decide `REVIEW_GATE_MODE` shadow → advisory. It also answers open question 5
+  (keep or retire the upstream `code-review` CI job).
+- **Workflow as the `/review:pr` default** (CLAUDE-318), the rest of Phase 2,
+  blocked by CLAUDE-285.
+- **Hunter rule vocabulary** (CLAUDE-238), so dismissals and dedup match on a
+  slug. Blocked by CLAUDE-285.
+- **Upstream job skips re-review** (CLAUDE-248): fix it or retire the job,
+  decided after CLAUDE-285.
+- **Phase 2 in yellow-goal** (GOAL-48): needs
+  `review_approval_humans: [KingInYellow18]` in an untracked config first.
+- **Eval follow-ups** (CLAUDE-332): fence quoted findings, classify with CI's
+  policy ref, widen the grader's line window.
+- Open questions 2, 3 and 4 in section 10 have no recorded answer. The shipped
+  behaviour is the proposal in each: the high-tier extras of section 5, the
+  seeded path list, and a weekly full run.
 
 ## 1. Recommendation in one paragraph
 
