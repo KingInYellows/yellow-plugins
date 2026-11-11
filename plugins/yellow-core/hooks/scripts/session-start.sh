@@ -357,38 +357,26 @@ fi
 DRAIN_TIMEOUT_BIN=$(command -v timeout 2>/dev/null || true)
 DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
 
-# Pin the drain's model. Unpinned, `claude -p` runs on the user's default
-# model (often Opus or Fable) and draws on the same subscription limit
-# window as the user's own session. The drain lead only moves files and
-# dispatches staging-reviewer, whose sub-agents pin their own models, so
-# Haiku is enough. COMPOUND_DRAIN_MODEL overrides it (e.g. `sonnet` if
-# dispatch proves unreliable). Only haiku|sonnet|opus or a well-formed
-# claude-<id> reaches argv: the negated class rejects anything outside
-# [a-z0-9-] first (so `claude-x; rm` never matches the claude-* arm), and
-# the second arm rejects malformed IDs (`claude-`, `--`, trailing `-`) in
-# the shape of MODEL_VALUE_PATTERN in scripts/validate-agent-authoring.js.
-# Unset means haiku silently; set-but-empty or invalid is rejected and
-# logged (without echoing the untrusted value) so a mistyped rollback
-# shows up in DRAIN_LOG instead of failing silently.
-DRAIN_MODEL="${COMPOUND_DRAIN_MODEL-haiku}"
-case "$DRAIN_MODEL" in
-  '' | *[!a-z0-9-]*) DRAIN_MODEL_REJECTED=1 ;;
-  claude- | *--* | *-) DRAIN_MODEL_REJECTED=1 ;;
-  haiku | sonnet | opus | claude-*) DRAIN_MODEL_REJECTED=0 ;;
-  *) DRAIN_MODEL_REJECTED=1 ;;
-esac
-if [ "$DRAIN_MODEL_REJECTED" -eq 1 ]; then
+# Pin the drain's model (see cs_drain_model): haiku unless a valid
+# COMPOUND_DRAIN_MODEL says otherwise. A rejected value is logged, without
+# echoing it, so a mistyped rollback shows up in DRAIN_LOG.
+if ! DRAIN_MODEL=$(cs_drain_model); then
   printf '[yellow-core] compound-staging: COMPOUND_DRAIN_MODEL rejected (only haiku|sonnet|opus|claude-<id> allowed); using haiku\n' \
     >> "$DRAIN_LOG" 2>/dev/null
-  DRAIN_MODEL=haiku
+fi
+
+# Dollar cap for the drain (see cs_drain_max_budget_usd).
+if ! DRAIN_BUDGET_USD=$(cs_drain_max_budget_usd); then
+  printf '[yellow-core] compound-staging: COMPOUND_DRAIN_MAX_BUDGET_USD rejected (positive decimal only); using %s\n' \
+    "$DRAIN_BUDGET_USD" >> "$DRAIN_LOG" 2>/dev/null
 fi
 
 (
   DRAIN_LOCK_PATH="${STAGING_DIR}/.drain-lock"
   trap 'rmdir "$DRAIN_LOCK_PATH" 2>/dev/null || true' EXIT INT TERM
   export COMPOUND_DRAIN_IN_PROGRESS=1
-  printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s, model=%s)\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" "$DRAIN_MODEL" >> "$DRAIN_LOG" 2>/dev/null
+  printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s, model=%s, max_budget_usd=%s)\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" "$DRAIN_MODEL" "$DRAIN_BUDGET_USD" >> "$DRAIN_LOG" 2>/dev/null
   # NOTE: --bare CANNOT be used here. The drain prompt invokes the
   # yellow-core:workflow:staging-reviewer agent via Task, and --bare
   # skips plugin auto-discovery — the child session would not have the
@@ -407,6 +395,7 @@ fi
   if [ -n "$DRAIN_TIMEOUT_BIN" ]; then
     "$DRAIN_TIMEOUT_BIN" "$DRAIN_TIMEOUT_S" "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
       --model "$DRAIN_MODEL" \
+      --max-budget-usd "$DRAIN_BUDGET_USD" \
       --max-turns 50 \
       --permission-mode bypassPermissions \
       --output-format json \
@@ -415,6 +404,7 @@ fi
   else
     "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
       --model "$DRAIN_MODEL" \
+      --max-budget-usd "$DRAIN_BUDGET_USD" \
       --max-turns 50 \
       --permission-mode bypassPermissions \
       --output-format json \
@@ -425,6 +415,8 @@ fi
   # 124) otherwise leaves only the CLI's stderr behind.
   printf '[yellow-core] compound-staging: drain claude exited %s\n' "$DRAIN_RC" \
     >> "$DRAIN_LOG" 2>/dev/null
+  # API-equivalent cost of this drain, from the CLI's JSON result.
+  cs_drain_cost_line "$DRAIN_LOG" >> "$DRAIN_LOG" 2>/dev/null
   # staging-reviewer's Phase 1 moves every pending entry to processing/, so
   # an entry still in pending/ was never taken. Untaken entries are retried
   # next SessionStart but reaped after 7 days, so a drain that keeps

@@ -175,7 +175,7 @@ def run(work, claude, model, timeout):
     prompts = os.path.join(os.path.realpath(work), "prompts")
     with open(os.path.join(prompts, "args.json"), encoding="utf-8") as handle:
         args_text = handle.read().strip()
-    argv = ev.headless_argv(claude, model, prompts, REVIEWER, args_text)
+    argv = ev.headless_argv(claude, model, prompts, REVIEWER, args_text, budget=ev.max_budget_usd())
     try:
         res = subprocess.run(argv, cwd=meta["pr_dir"], env=ev.run_env(), capture_output=True,
                              text=True, timeout=timeout, check=False)

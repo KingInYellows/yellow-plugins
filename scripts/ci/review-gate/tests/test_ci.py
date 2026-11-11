@@ -133,6 +133,7 @@ class Flow(unittest.TestCase):
         argv = call["argv"]
         self.assertIn("Workflow(yellow-review:review-gate)", argv[argv.index("--allowedTools") + 1])
         self.assertIn("Bash", argv[argv.index("--disallowedTools") + 1])
+        self.assertEqual(argv[argv.index("--max-budget-usd") + 1], "25")
 
     def test_a_failed_hunter_is_incomplete_never_clean(self):
         self.prepare({"docs/a.md": "b\n"})
