@@ -4,8 +4,13 @@ Graphite-native workflow commands for Claude Code. Manages stacked PRs, smart
 commits with code auditing, repo sync, and stack navigation — all through the
 `gt` CLI.
 
+The plugin ships skills only: eight user-invocable ones, listed under
+"Commands" below because you type them as slash commands, and three internal
+ones. Type `/gt-workflow:<name>` if a bare name such as `/smart-submit` is
+also used by one of your own commands.
+
 Codex exposes the eleven catalog-selected skills. Its generated manifest sets
-`commands: []` so Claude command wrappers are not converted into extra skills.
+`commands: []`.
 See [Codex distribution](../../docs/codex-distribution.md).
 
 On Codex 0.157.0, trusted installed hooks block the fixture's push stub and warn
