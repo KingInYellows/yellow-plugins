@@ -1,7 +1,10 @@
 ---
 name: gt-sync
 description: 'Pull latest trunk, restack all tracked branches, and untrack branches whose PRs merged. Use when user says "sync with main", "rebase my stack", or "pull latest", after PRs merge, or when gt reports "needs restack". Not for deleting stale local-only branches — use the gt-cleanup skill.'
-user-invocable: false
+argument-hint: '[--no-delete | --force]'
+user-invocable: true
+allowed-tools:
+  - Bash
 ---
 
 ## What It Does

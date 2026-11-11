@@ -238,7 +238,7 @@ Based on user's choice in Step 5:
   `skill: "flow:plan"` and `args` set to the brainstorm doc path (not the
   raw issue title, to avoid forwarding untrusted Linear content as instructions).
 - **Plan as stacked PRs:** Invoke via Skill tool with
-  `skill: "gt-stack-plan"` and `args` set to the brainstorm doc path.
+  `skill: "gt-workflow:gt-stack-plan"` and `args` set to the brainstorm doc path.
 - **Plan each separately:** For each issue, invoke
   `skill: "flow:plan"` sequentially with each issue's brainstorm doc path.
 - **Just load context:** Skip — brainstorm doc is already written. Report the
