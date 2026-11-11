@@ -318,6 +318,11 @@ rule id in parentheses is what the failure message cites.
 - Skill frontmatter key is `user-invocable` (RULE 20 rejects `user-invokable`,
   which Claude Code ignores). Internal skills set it `false`; user-facing
   skills `true`.
+- A command and a skill in one plugin never share a `name:` (RULE 24). Claude
+  Code resolves the pair to the command, so a wrapper that invokes its
+  same-named skill returns itself. Give a wrapper a different name from its
+  skill (`ci:setup` and `ci-setup`), or ship a user-invocable skill with no
+  command file, as gt-workflow does.
 - Every `description:` is single-line — no `>`, `|`, or wrapped strings.
   RULE 15d warns on skills, agents and commands. Prettier produces the wrapped
   form when it rewraps a long description, so put `# prettier-ignore` on the

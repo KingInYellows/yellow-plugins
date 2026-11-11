@@ -963,7 +963,7 @@ step 5. Phase 4 becomes a summary phase:
 
 3. Delegate to the resolved provider's audit + commit + submit skill:
 
-   **Graphite:** Invoke the Skill tool with `skill: "smart-submit"`.
+   **Graphite:** Invoke the Skill tool with `skill: "gt-workflow:smart-submit"`.
 
    `/smart-submit` will:
    - Run 3 parallel audit agents (code review, security, silent failures)

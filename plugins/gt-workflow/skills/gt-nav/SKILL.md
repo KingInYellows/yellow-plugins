@@ -1,7 +1,11 @@
 ---
 name: gt-nav
 description: 'Visualize your Graphite stack and navigate between its branches. Use when user says "show my stack", "where am I in the stack", "go up/down a branch", or "checkout the top of the stack". Not for restacking, syncing, or cleanup — use the gt-sync or gt-cleanup skill.'
-user-invocable: false
+argument-hint: '[--pr | --top | --bottom]'
+user-invocable: true
+allowed-tools:
+  - Bash
+  - AskUserQuestion
 ---
 
 ## What It Does
