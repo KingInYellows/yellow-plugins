@@ -529,7 +529,7 @@ where `$BRANCH_NAME` is empty (Cat 3 — Detached HEAD removes have no branch).*
 If any orphaned branches are found:
 
 ```text
-Tip: N branches may now be orphaned. Run /gt-cleanup to audit.
+Tip: N branches may now be orphaned. Run /gt-workflow:gt-cleanup to audit.
 ```
 
 ```text

@@ -249,6 +249,13 @@ const DURABLE_BAR_FILES = [
 // RULE 23 — description budget (error tier). Documented beside its code;
 // search for "RULE 23 — description budget".
 //
+// RULE 24 — ERROR tier. A command and a skill in one plugin must not share a
+// `name:`. Claude Code resolves such a pair to the command, for the typed
+// slash form and for the Skill tool, so a wrapper command that invokes its
+// same-named skill returns itself and the skill body is unreachable. That
+// holds for a `user-invocable: false` skill too (observed on 2.1.321), so
+// the rule has no exemption for one.
+//
 // RULE 15 (a–d) — authoring lint, ALL warning-tier: 15a–c on SKILL.md, 15d
 // (single-line description) on SKILL.md, agents and commands. AGENTS.md and
 // the root CLAUDE.md document these skill-authoring conventions but until
@@ -1758,6 +1765,48 @@ function validateCommandDescriptions(commandFiles, errors, warnings) {
   }
 }
 
+// RULE 24 — same-plugin command/skill name collision (see the constant block
+// above).
+function validateCommandSkillNameCollisions(commandFiles, skillFiles, errors) {
+  const commandNames = new Map();
+  for (const filePath of commandFiles) {
+    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
+    // A command with no `name:` is named after its path under commands/
+    // (`commands/ci/setup.md` is `ci:setup`).
+    const name =
+      parseScalar(
+        extractFrontmatter(fs.readFileSync(filePath, 'utf8')),
+        'name'
+      ) ||
+      parts
+        .slice(parts.indexOf('commands') + 1)
+        .join(':')
+        .replace(/\.md$/, '');
+    commandNames.set(`${parts[0]}\0${name}`, filePath);
+  }
+  for (const filePath of skillFiles) {
+    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
+    // skills/<name>/SKILL.md only: the generated codex/ and cursor/ copies
+    // repeat every skill name.
+    if (parts.length !== 4 || parts[1] !== 'skills') continue;
+    // A skill with no `name:` is named after its directory.
+    const name =
+      parseScalar(
+        extractFrontmatter(fs.readFileSync(filePath, 'utf8')),
+        'name'
+      ) || parts[2];
+    const commandPath = commandNames.get(`${parts[0]}\0${name}`);
+    if (commandPath) {
+      errors.push(
+        `${relative(filePath)}: RULE 24 — skill name "${name}" is also the ` +
+          `name of the command ${relative(commandPath)}. Claude Code resolves ` +
+          `the pair to the command, so the skill body is unreachable; keep ` +
+          `one of them, or give them different names.`
+      );
+    }
+  }
+}
+
 // RULE 21 — command/agent line ceilings (see the constant block above for the
 // rationale). Warning tier; the message names the remedy the repo already
 // uses (references/ offload behind an imperative load stub) plus the
@@ -2073,6 +2122,7 @@ function main() {
   validateSkillToolGrant(agentFiles, errors, { toolsKey: 'tools' });
   validateSkillFiles(skillFiles, { errors, warnings });
   validateCommandDescriptions(commandFiles, errors, warnings);
+  validateCommandSkillNameCollisions(commandFiles, skillFiles, errors);
   validateSizeCeilings(commandFiles, agentFiles, warnings);
   validateMemoryProtocolSentinel(markdownFiles, errors);
   validateDurableBar(markdownFiles, errors);

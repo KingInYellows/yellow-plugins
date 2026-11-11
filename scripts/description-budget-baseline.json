@@ -2,7 +2,7 @@
   "unit": "chars",
   "plugins": {
     "github-workflow": 3375,
-    "gt-workflow": 4487,
+    "gt-workflow": 2563,
     "yellow-agy": 1895,
     "yellow-browser-test": 1770,
     "yellow-ci": 4446,

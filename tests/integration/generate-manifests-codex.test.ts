@@ -1492,6 +1492,54 @@ describe('exposure lint registry-gated sibling-path detection (true-positive pat
   });
 });
 
+describe('exposure lint slash-command registry includes user-invocable skills', () => {
+  function lintWithSiblingSkill(extraFrontmatter: string): string[] {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'talkative-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['chatty'],
+        skills: { chatty: { name: 'chatty', description: 'Skill naming a slash command.' } },
+      },
+      { name: 'sibling-plugin', codexEnabled: false },
+    ]);
+    writeFileSync(
+      join(root, 'plugins', 'talkative-plugin', 'skills', 'chatty', 'SKILL.md'),
+      '---\nname: chatty\ndescription: "Skill naming a slash command."\n---\n\nThen run `/sibling-sync`.\n',
+      'utf8'
+    );
+    // sibling-plugin ships no commands/ directory: its entry point is a skill.
+    mkdirSync(join(root, 'plugins', 'sibling-plugin', 'skills', 'sibling-sync'), { recursive: true });
+    writeFileSync(
+      join(root, 'plugins', 'sibling-plugin', 'skills', 'sibling-sync', 'SKILL.md'),
+      `---\nname: sibling-sync\ndescription: fixture\n${extraFrontmatter}---\n\nBody.\n`,
+      'utf8'
+    );
+    expect(generateManifests({ mode: 'apply', rootDir: root }).status).toBe('ok');
+    const catalog = loadCatalog(join(root, 'catalog')).data;
+    const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder).sources;
+    return runExposureLint({ rootDir: root, catalog, sources }).filter((e: string) =>
+      e.includes('[slash-command-syntax]')
+    );
+  }
+
+  it.each([
+    ['sets user-invocable: true', 'user-invocable: true\n'],
+    ['omits the key', ''],
+  ])('flags a slash reference to a skill that %s', (_label, extra) => {
+    const findings = lintWithSiblingSkill(extra);
+    expect(findings.length).toBe(1);
+    expect(findings[0]).toContain('/sibling-sync');
+  });
+
+  it.each([
+    ['false', 'user-invocable: false\n'],
+    ['a quoted false', "user-invocable: 'false'\n"],
+  ])('does not flag the name of a skill that sets user-invocable to %s', (_label, extra) => {
+    expect(lintWithSiblingSkill(extra)).toEqual([]);
+  });
+});
+
 describe('stale sweep symlink hardening (dangling hooks/hooks.json, symlinked hooks/ directory)', () => {
   it('reports a DANGLING hooks/hooks.json symlink as forbidden and never unlinks it', () => {
     // existsSync follows the link and reports "absent", so the pre-2026-09-17
