@@ -8,13 +8,14 @@
 > `/plan:complete`. Source:
 > `docs/brainstorms/2026-10-07-haiku-5-5-model-routing-policy-brainstorm.md`.
 >
-> Phases 2 and 3, listed under "Follow-ups", have shipped outside this plan:
-> the replay eval and its swaps (CLAUDE-163), effort on the remaining agents
+> Phase 2, listed under "Follow-ups", has shipped outside this plan: the
+> replay eval and its swaps (CLAUDE-163), effort on the remaining agents
 > (CLAUDE-187), the leftover swaps (CLAUDE-194, #1436) and the council CLI
 > wrappers, which went to Sonnet (CLAUDE-200, #1469). The verdicts are in
 > `docs/research/model-routing-policy.md`. Swap candidates not yet evaluated
-> are tracked in CLAUDE-319; tightening the plugin-markdown reviewer triggers
-> is CLAUDE-328.
+> are tracked in CLAUDE-319. Phase 3 has not shipped: `/review:pr` still uses
+> the broad plugin-markdown reviewer triggers, and tightening them is
+> CLAUDE-328 (Backlog).
 
 ## Delivery (decided 2026-10-14)
 
@@ -841,8 +842,9 @@ Kept `inherit`, with the reason recorded:
 
 ## Follow-ups (not in this plan)
 
-> 2026-11-11: Phase 2 and Phase 3 below have shipped; see the status note at
-> the top. The lists are kept as the record of what was planned.
+> 2026-11-11: Phase 2 below has shipped and Phase 3 has not (CLAUDE-328); see
+> the status note at the top. The lists are kept as the record of what was
+> planned.
 
 - **Phase 2, replay-gated:** first build the per-reviewer yield rollup from the
   review ledger's `reviewers` array. The ledger is per clone and pruned when a

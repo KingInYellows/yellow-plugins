@@ -295,10 +295,13 @@ the model cannot infer, and do not over-prescribe.
   after a model swap.
 - **Existing prompts should work unchanged.** Anthropic recommends testing a
   prompt as it is before rewriting it for a new model.
-- **Do not ask for reasoning in the response.** Lines such as "think
-  carefully" or "show your reasoning" are no longer useful, and on Opus 5.5 a
-  request to reproduce reasoning in the answer can be refused
-  (`reasoning_extraction`).
+- **Do not ask for reasoning in the response.** A request to reproduce
+  reasoning in the answer ("show your reasoning") can be refused
+  (`reasoning_extraction`); read summarized thinking blocks instead. Asking
+  the model to think is a different thing and is not ruled out: the Sonnet 5.5
+  page recommends "Think the problem through before you answer" for tasks
+  that need a few steps of working out and return JSON. To get less thinking,
+  lower the effort setting; a prompt line does not do it reliably.
 - **Name the stop you do not want.** The shared failure in unattended runs is
   ending the turn early: a check-in, a summary, or an offer to continue. A
   sentence that names that stop works better than "be thorough".
@@ -371,7 +374,8 @@ Source:
   setting.
 - The authoring rules already in `AGENTS.md` (no ALL-CAPS rule lists, no "be
   thorough", no self-verification loops) match this guidance. Two additions
-  follow from it: do not write "think carefully" or "minimize tool calls"
-  into an agent body, and when an agent must not stop early, name the stop.
+  follow from it: do not ask an agent to show its reasoning in its answer or
+  to "minimize tool calls", and when an agent must not stop early, name the
+  stop.
 - Not verified here: none of the per-model behaviours above was measured on
   this repository's agents. The Fable 5.1 page was not read.
