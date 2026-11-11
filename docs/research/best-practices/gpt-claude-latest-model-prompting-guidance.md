@@ -10,7 +10,11 @@ verified (14 confirmed, 11 refuted).
 
 ---
 
-## Claude (Sonnet 5 / Opus 5 / Fable 5) — Anthropic's guidance
+## Claude (current models) — Anthropic's guidance
+
+This section was written for Sonnet 5, Opus 5 and Fable 5. It still holds for
+the 5.5 generation; the per-model changes are in the
+[2026-11-11 addendum](#addendum-claude-55-generation-and-fable-52-2026-11-11).
 
 **Confidence: high.** Anthropic's core principle is explicit, unambiguous
 instruction-giving:
@@ -268,3 +272,106 @@ distills — the open question narrows to proprietary-GPT coverage and the
 mechanistic analysis; (3) per-model verbosity/effort defaults now diverge
 enough (Fable 5 `high` vs GPT-5.6 `medium`; Opus 5's long-output exception)
 that per-model tuning notes belong in any cross-model prompt library.
+
+---
+
+## Addendum: Claude 5.5 generation and Fable 5.2 (2026-11-11)
+
+**Method:** a read of Anthropic's prompting pages on 2026-11-11, not a
+`/deep-research` pass. There was no claim verification vote; every item below
+is Anthropic's own statement, taken from the page linked at the end of its
+section. OpenAI's guidance was not rechecked.
+
+**What changed since July.** Anthropic's
+[best-practices page](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+now covers Fable 5.2, Opus 5.5, Sonnet 5.5 and Haiku 5.5, and links one page
+per model. The core guidance above is unchanged: be explicit, give the facts
+the model cannot infer, and do not over-prescribe.
+
+### Common to the current models
+
+- **Effort is the main control, and each model is calibrated separately.** A
+  setting tuned on one model does not carry to the next. Sweep effort again
+  after a model swap.
+- **Existing prompts should work unchanged.** Anthropic recommends testing a
+  prompt as it is before rewriting it for a new model.
+- **Do not ask for reasoning in the response.** Lines such as "think
+  carefully" or "show your reasoning" are no longer useful, and on Opus 5.5 a
+  request to reproduce reasoning in the answer can be refused
+  (`reasoning_extraction`).
+- **Name the stop you do not want.** The shared failure in unattended runs is
+  ending the turn early: a check-in, a summary, or an offer to continue. A
+  sentence that names that stop works better than "be thorough".
+
+### Opus 5.5
+
+- Default effort is `medium` (Opus 5 defaulted to `high`). Anthropic states
+  that `medium` on Opus 5.5 matches or beats `high` on Opus 5.
+- Thinking is always on; `thinking: disabled` returns a 400.
+- In unattended runs it can end a turn with text where a tool call was
+  expected. Say which stops are unwanted.
+- Progress updates arrive as thinking blocks, so a harness that hides thinking
+  shows no progress.
+- It responds to elapsed-time signals, and it follows named frontend patterns
+  to avoid better than a general "make it look good".
+
+Source:
+[Prompting Claude Opus 5.5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5).
+
+### Sonnet 5.5
+
+- The API default is `high`. Anthropic suggests starting at `medium` for
+  well-specified agentic coding.
+- At `low` and `medium` it may check in early. At `low` it can skip
+  verification, so state the check you require.
+- At `xhigh` and `max` it starts review rounds and reviewer subagents on its
+  own. Anthropic reports that a sentence damping this cut cost by about a
+  third.
+- It adds tests and documentation nobody asked for. State the scope.
+- Remove "minimize tool calls" language; it suppresses useful calls.
+
+Source:
+[Prompting Claude Sonnet 5.5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5).
+
+### Haiku 5.5
+
+- It is the first Haiku with an effort setting. The default is `medium`.
+- At `low` it is more likely to skip a search, stop early, or skip a check.
+  Use `high` when instructions must be followed strictly.
+- Give it today's date when it has search tools.
+- There is no server-side fallback model.
+- Benign security work can trigger the `cyber` refusal category.
+
+Source:
+[Prompting Claude Haiku 5.5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5).
+
+### Fable 5.2
+
+- Default effort is `high`. A line such as "answer directly" does not reduce
+  thinking; lower the effort setting.
+- Approval rules are applied literally. Name the exact actions that need
+  approval, and write the exceptions into the rule.
+- Caution accumulates. A warning left in memory, notes or a rules file keeps
+  applying after its reason is gone. Delete stale cautions, and give each
+  remaining one a scope and a reason.
+- Review standing delegation instructions and prompt token budgets written
+  for earlier models; both are followed more literally than before.
+- Hard style rules ("never use X") make prose choppy. Describe the reader and
+  the register.
+
+Source:
+[Prompting Claude Fable 5.2](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2).
+
+### What this means for this repository
+
+- Prompt rules name "the current Claude models", not a version, so they do
+  not go stale at the next release. Per-model facts live in this file.
+- An agent's `model:` and `effort:` are a pair. A model swap needs an effort
+  sweep on the eval set (`scripts/eval/model-swap/`), not a carried-over
+  setting.
+- The authoring rules already in `AGENTS.md` (no ALL-CAPS rule lists, no "be
+  thorough", no self-verification loops) match this guidance. Two additions
+  follow from it: do not write "think carefully" or "minimize tool calls"
+  into an agent body, and when an agent must not stop early, name the stop.
+- Not verified here: none of the per-model behaviours above was measured on
+  this repository's agents. The Fable 5.1 page was not read.

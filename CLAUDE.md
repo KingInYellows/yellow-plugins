@@ -155,11 +155,11 @@ still rely on review:
 - Commands and agents over the RULE 21 ceilings (500 / 300 lines) only warn.
   Delete prose that does not change behaviour before offloading it to
   `references/`.
-- Write for the Claude 5 generation: brief imperative sentences, the
+- Write for the current Claude models: brief imperative sentences, the
   project-specific facts Claude cannot infer, and no ALL-CAPS rule lists,
   "be thorough" exhortations, or self-verification loops — these degrade
-  Sonnet 5 / Opus 5 / Fable output (docs/research/best-practices/
-  gpt-claude-latest-model-prompting-guidance.md).
+  their output. Per-model notes (effort defaults, early stops) are in
+  docs/research/best-practices/gpt-claude-latest-model-prompting-guidance.md.
 - All files use LF line endings; WSL2-created files often arrive with CRLF
   (`sed -i 's/\r$//'`). The Write tool is the usual culprit — prefer
   heredocs or scripts for new `.sh` files.

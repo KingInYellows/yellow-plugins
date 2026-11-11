@@ -288,7 +288,7 @@ PreCompact 3s (`catalog/plugins/yellow-core.json`).
   plain text, not `{"continue": true}`: Claude Code appends a PreCompact hook's
   stdout to the **main-session** compaction prompt on exit 0 (exit 2 blocks
   compaction). Subagent compactons (`agentContext` set) discard that stdout. It
-  carries the Claude 5-generation compaction-preservation instruction (plan
+  carries the compaction-preservation instruction (plan
   path + unchecked tasks, modified files, user decisions verbatim, open
   questions, last failing command, in-flight branch/PR names — every item
   secret-redacted then fenced as untrusted-content). Synchronous, no jq, well
