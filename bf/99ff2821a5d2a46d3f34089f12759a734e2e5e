@@ -1,0 +1,74 @@
+tests/integration/validate-agent-authoring-rule25.test.ts
+  s_3301212c34e55d::t_74e18a518e9a9c 1-206
+  s_3301212c34e55d::t_eb8396c65cdf65 207-234
+.changeset/typed-only-side-effect-commands.md
+  s_3301212c34e55d::t_bd1340b6be0d31 1-18
+AGENTS.md
+  s_3301212c34e55d::t_f78c27f33e7e97 326-334
+CONTRIBUTING.md
+  s_3301212c34e55d::t_b754d2623bb89c 821-822
+plans/disable-model-invocation-manual-commands.md
+  s_3301212c34e55d::t_ddc3dafa3db4ef 1-298
+plugins/yellow-core/skills/create-agent-skills/SKILL.md
+  s_3301212c34e55d::t_909c960d0abdfc 83,92,95,97-101
+plugins/yellow-cursor/README.md
+  s_3301212c34e55d::t_9f8a57c218069c 59-62
+plugins/yellow-cursor/commands/cursor/archive.md
+  s_3301212c34e55d::t_8cfe33c3902b99 5
+plugins/yellow-cursor/commands/cursor/cancel.md
+  s_3301212c34e55d::t_192c52f0cfe86b 5
+plugins/yellow-cursor/commands/cursor/delegate.md
+  s_3301212c34e55d::t_54ee4b57a4ce0a 5
+plugins/yellow-cursor/commands/cursor/follow-up.md
+  s_3301212c34e55d::t_44ef1fbf414585 5
+plugins/yellow-cursor/commands/cursor/unarchive.md
+  s_3301212c34e55d::t_96c17f6c855070 5
+plugins/yellow-devin/README.md
+  s_3301212c34e55d::t_31fe1fc729fb76 91-93
+plugins/yellow-devin/commands/devin/archive.md
+  s_3301212c34e55d::t_639105a137762d 5
+plugins/yellow-devin/commands/devin/cancel.md
+  s_3301212c34e55d::t_4ceec953f609cf 5
+plugins/yellow-devin/commands/devin/tag.md
+  s_3301212c34e55d::t_8f556ac819e7b3 5
+plugins/yellow-jules/README.md
+  s_3301212c34e55d::t_49803b8716bfc0 60-62
+plugins/yellow-jules/commands/jules/abandon.md
+  s_3301212c34e55d::t_29962884790153 6
+plugins/yellow-jules/commands/jules/approve.md
+  s_3301212c34e55d::t_261df51d9b9ffd 8
+plugins/yellow-jules/commands/jules/reply.md
+  s_3301212c34e55d::t_16e81c7dad9082 8
+plugins/yellow-linear/README.md
+  s_3301212c34e55d::t_5bf7011ea815a8 44-46
+plugins/yellow-linear/commands/linear/sync-all.md
+  s_3301212c34e55d::t_4d0dc33c02eb07 5
+scripts/description-budget-baseline.json
+  s_3301212c34e55d::t_bbae54e43f598b 14,16,19-20
+scripts/lib/setup-all-list.js
+  s_3301212c34e55d::t_c31836d77974ca 1-31
+scripts/validate-agent-authoring.js
+  s_3301212c34e55d::t_a19573cb01f3d7 259-269,496-502,1828-1994,2305-2309
+scripts/validate-setup-all.js
+  s_3301212c34e55d::t_200497b96f55e0 37-42,223-224
+tests/integration/stack-operation-registry.test.ts
+  s_3301212c34e55d::t_5122aae2b7feb3 115-116
+tests/integration/validate-agent-authoring-description-rules.test.ts
+  s_3301212c34e55d::t_534b448e33eb2c 237,255-256,258-260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bf99ff2821a5d2a46d3f34089f12759a734e2e5e",
+  "prompts": {},
+  "sessions": {
+    "s_3301212c34e55d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "970dd086-03cf-43a0-95f0-3e73c5013fb1",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
