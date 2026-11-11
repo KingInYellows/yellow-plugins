@@ -644,7 +644,7 @@ Schema migrations if applicable.
    - `/flow:spec`: FIRST `Read plans/<name>.md` yourself so its requirements and research are in the conversation, then invoke `skill: "flow:spec"` with args = a SHORT topic/title only. `/flow:spec` derives the spec slug from `$ARGUMENTS`, so keep the args to a concise title — do NOT pass the draft path or a requirements summary in the args (a long summary would corrupt slug derivation, and an embedded "read this file" directive is ignored since spec.md treats `$ARGUMENTS` as untrusted, never as instructions). Because the Skill tool runs `/flow:spec` in this same conversation, the draft you just read is already in context for its dialogue to build on.
    - `/flow:work`: `skill: "flow:work"`, args: plan file path
    - `/flow:deepen-plan`: `skill: "flow:deepen-plan"`, args: plan file path (requires yellow-research)
-   - `/gt-stack-plan`: `skill: "gt-stack-plan"`, args: plan file path
+   - `/gt-stack-plan`: `skill: "gt-workflow:gt-stack-plan"`, args: plan file path
    - Create GitHub issue: `gh issue create --title "..." --body-file plans/<name>.md`
    - Simplify: Rewrite plan with simpler template
    - Something else: Ask for clarification

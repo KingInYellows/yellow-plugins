@@ -2,7 +2,12 @@
 name: gt-setup
 # prettier-ignore
 description: 'Validate Graphite CLI prerequisites and configure settings for AI agent workflows. Use when first installing the plugin, after Graphite auth changes, or when gt commands fail.'
-user-invocable: false
+user-invocable: true
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - AskUserQuestion
 ---
 
 ## What It Does

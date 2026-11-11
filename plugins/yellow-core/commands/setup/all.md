@@ -688,7 +688,7 @@ as **NOT INSTALLED** and skip all other checks for that plugin.
 
 **gt-workflow:**
 
-`/gt-setup` stops when the repo is not initialised (`graphite_repo` missing OR
+`/gt-workflow:gt-setup` stops when the repo is not initialised (`graphite_repo` missing OR
 `gt_trunk` unavailable), so both checks are required. `gt_trunk: SKIPPED` (no
 `gt`, or not in a git repo) is a failure, not a pass.
 
@@ -1141,7 +1141,7 @@ readiness is worth reporting. Only the **enabled** one is offered for setup:
 4. If the state is `PARTIAL_TOOLING`, the enabled provider is not ambiguous —
    only its tooling is missing. Offer that provider's own setup command rather
    than a provider-switch command (which only changes plugin enablement and
-   cannot install missing tooling): `/gt-setup` for `gt-workflow`,
+   cannot install missing tooling): `/gt-workflow:gt-setup` for `gt-workflow`,
    `/github-stack:setup` for `github-workflow`, `/cursor:setup` for
    `yellow-cursor`, `/devin:setup` for `yellow-devin`, `/jules:setup` for
    `yellow-jules`, `/agy:setup` for `yellow-agy`.
@@ -1200,7 +1200,7 @@ tool in this fixed order:
 
 <!-- setup-all-delegated-commands:start -->
 
-1. `gt-setup`
+1. `gt-workflow:gt-setup`
 2. `github-stack:setup`
 3. `ruvector:setup`
 4. `morph:setup`
@@ -1230,7 +1230,7 @@ provider group in one run (see the section below). Use this mapping:
 
 <!-- setup-all-plugin-command-map:start -->
 
-- `gt-workflow` → `gt-setup`
+- `gt-workflow` → `gt-workflow:gt-setup`
 - `github-workflow` → `github-stack:setup`
 - `yellow-ruvector` → `ruvector:setup`
 - `yellow-morph` → `morph:setup`
