@@ -1,9 +1,7 @@
 ---
 name: goal:request
-description:
-  'Create or validate a yellow-goal request packet by spawning goal-gen (request
-  create / request validate). Read-only: never run, never --executor
-  claude-code.'
+# prettier-ignore
+description: 'Create or validate a yellow-goal request packet by spawning goal-gen (request create / request validate). Read-only: never run, never --executor claude-code.'
 argument-hint:
   '[create --repo <path> --goal "<text>" --output <file> | validate <file>]'
 allowed-tools:

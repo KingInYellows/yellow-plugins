@@ -63,7 +63,9 @@ inventory wired into `pnpm validate:schemas`:
 - `scripts/validate-marketplace.js` — marketplace catalog
 - `scripts/validate-plugin.js` — plugin manifests
 - `scripts/validate-setup-all.js` — `/yellow-core:setup:all` coverage
-- `scripts/validate-agent-authoring.js` — agent/skill/command markdown rules
+- `scripts/validate-agent-authoring.js` — agent/skill/command markdown rules,
+  including the per-plugin description budget
+  (`scripts/description-budget-baseline.json`)
 - `scripts/lint-error-codes.js` — error catalog import discipline
 - `scripts/sync-shell-snippets.js --check` — install-script snippet sync
 - `scripts/validate-solutions.js` — solution-doc frontmatter and slug
