@@ -1,0 +1,23 @@
+.changeset/typed-only-side-effect-commands.md
+  s_3301212c34e55d::t_c53054d1ab7ad2 8,11
+plans/disable-model-invocation-manual-commands.md
+  s_3301212c34e55d::t_389c10fd7e4bab 86-88,105
+scripts/description-budget-baseline.json
+  s_3301212c34e55d::t_be6bb6f9727eb8 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b240643892bbb2b597067f6f0301abc7c142f5a8",
+  "prompts": {},
+  "sessions": {
+    "s_3301212c34e55d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "970dd086-03cf-43a0-95f0-3e73c5013fb1",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
