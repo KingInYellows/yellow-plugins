@@ -120,7 +120,7 @@ Stop after reporting all required failures:
 If `gt` is not found, note it and continue: "Graphite CLI is not installed.
 It is needed only when gt-workflow is the enabled stacked-PR provider; run
 `/stack:status` to see which provider is enabled, and its setup command
-(`/gt-setup` or `/github-stack:setup`) to install that provider's tooling."
+(`/gt-workflow:gt-setup` or `/github-stack:setup`) to install that provider's tooling."
 
 If `yellow_core` is not installed, warn but continue:
 

@@ -42,8 +42,9 @@ const PROVIDER_IDS = Object.freeze(['graphite', 'github']);
  * The nine neutral operations. yellow-core does not ship a `/stack:<name>`
  * command per operation (only `/stack:status` and `/stack:select` exist, and
  * neither reads this registry); each entry resolves to the provider's own
- * command (a gt-workflow command such as `gt-sync` or `smart-submit`, or
- * github-workflow's `/github-stack:*`). Nothing loads this module at runtime
+ * entry point, invoked by name (a gt-workflow user-invocable skill such as
+ * `gt-sync` or `smart-submit`, or github-workflow's `/github-stack:*`
+ * command). Nothing loads this module at runtime
  * except its integration test: `/flow:work` and the git-worktree skill's
  * `scripts/worktree-restack.sh` mirror these entries in prose, so a change
  * here needs the matching edit in `commands/flow/work.md` and that script.
@@ -93,7 +94,7 @@ const OPERATIONS = Object.freeze({
   // `gt merge` is a real, direct, noninteractive-capable CLI command
   // (`gt merge -c`/`--dry-run`, verified locally against gt 1.7.20) — NOT
   // the "no safe direct CLI stack-merge exists" case GOAL.md's Phase 5
-  // anticipated as a possibility. A thin /gt-merge wrapper is therefore
+  // anticipated as a possibility. A /gt-merge skill is therefore
   // more truthful than a structured handoff placeholder would be.
   merge: Object.freeze({
     graphite: cmd('gt-workflow', 'gt-merge'),
