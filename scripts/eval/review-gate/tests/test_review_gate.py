@@ -323,7 +323,9 @@ class PipelineTest(Tmp):
             self.assertNotEqual(rg.row_fingerprint(args, diff, row["model"], "r"), before)
         # The command that runs is the one fingerprinted, plus the budget cap,
         # which the fingerprint leaves out so changing the cap reruns nothing.
-        cmd = rg.headless_cmd(row, self.work)
+        with mock.patch.dict(os.environ):
+            os.environ.pop("REVIEW_GATE_MAX_BUDGET_USD", None)  # the default, not the caller's
+            cmd = rg.headless_cmd(row, self.work)
         self.assertEqual(cmd[cmd.index("--max-budget-usd") + 1], "25")
         self.assertEqual(len(cmd), 2 + len(rg.headless_argv("<claude>", row["model"], "<p>", "<r>", "<a>")))
         with mock.patch.dict(os.environ, {"REVIEW_GATE_MAX_BUDGET_USD": "40"}):

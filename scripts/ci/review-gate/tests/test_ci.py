@@ -124,7 +124,9 @@ class Flow(unittest.TestCase):
 
     def test_run_complete(self):
         self.prepare({"docs/a.md": "b\n"})
-        self.assertEqual(ci.run(self.work, STANDIN, "sonnet", 60), 0)
+        with mock.patch.dict(os.environ):
+            os.environ.pop("REVIEW_GATE_MAX_BUDGET_USD", None)  # assert the default, not the caller's
+            self.assertEqual(ci.run(self.work, STANDIN, "sonnet", 60), 0)
         result = ci.read_json(os.path.join(self.work, "result.json"))
         self.assertEqual(result["status"], "complete")
         with open(os.path.join(self.tmp, "log", "pr.json"), encoding="utf-8") as handle:

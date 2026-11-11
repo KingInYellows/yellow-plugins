@@ -54,7 +54,7 @@ unset CLAUDE_EFFORT CLAUDE_CODE_EFFORT_LEVEL CLAUDE_COWORK_MEMORY_PATH_OVERRIDE 
   CLAUDE_MEMORY_STORES CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD CLAUDE_ADDITIONAL_DIRECTORIES
 # Runaway stop for one run, in API-equivalent USD (the CLI counts it on a
 # subscription too). A run that hits it prints is_error JSON and is rerun.
-budget=${EVAL_MAX_BUDGET_USD:-5}
+budget=${EVAL_MAX_BUDGET_USD-5}
 case $budget in '' | *[!0-9.]* | *.*.* | .* | *.) printf 'run-one: EVAL_MAX_BUDGET_USD must be a decimal\n' >&2; exit 2 ;; esac
 start=$(date +%s)
 (cd "$workdir" && timeout 1200 claude -p --setting-sources "" --strict-mcp-config \
