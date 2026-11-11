@@ -209,7 +209,7 @@ One row runs, in its worktree:
 ```bash
 claude -p --setting-sources "" --strict-mcp-config \
   --plugin-dir plugins/yellow-core --plugin-dir plugins/yellow-linear --plugin-dir plugins/yellow-review \
-  --model sonnet --permission-mode dontAsk \
+  --model sonnet --max-budget-usd 25 --permission-mode dontAsk \
   --allowedTools 'Workflow(yellow-review:review-gate),Read(./**),Grep(./**),Glob(./**),Read(/<work>/prompts/**)' \
   --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch \
   --output-format json '<prompt with the args JSON>'
@@ -227,6 +227,11 @@ claude -p --setting-sources "" --strict-mcp-config \
   plugin workflows run as commands.
 - `CLAUDE_BIN` overrides the binary; the tests point it at the stand-in in
   `tests/fixtures/bin/claude`.
+- `--max-budget-usd` is a runaway stop per row (`REVIEW_GATE_MAX_BUDGET_USD`,
+  default 25; the dearest row of the 2026-11-09 run reported 13.29). It is the
+  one flag the row fingerprint leaves out, so changing it reruns nothing. A row
+  that hits it is an error row, and CI (`scripts/ci/review-gate/ci.py`) uses the
+  same cap.
 - Cost is what the CLI's JSON reports (`total_cost_usd`, `modelUsage`,
   `num_turns`) plus wall time. It may cover only the parent session, not the
   workflow's agents; `agents` from the workflow result is the steadier measure.

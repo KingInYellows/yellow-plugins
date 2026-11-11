@@ -321,9 +321,21 @@ class PipelineTest(Tmp):
             self.assertNotEqual(rg.row_fingerprint(args, diff, row["model"], "r"), before)
         with mock.patch.object(rg, "DENIED_TOOLS", "Bash"):
             self.assertNotEqual(rg.row_fingerprint(args, diff, row["model"], "r"), before)
-        # The command that runs is the one fingerprinted.
-        cmd = rg.headless_cmd(row, self.work)
-        self.assertEqual(len(cmd), len(rg.headless_argv("<claude>", row["model"], "<p>", "<r>", "<a>")))
+        # The command that runs is the one fingerprinted, plus the budget cap,
+        # which the fingerprint leaves out so changing the cap reruns nothing.
+        with mock.patch.dict(os.environ):
+            os.environ.pop("REVIEW_GATE_MAX_BUDGET_USD", None)  # the default, not the caller's
+            cmd = rg.headless_cmd(row, self.work)
+        self.assertEqual(cmd[cmd.index("--max-budget-usd") + 1], "25")
+        self.assertEqual(len(cmd), 2 + len(rg.headless_argv("<claude>", row["model"], "<p>", "<r>", "<a>")))
+        with mock.patch.dict(os.environ, {"REVIEW_GATE_MAX_BUDGET_USD": "40"}):
+            self.assertEqual(rg.row_fingerprint(args, diff, row["model"], "r"), before)
+            capped = rg.headless_cmd(row, self.work)
+            self.assertEqual(capped[capped.index("--max-budget-usd") + 1], "40")
+        for bad in ("", "0", "-1", "1e3", "5; rm"):
+            with mock.patch.dict(os.environ, {"REVIEW_GATE_MAX_BUDGET_USD": bad}):
+                with self.assertRaises(SystemExit):
+                    rg.max_budget_usd()
 
     def test_prepare_needs_a_checkout_for_the_repo(self):
         res = self.cli("prepare", self.work, "--cases", self.cases, "--controls", self.controls)
