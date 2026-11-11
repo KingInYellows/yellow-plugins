@@ -1,0 +1,31 @@
+.changeset/disable-model-invocation-doc-fix.md
+  s_3301212c34e55d::t_98e6f294c5d5fe 5-8
+AGENTS.md
+  s_3301212c34e55d::t_ab8db6c7f941ff 328-339
+CONTRIBUTING.md
+  s_3301212c34e55d::t_f39f98d7cb10df 821-822
+plans/disable-model-invocation-manual-commands.md
+  s_3301212c34e55d::t_f765855042a111 1,23-28,46-65
+scripts/description-budget-baseline.json
+  s_3301212c34e55d::t_56a923827b07e3 14,16,20
+scripts/validate-agent-authoring.js
+  s_3301212c34e55d::t_58926eeddb2ab7 266-272,1911-1912,1952-1957,1978,1980,1984-1985,1988-1997,2012-2017
+tests/integration/validate-agent-authoring-rule25.test.ts
+  s_3301212c34e55d::t_cd0f54bc3773d0 256-355
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8f153ffa2571041163335955bb7529ef2f567c8c",
+  "prompts": {},
+  "sessions": {
+    "s_3301212c34e55d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "970dd086-03cf-43a0-95f0-3e73c5013fb1",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
