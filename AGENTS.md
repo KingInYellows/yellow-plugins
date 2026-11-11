@@ -318,10 +318,29 @@ rule id in parentheses is what the failure message cites.
 - Skill frontmatter key is `user-invocable` (RULE 20 rejects `user-invokable`,
   which Claude Code ignores). Internal skills set it `false`; user-facing
   skills `true`.
-- Every `description:` is single-line — no `>`, `|`, or wrapped strings
-  (Claude Code truncates them silently). RULE 15d's advisory only runs on
-  `SKILL.md`; agent and command descriptions follow the same convention
-  with no validator warning.
+- Every `description:` is single-line — no `>`, `|`, or wrapped strings.
+  RULE 15d warns on skills, agents and commands. Prettier produces the wrapped
+  form when it rewraps a long description, so put `# prettier-ignore` on the
+  line above; an unindented continuation drops the whole frontmatter, and
+  other parsers may read only the first line.
+- Descriptions are loaded into every session, so each plugin has a character
+  budget in `scripts/description-budget-baseline.json` (RULE 23, error tier).
+  A plugin over its number fails `pnpm validate:agents`. To add description
+  text, run `pnpm update:description-baseline` and commit the file, so the
+  growth is reviewed; run it after removing text too. The count covers
+  `description` and `when_to_use` in a plugin's own `commands/`, `agents/` and
+  `skills/`, and skips commands and skills that set
+  `disable-model-invocation: true`. The budget measures Claude Code's listing:
+  Codex and Cursor still list the skipped commands. On a baseline merge
+  conflict, or a RULE 23 failure after two PRs grew the same plugin, re-run
+  the update command on the merged tree.
+- Every markdown file under a plugin's `commands/` registers as a command, so
+  each needs valid YAML frontmatter with a string `description`; so does every
+  agent and `skills/<name>/SKILL.md`. Malformed frontmatter is an error. A
+  missing description is a RULE 23 error unless the command or skill sets
+  `disable-model-invocation: true`, because Claude Code may list the file's
+  first body text instead, which the budget cannot count. The update command
+  refuses to write the baseline while either problem exists.
 - SKILL.md body headings are `## What It Does`, `## When to Use`, `## Usage`
   (RULE 15b); keep SKILL.md under 500 lines (RULE 15a), commands under 500
   and agents under 300 (RULE 21) — all warning tier.

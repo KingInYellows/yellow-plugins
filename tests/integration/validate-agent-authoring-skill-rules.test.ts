@@ -12,8 +12,9 @@
  *   15a: SKILL.md over 500 lines (official Anthropic skill guidance).
  *   15b: missing one of ## What It Does / ## When to Use / ## Usage.
  *   15c: `description:` absent or lacking a "Use when" trigger clause.
- *   15d: folded/literal block-scalar `description: >` or `|` (Claude Code
- *        silently truncates multi-line descriptions).
+ *   15d: multi-line `description:` (block scalar, wrapped or quoted). The
+ *        agent and command cases are in
+ *        validate-agent-authoring-description-rules.test.ts.
  *
  * One structural gate sits OUTSIDE the warning tier: malformed YAML
  * frontmatter is a hard error (exit 1), mirroring validateAgentFile —
