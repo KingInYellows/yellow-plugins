@@ -230,10 +230,10 @@ Read/Write/Edit to memory-backed agents, so omitting them from `tools:` is not
 enough (W1.5b, see AGENTS.md).
 ```
 
-Write the body for the Claude 5 generation: brief imperative sentences and
+Write the body for the current Claude models: brief imperative sentences and
 the project-specific facts Claude cannot infer. Skip "You are an expert…"
 openers, ALL-CAPS rule lists, "be thorough" exhortations, and
-self-verification steps — Sonnet 5 / Opus 5 / Fable follow instructions
+self-verification steps — the current Claude models follow instructions
 literally, and prior-model scaffolding degrades their output. The one
 ALL-CAPS heading that stays is the canonical `## CRITICAL SECURITY RULES`
 block, copied verbatim whenever the agent reads untrusted input.

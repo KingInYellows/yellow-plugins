@@ -452,7 +452,7 @@ a subagent inherits the session's effort, so set it explicitly (Haiku 4.5
 ignores it).
 Review agents under `agents/review/` must stay read-only (W1.5). Keep the body
 to the task, inputs, output contract, and the project-specific facts Claude
-cannot infer; brief imperative sentences steer the Claude 5 generation better
+cannot infer; brief imperative sentences steer the current Claude models better
 than enumerated ALL-CAPS rules.
 
 ```markdown
