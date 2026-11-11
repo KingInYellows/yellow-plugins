@@ -220,7 +220,7 @@ Stacked-PR Provider Status
 | `CONFIG_MISMATCH` | Runtime disagrees with `.yellow-stack.yml` | `/stack:select <intent>` |
 | `CONFIG_INVALID` | `.yellow-stack.yml` exists but could not be parsed into a valid provider intent (missing key, empty value, unknown provider, duplicate keys, malformed syntax, or the file is a symlink/non-regular/unreadable) | fix or remove `.yellow-stack.yml` by hand — `/stack:select` will not overwrite it automatically |
 | `MANAGED_CONFLICT` | A managed-scope plugin makes this unfixable locally | contact whoever controls managed settings |
-| `PARTIAL_TOOLING` | Right provider enabled, its CLI missing | `/gt-setup` or `/github-stack:setup` |
+| `PARTIAL_TOOLING` | Right provider enabled, its CLI missing | `/gt-workflow:gt-setup` or `/github-stack:setup` |
 
 `CONFIG_INVALID` carries an `intentInvalid: { reason, rawValue? }` field
 instead of a bare intent string. `reason` is one of the fixed codes

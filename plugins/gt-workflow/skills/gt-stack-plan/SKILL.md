@@ -1,7 +1,18 @@
 ---
 name: gt-stack-plan
 description: 'Decompose a feature into stacked PRs, ordered by dependency (plan-only). Use when breaking a feature into reviewable stacked PRs.'
-user-invocable: false
+argument-hint: '[feature-description or plan-file-path]'
+user-invocable: true
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
+  - Agent
+  - AskUserQuestion
+  - Skill
 ---
 
 ## What It Does

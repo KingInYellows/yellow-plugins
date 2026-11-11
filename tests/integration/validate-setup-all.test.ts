@@ -256,7 +256,94 @@ describe('validate-setup-all', () => {
     const result = runValidator(fixture);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(`${SETUP}-003`);
-    expect(result.stderr).toContain('missing command file: gamma:setup');
+    expect(result.stderr).toContain('named <plugin>:<skill>: gamma:setup');
+  });
+
+  describe('a setup entry point shipped as a skill instead of a command file', () => {
+    const NOT_FOUND = 'not found as a command file or as a user-invocable skill';
+
+    function writeSkill(relDir: string, body: string) {
+      mkdirSync(join(fixture.pluginsDir, relDir), { recursive: true });
+      writeFileSync(join(fixture.pluginsDir, relDir, 'SKILL.md'), body, 'utf8');
+    }
+
+    // Replaces beta's command file with skills/beta-setup/SKILL.md and points
+    // the delegated list and the map at `delegatedName`.
+    function replaceBetaCommandWithSkill(
+      extraFrontmatter: string,
+      { delegatedName = 'beta:beta-setup', body = 'Body.' } = {}
+    ) {
+      rmSync(join(fixture.pluginsDir, 'beta', 'commands'), {
+        recursive: true,
+        force: true,
+      });
+      writeSkill(
+        join('beta', 'skills', 'beta-setup'),
+        `---\nname: beta-setup\ndescription: fixture\n${extraFrontmatter}---\n\n${body}\n`
+      );
+      writeFileSync(
+        fixture.commandPath,
+        mutate(
+          mutate(DEFAULT_SETUP_ALL, '2. `beta-setup`', `2. \`${delegatedName}\``),
+          '- `beta` → `beta-setup`',
+          `- \`beta\` → \`${delegatedName}\``
+        ),
+        'utf8'
+      );
+    }
+
+    it.each([
+      ['sets user-invocable: true', 'user-invocable: true\n'],
+      ['omits the key', ''],
+    ])('passes when the skill %s', (_label, extra) => {
+      replaceBetaCommandWithSkill(extra);
+      expect(runValidator(fixture).status).toBe(0);
+    });
+
+    it('passes when only the skill body mentions user-invocable: false', () => {
+      replaceBetaCommandWithSkill('', { body: 'user-invocable: false' });
+      expect(runValidator(fixture).status).toBe(0);
+    });
+
+    it.each([
+      ['false', 'user-invocable: false\n'],
+      ['a quoted false', 'user-invocable: "false"\n'],
+      ['false with a trailing comment', 'user-invocable: false  # internal\n'],
+      ['false in a CRLF file', 'user-invocable: false\r\n'],
+    ])('fails with -003 when the skill sets %s', (_label, extra) => {
+      replaceBetaCommandWithSkill(extra);
+      const result = runValidator(fixture);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(`${NOT_FOUND} named <plugin>:<skill>: beta:beta-setup`);
+    });
+
+    it('fails with -003 when the delegated entry names the skill without its plugin', () => {
+      replaceBetaCommandWithSkill('', { delegatedName: 'beta-setup' });
+      const result = runValidator(fixture);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(`${NOT_FOUND} named <plugin>:<skill>: beta-setup`);
+    });
+
+    it('does not resolve a generated codex copy of a skill', () => {
+      replaceBetaCommandWithSkill('user-invocable: false\n');
+      writeSkill(
+        join('beta', 'codex', 'skills', 'beta-setup'),
+        '---\nname: beta-setup\ndescription: fixture\n---\n\nBody.\n'
+      );
+      expect(runValidator(fixture).status).toBe(1);
+    });
+
+    it('accepts the same skill name in two plugins', () => {
+      for (const plugin of ['alpha', 'beta']) {
+        writeSkill(
+          join(plugin, 'skills', 'shared-helper'),
+          '---\nname: shared-helper\ndescription: fixture\n---\n\nBody.\n'
+        );
+      }
+      const result = runValidator(fixture);
+      expect(result.stderr).not.toContain('duplicate command names');
+      expect(result.status).toBe(0);
+    });
   });
 
   it('fails with -004 when dashboard and delegated order diverge', () => {

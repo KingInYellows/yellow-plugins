@@ -107,12 +107,11 @@ Graphite CLI feature). The same exactly-one-enabled pattern governs the
 `plugins/yellow-core/commands/setup/all.md` Step 2.5 and
 `plugins/yellow-core/lib/remote-agent-provider-state.js`).
 
-Observed on Claude Code 2.1.259: invoking the `Skill` tool with `smart-submit`
-or `gt-amend` (a command and a skill share each name) returned the thin
-command wrapper instead of the skill body. If that happens, read the
-installed `skills/<name>/SKILL.md` under
-`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/yellow-plugins/gt-workflow/<version>/`
-(or resolve `installPath` from `claude plugin list --json`) and follow it.
+A command and a skill in one plugin must not share a name (RULE 24): Claude
+Code 2.1.321 resolved such a pair to the command, leaving the skill body
+unreachable. gt-workflow therefore ships its entry points as user-invocable
+skills with no command files; invoke them from another plugin as
+`gt-workflow:<name>`.
 
 ### Conventional commits
 
