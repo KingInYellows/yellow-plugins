@@ -323,6 +323,20 @@ rule id in parentheses is what the failure message cites.
   same-named skill returns itself. Give a wrapper a different name from its
   skill (`ci:setup` and `ci-setup`), or ship a user-invocable skill with no
   command file, as gt-workflow does.
+- `disable-model-invocation: true` is for entry points only the user types
+  (RULE 25). Claude Code drops the description from the session listing and
+  the Skill tool refuses the entry point, so Claude does not run it by name,
+  including when the user asks in plain language. The key does not stop
+  Claude from reading the file or calling a CLI it wraps, so it is not a
+  safety gate. Before setting it, check that no other command, skill, agent
+  or hook needs the entry point, and that something the model still reads
+  tells it to ask the user to type it. RULE 25 errors when a flagged entry
+  point is a `skill:` target, an agent `skills:` preload, in the
+  `/setup:all` list or in the stack-operation registry, when a skill also
+  sets `user-invocable: false`, or when the value is not a boolean. It warns
+  when a file under a plugin's `hooks/` or the root `CLAUDE.md` names the
+  slash form. It does not check prose dispatches in command, skill or agent
+  bodies.
 - Every `description:` is single-line — no `>`, `|`, or wrapped strings.
   RULE 15d warns on skills, agents and commands. Prettier produces the wrapped
   form when it rewraps a long description, so put `# prettier-ignore` on the
