@@ -176,8 +176,8 @@ printf '%s' "$plugin_json" | node "$LIB" classify \
 Read `state` from the JSON.
 
 **`READY_GRAPHITE`** — the active provider is `gt-workflow`. Dispatch
-Graphite-owned work there (for example `/smart-submit`, `/gt-sync`,
-`/gt-stack-plan`).
+Graphite-owned work there (for example `/gt-workflow:smart-submit`, `/gt-workflow:gt-sync`,
+`/gt-workflow:gt-stack-plan`).
 
 **`READY_GITHUB`** — the active provider is `github-workflow`. Dispatch
 GitHub-owned work to its `github-stack:*` command surface (for example
@@ -214,7 +214,7 @@ Then give the one relevant next step:
 - `CONFLICT` → `/stack:select <provider>` to disable the other
 - `MANAGED_CONFLICT` → contact whoever controls managed settings; nothing
   local can fix it
-- `PARTIAL_TOOLING` → the enabled provider's setup command (`/gt-setup` or
+- `PARTIAL_TOOLING` → the enabled provider's setup command (`/gt-workflow:gt-setup` or
   `/github-stack:setup`)
 
 ### Step 3: Report the tooling caveat honestly
