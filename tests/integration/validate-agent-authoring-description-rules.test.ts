@@ -234,7 +234,7 @@ describe('validate-agent-authoring description rules', () => {
       expect(runBudget().status).toBe(0);
     });
 
-    it('skips commands with disable-model-invocation: true only', () => {
+    it('skips commands with a boolean disable-model-invocation: true only', () => {
       writeAgent(
         plugins,
         'alpha/commands/demo/hidden.md',
@@ -252,8 +252,11 @@ describe('validate-agent-authoring description rules', () => {
       );
       writeBaseline({ alpha: 20 });
       const { status, output } = runBudget();
-      expect(status).toBe(0);
+      expect(status).toBe(1);
       expect(output).toContain('Description budget: 20 chars');
+      expect(output).toContain(
+        'commands/demo/quoted.md: RULE 25 — `disable-model-invocation` must be the boolean'
+      );
     });
 
     it.each([
