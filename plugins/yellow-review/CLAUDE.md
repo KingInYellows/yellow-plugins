@@ -157,7 +157,7 @@ or written to the ledger. `tests/integration/review-gate-workflow.test.ts` runs
 the body in `node:vm` with stub agents; ESLint ignores `plugins/*/workflows/`
 because no parser accepts top-level `return` beside `export`.
 
-### Scripts (27)
+### Scripts (28)
 
 All live in `skills/pr-review-workflow/scripts/`; invoke as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes for
@@ -182,6 +182,11 @@ the resolve scripts: `references/resolve/dispositions.md`.
   machine-local `rule_pack_dirs`; prints nothing without packs. yellow-core's
   `lib/rule-pack-context.sh` is a byte-identical copy (`/flow:plan`,
   `--worktree`); `rule-pack-context.bats` fails when they differ
+- `settled-decisions-context` — the `(session-settled: …)` entries of the plan a
+  PR names in its body or commits under `plans/`, as a fenced block the
+  orchestrator alone reads in aggregation; P2/P3 `maintainability`/`docs`
+  findings that only re-argue an entry are set aside into Coverage, defects
+  never (`references/review-pr/settled-decisions.md`)
 - `check-merge-ready` — read-only `/review:merge-ready` gate combining the
   readers above with a PR-state and CI read and the ledger summary; exits 0
   ready, 1 blocked, 3 unknown. Its `approval` section (CLAUDE-234) runs

@@ -343,6 +343,11 @@ aggregation rules change there, propagate the same change here.
    9. **Confidence gate** — suppress below 75 except P0 ≥ 50, including
       the pre-existing set from step 5 (gated-out pre-existing findings
       count as suppressed, not listed under Pre-existing).
+   9a. **Settled decisions** (mirrors review-pr.md Step 6 sub-step 8a):
+      read `${CLAUDE_PLUGIN_ROOT}/references/review-pr/settled-decisions.md`
+      and follow it with this PR's diff base; set-aside findings skip the
+      partition, the fixes and the ledger, and go in this PR's Step 5
+      breakdown. If the Read fails, set nothing aside.
    10. **Partition** into safe_auto / residual / advisory queues.
    11. **Sort** (severity → anchor desc → file path → line).
 
@@ -440,6 +445,8 @@ Present per-PR breakdown:
 - PR number, title, branch
 - Findings count by severity (P0/P1/P2/P3)
 - Confidence-gated suppression count
+- Settled decisions line, when the PR's plan recorded any
+  (settled-decisions.md "Coverage")
 - Changes applied
 - Comments resolved
 - Restack status
