@@ -818,7 +818,8 @@ The positional ~250-char threshold above matters less for
 reached by agents that preload them via `skills:` frontmatter. Their
 descriptions still count toward RULE 23: only
 `disable-model-invocation: true` removes a description from the model's
-listing. Trim them only when the
+listing, and it also stops Claude from running the entry point by name
+(RULE 25 in `AGENTS.md` says what to check before setting it). Trim them only when the
 description has obvious documentation-style bloat (capability
 enumerations, methodology names, body-content repetition that the
 reader can recover from the skill body) — as the audit did for
