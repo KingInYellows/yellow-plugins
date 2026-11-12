@@ -12,13 +12,13 @@ Measured 2026-11-11 on one machine, Claude Code 2.1.322, from 51 workflow runs
 | Workflow | Runs | Active time (median / p90) | API calls | Subagents | Input | Cache write | Cache read | Output | Cost (median / p90 / max) | Subagent share |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `/review:pr` | 1 (0 typed, 1 model) | 57 min / 57 min | 453 | 42 | 960 | 3.55M | 110.86M | 196.2k | $40.31 / $40.31 / $40.31 | 28% |
-| `/review:pr` inside another workflow | 15 | 10 min / 32 min | 159 | 18 | 344 | 1.27M | 22.76M | 46.9k | $7.90 / $19.64 / $32.82 | 55% |
+| `/review:pr` inside another workflow | 15 | 10 min / 32 min | 159 | 18 | 344 | 1.27M | 22.64M | 45.2k | $7.88 / $19.72 / $32.95 | 54% |
 | `/review:resolve` | 7 (3 typed, 4 model) | 20 min / 40 min | 78 | 4 | 168 | 434.0k | 19.33M | 35.7k | $6.54 / $25.24 / $25.24 | 30% |
-| `/review:resolve` inside another workflow | 6 | 12 min / 18 min | 46 | 2 | 98 | 254.8k | 15.44M | 25.1k | $2.69 / $3.46 / $3.46 | 15% |
+| `/review:resolve` inside another workflow | 6 | 12 min / 18 min | 46 | 2 | 98 | 254.6k | 15.32M | 26.8k | $2.70 / $3.46 / $3.46 | 15% |
 | `/review:sweep` | 5 (1 typed, 4 model) | 9 min / 1.7 h | 146 | 15 | 310 | 1.10M | 12.71M | 22.8k | $6.51 / $42.00 / $42.00 | 53% |
 | `/flow:plan` | 7 (4 typed, 3 model) | 52 min / 9.9 h | 118 | 6 | 244 | 610.3k | 9.64M | 108.8k | $9.55 / $42.48 / $42.48 | 34% |
 | `/flow:work` | 7 (3 typed, 4 model) | 1.1 h / 3.5 h | 302 | 5 | 628 | 1.62M | 41.02M | 118.7k | $13.54 / $67.53 / $67.53 | 26% |
-| `/flow:work` inside another workflow | 3 | 39 min / 7.5 h | 120 | 11 | 268 | 835.9k | 34.61M | 106.1k | $14.81 / $19.73 / $19.73 | 19% |
+| `/flow:work` inside another workflow | 3 | 39 min / 7.5 h | 119 | 11 | 266 | 835.0k | 34.01M | 106.0k | $14.65 / $19.60 / $19.60 | 19% |
 
 Token columns and API calls are per-run medians. "Subagent share" is the part
 of the group's total cost spent in subagents. A row marked "inside another
@@ -103,7 +103,7 @@ and `claude_code.cost.usage` with `skill.name`, `plugin.name`, `agent.name` and
 That is per-skill attribution without transcript parsing. It was not used
 here because it records nothing about past sessions, needs a collector
 (console and OTLP exporters only; no file exporter is documented), reports
-plugin names outside the official marketplace as `third-party` unless
-`OTEL_LOG_TOOL_DETAILS=1` is set, and its cost figures are documented as
-approximations. It is the better source for a continuous record if one is
+third-party plugin and skill names as `third-party` unless
+`OTEL_LOG_TOOL_DETAILS=1` is set, so these workflows cannot be told apart
+without that setting, and its cost figures are documented as approximations. It is the better source for a continuous record if one is
 wanted later.

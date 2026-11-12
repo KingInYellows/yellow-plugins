@@ -75,7 +75,13 @@ function normalizeModel(model) {
 }
 
 function emptyTokens() {
-  return { input: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 };
+  return {
+    input: 0,
+    cacheWrite5m: 0,
+    cacheWrite1h: 0,
+    cacheRead: 0,
+    output: 0,
+  };
 }
 
 function usageTokens(usage) {
@@ -118,7 +124,13 @@ function usageCost(model, usage) {
 }
 
 function newBucket() {
-  return { calls: 0, tokens: emptyTokens(), costUsd: 0, unpricedCalls: 0, models: {} };
+  return {
+    calls: 0,
+    tokens: emptyTokens(),
+    costUsd: 0,
+    unpricedCalls: 0,
+    models: {},
+  };
 }
 
 function addUsage(bucket, model, usage) {
@@ -133,7 +145,8 @@ function addUsage(bucket, model, usage) {
 }
 
 function mergeBucket(into, from) {
-  for (const key of Object.keys(from.tokens)) into.tokens[key] += from.tokens[key];
+  for (const key of Object.keys(from.tokens))
+    into.tokens[key] += from.tokens[key];
   into.calls += from.calls;
   into.costUsd += from.costUsd;
   into.unpricedCalls += from.unpricedCalls;
@@ -162,7 +175,8 @@ async function eachRecord(file, onRecord) {
 function userText(content) {
   if (typeof content === 'string') return content;
   if (!Array.isArray(content)) return null;
-  if (content.some((block) => block && block.type === 'tool_result')) return null;
+  if (content.some((block) => block && block.type === 'tool_result'))
+    return null;
   return content
     .filter((block) => block && block.type === 'text')
     .map((block) => block.text || '')
@@ -179,7 +193,8 @@ const NON_PROMPT_PREFIX =
  * injected skill body, notification or other harness-written entry.
  */
 function humanPrompt(record) {
-  if (record.type !== 'user' || !record.message || record.isSidechain) return null;
+  if (record.type !== 'user' || !record.message || record.isSidechain)
+    return null;
   if (record.isMeta || record.isCompactSummary) return null;
   if (record.origin && record.origin.kind !== 'human') return null;
   const text = userText(record.message.content);
@@ -205,7 +220,15 @@ async function parseSession(file, seen) {
   let open = null;
   let nested = null;
   let lastTs = null;
-  let unowned = null; // usage of the response in progress, counted before a run opened
+  // The response being read. Its usage is charged when the next response,
+  // a human prompt or the end of the file arrives, to the run that was open
+  // at its last record, so the order of its content blocks does not matter.
+  let pending = null;
+  const flush = () => {
+    if (pending && pending.owner)
+      addUsage(pending.owner.lead, pending.model, pending.usage);
+    pending = null;
+  };
 
   const newRun = (record, workflow, trigger, ts, parent) => ({
     workflow,
@@ -245,21 +268,24 @@ async function parseSession(file, seen) {
     if (ts !== null && !Number.isNaN(ts)) lastTs = ts;
 
     if (record.type === 'system' && record.subtype === 'turn_duration') {
-      if (lastTs !== null && record.durationMs >= 0) turns.push([lastTs - record.durationMs, lastTs]);
+      if (lastTs !== null && record.durationMs >= 0)
+        turns.push([lastTs - record.durationMs, lastTs]);
       return;
     }
 
     const prompt = humanPrompt(record);
     if (prompt) {
+      flush();
       close(lastTs, 'prompt');
-      unowned = null;
       const duplicate = record.uuid && seen.promptUuids.has(record.uuid);
       if (record.uuid) seen.promptUuids.add(record.uuid);
-      if (prompt.workflow && !duplicate) start(record, prompt.workflow, 'typed', lastTs);
+      if (prompt.workflow && !duplicate)
+        start(record, prompt.workflow, 'typed', lastTs);
       return;
     }
 
-    if (record.type !== 'assistant' || !record.message || record.isSidechain) return;
+    if (record.type !== 'assistant' || !record.message || record.isSidechain)
+      return;
     const message = record.message;
     const blocks = Array.isArray(message.content) ? message.content : [];
 
@@ -269,9 +295,6 @@ async function parseSession(file, seen) {
         const workflow = canonicalWorkflow(block.input && block.input.skill);
         if (workflow && !open) {
           start(record, workflow, 'model', lastTs);
-          if (unowned && unowned.id === message.id) {
-            addUsage(open.lead, unowned.model, unowned.usage);
-          }
         } else if (workflow && workflow !== open.workflow) {
           closeNested(lastTs, 'next-workflow');
           nested = newRun(record, workflow, 'nested', lastTs, open);
@@ -283,13 +306,23 @@ async function parseSession(file, seen) {
 
     // One API response is written as one record per content block, each
     // repeating the same usage; count it once.
-    if (message.usage && message.id && !seen.messageIds.has(message.id)) {
-      seen.messageIds.add(message.id);
-      if (open) addUsage((nested || open).lead, message.model, message.usage);
-      else unowned = { id: message.id, model: message.model, usage: message.usage };
+    if (!message.usage || !message.id) return;
+    if (pending && pending.id === message.id) {
+      pending.owner = nested || open || pending.owner;
+      return;
     }
+    flush();
+    if (seen.messageIds.has(message.id)) return;
+    seen.messageIds.add(message.id);
+    pending = {
+      id: message.id,
+      model: message.model,
+      usage: message.usage,
+      owner: nested || open,
+    };
   });
 
+  flush();
   close(lastTs, 'eof');
   // Turn records can overlap (a turn that resumes while another is still
   // being timed), so merge them before measuring.
@@ -302,7 +335,9 @@ async function parseSession(file, seen) {
   }
   for (const run of runs) {
     run.activeMs = merged.reduce(
-      (total, [from, to]) => total + Math.max(0, Math.min(to, run.endTs) - Math.max(from, run.startTs)),
+      (total, [from, to]) =>
+        total +
+        Math.max(0, Math.min(to, run.endTs) - Math.max(from, run.startTs)),
       0
     );
   }
@@ -317,7 +352,8 @@ async function parseSubagent(file, seen) {
     if (record.type !== 'assistant' || !record.message) return;
     const message = record.message;
     for (const block of Array.isArray(message.content) ? message.content : []) {
-      if (block && block.type === 'tool_use' && block.id) toolUseIds.push(block.id);
+      if (block && block.type === 'tool_use' && block.id)
+        toolUseIds.push(block.id);
     }
     if (message.usage && message.id && !seen.messageIds.has(message.id)) {
       seen.messageIds.add(message.id);
@@ -341,7 +377,12 @@ async function attributeSubagents(sessionFile, toolUseOwner, seen) {
     if (!/^agent-.*\.jsonl$/.test(name)) continue;
     let meta = {};
     try {
-      meta = JSON.parse(fs.readFileSync(path.join(dir, name.replace(/\.jsonl$/, '.meta.json')), 'utf8'));
+      meta = JSON.parse(
+        fs.readFileSync(
+          path.join(dir, name.replace(/\.jsonl$/, '.meta.json')),
+          'utf8'
+        )
+      );
     } catch {
       // no metadata: the subagent cannot be tied to a tool call
     }
@@ -372,14 +413,21 @@ function findSessionFiles(projectsDir, projectFilters) {
   try {
     projects = fs.readdirSync(projectsDir, { withFileTypes: true });
   } catch (error) {
-    throw new Error(`cannot read projects directory ${projectsDir}: ${error.message}`);
+    throw new Error(
+      `cannot read projects directory ${projectsDir}: ${error.message}`
+    );
   }
   for (const project of projects) {
     if (!project.isDirectory()) continue;
-    if (projectFilters.length && !projectFilters.some((f) => project.name.includes(f))) continue;
+    if (
+      projectFilters.length &&
+      !projectFilters.some((f) => project.name.includes(f))
+    )
+      continue;
     const dir = path.join(projectsDir, project.name);
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isFile() && entry.name.endsWith('.jsonl')) files.push(path.join(dir, entry.name));
+      if (entry.isFile() && entry.name.endsWith('.jsonl'))
+        files.push(path.join(dir, entry.name));
     }
   }
   return files.sort();
@@ -416,7 +464,12 @@ function summarizeRun(run) {
   };
 }
 
-async function collectRuns({ projectsDir, projectFilters = [], since = null, until = null }) {
+async function collectRuns({
+  projectsDir,
+  projectFilters = [],
+  since = null,
+  until = null,
+}) {
   const seen = { messageIds: new Set(), promptUuids: new Set() };
   const runs = [];
   for (const file of findSessionFiles(projectsDir, projectFilters)) {
@@ -439,19 +492,30 @@ async function collectRuns({ projectsDir, projectFilters = [], since = null, unt
 function percentile(values, p) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(p * sorted.length) - 1))];
+  return sorted[
+    Math.min(sorted.length - 1, Math.max(0, Math.ceil(p * sorted.length) - 1))
+  ];
 }
 
 function aggregate(runs) {
   const rows = [];
-  for (const [workflow, scope] of WORKFLOWS.flatMap(([name]) => [[name, 'standalone'], [name, 'nested']])) {
+  for (const [workflow, scope] of WORKFLOWS.flatMap(([name]) => [
+    [name, 'standalone'],
+    [name, 'nested'],
+  ])) {
     const group = runs.filter(
-      (run) => run.workflow === workflow && (scope === 'nested') === (run.parent !== null)
+      (run) =>
+        run.workflow === workflow &&
+        (scope === 'nested') === (run.parent !== null)
     );
     if (scope === 'nested' && !group.length) continue;
     const stat = (pick) => {
       const values = group.map(pick);
-      return { median: percentile(values, 0.5), p90: percentile(values, 0.9), max: percentile(values, 1) };
+      return {
+        median: percentile(values, 0.5),
+        p90: percentile(values, 0.9),
+        max: percentile(values, 1),
+      };
     };
     const totalCost = group.reduce((sum, run) => sum + run.costUsd, 0);
     const subCost = group.reduce((sum, run) => sum + run.subagentCostUsd, 0);
@@ -470,7 +534,9 @@ function aggregate(runs) {
       calls: stat((run) => run.calls),
       subagents: stat((run) => run.subagentCount),
       input: stat((run) => run.tokens.input),
-      cacheWrite: stat((run) => run.tokens.cacheWrite5m + run.tokens.cacheWrite1h),
+      cacheWrite: stat(
+        (run) => run.tokens.cacheWrite5m + run.tokens.cacheWrite1h
+      ),
       cacheRead: stat((run) => run.tokens.cacheRead),
       output: stat((run) => run.tokens.output),
       costUsd: stat((run) => run.costUsd),
@@ -482,7 +548,9 @@ function aggregate(runs) {
   return rows;
 }
 
-/** Result objects of `claude -p --output-format json`, one row per file. */
+/**
+ * Result objects of `claude -p --output-format json`, one row per file.
+ */
 function readHeadless(paths) {
   const files = [];
   for (const target of paths) {
@@ -512,7 +580,10 @@ function readHeadless(paths) {
       }
     }
     const results = candidates.filter(
-      (value) => value && typeof value === 'object' && typeof value.total_cost_usd === 'number'
+      (value) =>
+        value &&
+        typeof value === 'object' &&
+        typeof value.total_cost_usd === 'number'
     );
     if (!results.length) continue;
     const tokens = emptyTokens();
@@ -520,7 +591,8 @@ function readHeadless(paths) {
       const t = usageTokens(result.usage || {});
       for (const key of Object.keys(t)) tokens[key] += t[key];
     }
-    const sum = (pick) => results.reduce((total, result) => total + (pick(result) || 0), 0);
+    const sum = (pick) =>
+      results.reduce((total, result) => total + (pick(result) || 0), 0);
     rows.push({
       label: path.basename(file).replace(/\.(json|jsonl)$/, ''),
       results: results.length,
@@ -554,18 +626,27 @@ function formatUsd(n) {
 
 function renderMarkdown(rows, headless) {
   const out = [];
-  out.push('| Workflow | Runs | Active time (median / p90) | API calls | Subagents | Input | Cache write | Cache read | Output | Cost (median / p90 / max) | Subagent share |');
+  out.push(
+    '| Workflow | Runs | Active time (median / p90) | API calls | Subagents | Input | Cache write | Cache read | Output | Cost (median / p90 / max) | Subagent share |'
+  );
   out.push('|---|---|---|---|---|---|---|---|---|---|---|');
   for (const row of rows) {
-    const name = row.scope === 'nested' ? `\`${row.workflow}\` inside another workflow` : `\`${row.workflow}\``;
+    const name =
+      row.scope === 'nested'
+        ? `\`${row.workflow}\` inside another workflow`
+        : `\`${row.workflow}\``;
     if (!row.runs) {
-      out.push(`| ${name} | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |`);
+      out.push(
+        `| ${name} | 0 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |`
+      );
       continue;
     }
     out.push(
       [
         `| ${name}`,
-        row.scope === 'nested' ? String(row.runs) : `${row.runs} (${row.typed} typed, ${row.modelInvoked} model)`,
+        row.scope === 'nested'
+          ? String(row.runs)
+          : `${row.runs} (${row.typed} typed, ${row.modelInvoked} model)`,
         `${formatDuration(row.activeSeconds.median)} / ${formatDuration(row.activeSeconds.p90)}`,
         row.calls.median,
         row.subagents.median,
@@ -574,13 +655,17 @@ function renderMarkdown(rows, headless) {
         formatTokens(row.cacheRead.median),
         formatTokens(row.output.median),
         `${formatUsd(row.costUsd.median)} / ${formatUsd(row.costUsd.p90)} / ${formatUsd(row.costUsd.max)}`,
-        row.subagentCostShare === null ? 'n/a' : `${Math.round(row.subagentCostShare * 100)}%`,
+        row.subagentCostShare === null
+          ? 'n/a'
+          : `${Math.round(row.subagentCostShare * 100)}%`,
       ].join(' | ') + ' |'
     );
   }
   if (headless.length) {
     out.push('');
-    out.push('| Headless run | Results | Errors | Turns | Duration | Input | Cache write | Cache read | Output | Reported cost |');
+    out.push(
+      '| Headless run | Results | Errors | Turns | Duration | Input | Cache write | Cache read | Output | Reported cost |'
+    );
     out.push('|---|---|---|---|---|---|---|---|---|---|');
     for (const row of headless) {
       out.push(
@@ -603,13 +688,23 @@ function renderMarkdown(rows, headless) {
 }
 
 function parseDate(value, flag) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) throw new Error(`${flag} needs a YYYY-MM-DD date`);
-  return Date.parse(`${value}T00:00:00Z`);
+  const ms = /^\d{4}-\d{2}-\d{2}$/.test(value || '')
+    ? Date.parse(`${value}T00:00:00Z`)
+    : NaN;
+  // Date.parse accepts some impossible dates by rolling them over.
+  if (Number.isNaN(ms) || new Date(ms).toISOString().slice(0, 10) !== value) {
+    throw new Error(`${flag} needs a real YYYY-MM-DD date, got ${value}`);
+  }
+  return ms;
 }
 
 function parseArgs(argv) {
   const options = {
-    projectsDir: path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'projects'),
+    projectsDir: path.join(
+      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'),
+      'projects'
+    ),
+    projectsDirGiven: false,
     projectFilters: [],
     since: null,
     until: null,
@@ -624,8 +719,10 @@ function parseArgs(argv) {
       if (i >= argv.length) throw new Error(`${arg} needs a value`);
       return argv[i];
     };
-    if (arg === '--projects-dir') options.projectsDir = value();
-    else if (arg === '--project') options.projectFilters.push(value());
+    if (arg === '--projects-dir') {
+      options.projectsDir = value();
+      options.projectsDirGiven = true;
+    } else if (arg === '--project') options.projectFilters.push(value());
     else if (arg === '--since') options.since = parseDate(value(), arg);
     else if (arg === '--until') options.until = parseDate(value(), arg);
     else if (arg === '--headless') options.headless.push(value());
@@ -638,7 +735,13 @@ function parseArgs(argv) {
 
 async function main(argv) {
   const options = parseArgs(argv);
-  const runs = await collectRuns(options);
+  // A machine that only holds headless results has no transcript store. A
+  // directory named with --projects-dir must still exist.
+  const noTranscripts =
+    options.headless.length > 0 &&
+    !options.projectsDirGiven &&
+    !fs.existsSync(options.projectsDir);
+  const runs = noTranscripts ? [] : await collectRuns(options);
   const rows = aggregate(runs);
   const headless = readHeadless(options.headless);
   if (options.json) {

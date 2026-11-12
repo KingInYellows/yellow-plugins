@@ -2,6 +2,7 @@
  * scripts/workflow-cost-baseline.js against synthetic transcripts. The record
  * shapes copy what Claude Code 2.1.322 writes; no real session is read.
  */
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -155,18 +156,27 @@ describe('run boundaries', () => {
         type: 'user',
         timestamp: at(2),
         origin: { kind: 'task-notification' },
-        message: { role: 'user', content: '<task-notification>done</task-notification>' },
+        message: {
+          role: 'user',
+          content: '<task-notification>done</task-notification>',
+        },
       },
       {
         type: 'user',
         timestamp: at(3),
-        message: { role: 'user', content: [{ type: 'tool_result', content: 'x' }] },
+        message: {
+          role: 'user',
+          content: [{ type: 'tool_result', content: 'x' }],
+        },
       },
       {
         type: 'user',
         timestamp: at(4),
         isMeta: true,
-        message: { role: 'user', content: [{ type: 'text', text: 'skill body' }] },
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'skill body' }],
+        },
       },
       assistant(5, 'm2', { output_tokens: 1 }),
     ]);
@@ -189,7 +199,11 @@ describe('run boundaries', () => {
 
     const [run] = await collect();
 
-    expect(run).toMatchObject({ workflow: '/review:pr', trigger: 'model', calls: 2 });
+    expect(run).toMatchObject({
+      workflow: '/review:pr',
+      trigger: 'model',
+      calls: 2,
+    });
     expect(run.tokens.output).toBe(9);
   });
 });
@@ -225,6 +239,25 @@ describe('nested workflows', () => {
       runs.find((run: { workflow: string }) => run.workflow === '/review:pr')
     ).toMatchObject({ trigger: 'nested', parent: '/review:sweep' });
   });
+
+  it('charges the response that starts a nested run to it, whatever the block order', async () => {
+    const usage = { output_tokens: 5 };
+    writeSession('s1', [
+      command(0, 'yellow-review:review:sweep'),
+      assistant(1, 'm1', usage, [{ type: 'text', text: 'reviewing' }]),
+      assistant(1, 'm1', usage, [
+        toolUse('t1', 'Skill', { skill: 'review:pr' }),
+      ]),
+    ]);
+
+    const runs = await collect();
+    const nested = runs.find(
+      (run: { workflow: string }) => run.workflow === '/review:pr'
+    );
+
+    expect(nested).toMatchObject({ calls: 1, parent: '/review:sweep' });
+    expect(nested.tokens.output).toBe(5);
+  });
 });
 
 describe('subagents', () => {
@@ -236,7 +269,13 @@ describe('subagents', () => {
       assistant(10, 'm2', { output_tokens: 1 }, [toolUse('t9', 'Agent', {})]),
     ]);
     writeSubagent('s1', 'a', 't1', [
-      assistant(2, 'a1', { output_tokens: 50 }, [toolUse('t2', 'Agent', {})], 'claude-sonnet-5-5'),
+      assistant(
+        2,
+        'a1',
+        { output_tokens: 50 },
+        [toolUse('t2', 'Agent', {})],
+        'claude-sonnet-5-5'
+      ),
     ]);
     writeSubagent('s1', 'b', 't2', [
       assistant(3, 'b1', { output_tokens: 7 }, undefined, 'claude-haiku-5-5'),
@@ -296,11 +335,16 @@ describe('usageCost', () => {
     const large = { input_tokens: 100_001, output_tokens: 0 };
 
     expect(baseline.usageCost('claude-haiku-5-5', small)).toBeCloseTo(0.01, 6);
-    expect(baseline.usageCost('claude-haiku-5-5', large)).toBeCloseTo(0.0500005, 6);
+    expect(baseline.usageCost('claude-haiku-5-5', large)).toBeCloseTo(
+      0.0500005,
+      6
+    );
   });
 
   it('returns null for a model with no listed price', () => {
-    expect(baseline.usageCost('some-new-model', { input_tokens: 1 })).toBeNull();
+    expect(
+      baseline.usageCost('some-new-model', { input_tokens: 1 })
+    ).toBeNull();
   });
 });
 
@@ -311,8 +355,20 @@ describe('readHeadless', () => {
       file,
       [
         'not json',
-        JSON.stringify({ total_cost_usd: 0.25, num_turns: 3, duration_ms: 4000, is_error: false, usage: { output_tokens: 10 } }),
-        JSON.stringify({ total_cost_usd: 0.5, num_turns: 1, duration_ms: 2000, is_error: true, usage: { output_tokens: 5 } }),
+        JSON.stringify({
+          total_cost_usd: 0.25,
+          num_turns: 3,
+          duration_ms: 4000,
+          is_error: false,
+          usage: { output_tokens: 10 },
+        }),
+        JSON.stringify({
+          total_cost_usd: 0.5,
+          num_turns: 1,
+          duration_ms: 2000,
+          is_error: true,
+          usage: { output_tokens: 5 },
+        }),
       ].join('\n')
     );
 
@@ -328,4 +384,43 @@ describe('readHeadless', () => {
     });
     expect(row.tokens.output).toBe(15);
   });
+});
+
+describe('command line', () => {
+  const run = (args: string[], configDir: string) =>
+    spawnSync(
+      process.execPath,
+      [resolve(ROOT, 'scripts/workflow-cost-baseline.js'), ...args],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, CLAUDE_CONFIG_DIR: configDir },
+      }
+    );
+
+  it('reports headless results on a machine with no transcript store', () => {
+    const file = join(dir, 'eval.json');
+    writeFileSync(file, JSON.stringify({ total_cost_usd: 1.5, num_turns: 2 }));
+
+    const result = run(['--headless', file], join(dir, 'no-such-config'));
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('| eval | 1 | 0 | 2 |');
+  });
+
+  it('fails when a named projects directory is missing', () => {
+    const result = run(['--projects-dir', join(dir, 'missing')], dir);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('cannot read projects directory');
+  });
+
+  it.each(['2026-13-01', '2026-02-30', 'yesterday'])(
+    'rejects the impossible date %s',
+    (date) => {
+      const result = run(['--since', date], dir);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('--since needs a real YYYY-MM-DD date');
+    }
+  );
 });
