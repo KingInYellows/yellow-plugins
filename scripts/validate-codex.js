@@ -70,6 +70,7 @@ const {
 const { isClaudeEnabled } = require('./lib/generate/emit-claude');
 const { isCodexEnabled, REF_FILE_RE } = require('./lib/generate/emit-codex');
 const { assertWithinRoot } = require('./lib/generate/write');
+const { isUserInvocableSkill } = require('./lib/skill-frontmatter');
 
 const DEFAULT_ROOT = resolve(__dirname, '..');
 const SCHEMAS_DIR_NAME = 'schemas';
@@ -454,20 +455,35 @@ function parseFrontmatterName(markdown) {
 }
 
 /**
- * Build the real Claude slash-command-name registry by reading every
- * plugin's commands/ directory (recursively) for each *.md file's
- * frontmatter `name:` field — the literal
- * invocation token (e.g. "ci:setup", "gt-amend") Claude Code slash-command
- * syntax refers to, independent of directory nesting depth.
+ * Build the real Claude slash-command-name registry: the frontmatter
+ * `name:` of every *.md under each plugin's commands/ directory
+ * (recursively) and of every user-invocable skills/<name>/SKILL.md. That
+ * name is the literal invocation token (e.g. "ci:setup", "gt-amend") Claude
+ * Code slash syntax refers to, independent of directory nesting depth.
  */
 function buildCommandNameRegistry(rootDir, pluginOrder) {
   const names = new Set();
   for (const name of pluginOrder) {
     const commandsDir = join(rootDir, 'plugins', name, 'commands');
-    if (!existsSync(commandsDir)) continue;
-    collectCommandNames(commandsDir, names);
+    if (existsSync(commandsDir)) collectCommandNames(commandsDir, names);
+    collectInvocableSkillNames(join(rootDir, 'plugins', name, 'skills'), names);
   }
   return names;
+}
+
+// A user-invocable skill is typed as `/name` too, so its name is a slash
+// command for the exposure lint (gt-workflow ships skills and no commands).
+function collectInvocableSkillNames(skillsDir, names) {
+  if (!existsSync(skillsDir)) return;
+  for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const skillPath = join(skillsDir, entry.name, 'SKILL.md');
+    if (!existsSync(skillPath)) continue;
+    const text = readFileSync(skillPath, 'utf8');
+    if (!isUserInvocableSkill(text)) continue;
+    const skillName = parseFrontmatterName(text);
+    if (skillName) names.add(skillName);
+  }
 }
 
 function collectCommandNames(dir, names) {

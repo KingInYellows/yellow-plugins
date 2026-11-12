@@ -1,7 +1,16 @@
 ---
 name: smart-submit
 description: 'Stage, audit, commit, and submit uncommitted changes via Graphite, with parallel code-review agents. Use when user says "submit this", "ship it", or "commit and push", or has uncommitted work to turn into a PR. Requires uncommitted changes — a clean, already-committed branch needs only gt submit; amending an already-submitted branch is the gt-amend skill.'
-user-invocable: false
+argument-hint: '[--amend] [--dry-run] [--no-verify] [--publish]'
+user-invocable: true
+allowed-tools:
+  - Bash
+  - Read
+  - Glob
+  - Grep
+  - Agent
+  - AskUserQuestion
+  - Skill
 ---
 
 ## What It Does
