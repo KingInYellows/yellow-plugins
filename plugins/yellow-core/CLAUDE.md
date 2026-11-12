@@ -203,7 +203,8 @@ field stays on the yellow-review personas that are re-dispatched across reviews.
 Background pipeline: the Stop hook writes a redacted pending entry, the
 SessionStart hook launches a disowned `claude -p` drain (`count >= 5` or
 oldest > 48h, `mkdir` `.drain-lock`, `COMPOUND_DRAIN_IN_PROGRESS=1` recursion
-guard, `--model haiku` unless `COMPOUND_DRAIN_MODEL` is set), and
+guard, `--model haiku` unless `COMPOUND_DRAIN_MODEL` is set,
+`--max-budget-usd 3.00` unless `COMPOUND_DRAIN_MAX_BUDGET_USD` is set), and
 `staging-reviewer` scores, filters, dedups and hands survivors to
 `staging-promoter`. `cs_stage_entry` is the second producer (used by
 yellow-review's `lib/stage-learning.sh`). `COMPOUND_JEV_PREFILTER=shadow` is an
@@ -287,7 +288,7 @@ PreCompact 3s (`catalog/plugins/yellow-core.json`).
   plain text, not `{"continue": true}`: Claude Code appends a PreCompact hook's
   stdout to the **main-session** compaction prompt on exit 0 (exit 2 blocks
   compaction). Subagent compactons (`agentContext` set) discard that stdout. It
-  carries the Claude 5-generation compaction-preservation instruction (plan
+  carries the compaction-preservation instruction (plan
   path + unchecked tasks, modified files, user decisions verbatim, open
   questions, last failing command, in-flight branch/PR names — every item
   secret-redacted then fenced as untrusted-content). Synchronous, no jq, well

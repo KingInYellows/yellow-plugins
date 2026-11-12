@@ -159,7 +159,9 @@ Three hooks run automatically once the plugin is enabled:
   queue, except while a yellow-review `/review:resolve` or sweep runs in the
   same checkout (the drain's files would trip its ignored-file stop). The drain runs on Haiku; set `COMPOUND_DRAIN_MODEL` to `sonnet`,
   `opus`, or a full `claude-<id>` to change it. Any other value is logged and
-  ignored (the drain stays on Haiku). Each drain writes a log to
+  ignored (the drain stays on Haiku). Each drain is capped at 3.00 USD of
+  API-equivalent cost (`COMPOUND_DRAIN_MAX_BUDGET_USD` changes the cap). Each
+  drain writes a log, with a `drain cost_usd=` line, to
   `~/.claude/projects/<slug>/compound-staging/drain-logs/`. A log line
   `WARNING drain left all <n> dispatched entries` means the drain never
   handed the queue to `staging-reviewer`. Those entries are retried but

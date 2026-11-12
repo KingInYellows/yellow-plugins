@@ -228,6 +228,16 @@ Use this when:
    # while no drain work actually ran. Mirrors session-start.sh.
    DRAIN_TIMEOUT_BIN=$(command -v timeout 2>/dev/null || true)
 
+   # Same model pin and dollar cap as session-start.sh. A rejected
+   # override falls back to the default and is logged without the value.
+   if ! DRAIN_MODEL=$(cs_drain_model); then
+     printf '[compound:review-staged] COMPOUND_DRAIN_MODEL rejected; using haiku\n' >> "$DRAIN_LOG" 2>/dev/null
+   fi
+   if ! DRAIN_BUDGET_USD=$(cs_drain_max_budget_usd); then
+     printf '[compound:review-staged] COMPOUND_DRAIN_MAX_BUDGET_USD rejected; using %s\n' \
+       "$DRAIN_BUDGET_USD" >> "$DRAIN_LOG" 2>/dev/null
+   fi
+
    # Export STAGING_DIR before the subshell so the EXIT trap can read it
    # by name (not by definition-time interpolation). The previous form
    # baked the path into a single-quoted string, so any `"` in the path
@@ -253,17 +263,22 @@ Use this when:
      if [ -n "$DRAIN_TIMEOUT_BIN" ]; then
        "$DRAIN_TIMEOUT_BIN" --preserve-status "${COMPOUND_DRAIN_TIMEOUT_S}s" \
          "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+         --model "$DRAIN_MODEL" \
+         --max-budget-usd "$DRAIN_BUDGET_USD" \
          --max-turns 50 \
          --permission-mode bypassPermissions \
          --output-format json \
          >> "$DRAIN_LOG" 2>&1
      else
        "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+         --model "$DRAIN_MODEL" \
+         --max-budget-usd "$DRAIN_BUDGET_USD" \
          --max-turns 50 \
          --permission-mode bypassPermissions \
          --output-format json \
          >> "$DRAIN_LOG" 2>&1
      fi
+     cs_drain_cost_line "$DRAIN_LOG" >> "$DRAIN_LOG" 2>/dev/null
      cs_update_drain_budget "$STAGING_DIR" "$AUTH_ROUTE" || true
    ) >/dev/null 2>&1 &
    disown

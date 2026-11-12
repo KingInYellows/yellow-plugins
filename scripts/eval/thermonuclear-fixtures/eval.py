@@ -349,7 +349,7 @@ def smoke_claude(args):
     tools = "Agent,Read,Grep,Glob"
     out = subprocess.run(  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
         ["claude", "-p", "--setting-sources", "", "--strict-mcp-config", *plugins, "--model", args.model,
-         "--tools", tools, "--allowedTools", tools, "--output-format", "json", "--no-session-persistence",
+         "--max-budget-usd", os.environ.get("EVAL_MAX_BUDGET_USD", "5"), "--tools", tools, "--allowedTools", tools, "--output-format", "json", "--no-session-persistence",
          prompt], cwd=cwd, capture_output=True, text=True, timeout=900, check=False)
     write(os.path.join(work, "smoke-claude.json"), out.stdout)
     reply = parse(json.loads(out.stdout or "{}").get("result")) or {}

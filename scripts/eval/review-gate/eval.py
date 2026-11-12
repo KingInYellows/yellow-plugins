@@ -363,17 +363,29 @@ def headless_cmd(row, work, claude="claude"):
         sys.exit("run: work dir %s has a comma, parenthesis or space" % prompts)
     with open(row["args"], encoding="utf-8") as handle:
         args = handle.read()
-    return headless_argv(claude, row["model"], prompts, REPO, args.strip())
+    return headless_argv(claude, row["model"], prompts, REPO, args.strip(), budget=max_budget_usd())
 
 
-def headless_argv(claude, model, prompts, repo, args):
+def max_budget_usd():
+    """Runaway stop for one row, in API-equivalent USD. The dearest row of the
+    2026-11-09 run cost 13.29, so the default leaves room above it."""
+    value = os.environ.get("REVIEW_GATE_MAX_BUDGET_USD", "25")
+    if not re.fullmatch(r"\d+(\.\d+)?", value) or float(value) <= 0:
+        sys.exit("REVIEW_GATE_MAX_BUDGET_USD must be a positive decimal")
+    return value
+
+
+def headless_argv(claude, model, prompts, repo, args, budget=None):
     """The argv itself. row_fingerprint hashes it with placeholders, so any
-    flag added or changed here reruns every row."""
+    flag added or changed here reruns every row. `budget` is the exception:
+    row_fingerprint leaves it out, because a cap that is not hit changes
+    nothing about the run, and a run that hits it is an error row."""
     allowed = ",".join(["Workflow(%s)" % WORKFLOW, "Read(./**)", "Grep(./**)", "Glob(./**)",
                         "Read(/%s/**)" % prompts])
     plugins = [x for name in PLUGINS for x in ("--plugin-dir", os.path.join(repo, "plugins", name))]
+    cap = ["--max-budget-usd", budget] if budget else []
     return [claude, "-p", "--setting-sources", "", "--strict-mcp-config", *plugins,
-            "--model", model, "--permission-mode", "dontAsk",
+            "--model", model, *cap, "--permission-mode", "dontAsk",
             "--allowedTools", allowed, "--disallowedTools", DENIED_TOOLS,
             "--output-format", "json", PROMPT.format(workflow=WORKFLOW, args=args)]
 

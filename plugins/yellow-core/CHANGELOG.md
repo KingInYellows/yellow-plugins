@@ -1,5 +1,47 @@
 # Changelog
 
+## 2.15.0
+
+### Minor Changes
+
+- [#1721](https://github.com/KingInYellows/yellow-plugins/pull/1721)
+  [`06cfdfa`](https://github.com/KingInYellows/yellow-plugins/commit/06cfdfa4f5ad52f07257904b7ea61cdd2b4de07f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/flow:work`
+  runs a simplify pass at the end of Phase 3, before Ship It (CLAUDE-214). It
+  dispatches `code-simplifier` plus two new yellow-review agents,
+  `test-value-reviewer` and `comment-reviewer` (code files only), on what the
+  branch added or changed, applies their fixes without asking, deletes a test
+  only after running it green, and skips docs- and Markdown-only diffs with
+  "nothing to simplify". `/review:pr` never selects the new agents, and its Step
+  8 code-simplifier pass is unchanged.
+
+- [#1732](https://github.com/KingInYellows/yellow-plugins/pull/1732)
+  [`81e3dad`](https://github.com/KingInYellows/yellow-plugins/commit/81e3dad8aff2ea10c96bb9f957796e974ab3f5cd)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rule packs
+  (CLAUDE-211): team rules in `rule-packs/<id>/*.md` with `title` and
+  `applies_when` frontmatter. `/review:pr` reads them from the PR's base branch
+  and gives them, fenced as reference only, to `project-standards-reviewer`,
+  which reports contradictions citing `(pack: <id>, <file>)` and caps them at P2
+  unless the rule names a concrete consequence. `/flow:plan` adds the packs to
+  `learnings-researcher`'s search. Machine-local packs come from
+  `rule_pack_dirs` in a user-level or untracked `yellow-plugins.local.md`.
+  Repositories without packs behave as before.
+
+- [#1729](https://github.com/KingInYellows/yellow-plugins/pull/1729)
+  [`1661347`](https://github.com/KingInYellows/yellow-plugins/commit/1661347e64130bf1c3dccb4ce4f46326328412ed)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Settled
+  decisions carry across the flow workflow (CLAUDE-212). A decision the user
+  made with a tradeoff in view is recorded as
+  `(session-settled: user-directed|user-approved — chosen over <alternative>: <reason>)`
+  in brainstorm docs, specs, plans and shells, so later steps build on it
+  instead of reopening it. `/flow:plan` collects them from the brainstorm doc, a
+  `Settled decisions:` block in its arguments, or the conversation, grades any
+  contradicting research, and with the new `--non-interactive` flag writes no
+  plan and returns `settled-decision-invalidated` when one cannot work.
+  `/flow:work` stops and asks instead of switching away from one silently. The
+  protocol, adapted from Compound Engineering, is
+  `references/flow-plan/settled-decisions.md`.
+
 ## 2.14.0
 
 ### Minor Changes
