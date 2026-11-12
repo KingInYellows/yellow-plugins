@@ -409,7 +409,9 @@ Frontmatter rules the validator checks: kebab-case `name`, a **single-line**
 `user-invocable` key spelled with a `c` (RULE 20 — Claude Code ignores
 `user-invokable`), the three standard headings (RULE 15b), and under 500 lines
 (RULE 15a). Set `user-invocable: false` for internal reference skills that
-only agents and commands load.
+only agents and commands load. Descriptions count toward the plugin's
+character budget (RULE 23): after adding a skill, command or agent, run
+`pnpm update:description-baseline` and commit the baseline file.
 
 ```markdown
 ---
