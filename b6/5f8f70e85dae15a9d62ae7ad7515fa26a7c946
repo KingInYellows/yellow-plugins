@@ -1,0 +1,19 @@
+plans/claude-code-quality-and-cost-roadmap.md
+  s_4df8fdefd00c88::t_dfa3a2bcf24a8c 150,155-157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b65f8f70e85dae15a9d62ae7ad7515fa26a7c946",
+  "prompts": {},
+  "sessions": {
+    "s_4df8fdefd00c88": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "af30770c-3f7c-441e-95c7-1c6b0f027d44",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
