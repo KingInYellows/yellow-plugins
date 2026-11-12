@@ -1,0 +1,23 @@
+{
+  "id": "1610-fork-policy-origin",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1610,
+  "base": "15cbb5d1e590a607e9d640ee895342440a9ecc79",
+  "head": "6e10f6531c53ae53e590d218c808e51d2676b1c1",
+  "lane": "security",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "plugins/yellow-review/commands/review/review-pr.md",
+      "line": 195,
+      "match": [
+        "origin|fork|remote",
+        "polic|tier|default.?branch|upstream|base.?repo"
+      ]
+    }
+  ],
+  "source": "fix #1652 (5c98e4f): Step 3a2 fetched the risk policy's default branch from origin, so in a fork checkout the fork owner controlled the displayed tier",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-12",
+  "notes": "The same pattern reached resolve-pr.md through #1629 (371faf3, lines 878-917); that is not a separate golden entry here."
+}

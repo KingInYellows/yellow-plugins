@@ -1,0 +1,22 @@
+{
+  "id": "1612-dismissal-line-scope",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1612,
+  "base": "6e10f6531c53ae53e590d218c808e51d2676b1c1",
+  "head": "8c283de91496686e598899a3afc959eddbe530db",
+  "lane": "correctness",
+  "tier": "medium",
+  "golden": [
+    {
+      "file": "plugins/yellow-review/workflows/review-gate.js",
+      "line": 633,
+      "match": [
+        "dismiss",
+        "line|scope|map|moved|shift|head"
+      ]
+    }
+  ],
+  "source": "fix #1632 (98fca15): dismissalMatches compared a dismissal's recorded line with the finding's head line instead of the head-mapped line, and a dismissal from one scope could drop a finding in another",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-12"
+}

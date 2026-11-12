@@ -1,0 +1,22 @@
+{
+  "id": "1704-draft-after-push",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1704,
+  "base": "e31af4926180264f50dd067688c7dc7e5894f138",
+  "head": "253aebe56316a0f53ca9a5adcd05d70d767f84ad",
+  "lane": "correctness",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes",
+      "line": 1842,
+      "match": [
+        "draft|ready --undo",
+        "after|before|order|push|exit|fail|ready"
+      ]
+    }
+  ],
+  "source": "fix #1710 (6388d45): --over-cap-draft converted the PR to draft only after the push and the post-push checks, so a push that landed but then failed a check (exit 5/6) left an over-cap fix on a ready PR",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-12"
+}
