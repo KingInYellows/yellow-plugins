@@ -1,0 +1,19 @@
+CHANGELOG.md
+  s_4df8fdefd00c88::t_268301c96e99f0 16-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "001160ff3ccdeda4ed140a6684158c8ef6d62502",
+  "prompts": {},
+  "sessions": {
+    "s_4df8fdefd00c88": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "af30770c-3f7c-441e-95c7-1c6b0f027d44",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
