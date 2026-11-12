@@ -1,0 +1,23 @@
+{
+  "id": "1649-maskcode-wrapped-span",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1649,
+  "base": "4af3eebaccea1984e410d3ff9fe871d75b9dd709",
+  "head": "95bd69a339e114aad848639f2392d1b31bef2787",
+  "lane": "correctness",
+  "tier": "high",
+  "golden": [
+    {
+      "file": "scripts/lib/doc-claims.js",
+      "line": 182,
+      "match": [
+        "backtick|inline code|code span|maskInlineCode|maskCode",
+        "wrap|multi.?line|across|next line|per.?line|one line|line by line|each line"
+      ]
+    }
+  ],
+  "source": "fix #1671 (bc70aaf): maskCode masked inline code one line at a time, so an inline code span that wrapped onto the next line stayed unmasked and raised a false SOL-003",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-12",
+  "notes": "Second defect from #1649; the first is 1649-runs-checkout-validator, which runs on an intermediate PR head. This one uses the merged squash commit."
+}

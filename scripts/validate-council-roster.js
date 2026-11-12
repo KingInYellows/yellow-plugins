@@ -250,6 +250,9 @@ function ledgerExcluded(rel) {
   // Changelogs are append-only history; their reviewer counts record past
   // states and are correct as written.
   if (path.basename(rel) === 'CHANGELOG.md') return true;
+  // Weekly review-gate eval results quote reviewer output verbatim; like the
+  // model-swap fixtures they are dated records of what ran.
+  if (/^scripts\/eval\/review-gate\/results-[^/]+\.md$/.test(rel)) return true;
   // Generated from catalog/ — editing them is never the fix.
   if (rel.includes('.claude-plugin/')) return true;
   return LEDGER_EXCLUDED_DIRS.some((x) => rel === x || rel.startsWith(`${x}/`));
