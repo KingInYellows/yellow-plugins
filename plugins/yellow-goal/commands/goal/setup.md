@@ -1,9 +1,7 @@
 ---
 name: goal:setup
-description:
-  'Probe the pinned goal-gen engine (version --json) and fail closed on missing
-  binary or version mismatch. Use when first installing yellow-goal or when
-  /goal:request fails with GOAL_ENGINE_MISSING / GOAL_ENGINE_VERSION_MISMATCH.'
+# prettier-ignore
+description: 'Probe the pinned goal-gen engine (version --json) and fail closed on missing binary or version mismatch. Use when first installing yellow-goal or when /goal:request fails with GOAL_ENGINE_MISSING / GOAL_ENGINE_VERSION_MISMATCH.'
 argument-hint: ''
 allowed-tools:
   - Bash
