@@ -208,6 +208,62 @@ describe('run boundaries', () => {
   });
 });
 
+describe('copied history', () => {
+  it('gives a forked session a run holding only the responses it added', async () => {
+    const prompt = { ...command(0, 'yellow-core:flow:work'), uuid: 'same' };
+    const first = assistant(1, 'm1', { output_tokens: 10 });
+    writeSession('a', [prompt, first]);
+    writeSession('b', [
+      prompt,
+      first,
+      assistant(2, 'm2', { output_tokens: 3 }),
+    ]);
+    writeSession('c', [prompt, first]);
+
+    const runs = await collect();
+
+    expect(
+      runs.map((run: { tokens: { output: number } }) => run.tokens.output)
+    ).toEqual([10, 3]);
+  });
+});
+
+describe('unpriced models', () => {
+  it('says in the report that costs are incomplete', async () => {
+    writeSession('s1', [
+      command(0, 'yellow-core:flow:plan'),
+      assistant(
+        1,
+        'm1',
+        { output_tokens: 1_000_000 },
+        undefined,
+        'some-new-model'
+      ),
+    ]);
+
+    const report = baseline.renderMarkdown(
+      baseline.aggregate(await collect()),
+      []
+    );
+
+    expect(report).toContain('Costs are incomplete: 1 response(s)');
+  });
+
+  it('adds no note when every model is priced', async () => {
+    writeSession('s1', [
+      command(0, 'yellow-core:flow:plan'),
+      assistant(1, 'm1', { output_tokens: 1 }),
+    ]);
+
+    const report = baseline.renderMarkdown(
+      baseline.aggregate(await collect()),
+      []
+    );
+
+    expect(report).not.toContain('Costs are incomplete');
+  });
+});
+
 describe('nested workflows', () => {
   it('reports a nested run on its own and inside its parent', async () => {
     writeSession('s1', [

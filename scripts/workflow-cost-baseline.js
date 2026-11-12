@@ -277,10 +277,11 @@ async function parseSession(file, seen) {
     if (prompt) {
       flush();
       close(lastTs, 'prompt');
-      const duplicate = record.uuid && seen.promptUuids.has(record.uuid);
-      if (record.uuid) seen.promptUuids.add(record.uuid);
-      if (prompt.workflow && !duplicate)
-        start(record, prompt.workflow, 'typed', lastTs);
+      // A forked or resumed session copies earlier prompts into a new file.
+      // The copy opens a run too: responses already counted are skipped by
+      // message id, so it holds only what the new file added, and a copy
+      // that added nothing has no responses and is dropped.
+      if (prompt.workflow) start(record, prompt.workflow, 'typed', lastTs);
       return;
     }
 
@@ -470,7 +471,7 @@ async function collectRuns({
   since = null,
   until = null,
 }) {
-  const seen = { messageIds: new Set(), promptUuids: new Set() };
+  const seen = { messageIds: new Set() };
   const runs = [];
   for (const file of findSessionFiles(projectsDir, projectFilters)) {
     const { runs: sessionRuns, toolUseOwner } = await parseSession(file, seen);
@@ -659,6 +660,13 @@ function renderMarkdown(rows, headless) {
           ? 'n/a'
           : `${Math.round(row.subagentCostShare * 100)}%`,
       ].join(' | ') + ' |'
+    );
+  }
+  const unpriced = rows.reduce((sum, row) => sum + row.unpricedCalls, 0);
+  if (unpriced) {
+    out.push('');
+    out.push(
+      `Costs are incomplete: ${unpriced} response(s) came from a model with no listed price. Their tokens are counted; their cost is not.`
     );
   }
   if (headless.length) {
