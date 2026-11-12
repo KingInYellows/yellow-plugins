@@ -256,6 +256,21 @@ const DURABLE_BAR_FILES = [
 // holds for a `user-invocable: false` skill too (observed on 2.1.321), so
 // the rule has no exemption for one.
 //
+// RULE 25 — `disable-model-invocation`. With the key set to true, Claude
+// Code drops the entry point's description from the session listing and the
+// Skill tool refuses it; only a typed `/name` runs it (probed on 2.1.322).
+// ERROR when an entry point with the key is dispatched by name (a `skill:`
+// value, an agent `skills:` preload, the /setup:all delegated list or the
+// stack-operation registry), when a skill sets it with
+// `user-invocable: false` (nothing could reach it), or when the value is not
+// a boolean (RULE 23 counts anything but boolean true). ADVISORY when a file
+// under a plugin's hooks/ directory, or the root CLAUDE.md, names the entry
+// point's slash form (a skill's qualified form only), because the model reads
+// those and could not act on them. Only these structured forms are checked:
+// prose in a command, skill or agent body that tells the model to run a
+// flagged entry point is not caught, and the key does not stop Claude from
+// reading the file or calling a CLI it wraps.
+//
 // RULE 15 (a–d) — authoring lint, ALL warning-tier: 15a–c on SKILL.md, 15d
 // (single-line description) on SKILL.md, agents and commands. AGENTS.md and
 // the root CLAUDE.md document these skill-authoring conventions but until
@@ -482,6 +497,13 @@ const taskBarewordPattern = /\b(Task|Agent)\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 // the checks). The CommonMark fence model lives in scripts/lib/markdown-fences.js
 // so the shell-compat validators extract exactly the blocks this one strips.
 const { stripFencedContent } = require('./lib/markdown-fences');
+const {
+  DELEGATED_START,
+  DELEGATED_END,
+  extractMarkedSection,
+  parseDelegatedCommands,
+} = require('./lib/setup-all-list');
+const { isUserInvocableSkill } = require('./lib/skill-frontmatter');
 
 // Map final agent-name segment → Set of fully-qualified 3-segment refs.
 // The colon-less/bareword checks gate on registry membership (RULE 13
@@ -1807,6 +1829,207 @@ function validateCommandSkillNameCollisions(commandFiles, skillFiles, errors) {
   }
 }
 
+// RULE 25 — disable-model-invocation (see the constant block above).
+const MODEL_INVOCATION_KEY = 'disable-model-invocation';
+
+function pluginOf(filePath) {
+  return path.relative(PLUGINS_DIR, filePath).split(path.sep)[0];
+}
+
+// Every entry point that sets the key to true: a command by its `name:`, a
+// skill by `<plugin>:<name>`.
+function collectModelInvocationDisabled(commandFiles, skillFiles, errors) {
+  const disabled = new Map();
+  const read = (filePath) => {
+    const data = parseFrontmatter(
+      extractFrontmatter(fs.readFileSync(filePath, 'utf8'))
+    );
+    if (!data || !(MODEL_INVOCATION_KEY in data)) return null;
+    const value = data[MODEL_INVOCATION_KEY];
+    if (typeof value !== 'boolean') {
+      errors.push(
+        `${relative(filePath)}: RULE 25 — \`${MODEL_INVOCATION_KEY}\` must be ` +
+          `the boolean true or false, not ${JSON.stringify(value)}. Only a ` +
+          `boolean true hides the description and leaves the RULE 23 budget.`
+      );
+      return null;
+    }
+    return value ? data : null;
+  };
+  for (const filePath of commandFiles) {
+    const data = read(filePath);
+    if (!data) continue;
+    // A command with no `name:` is named after its path under commands/, as
+    // in RULE 24.
+    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
+    const name =
+      typeof data.name === 'string' && data.name.trim()
+        ? data.name.trim()
+        : parts
+            .slice(parts.indexOf('commands') + 1)
+            .join(':')
+            .replace(/\.md$/, '');
+    disabled.set(name, filePath);
+  }
+  for (const filePath of skillFiles) {
+    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
+    // skills/<name>/SKILL.md only: codex/ and cursor/ copies keep no such key.
+    if (parts.length !== 4 || parts[1] !== 'skills') continue;
+    const data = read(filePath);
+    if (!data) continue;
+    if (!isUserInvocableSkill(fs.readFileSync(filePath, 'utf8'))) {
+      errors.push(
+        `${relative(filePath)}: RULE 25 — sets \`${MODEL_INVOCATION_KEY}: true\` ` +
+          `and \`user-invocable: false\`, so neither the model nor the user ` +
+          `can reach it. Remove one of them.`
+      );
+    }
+    const name = typeof data.name === 'string' ? data.name.trim() : parts[2];
+    disabled.set(`${parts[0]}:${name}`, filePath);
+  }
+  return disabled;
+}
+
+function validateModelInvocationFlag(files, errors, warnings) {
+  const { commandFiles, skillFiles, agentFiles, markdownFiles } = files;
+  const disabled = collectModelInvocationDisabled(
+    commandFiles,
+    skillFiles,
+    errors
+  );
+  if (disabled.size === 0) return;
+
+  const report = (callerLabel, how, target, plugin) => {
+    // A bare skill name resolves within the caller's own plugin.
+    const targetPath =
+      disabled.get(target) || (plugin && disabled.get(`${plugin}:${target}`));
+    if (!targetPath) return;
+    errors.push(
+      `${callerLabel}: RULE 25 — ${how} "${target}", but ` +
+        `${relative(targetPath)} sets \`${MODEL_INVOCATION_KEY}: true\`. The ` +
+        `Skill tool refuses such an entry point, so this dispatch fails. ` +
+        `Either drop the dispatch and tell the user to type the entry point, ` +
+        `or, if it must be dispatchable, remove the key from the target.`
+    );
+  };
+
+  for (const filePath of markdownFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const fmBlock = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+    const body = fmBlock ? content.slice(fmBlock[0].length) : content;
+    const seen = new Set();
+    for (const match of stripFencedContent(body, {
+      stripFrontmatter: false,
+    }).matchAll(SKILL_DISPATCH_VALUE_RE)) {
+      const value = match[1] !== undefined ? match[1] : match[2];
+      if (seen.has(value)) continue;
+      seen.add(value);
+      report(relative(filePath), 'dispatches `skill:`', value, pluginOf(filePath));
+    }
+  }
+
+  for (const filePath of agentFiles) {
+    const frontmatter = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
+    if (!frontmatter) continue;
+    for (const skill of parseList(frontmatter, 'skills')) {
+      report(relative(filePath), 'preloads the skill', skill, pluginOf(filePath));
+    }
+  }
+
+  const setupAllPath = path.join(
+    PLUGINS_DIR,
+    'yellow-core',
+    'commands',
+    'setup',
+    'all.md'
+  );
+  if (fs.existsSync(setupAllPath)) {
+    const section = extractMarkedSection(
+      fs.readFileSync(setupAllPath, 'utf8'),
+      DELEGATED_START,
+      DELEGATED_END
+    );
+    if (section === null) {
+      errors.push(
+        `${relative(setupAllPath)}: RULE 25 — cannot find the ` +
+          `delegated-commands markers, so setup delegation was not checked.`
+      );
+    }
+    for (const name of section ? parseDelegatedCommands(section) : []) {
+      report(relative(setupAllPath), 'delegates setup to', name, null);
+    }
+  }
+
+  const registryPath = path.join(
+    PLUGINS_DIR,
+    'yellow-core',
+    'lib',
+    'stack-operation-registry.js'
+  );
+  if (fs.existsSync(registryPath)) {
+    const visit = (node) => {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'command' && node.plugin && node.ref) {
+        report(relative(registryPath), 'routes an operation to', node.ref, node.plugin);
+        return;
+      }
+      for (const child of Object.values(node)) visit(child);
+    };
+    let registry = null;
+    try {
+      registry = require(registryPath);
+    } catch (e) {
+      errors.push(
+        `${relative(registryPath)}: RULE 25 — cannot load the stack-operation ` +
+          `registry (${String(e.message).split('\n')[0]}), so its targets ` +
+          `were not checked.`
+      );
+    }
+    if (registry) {
+      if (!registry.OPERATIONS || typeof registry.OPERATIONS !== 'object') {
+        errors.push(
+          `${relative(registryPath)}: RULE 25 — the registry exports no ` +
+            `OPERATIONS object, so its targets were not checked.`
+        );
+      }
+      visit(registry.OPERATIONS);
+      visit(registry.PRIMITIVES);
+    }
+  }
+
+  const modelFacing = [
+    ...walk(
+      PLUGINS_DIR,
+      (filePath) =>
+        path.relative(PLUGINS_DIR, filePath).split(path.sep)[1] === 'hooks'
+    ),
+    path.join(path.dirname(PLUGINS_DIR), 'CLAUDE.md'),
+  ];
+  for (const filePath of modelFacing) {
+    let text;
+    try {
+      text = fs.readFileSync(filePath, 'utf8');
+    } catch (e) {
+      if (e.code !== 'ENOENT') {
+        warnings.push(
+          `[RULE 25 advisory] ${relative(filePath)}: not scanned (${e.code || e.name}).`
+        );
+      }
+      continue;
+    }
+    for (const name of disabled.keys()) {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (new RegExp(`(?<![\\w./:-])/${escaped}(?![\\w:-])`).test(text)) {
+        warnings.push(
+          `[RULE 25 advisory] ${relative(filePath)}: names \`/${name}\`, which ` +
+            `sets \`${MODEL_INVOCATION_KEY}: true\`. The model reads this file ` +
+            `and cannot run that entry point; say that the user must type it.`
+        );
+      }
+    }
+  }
+}
+
 // RULE 21 — command/agent line ceilings (see the constant block above for the
 // rationale). Warning tier; the message names the remedy the repo already
 // uses (references/ offload behind an imperative load stub) plus the
@@ -2123,6 +2346,11 @@ function main() {
   validateSkillFiles(skillFiles, { errors, warnings });
   validateCommandDescriptions(commandFiles, errors, warnings);
   validateCommandSkillNameCollisions(commandFiles, skillFiles, errors);
+  validateModelInvocationFlag(
+    { commandFiles, skillFiles, agentFiles, markdownFiles },
+    errors,
+    warnings
+  );
   validateSizeCeilings(commandFiles, agentFiles, warnings);
   validateMemoryProtocolSentinel(markdownFiles, errors);
   validateDurableBar(markdownFiles, errors);
