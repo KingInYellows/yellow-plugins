@@ -147,12 +147,14 @@ Each initiative lists its check. "Gate" means the eval gate applies.
 
 ### T0 — Baseline and measurement
 
-- [ ] **R0.1 Per-workflow cost baseline.** A script that turns session
+- [x] **R0.1 Per-workflow cost baseline.** A script that turns session
   transcripts and `claude -p --output-format json` output into a table of
   tokens, duration and cost per workflow. Check: one committed table for the
   five most-used workflows (`/review:pr`, `/review:resolve`, `/flow:plan`,
   `/flow:work`, `/review:sweep`). Verify the OpenTelemetry export before
-  designing around it.
+  designing around it. Done: `scripts/workflow-cost-baseline.js`, table in
+  `docs/research/workflow-cost-baseline.md` (metered dollars not yet
+  sampled).
 - [ ] **R0.2 Usage attribution snapshot.** Record `/usage` attribution by
   plugin, skill, subagent and MCP server, plus `/context` and `/doctor` listing
   cost, for one normal week. Check: snapshot committed under `docs/research/`,
