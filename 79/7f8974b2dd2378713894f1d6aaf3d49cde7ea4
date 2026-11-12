@@ -1,0 +1,23 @@
+docs/research/workflow-cost-baseline.md
+  s_4df8fdefd00c88::t_c2b043c00c0ce8 12-21,23-24,29-30,55-60,67-69,80-87,105-111
+scripts/workflow-cost-baseline.js
+  s_4df8fdefd00c88::t_e848ab2cb20e20 280-284,474,665-671
+tests/integration/workflow-cost-baseline.test.ts
+  s_4df8fdefd00c88::t_de8897feb226f0 211-266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "797f8974b2dd2378713894f1d6aaf3d49cde7ea4",
+  "prompts": {},
+  "sessions": {
+    "s_4df8fdefd00c88": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "af30770c-3f7c-441e-95c7-1c6b0f027d44",
+        "model": "claude-fable-5-2"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
