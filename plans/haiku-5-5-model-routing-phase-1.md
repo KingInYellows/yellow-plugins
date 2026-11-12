@@ -1,13 +1,21 @@
 # Feature: Haiku 5.5 model-routing policy — Phase 1
 
-> **Status (2026-10-15):** Implemented and on `main`: #1171 (`c01968c`) and
-> #1176 (`35d1367`). Not yet released; the open "chore: version packages" PR
-> (#1218) carries it. 30 of 31 tasks are done. 1.0.3 is confirmed from a CI
-> run log. 1.5.2 stays open until the `linear-pr-linker` write path is
-> smoke-tested interactively against the released plugins. Source:
+> **Status (2026-11-11, reconciled with `main` at `8d9762e`):** Implemented
+> and released: #1171 (`c01968c`) and #1176 (`35d1367`). 30 of 31 tasks are
+> done. 1.5.2 is the one open task: the `linear-pr-linker` write path has not
+> been smoke-tested interactively against a scratch issue (CLAUDE-312). The
+> plan stays in `plans/` until that run is recorded; then archive it with
+> `/plan:complete`. Source:
 > `docs/brainstorms/2026-10-07-haiku-5-5-model-routing-policy-brainstorm.md`.
-> Phase 2 (replay-gated swaps) and Phase 3 (trigger tightening; router
-> deferred) are tracked under "Follow-ups" and are not implemented here.
+>
+> Phase 2, listed under "Follow-ups", has shipped outside this plan: the
+> replay eval and its swaps (CLAUDE-163), effort on the remaining agents
+> (CLAUDE-187), the leftover swaps (CLAUDE-194, #1436) and the council CLI
+> wrappers, which went to Sonnet (CLAUDE-200, #1469). The verdicts are in
+> `docs/research/model-routing-policy.md`. Swap candidates not yet evaluated
+> are tracked in CLAUDE-319. Phase 3 has not shipped: `/review:pr` still uses
+> the broad plugin-markdown reviewer triggers, and tightening them is
+> CLAUDE-328 (Backlog).
 
 ## Delivery (decided 2026-10-14)
 
@@ -833,6 +841,10 @@ Kept `inherit`, with the reason recorded:
   - Linear or ruvector agents answering in prose without calling a tool.
 
 ## Follow-ups (not in this plan)
+
+> 2026-11-11: Phase 2 below has shipped and Phase 3 has not (CLAUDE-328); see
+> the status note at the top. The lists are kept as the record of what was
+> planned.
 
 - **Phase 2, replay-gated:** first build the per-reviewer yield rollup from the
   review ledger's `reviewers` array. The ledger is per clone and pruned when a

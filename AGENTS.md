@@ -373,7 +373,7 @@ rule id in parentheses is what the failure message cites.
   `<!-- durable-bar:end -->` in `knowledge-compounder` and `staging-scorer`.
   RULE 22 requires every copy to be byte-identical and to match the upstream
   text; edit all copies and `DURABLE_BAR_TEXT` together.
-- Write agent and skill bodies for the Claude 5 generation: task, inputs,
+- Write agent and skill bodies for the current Claude models: task, inputs,
   output contract, and the project-specific facts Claude cannot infer, in
   brief imperative sentences. Omit ALL-CAPS rule lists, "be thorough"
   exhortations, self-verification loops, and finding-stage confidence

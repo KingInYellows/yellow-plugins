@@ -558,6 +558,62 @@ cs_detect_auth_route() {
   fi
 }
 
+# Print the model for a drain's `claude -p --model`. Unpinned, the drain runs
+# on the user's default model (often Opus or Fable) and draws on the same
+# subscription limit window as the user's own session. The drain lead only
+# moves files and dispatches staging-reviewer, whose sub-agents pin their own
+# models, so Haiku is enough. COMPOUND_DRAIN_MODEL overrides it (e.g.
+# `sonnet` if dispatch proves unreliable). Only haiku|sonnet|opus or a
+# well-formed claude-<id> is printed: the negated class rejects anything
+# outside [a-z0-9-] first (so `claude-x; rm` never matches the claude-* arm),
+# and the second arm rejects malformed IDs (`claude-`, `--`, trailing `-`) in
+# the shape of MODEL_VALUE_PATTERN in scripts/validate-agent-authoring.js.
+# Unset means haiku; set-but-empty or invalid prints haiku and returns 1 so
+# the caller can log the rejection.
+cs_drain_model() {
+  local model="${COMPOUND_DRAIN_MODEL-haiku}"
+  case "$model" in
+    '' | *[!a-z0-9-]*) ;;
+    claude- | *--* | *-) ;;
+    haiku | sonnet | opus | claude-*) printf '%s' "$model"; return 0 ;;
+  esac
+  printf 'haiku'
+  return 1
+}
+
+# Print the dollar cap for one drain's `claude -p --max-budget-usd`. The cap
+# is a runaway stop beside --max-turns and the wall-clock timeout, not a
+# tuned number: the CLI counts API-equivalent cost, so it also bounds the
+# usage a drain can draw on a subscription. COMPOUND_DRAIN_MAX_BUDGET_USD
+# overrides the default; only a positive plain decimal (`3`, `0.50`) reaches
+# argv. Returns 1 after printing the default when the override is rejected,
+# so the caller can log it without echoing the untrusted value.
+CS_DRAIN_MAX_BUDGET_USD_DEFAULT=3.00
+cs_drain_max_budget_usd() {
+  local value="${COMPOUND_DRAIN_MAX_BUDGET_USD-$CS_DRAIN_MAX_BUDGET_USD_DEFAULT}"
+  case "$value" in
+    '' | *[!0-9.]* | *.*.* | .* | *.) value='' ;;
+  esac
+  case "$value" in
+    *[1-9]*) printf '%s' "$value"; return 0 ;;
+  esac
+  printf '%s' "$CS_DRAIN_MAX_BUDGET_USD_DEFAULT"
+  return 1
+}
+
+# Print one log line with the cost of the drain whose `--output-format json`
+# result is in the tail of <drain-log>. Prints nothing when the tail holds no
+# result object (a timeout, a crash before the first turn, a missing jq).
+cs_drain_cost_line() {
+  local log="$1" line
+  line=$(tail -n 20 -- "$log" 2>/dev/null \
+    | jq -Rr 'fromjson? | select(type == "object" and has("total_cost_usd"))
+        | "cost_usd=\(.total_cost_usd) turns=\(.num_turns // "?") subtype=\(.subtype // "?")"' 2>/dev/null \
+    | tail -n 1)
+  [ -n "$line" ] || return 0
+  printf '[yellow-core] compound-staging: drain %s\n' "$line"
+}
+
 # --- Review-run lock (read side) ---
 # /review:resolve, /review:sweep, /review:sweep-all and /review:resolve-stack
 # (yellow-review) hold <staging-dir>/.review-run-lock/ while they run: one

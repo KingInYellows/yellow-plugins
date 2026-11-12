@@ -285,6 +285,69 @@ STUB
   [ "$output" -eq 2 ]
 }
 
+@test "session-start caps the drain with --max-budget-usd and logs its cost" {
+  _plant_pending 5
+  cat > "$STUB_BIN" <<STUB
+#!/usr/bin/env bash
+printf 'invoked with args: %s\n' "\$*" > "$STUB_MARKER"
+printf '{"result": "stub", "is_error": false, "subtype": "success", "num_turns": 7, "total_cost_usd": 0.0421}\n'
+STUB
+  run env -u COMPOUND_DRAIN_MAX_BUDGET_USD bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_drain_done
+  grep -q -- '--max-budget-usd 3.00 ' "$STUB_MARKER"
+  grep -q 'max_budget_usd=3.00)' "$STAGING"/drain-logs/*.log
+  grep -q 'drain cost_usd=0.0421 turns=7 subtype=success' "$STAGING"/drain-logs/*.log
+  run grep -q 'COMPOUND_DRAIN_MAX_BUDGET_USD rejected' "$STAGING"/drain-logs/*.log
+  [ "$status" -eq 1 ]
+}
+
+@test "session-start logs no cost line when the drain prints no result" {
+  _plant_pending 5
+  cat > "$STUB_BIN" <<STUB
+#!/usr/bin/env bash
+printf 'invoked\n' > "$STUB_MARKER"
+printf 'not json\n'
+STUB
+  run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_drain_done
+  grep -q 'drain claude exited 0' "$STAGING"/drain-logs/*.log
+  run grep -q 'cost_usd=' "$STAGING"/drain-logs/*.log
+  [ "$status" -eq 1 ]
+}
+
+@test "session-start honours COMPOUND_DRAIN_MAX_BUDGET_USD and rejects invalid values" {
+  _plant_pending 5
+  run env COMPOUND_DRAIN_MAX_BUDGET_USD=0.50 bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_drain_done
+  grep -q -- '--max-budget-usd 0.50 ' "$STUB_MARKER"
+  local value
+  for value in '' '0' '0.00' '-1' '1e3' '.5' '5.' '1.2.3' '5; rm' '--bare'; do
+    rm -f "$STUB_MARKER" "$STAGING"/drain-logs/*.log
+    run env COMPOUND_DRAIN_MAX_BUDGET_USD="$value" bash "$SS_HOOK" <<< "$(_stdin_json)"
+    [ "$status" -eq 0 ]
+    _wait_for_drain_done
+    grep -q -- '--max-budget-usd 3.00 ' "$STUB_MARKER"
+    grep -q 'COMPOUND_DRAIN_MAX_BUDGET_USD rejected' "$STAGING"/drain-logs/*.log
+    run grep -q -e '5; rm' -e '--bare' -e '1e3' "$STUB_MARKER"
+    [ "$status" -eq 1 ]
+  done
+}
+
+@test "the manual drain in review-staged.md carries the same model pin and budget cap" {
+  local cmd="$BATS_TEST_DIRNAME/../commands/compound/review-staged.md"
+  run grep -c -- '-p "$DRAIN_PROMPT"' "$cmd"
+  [ "$output" -eq 2 ]
+  run grep -c -- '--model "$DRAIN_MODEL"' "$cmd"
+  [ "$output" -eq 2 ]
+  run grep -c -- '--max-budget-usd "$DRAIN_BUDGET_USD"' "$cmd"
+  [ "$output" -eq 2 ]
+  run grep -c -- '--max-budget-usd "$DRAIN_BUDGET_USD"' "$SS_HOOK"
+  [ "$output" -eq 2 ]
+}
+
 @test "session-start does NOT dispatch at count=4" {
   _plant_pending 4
   run bash "$SS_HOOK" <<< "$(_stdin_json)"
