@@ -1,5 +1,15 @@
 # yellow-goal
 
+## 0.4.1
+
+### Patch Changes
+
+- [#1768](https://github.com/KingInYellows/yellow-plugins/pull/1768)
+  [`af70c7e`](https://github.com/KingInYellows/yellow-plugins/commit/af70c7ef54029a3746d031512cae75cecd1e0205)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Put the
+  `/goal:request` and `/goal:setup` descriptions on one line, so
+  Prettier-wrapped text cannot break their frontmatter.
+
 ## 0.4.0
 
 ### Minor Changes
