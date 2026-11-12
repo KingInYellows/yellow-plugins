@@ -766,6 +766,23 @@ planner prompts.
   symlinks. Symlinked pack folders and rule files are skipped, and the size caps
   (25 rules per pack, 16 KiB per rule, 96 KiB total) bound what enters a prompt.
 
+### Settled Decisions in Review (yellow-review)
+
+`/review:pr` and `/review:all` read the `(session-settled: …)` entries of the
+plan a PR names in its body or commits under `plans/`
+(`settled-decisions-context`). That text is PR-controlled.
+
+- **Screened like rule packs.** Control and bidi characters are removed, every
+  `--- begin`/`--- end` fence opener is defanged, XML metacharacters are
+  escaped, and the block is a reference-only `settled-decisions` fence. Plan
+  paths must match `plans/<name>.md` with no `.`/`..` segments; symlinks are
+  skipped; at most 3 plans, 30 entries and 16 KiB are read.
+- **It can only hide preference.** Only the orchestrator reads the block, and
+  only to set aside P2/P3 `maintainability`/`docs` findings that re-argue an
+  entry. Set-aside findings are still listed in Coverage. Correctness, security,
+  reliability, performance, contract and testing findings, and any finding that
+  cites a defect, keep their severity.
+
 ### Persona Selection Shadow Log (yellow-review)
 
 Off by default. When `yellow-plugins.local.md` sets `reviewer_selection: shadow`

@@ -115,6 +115,9 @@ Grade the evidence before writing the plan:
   `## Settled Decisions` section of every shell it constrains.
 - `/flow:expand-shell` carries the shell's `## Settled Decisions` section into
   the expanded plan unchanged.
+- yellow-review's `/review:pr` and `/review:all` read the entries of the plan a
+  PR names or commits, and set aside P2/P3 preference findings that would
+  reverse one (listed under Coverage). Defect findings keep full severity.
 - `/flow:work` treats settled entries as constraints. If implementation shows
   one cannot work, stop and ask with AskUserQuestion instead of switching
   approaches silently.

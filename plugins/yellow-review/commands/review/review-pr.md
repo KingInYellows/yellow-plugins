@@ -1183,6 +1183,14 @@ Apply the aggregation steps from
    confidence score), so sub-75 findings in the input are expected — gate
    them here and count them under `suppressed`, do not treat them as a
    persona defect.
+8a. **Settled decisions.** Read
+   `${CLAUDE_PLUGIN_ROOT}/references/review-pr/settled-decisions.md` and
+   follow it: when the PR's plan records settled decisions, P2/P3
+   `maintainability`/`docs` findings that only re-argue one are set aside
+   into Coverage, and defect findings stay at full severity. Set-aside
+   findings skip the partition, the fixes and the ledger. If the Read
+   fails, set nothing aside and note `Settled decisions: not checked` in
+   Coverage.
 9. **Partition the work.** Build three sets:
    - in-skill fixer queue: `safe_auto → review-fixer`
    - residual actionable queue: `gated_auto`/`manual` owned by
@@ -1452,6 +1460,7 @@ findings were produced but extension classification was malformed."
 - Reviewers run: <list>
 - Reviewers skipped (graceful degradation): <list with reasons>
 - Findings suppressed at confidence < 75: <count>
+- Settled decisions: <the settled-decisions.md line, or omit when no plan entry was found>
 - Themes: <group count | not built (themes.md unreadable)>
 - Findings demoted to soft-bucket: <count>
 - Compact-return validation drops (base schema): <count>
