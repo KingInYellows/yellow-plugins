@@ -1473,7 +1473,8 @@ jobs:
     # The required suites took 3m18s before yellow-review's ledger suite
     # landed. Resolve suites later pushed the combined job to 7-11 min
     # against a 15-minute cap, so yellow-review moved to its own job.
-    # 15 still covers the remaining required suites plus the advisory loop.
+    # The advisory loop now runs in plugin-shell-tests-advisory; 15 minutes
+    # covers only the remaining required suites (core, council, codex).
     timeout-minutes: 15
     needs: [validate-schemas]
 
@@ -1536,28 +1537,44 @@ jobs:
         # extractor under both mawk and gawk.
         run: bats plugins/yellow-codex/tests/
 
+  # ============================================================================
+  # PLUGIN SHELL TESTS — ADVISORY LOOP (bats)
+  # ============================================================================
+  # A job of its own: the advisory loop over remaining plugins can overrun the
+  # 15-minute cap on plugin-shell-tests after the required suites (council and
+  # codex redaction are heavy on slow runners). When that happens the job is
+  # cancelled and ci-status fails even though required gates passed.
+  # Advisory only, like ruvector-shell-tests — not in ci-status's needs.
+  plugin-shell-tests-advisory:
+    name: Plugin Shell Tests (advisory loop)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [validate-schemas]
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          clean: true
+
+      - name: Install bats
+        run: sudo npm install -g bats@1.11.0
+
       - name: Run other plugins' bats suites (advisory)
-        continue-on-error: true
         run: |
           set -uo pipefail
           STATUS=0
-          # Both top-level and nested test dirs. yellow-core's suites,
-          # yellow-council's redaction suite and yellow-codex's redaction
-          # suite are required steps above. yellow-review's suite is required
-          # in yellow-review-shell-tests, and yellow-debt's in
-          # shell-compat-tests. Skip them here to avoid double execution and
-          # to keep the advisory status accurate.
+          # Both top-level and nested test dirs. Required and split-out suites
+          # are owned by other jobs — keep the skip list in sync with
+          # plugin-shell-tests, yellow-review-shell-tests, shell-compat-tests,
+          # and ruvector-shell-tests.
           for d in plugins/*/tests plugins/*/skills/*/tests; do
             [ -d "$d" ] || continue
             case "$d" in
               plugins/yellow-core/tests|plugins/yellow-core/skills/git-worktree/tests|plugins/yellow-council/tests|plugins/yellow-review/tests|plugins/yellow-codex/tests) continue ;;
-              # Required in shell-compat-tests, the job that installs the
-              # kislyuk yq its transition tests need (this one has mikefarah
-              # yq, so those tests would fail here: a missing kislyuk yq is a
-              # failure whenever CI is set).
               plugins/yellow-debt/tests) continue ;;
-              # Its own job below: its timing-heavy suite alone outlasts
-              # what this job's 15 minutes leave after the required suites.
               plugins/yellow-ruvector/tests) continue ;;
             esac
             echo "::group::bats $d"
