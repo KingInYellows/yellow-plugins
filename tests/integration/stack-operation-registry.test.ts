@@ -112,6 +112,8 @@ describe('every command-type registry entry resolves to a real file whose frontm
     const frontmatter = readFileSync(filePath, 'utf8');
     // An internal skill exists on disk but cannot be invoked by name.
     expect(isUserInvocableSkill(frontmatter)).toBe(true);
+    // The Skill tool refuses an entry point with this key (RULE 25).
+    expect(frontmatter).not.toMatch(/^disable-model-invocation:\s*true\s*$/m);
     const nameMatch = /^name:\s*(.+)$/m.exec(frontmatter);
     expect(nameMatch).not.toBeNull();
     expect((nameMatch as RegExpExecArray)[1].trim()).toBe(entry.ref);
