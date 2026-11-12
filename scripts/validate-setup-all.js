@@ -34,6 +34,12 @@
 const fs = require('fs');
 const path = require('path');
 
+const {
+  DELEGATED_START,
+  DELEGATED_END,
+  extractMarkedSection,
+  parseDelegatedCommands,
+} = require('./lib/setup-all-list');
 const { isUserInvocableSkill } = require('./lib/skill-frontmatter');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -124,14 +130,6 @@ function parseFrontmatterName(markdown) {
   return nameMatch ? nameMatch[1].trim().replace(/^['"]|['"]$/g, '') : null;
 }
 
-function extractMarkedSection(markdown, startMarker, endMarker) {
-  const start = markdown.indexOf(startMarker);
-  if (start === -1) return null;
-  const end = markdown.indexOf(endMarker, start + startMarker.length);
-  if (end === -1) return null;
-  return markdown.slice(start + startMarker.length, end);
-}
-
 function parseForLoopItems(section) {
   const match = section.match(/for \w+ in\s+([\s\S]*?)\s*;\s*do/);
   if (!match) return [];
@@ -144,14 +142,6 @@ function parseClassificationPlugins(section) {
     headings.push(match[1]);
   }
   return headings;
-}
-
-function parseDelegatedCommands(section) {
-  const commands = [];
-  for (const match of section.matchAll(/^\d+\.\s+`([^`]+)`$/gm)) {
-    commands.push(match[1]);
-  }
-  return commands;
 }
 
 function compareSets(actual, expected) {
@@ -230,8 +220,8 @@ function extractRequiredSections(setupAll, references) {
     ),
     delegatedSection: extractMarkedSection(
       setupAll,
-      '<!-- setup-all-delegated-commands:start -->',
-      '<!-- setup-all-delegated-commands:end -->'
+      DELEGATED_START,
+      DELEGATED_END
     ),
     mappingSection: extractMarkedSection(
       setupAll,
