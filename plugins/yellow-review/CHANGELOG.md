@@ -1,5 +1,38 @@
 # Changelog
 
+## 3.18.0
+
+### Minor Changes
+
+- [#1775](https://github.com/KingInYellows/yellow-plugins/pull/1775)
+  [`2361b8c`](https://github.com/KingInYellows/yellow-plugins/commit/2361b8ca620206b3efad93d8f66947dbba9cd2c6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Settled
+  decisions in review (CLAUDE-293): `/review:pr` and `/review:all` read the
+  `(session-settled: …)` entries of the plan a PR names in its body or commits
+  under `plans/` (new `settled-decisions-context` script) and set aside P2/P3
+  `maintainability`/`docs` findings that only re-argue one. Set-aside findings
+  are listed under Coverage, not applied and not written to the ledger. Defect
+  findings, and any finding that shows a settled option cannot work, keep full
+  severity. PRs without a plan behave as before.
+
+### Patch Changes
+
+- [#1769](https://github.com/KingInYellows/yellow-plugins/pull/1769)
+  [`90c9d0f`](https://github.com/KingInYellows/yellow-plugins/commit/90c9d0fd7b2072bbb6d22aa94eac6327b3e52319)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - gt-workflow:
+  the eight entry points (`gt-setup`, `smart-submit`, `gt-amend`,
+  `gt-stack-plan`, `gt-cleanup`, `gt-sync`, `gt-nav`, `gt-merge`) are now
+  user-invocable skills, and the same-named wrapper commands are removed. Claude
+  Code resolved each command/skill pair to the wrapper, so the skill body was
+  unreachable through the Skill tool. Type `/gt-workflow:<name>`, and pass the
+  same qualified name to the Skill tool; a bare `/<name>` was not verified for a
+  plugin skill and can be taken by one of your own commands.
+
+  yellow-core and yellow-linear: `/flow:work`, `/flow:plan` and `/linear:work`
+  invoke `gt-workflow:smart-submit` and `gt-workflow:gt-stack-plan` by their
+  qualified names, `/setup:all` invokes `gt-workflow:gt-setup`, and the setup
+  and status hints in yellow-core and yellow-review name `/gt-workflow:<name>`.
+
 ## 3.17.0
 
 ### Minor Changes
