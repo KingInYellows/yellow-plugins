@@ -317,13 +317,31 @@ while IFS= read -r plugin; do
 
   # --- T1: isolated install from the local marketplace ---
   if [ "$run_tier1" -eq 1 ]; then
-    if run_isolated 120 "$CLAUDE_BIN" plugin install "${plugin}@${MARKETPLACE_NAME}" --scope user >/dev/null 2>&1; then
+    if install_json="$(run_isolated 120 "$CLAUDE_BIN" plugin install "${plugin}@${MARKETPLACE_NAME}" --scope user --json 2>/dev/null)"; then
+      # Every userConfig option starts unset in a fresh install, so the CLI's
+      # unsetOptionCount (Claude Code 2.1.323+) must equal the manifest's
+      # option count. A lower count means the CLI dropped options it read.
+      config_check="$(node -e '
+        const fs = require("fs");
+        const declared = Object.keys(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).userConfig || {}).length;
+        let out;
+        try { out = JSON.parse(process.argv[2]); } catch { out = {}; }
+        if (typeof out.unsetOptionCount !== "number") {
+          process.stdout.write(declared === 0 ? "ok" : "no-count");
+        } else {
+          process.stdout.write(out.unsetOptionCount === declared ? "ok" : `${out.unsetOptionCount}/${declared}`);
+        }' "$plugin_dir/.claude-plugin/plugin.json" "$install_json" 2>/dev/null)" || config_check="error"
       # Anchor the name to non-identifier boundaries so a similarly-named
       # plugin (e.g. "${plugin}-extra") can't satisfy the check via substring.
-      if run_isolated 30 "$CLAUDE_BIN" plugin list 2>/dev/null | grep -qE "(^|[^A-Za-z0-9_-])${plugin}([^A-Za-z0-9_-]|\$)"; then
-        t1="PASS"
-      else
+      if ! run_isolated 30 "$CLAUDE_BIN" plugin list 2>/dev/null | grep -qE "(^|[^A-Za-z0-9_-])${plugin}([^A-Za-z0-9_-]|\$)"; then
         t1="FAIL(absent)"   # install reported success but plugin not listed
+        FAILURES=$((FAILURES + 1))
+      elif [ "$config_check" = "ok" ]; then
+        t1="PASS"
+      elif [ "$config_check" = "no-count" ]; then
+        t1="PASS(no-count)"   # CLI before 2.1.323 has no unsetOptionCount
+      else
+        t1="FAIL(config ${config_check})"   # unset options seen / declared
         FAILURES=$((FAILURES + 1))
       fi
     else

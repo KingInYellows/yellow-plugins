@@ -22,6 +22,7 @@ const OPTIONAL_MANIFEST_KEYS = [
   'mcpServers',
   'hooks',
   'dependencies',
+  'engines',
 ];
 
 /**

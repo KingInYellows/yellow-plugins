@@ -185,7 +185,11 @@ python3 scripts/eval/review-gate/eval.py grade "$W" --baseline <old>/summary.jso
   recomputes every row's fingerprint and refuses to start when any input changed
   since `prepare` (an edited plugin file, diff or args); run `prepare` again,
   and then every changed row reruns. A failed run leaves `out/<id>.bad` and
-  reruns next time.
+  reruns next time. A run whose stderr says settings blocked the row's model
+  (`Model "<name>" is restricted by your organization's settings`, Claude Code
+  2.1.323 and later) also fails, because it ran on another model. Runs set
+  `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1` to skip the subagent
+  progress-summary requests.
 - `grade` writes `results-<date>.md` here (`--date`, default today;
   `--results-dir` elsewhere) and `summary.json` in the work directory, and exits
   non-zero while any run is missing or incomplete.

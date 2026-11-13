@@ -25,15 +25,15 @@ command hooks belong in `catalog/plugins/yellow-claudemod.json#hooks`.
 - `agent.spawn`'s `e.model` is the caller's parameter, undefined for a
   frontmatter-pinned agent. Leave a defined `e.model` alone.
 - Ledger writes go through the `writes` promise chain; parallel fan-outs
-  otherwise lose rows. Never cut a step short: a store call cannot be
-  cancelled, so a skipped-past step could land a stale row list late. Hooks
-  wait on the chain through `bounded` (2 s) instead, and once a wait times
-  out, spawns stop waiting until the chain settles. Write failures are kept
-  per ledger key and shown only to that session. Pruning old ledger keys runs
-  after the row is stored but outside the chain, one prune at a time, so a
-  store call that hangs there never blocks later rows. Because it is outside
-  the chain, it skips a key with a queued write or one written while it runs, and a
-  write to a key it is deleting waits for that delete (bounded).
+  otherwise lose rows. Never cut a step short: a store call cannot be cancelled,
+  so a skipped-past step could land a stale row list late. Hooks wait on the
+  chain through `bounded` (2 s) instead, and once a wait times out, spawns stop
+  waiting until the chain settles. Write failures are kept per ledger key and
+  shown only to that session. Pruning old ledger keys runs after the row is
+  stored but outside the chain, one prune at a time, so a store call that hangs
+  there never blocks later rows. Because it is outside the chain, it skips a key
+  with a queued write or one written while it runs, and a write to a key it is
+  deleting waits for that delete (bounded).
 - Rows go under `ledger:<session id>`; `$.store` is machine-wide and the chain
   only serializes one session. `$.session.id()` is read per write because
   `/clear` changes it without a new `session.start`. Read the legacy `ledger`
@@ -47,6 +47,14 @@ claude plugin test plugins/yellow-claudemod
 ```
 
 Neither runs in CI yet (CI has no `claude` binary); run both before pushing a
-change to `hooks/`. The API types come from the `plugin-authoring` skill's
-`types/claude-code.d.ts`; type-check with a tsconfig outside this folder that
-includes that file plus `hooks/` and `tests/`.
+change to `hooks/`. Import sibling modules without an extension
+(`from './policy'`): since Claude Code 2.1.323 `plugin validate` type-checks the
+module and flags a `.ts` extension as TS5097. The loader resolves both forms,
+and `claude plugin test` fails every test if the path is wrong.
+
+`engines["claude-code"]` in `catalog/plugins/yellow-claudemod.json` keeps the
+plugin off versions older than the mod API (2.1.301). Claude Code 2.1.323 and
+later enforce it; `/claudemod:setup` still checks the version for older ones.
+The API types come from the `plugin-authoring` skill's `types/claude-code.d.ts`;
+type-check with a tsconfig outside this folder that includes that file plus
+`hooks/` and `tests/`.

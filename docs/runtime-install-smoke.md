@@ -63,8 +63,10 @@ pnpm smoke:install --keep-temp           # retain the temp dir for debugging
   those `CLAUDE.md` files are contributor context, not plugin runtime context.
   The summary marks such plugins `T0=PASS(warn)`.
 - **T1 — install**: isolated `marketplace add <repo>` +
-  `plugin install <name>@<marketplace> --scope user`, with the real-state
-  invariant guard.
+  `plugin install <name>@<marketplace> --scope user --json`, with the real-state
+  invariant guard. On Claude Code 2.1.323 and later the JSON carries
+  `unsetOptionCount`, which must equal the number of `userConfig` options the
+  manifest declares (all start unset in a fresh install).
 
 ### Flags
 
@@ -103,6 +105,8 @@ install never blocks on a missing credential.
 | `T0=FAIL` for a plugin                        | The bundled validator rejected its manifest. Re-run `claude plugin validate plugins/<name>` directly to see the error.                       |
 | `T1=FAIL`                                     | Isolated install failed. Re-run with `--plugin <name> --keep-temp` and inspect the temp dir + rerun the install manually under the same env. |
 | `T1=FAIL(absent)`                             | Install reported success but the plugin wasn't listed — likely a marketplace-name mismatch.                                                  |
+| `T1=FAIL(config N/M)`                         | The CLI saw N unset `userConfig` options where the manifest declares M: it dropped or misread some. Run `claude plugin validate` on it.      |
+| `T1=PASS(no-count)`                           | The CLI predates 2.1.323 and reports no `unsetOptionCount`, so the option count went unchecked.                                              |
 | `SAFETY ABORT … real ~/.claude state CHANGED` | Isolation failed to contain an install. Do **not** ignore — inspect manually; the env vars may not have taken effect.                        |
 
 ## CI guidance

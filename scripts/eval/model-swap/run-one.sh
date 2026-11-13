@@ -52,6 +52,8 @@ allowed=$(printf '%s' "$tools" | awk -v RS=, -v pd="$prompt_dir" '{ gsub(/^[ \t\
 # Keep the parent session's effort, memory and extra CLAUDE.md out of the run.
 unset CLAUDE_EFFORT CLAUDE_CODE_EFFORT_LEVEL CLAUDE_COWORK_MEMORY_PATH_OVERRIDE \
   CLAUDE_MEMORY_STORES CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD CLAUDE_ADDITIONAL_DIRECTORIES
+# Progress summaries are only for a watching user; skip their requests.
+export CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1
 # Runaway stop for one run, in API-equivalent USD (the CLI counts it on a
 # subscription too). A run that hits it prints is_error JSON and is rerun.
 budget=${EVAL_MAX_BUDGET_USD-5}
@@ -64,6 +66,15 @@ start=$(date +%s)
   >"$out.tmp" 2>"$out_dir/$id.err"
 rc=$?
 wall=$(($(date +%s) - start))
+# Claude Code 2.1.323+ warns on stderr when settings block --model and the run
+# continues on another model; graded as $model, it would skew the comparison.
+blocked=$(grep -m 1 "is restricted by your organization's settings" "$out_dir/$id.err" 2>/dev/null)
+if [ -n "$blocked" ]; then
+  rm -f "$out"
+  mv "$out.tmp" "$out_dir/$id.bad" 2>/dev/null
+  printf 'run-one: %s ran on another model: %s\n' "$id" "$blocked" >&2
+  exit 1
+fi
 scan=
 scan_ok=1
 if [ "$scan_row" = 1 ]; then

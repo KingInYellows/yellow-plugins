@@ -281,6 +281,21 @@
       "minItems": 1,
       "description": "Channel declarations for message injection (Telegram, Slack, Discord style). Each binds to an MCP server in this plugin. Note: server name cross-reference to mcpServers cannot be enforced in JSON Schema and must be validated at runtime."
     },
+    "engines": {
+      "type": "object",
+      "required": ["claude-code"],
+      "properties": {
+        "claude-code": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[~^>=<*xXvV0-9]",
+          "semverRange": true,
+          "description": "Semver range of Claude Code versions the plugin installs, updates and loads on, such as \">=2.1.301\". Read by Claude Code 2.1.323 and later; older versions strip the key with an unknown-field warning."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Runtime version constraints. Only `claude-code` is recognized; `claude plugin validate` reports a non-object value or a malformed range and ignores it at load time."
+    },
     "dependencies": {
       "type": "array",
       "items": {
