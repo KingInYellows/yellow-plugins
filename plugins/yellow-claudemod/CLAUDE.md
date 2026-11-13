@@ -52,9 +52,11 @@ change to `hooks/`. Import sibling modules without an extension
 module and flags a `.ts` extension as TS5097. The loader resolves both forms,
 and `claude plugin test` fails every test if the path is wrong.
 
-`engines["claude-code"]` in `catalog/plugins/yellow-claudemod.json` keeps the
-plugin off versions older than the mod API (2.1.301). Claude Code 2.1.323 and
-later enforce it; `/claudemod:setup` still checks the version for older ones.
-The API types come from the `plugin-authoring` skill's `types/claude-code.d.ts`;
+`engines["claude-code"]` in `catalog/plugins/yellow-claudemod.json` records the
+mod API floor (2.1.301). Only Claude Code 2.1.323 and later read it, and older
+versions ignore it, so today it excludes nothing and `/claudemod:setup` is the
+real version check. Raise both together when the plugin needs a newer API; from
+a floor above 2.1.323, `engines` does keep the plugin off older versions. The
+API types come from the `plugin-authoring` skill's `types/claude-code.d.ts`;
 type-check with a tsconfig outside this folder that includes that file plus
 `hooks/` and `tests/`.

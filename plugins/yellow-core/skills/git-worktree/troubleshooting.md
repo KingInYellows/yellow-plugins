@@ -86,8 +86,10 @@ command ls -la .worktrees/<worktree-name>/.ruvector
 
 If the worktree already has a real `.ruvector/` directory (from a previous
 isolated setup), `copy-env` will warn and skip — preserving your isolated DB. To
-switch that worktree to the shared main DB, remove the real directory first
-(`rm -rf .worktrees/<name>/.ruvector`) and re-run `copy-env`.
+switch that worktree to the shared main DB, move the real directory out first
+(for example `mv .worktrees/<name>/.ruvector ~/<name>-ruvector-backup`) and
+re-run `copy-env`. Switching does not merge the isolated memories into the main
+DB.
 
 ## Stranded Detached Worktree After a Restack
 
@@ -116,8 +118,10 @@ the script never forces it. If someone committed in the detached worktree, the
 commit is on no branch: keep it with
 `git -C <worktree-path> branch <new-name> HEAD` before restoring. When the state
 file is rejected (exit 4), restore each worktree with the `checkout` lines the
-script printed to stderr at start, then delete
-`<git-common-dir>/yellow-core/worktree-restack/state`; `status` still lists the
+script printed to stderr at start. Those lines cover only a detached worktree
+whose HEAD is a branch tip, so run `git worktree list` and keep any other
+detached commit the same way before you delete
+`<git-common-dir>/yellow-core/worktree-restack/state`. `status` still lists the
 stranded and pause-locked worktrees when the state file is rejected.
 
 ## "Read-only file system" From Create or Cleanup
@@ -126,4 +130,6 @@ With the Claude Code Bash sandbox on (macOS, Linux, WSL), Claude Code 2.1.323
 and later deny `git worktree add`, `move` and `remove`. `create` and `cleanup`
 then fail with `Read-only file system` (`Operation not permitted` on macOS), and
 the manager prints a warning naming the sandbox. Rerun that command outside the
-sandbox; nothing was created or removed.
+sandbox. A failed `create` leaves no worktree. `cleanup` removes worktrees one
+at a time and carries on after a failure, so run `git worktree list` first to
+see which are left.

@@ -324,10 +324,13 @@ while IFS= read -r plugin; do
       config_check="$(node -e '
         const fs = require("fs");
         const declared = Object.keys(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).userConfig || {}).length;
-        let out;
-        try { out = JSON.parse(process.argv[2]); } catch { out = {}; }
-        if (typeof out.unsetOptionCount !== "number") {
+        const out = JSON.parse(process.argv[2]);
+        if (out === null || typeof out !== "object" || Array.isArray(out)) {
+          process.stdout.write("error");
+        } else if (!("unsetOptionCount" in out)) {
           process.stdout.write(declared === 0 ? "ok" : "no-count");
+        } else if (!Number.isInteger(out.unsetOptionCount)) {
+          process.stdout.write("error");
         } else {
           process.stdout.write(out.unsetOptionCount === declared ? "ok" : `${out.unsetOptionCount}/${declared}`);
         }' "$plugin_dir/.claude-plugin/plugin.json" "$install_json" 2>/dev/null)" || config_check="error"

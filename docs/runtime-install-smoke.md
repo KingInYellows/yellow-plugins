@@ -99,15 +99,15 @@ install never blocks on a missing credential.
 
 ## Failure triage
 
-| Symptom                                       | Likely cause / action                                                                                                                        |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `claude CLI not found; skipping` (exit 0)     | The CLI isn't installed. Install Claude Code to run the install tiers.                                                                       |
-| `T0=FAIL` for a plugin                        | The bundled validator rejected its manifest. Re-run `claude plugin validate plugins/<name>` directly to see the error.                       |
-| `T1=FAIL`                                     | Isolated install failed. Re-run with `--plugin <name> --keep-temp` and inspect the temp dir + rerun the install manually under the same env. |
-| `T1=FAIL(absent)`                             | Install reported success but the plugin wasn't listed — likely a marketplace-name mismatch.                                                  |
-| `T1=FAIL(config N/M)`                         | The CLI saw N unset `userConfig` options where the manifest declares M: it dropped or misread some. Run `claude plugin validate` on it.      |
-| `T1=PASS(no-count)`                           | The CLI predates 2.1.323 and reports no `unsetOptionCount`, so the option count went unchecked.                                              |
-| `SAFETY ABORT … real ~/.claude state CHANGED` | Isolation failed to contain an install. Do **not** ignore — inspect manually; the env vars may not have taken effect.                        |
+| Symptom                                       | Likely cause / action                                                                                                                                                                                                         |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `claude CLI not found; skipping` (exit 0)     | The CLI isn't installed. Install Claude Code to run the install tiers.                                                                                                                                                        |
+| `T0=FAIL` for a plugin                        | The bundled validator rejected its manifest. Re-run `claude plugin validate plugins/<name>` directly to see the error.                                                                                                        |
+| `T1=FAIL`                                     | Isolated install failed. Re-run with `--plugin <name> --keep-temp` and inspect the temp dir + rerun the install manually under the same env.                                                                                  |
+| `T1=FAIL(absent)`                             | Install reported success but the plugin wasn't listed — likely a marketplace-name mismatch.                                                                                                                                   |
+| `T1=FAIL(config N/M)`                         | The CLI saw N unset `userConfig` options where the manifest declares M: it dropped or misread some. Run `claude plugin validate` on it. `FAIL(config error)`: the install output was not a JSON object with an integer count. |
+| `T1=PASS(no-count)`                           | The CLI predates 2.1.323 and reports no `unsetOptionCount`, so the option count went unchecked.                                                                                                                               |
+| `SAFETY ABORT … real ~/.claude state CHANGED` | Isolation failed to contain an install. Do **not** ignore — inspect manually; the env vars may not have taken effect.                                                                                                         |
 
 ## CI guidance
 

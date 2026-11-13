@@ -4,10 +4,10 @@ A Claude Code mod (experimental). It records which model every subagent runs on,
 and can move listed Opus-tier reviewers to Sonnet when a Max usage window is
 nearly spent.
 
-Claude Code only, 2.1.301 or later. The manifest declares that range in
-`engines`, so Claude Code 2.1.323 and later will not install or load it on an
-older version. Codex, Cursor and Jules builds have no equivalent, so nothing
-else in the marketplace depends on it.
+Claude Code only, 2.1.301 or later. Run `/claudemod:setup` to check the version:
+Claude Code reads the manifest's `engines` range only from 2.1.323, so versions
+before that ignore it. Codex, Cursor and Jules builds have no equivalent, so
+nothing else in the marketplace depends on it.
 
 ## Install
 
