@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.18.1
+
+### Patch Changes
+
+- [#1809](https://github.com/KingInYellows/yellow-plugins/pull/1809)
+  [`b51a9e7`](https://github.com/KingInYellows/yellow-plugins/commit/b51a9e7e60f99caa95d629384807c76ac4625da5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Claude Code
+  2.1.323 follow-ups (CLAUDE-338): yellow-claudemod declares
+  `engines["claude-code"]: ">=2.1.301"` and imports `./policy` without a `.ts`
+  extension, clearing the new TS5097 validator warning. The git-worktree
+  manager, the review-gate shadow run and yellow-agy now name the Claude Code
+  Bash sandbox when `git worktree add` or `remove` fails read-only.
+
 ## 3.18.0
 
 ### Minor Changes
