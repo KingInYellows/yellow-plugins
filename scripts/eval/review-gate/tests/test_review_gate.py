@@ -455,6 +455,23 @@ class RunEnvTest(unittest.TestCase):
         self.assertEqual(env["CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS"], "0")
         self.assertNotIn("CLAUDE_EFFORT", env)
 
+    def test_turns_off_agent_progress_summaries(self):
+        self.assertEqual(rg.run_env()["CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES"], "1")
+
+
+class ModelBlockedTest(unittest.TestCase):
+    def test_finds_the_swap_warning(self):
+        err = ('noise\nModel "opus" is restricted by your organization\'s settings. '
+               "Using claude-sonnet-5-5 instead.\nmore\n")
+        self.assertEqual(rg.model_blocked(err),
+                         'Model "opus" is restricted by your organization\'s settings. '
+                         "Using claude-sonnet-5-5 instead.")
+
+    def test_ignores_other_stderr(self):
+        self.assertIsNone(rg.model_blocked(""))
+        self.assertIsNone(rg.model_blocked(None))
+        self.assertIsNone(rg.model_blocked("[mcp-sdk] warning\n"))
+
 
 class GradeMathTest(unittest.TestCase):
     GOLDEN = {"file": "lib/x.sh", "line": 10, "match": [r"unquoted", r"\bpath\b"]}

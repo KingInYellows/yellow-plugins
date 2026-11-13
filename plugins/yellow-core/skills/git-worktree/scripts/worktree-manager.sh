@@ -55,6 +55,17 @@ info() {
     printf '%s%s%s\n' "$BLUE" "$1" "$NC"
 }
 
+# Claude Code 2.1.323+ makes `git worktree add`, `move` and `remove` fail
+# read-only inside its Bash sandbox (macOS, Linux, WSL). Name the likely cause
+# when git's error looks like that denial, so the command is rerun outside it.
+sandbox_hint() {
+    case "$1" in
+        *'Read-only file system'* | *'Operation not permitted'*)
+            warning "If the Claude Code Bash sandbox is on, it blocks git worktree add, move and remove. Rerun this command outside the sandbox."
+            ;;
+    esac
+}
+
 # Get repository root (worktree-relative — returns the worktree root when run
 # inside a worktree, not the main repo root). Use get_main_repo_root for the
 # main repo path.
@@ -270,8 +281,13 @@ cmd_create() {
     # Create worktree
     info "Creating worktree: ${branch_name} from ${from_branch}"
     # Try creating with new branch (-b), fall back to existing branch
-    if ! git worktree add -b "$branch_name" "$worktree_path" -- "$from_branch" 2>/dev/null; then
-        git worktree add "$worktree_path" "$branch_name" || error "Failed to create worktree"
+    if ! wt_err=$(git worktree add -b "$branch_name" "$worktree_path" -- "$from_branch" 2>&1); then
+        if ! wt_err2=$(git worktree add "$worktree_path" "$branch_name" 2>&1); then
+            printf '%s\n' "$wt_err2" >&2
+            sandbox_hint "$wt_err
+$wt_err2"
+            error "Failed to create worktree"
+        fi
     fi
 
     # Copy .env files
@@ -406,7 +422,9 @@ cmd_cleanup() {
         saved_ruvector_target=$(unlink_ruvector_link "$path")
 
         info "Removing: ${path}"
-        if ! git worktree remove "$path"; then
+        if ! wt_err=$(git worktree remove "$path" 2>&1); then
+            printf '%s\n' "$wt_err" >&2
+            sandbox_hint "$wt_err"
             warning "Failed to remove: ${path}"
             restore_ruvector_link "$path" "$saved_ruvector_target"
         fi

@@ -210,3 +210,45 @@ init_ruvector() {
     [ "$status" -eq 0 ]
     [ ! -d "$REPO/.worktrees/pre-fix" ]
 }
+
+# Claude Code 2.1.323's Bash sandbox makes `git worktree add/remove` fail
+# read-only. A git shim stands in for that denial.
+sandboxed_git() {
+    mkdir -p "$REPO/.shim"
+    real_git=$(command -v git)
+    cat > "$REPO/.shim/git" <<SHIM
+#!/bin/sh
+if [ "\$1" = worktree ] && { [ "\$2" = add ] || [ "\$2" = remove ]; }; then
+    printf 'fatal: could not create directory: Read-only file system\n' >&2
+    exit 128
+fi
+exec "$real_git" "\$@"
+SHIM
+    chmod +x "$REPO/.shim/git"
+    printf '.shim/\n' >> "$REPO/.git/info/exclude"
+}
+
+@test "create: a read-only worktree add names the Claude Code sandbox" {
+    sandboxed_git
+    run --separate-stderr env PATH="$REPO/.shim:$PATH" sh "$SCRIPT" create boxed
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"Read-only file system"* ]]
+    [[ "$stderr" == *"Claude Code Bash sandbox"* ]]
+    [ ! -d "$REPO/.worktrees/boxed" ]
+}
+
+@test "create: an ordinary failure gives no sandbox hint" {
+    run --separate-stderr sh "$SCRIPT" create ok-branch no-such-base
+    [ "$status" -ne 0 ]
+    [[ "$stderr" != *"sandbox"* ]]
+}
+
+@test "cleanup: a read-only worktree remove names the Claude Code sandbox" {
+    run sh "$SCRIPT" create stays
+    [ "$status" -eq 0 ]
+    sandboxed_git
+    run --separate-stderr sh -c "printf 'y\n' | PATH='$REPO/.shim:$PATH' sh '$SCRIPT' cleanup"
+    [[ "$stderr" == *"Claude Code Bash sandbox"* ]]
+    [[ "$stderr" == *"Failed to remove"* ]]
+    [ -d "$REPO/.worktrees/stays" ]
+}

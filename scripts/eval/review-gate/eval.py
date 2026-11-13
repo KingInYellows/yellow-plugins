@@ -501,7 +501,24 @@ def run_env():
     # mid-run. 0 lifts the ceiling; the caller's subprocess timeout is the
     # deadline.
     env["CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS"] = "0"
+    # The per-subagent progress summaries are only for a watching user; an
+    # unattended run spends requests on them for nothing.
+    env["CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES"] = "1"
     return env
+
+
+# Claude Code 2.1.323+ prints this on stderr when settings block the requested
+# model and the run continues on another one.
+MODEL_BLOCKED_RE = re.compile(r"Model \S+ is restricted by your organization's settings")
+
+
+def model_blocked(stderr):
+    """The warning line, when settings swapped the row's model for another."""
+    match = MODEL_BLOCKED_RE.search(stderr or "")
+    if not match:
+        return None
+    end = (stderr or "").find("\n", match.start())
+    return (stderr or "")[match.start():end if end >= 0 else None].strip()
 
 
 def write_json(path, data):
@@ -535,6 +552,12 @@ def run_one(row, work, claude, timeout):
     if isinstance(cli, list):  # stream-style output: the last result message
         cli = next((m for m in reversed(cli) if isinstance(m, dict) and m.get("type") == "result"), None)
     wf = parse_workflow(cli.get("result")) if isinstance(cli, dict) else None
+    blocked = model_blocked(stderr)
+    if blocked:
+        # Graded as the row's model, it would skew the comparison.
+        with open(os.path.join(out_dir, rid + ".bad"), "w", encoding="utf-8") as handle:
+            handle.write(stdout or "")
+        return rid, False, blocked
     if rc != 0 or not isinstance(cli, dict) or cli.get("is_error") or wf is None:
         # A crash, timeout, rate limit or prose-only reply reruns next time.
         with open(os.path.join(out_dir, rid + ".bad"), "w", encoding="utf-8") as handle:

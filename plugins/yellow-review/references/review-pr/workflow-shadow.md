@@ -34,7 +34,14 @@ mkdir -p "$gate_dir" || exit 1
 git worktree prune
 gate_root=$(mktemp -d "$gate_dir/pr-<PR#>.XXXXXX") || exit 1
 head_sha=$(git rev-parse HEAD) || exit 1
-git worktree add --quiet --detach "$gate_root" "$head_sha" || exit 1
+if ! wt_err=$(git worktree add --quiet --detach "$gate_root" "$head_sha" 2>&1); then
+  printf '%s\n' "$wt_err" >&2
+  case "$wt_err" in
+    *'Read-only file system'* | *'Operation not permitted'*)
+      printf '[review:pr] review-gate: the Claude Code Bash sandbox blocks git worktree add\n' >&2 ;;
+  esac
+  exit 1
+fi
 git diff "<DIFF_BASE>"...HEAD >| "$gate_root.diff" || exit 1
 printf 'repo_root=%s\ndiff_path=%s\n' "$gate_root" "$gate_root.diff"
 printf 'base=%s head=%s\n' "$(git merge-base "<DIFF_BASE>" HEAD)" "$head_sha"
@@ -42,9 +49,11 @@ gh repo view --json nameWithOwner -q .nameWithOwner
 ```
 
 If this block fails, run Cleanup below, record `not run (checkout failed)` for
-Step 10 and skip the rest of this file. When it stops at the path checks,
-nothing was created: skip Cleanup too. Those checks mean the printed `repo_root`
-holds only plain path characters, so Cleanup can quote it safely.
+Step 10 and skip the rest of this file. When it printed the sandbox line, record
+`not run (Bash sandbox blocks git worktree add)` instead and do not retry it
+outside the sandbox: the shadow run is optional. When it stops at the path
+checks, nothing was created: skip Cleanup too. Those checks mean the printed
+`repo_root` holds only plain path characters, so Cleanup can quote it safely.
 
 Read `REVIEW.md` from the default branch, never from the PR head, so a PR cannot
 weaken its own review. Step 3a2 already fetched that branch:
