@@ -321,6 +321,7 @@ while IFS= read -r plugin; do
       # Every userConfig option starts unset in a fresh install, so the CLI's
       # unsetOptionCount (Claude Code 2.1.323+) must equal the manifest's
       # option count. A lower count means the CLI dropped options it read.
+      # shellcheck disable=SC2016  # ${...} is a JS template literal, not shell.
       config_check="$(node -e '
         const fs = require("fs");
         const declared = Object.keys(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).userConfig || {}).length;
