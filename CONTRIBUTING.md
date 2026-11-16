@@ -379,13 +379,16 @@ _partial_ run (tags created, Release missing or failed).
 > it, and confirm `package.json`'s catalog version is the one you mean to
 > (re)publish, not a stale value left over from an unrelated merge.
 
-### Note on auto-updates (GitHub issue #26744)
+### Note on auto-updates
 
-Claude Code's background auto-update check has a known bug where it does not
-prompt users even when a newer version is available in the marketplace. Until
-fixed, users can run `/plugin marketplace update` to fetch the latest. Version
-bumps are still worth doing — they will be retroactively effective once the bug
-is fixed.
+Third-party marketplaces auto-update only when auto-update is on for the
+marketplace; the check runs after a session's first message and can take up to
+ten minutes. The old bug where they never did (GitHub issue #26744) was reported
+fixed in Claude Code 2.1.72 and the issue is closed. Users who don't see a new
+version can refresh the catalog with `/plugin marketplace update
+yellow-plugins`, update the plugin with `claude plugin update
+<name>@yellow-plugins`, then run `/reload-plugins`; a running session keeps its
+loaded version until then.
 
 ### Manual cache refresh for non-interactive sessions
 
