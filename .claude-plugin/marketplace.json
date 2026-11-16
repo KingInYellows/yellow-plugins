@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.16.0",
+      "version": "2.16.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -84,7 +84,7 @@
     {
       "name": "yellow-agy",
       "description": "Local supervised delegate on the Antigravity CLI (agy) under the owner's Google AI Pro sign-in — successor to yellow-jules",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -94,7 +94,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.18.0",
+      "version": "3.18.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -224,7 +224,7 @@
     {
       "name": "yellow-claudemod",
       "description": "Claude Code mod that records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": {
         "name": "KingInYellows"
       },

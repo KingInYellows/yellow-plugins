@@ -37,7 +37,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.16.0",
+      "version": "2.16.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -87,7 +87,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-agy",
       "description": "Local supervised delegate on the Antigravity CLI (agy) under the owner's Google AI Pro sign-in — successor to yellow-jules",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -97,7 +97,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.18.0",
+      "version": "3.18.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -227,7 +227,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-claudemod",
       "description": "Claude Code mod that records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -385,7 +385,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-agy/.claude-plugin/plu
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-agy",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Local supervised delegate on the Antigravity CLI (agy) under the owner's Google AI Pro sign-in — successor to yellow-jules",
   "author": {
     "name": "KingInYellows",
@@ -479,7 +479,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-claudemod/.claude-plug
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-claudemod",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Claude Code mod that records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit",
   "author": {
     "name": "KingInYellows",
@@ -575,7 +575,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "2.16.0",
+  "version": "2.16.1",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
@@ -1071,7 +1071,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-review/.claude-plugin/
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-review",
-  "version": "3.18.0",
+  "version": "3.18.1",
   "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
   "author": {
     "name": "KingInYellows",
