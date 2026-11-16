@@ -13,6 +13,24 @@ and this project adheres to
 
 ---
 
+## [2.1.35] - 2026-11-16
+
+### Changed
+
+- **yellow-claudemod 0.1.3** — Declares `engines["claude-code"]: ">=2.1.301"` in
+  its manifest, and imports `./policy` without a `.ts` extension, which clears
+  the TS5097 warning `claude plugin validate` reports from Claude Code 2.1.323
+  (CLAUDE-338, #1809).
+
+### Fixed
+
+- **yellow-core 2.16.1, yellow-review 3.18.1, yellow-agy 0.2.3** — When
+  `git worktree add` or `remove` fails on a read-only path, the git-worktree
+  manager, the review-gate shadow run and yellow-agy name the Claude Code Bash
+  sandbox as the likely cause (CLAUDE-338, #1809).
+
+---
+
 ## [2.1.34] - 2026-11-12
 
 ### Added
