@@ -9,6 +9,9 @@
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
   "keywords": ["mod", "model-routing", "usage-limits", "subagents", "observability"],
+  "engines": {
+    "claude-code": ">=2.1.301"
+  },
   "userConfig": {
     "downshift_enabled": {
       "type": "boolean",

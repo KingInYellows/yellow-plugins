@@ -15,7 +15,7 @@ import {
   type LedgerRow,
   type Window,
   type WriteFailure,
-} from './policy.ts';
+} from './policy';
 
 const STATUS_COMMAND = 'claudemod-status';
 const DOWNSHIFT_TARGET = 'sonnet';

@@ -13,6 +13,44 @@ and this project adheres to
 
 ---
 
+## [2.1.34] - 2026-11-12
+
+### Added
+
+- **yellow-review 3.18.0, yellow-core 2.16.0** — Settled decisions in review:
+  `/review:pr` and `/review:all` read the `(session-settled: …)` entries of the
+  plan a PR names in its body or commits and set aside P2/P3 `maintainability`
+  and `docs` findings that only re-argue one. Set-aside findings are listed
+  under Coverage, not applied and not written to the ledger; defect findings
+  keep full severity (CLAUDE-293, #1775).
+- **yellow-core 2.16.0** — Every background compounding drain runs with
+  `--max-budget-usd` (3.00 by default, `COMPOUND_DRAIN_MAX_BUDGET_USD` overrides
+  it) and logs its `total_cost_usd`. `/compound:review-staged` pins the same
+  model and cap as the SessionStart drain (CLAUDE-309, #1774).
+
+### Changed
+
+- **gt-workflow 2.2.0, yellow-core 2.16.0, yellow-linear 2.3.1, yellow-review
+  3.18.0** — The eight gt-workflow entry points (`gt-setup`, `smart-submit`,
+  `gt-amend`, `gt-stack-plan`, `gt-cleanup`, `gt-sync`, `gt-nav`, `gt-merge`)
+  are user-invocable skills and the same-named wrapper commands are removed,
+  because Claude Code resolved each pair to the wrapper. Type
+  `/gt-workflow:<name>`; `/flow:work`, `/flow:plan`, `/linear:work` and
+  `/setup:all` call them by qualified name (CLAUDE-307, #1769).
+
+### Fixed
+
+- **yellow-core 2.16.0** — `create-agent-skills` describes
+  `disable-model-invocation` correctly: the entry point leaves the session
+  listing, the Skill tool refuses it, and it runs only when typed (CLAUDE-308,
+  #1773). The same skill names "the current Claude models" instead of a pinned
+  generation (#1778).
+- **yellow-goal 0.4.1** — The `/goal:request` and `/goal:setup` descriptions are
+  on one line, so Prettier-wrapped text cannot break their frontmatter
+  (CLAUDE-291, #1768).
+
+---
+
 ## [2.1.33] - 2026-11-09
 
 ### Added

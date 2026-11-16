@@ -30,5 +30,8 @@
       "description": "Percent of the fullest usage window (five_hour or seven_day) at which the downshift starts. 1 to 100.",
       "default": 80
     }
+  },
+  "engines": {
+    "claude-code": ">=2.1.301"
   }
 }

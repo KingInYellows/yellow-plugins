@@ -89,6 +89,52 @@ describe('worktree', () => {
     expect(git(wt, 'branch', '--show-current').trim()).toBe('agy/busy');
   });
 
+  it('names the Claude Code sandbox when worktree add fails read-only', async () => {
+    const { repo, root } = makeRepo();
+    const sandboxed = {
+      ...exec,
+      git: async (
+        args: readonly string[],
+        o: Parameters<typeof exec.git>[1]
+      ) =>
+        args[0] === 'worktree' && args[1] === 'add'
+          ? {
+              code: 128,
+              stdout: '',
+              stdoutBytes: Buffer.alloc(0),
+              stderr:
+                'fatal: could not create directory: Read-only file system\n',
+            }
+          : exec.git(args, o),
+    };
+    const err = await createWorktree(sandboxed, {
+      repo,
+      worktree: path.join(root, 'wt', 'boxed'),
+      branch: 'agy/boxed',
+      remote: 'origin',
+      baseBranch: 'main',
+    }).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: 'AGY_WORKTREE' });
+    expect((err as Error).message).toMatch(/Claude Code Bash sandbox/);
+    expect(git(repo, 'branch', '--list', 'agy/boxed')).toBe('');
+  });
+
+  it('gives no sandbox hint for an ordinary worktree add failure', async () => {
+    const { repo, root } = makeRepo();
+    const wt = path.join(root, 'wt', 'busy2');
+    fs.mkdirSync(wt, { recursive: true });
+    fs.writeFileSync(path.join(wt, 'f'), 'x');
+    const err = await createWorktree(exec, {
+      repo,
+      worktree: wt,
+      branch: 'agy/busy2',
+      remote: 'origin',
+      baseBranch: 'main',
+    }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AgyError);
+    expect((err as Error).message).not.toMatch(/sandbox/);
+  });
+
   it('leaves alone a branch another creator made after the existence check', async () => {
     const { repo, root } = makeRepo();
     const racing = {

@@ -61,9 +61,15 @@ async function runGit(exec, cwd, args, stdin, env) {
         throw gitError(args, res);
     return res.stdout;
 }
+// Claude Code 2.1.323+ makes `git worktree add`, `move` and `remove` fail
+// read-only inside its Bash sandbox (macOS, Linux, WSL).
+const SANDBOX_DENIAL_RE = /Read-only file system|Operation not permitted/;
 function gitError(args, res) {
     const detail = res.stderr.trim().split(/\r?\n/).slice(-3).join(' ');
-    return new errors_1.AgyError('AGY_WORKTREE', `git ${args.slice(0, 2).join(' ')} failed: ${detail || `exit ${res.code}`}`);
+    const hint = args[0] === 'worktree' && SANDBOX_DENIAL_RE.test(res.stderr)
+        ? '; if the Claude Code Bash sandbox is on, it blocks git worktree changes, so run this outside it'
+        : '';
+    return new errors_1.AgyError('AGY_WORKTREE', `git ${args.slice(0, 2).join(' ')} failed: ${detail || `exit ${res.code}`}${hint}`);
 }
 function sha(out) {
     const value = out.trim();

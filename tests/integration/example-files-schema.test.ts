@@ -208,7 +208,9 @@ describe('plugin.schema.json tightening (PR #559) — negative cases', () => {
     const d = {
       ...base,
       hooks: {
-        PostToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'x' }] }],
+        PostToolUse: [
+          { matcher: '*', hooks: [{ type: 'command', command: 'x' }] },
+        ],
       },
     };
     expect(factory.validate('plugin', d).valid).toBe(true);
@@ -221,6 +223,23 @@ describe('plugin.schema.json tightening (PR #559) — negative cases', () => {
 
   it('rejects string (file-path) hooks — remote validator rejects indirection', () => {
     const d = { ...base, hooks: './hooks/hooks.json' };
+    expect(factory.validate('plugin', d).valid).toBe(false);
+  });
+
+  // engines["claude-code"] (Claude Code 2.1.323): an object holding one
+  // semver range; the CLI rejects a string or a malformed range.
+  it('accepts engines with a claude-code range', () => {
+    const d = { ...base, engines: { 'claude-code': '>=2.1.301' } };
+    expect(factory.validate('plugin', d).valid).toBe(true);
+  });
+
+  it.each([
+    ['a string', '>=2.1.301'],
+    ['a malformed range', { 'claude-code': 'garbage' }],
+    ['an unknown engine', { 'claude-code': '>=2.1.301', node: '>=20' }],
+    ['no claude-code key', {}],
+  ])('rejects engines as %s', (_label, engines) => {
+    const d = { ...base, engines };
     expect(factory.validate('plugin', d).valid).toBe(false);
   });
 });
@@ -255,7 +274,10 @@ describe('official-marketplace.schema.json additionalProperties:false (PR #559)'
   });
 
   it('rejects an unknown top-level key (e.g. changelog) the remote validator also rejects', () => {
-    const d = { ...liveMarketplace, changelog: 'https://example.com/CHANGELOG' };
+    const d = {
+      ...liveMarketplace,
+      changelog: 'https://example.com/CHANGELOG',
+    };
     expect(factory.validate('marketplace-official', d).valid).toBe(false);
   });
 });

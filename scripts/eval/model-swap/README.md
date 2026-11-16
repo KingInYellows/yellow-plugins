@@ -67,6 +67,13 @@ Project `CLAUDE.md` files still load. Agents listed with `preload_skills` get
 those `SKILL.md` bodies appended, which is what `skills:` frontmatter does.
 `--plugin-dir` is not used: in cloud sessions it did not register plugin agents.
 
+Runs set `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1`, since nobody watches
+the subagent progress lines. When settings block the requested model, Claude
+Code 2.1.323 and later print
+`Model "<name>" is restricted by your organization's settings` on stderr and
+carry on with another model; `run-one.sh` fails that run (`<id>.bad`) so it is
+never graded as the model it asked for.
+
 The orchestrator blocks that `/review:pr` injects (`<standards-paths>`,
 `<rule-vocabulary>`) are not supplied, so agents run in standalone mode.
 
@@ -86,10 +93,10 @@ Add a spec under `fixtures/`, or extend one:
   checks. `fence: false` passes the context unfenced (for an agent whose
   dispatch prompt is the context). `env` sets variables for the run; `{repo}`,
   `{wt}`, `{rid}` and `{PATH}` are filled in, so
-  `"PATH": "{repo}/<fixtures>/bin:{PATH}"` puts stand-in CLIs first. List
-  the stand-ins and canned responses the agent reads in `fixtures`
-  (repo-relative files or directories): their contents go into its rows'
-  fingerprints, so editing one reruns those rows instead of reusing old output.
+  `"PATH": "{repo}/<fixtures>/bin:{PATH}"` puts stand-in CLIs first. List the
+  stand-ins and canned responses the agent reads in `fixtures` (repo-relative
+  files or directories): their contents go into its rows' fingerprints, so
+  editing one reruns those rows instead of reusing old output.
 
 An agent's optional `replays` or `scans` list limits it to those targets.
 

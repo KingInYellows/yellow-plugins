@@ -76,6 +76,10 @@
       "type": "object",
       "description": "Pass-through Claude component field; see schemas/plugin.schema.json for its full shape."
     },
+    "engines": {
+      "type": "object",
+      "description": "Pass-through Claude component field; see schemas/plugin.schema.json for its full shape."
+    },
     "dependencies": {
       "type": "array",
       "description": "Pass-through Claude component field; see schemas/plugin.schema.json for its full shape."
