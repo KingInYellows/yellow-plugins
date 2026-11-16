@@ -77,6 +77,23 @@ Linear.
 | `/review:triage`        | Re-verify a PR's review-findings ledger, then fix, dismiss, restore or skip each residual finding (`--non-interactive`, `--prune <PR#>`)                                                                                                                                                   |
 | `/review:merge-ready`   | Read-only merge gate: unresolved threads (outdated included), changes requested, CI, mergeability and pending P0-P2 ledger findings; ends with a `MergeReady:` line                                                                                                                        |
 
+### Running unattended
+
+Every `/review:*` command declares `allowed-tools`, so when Claude invokes one
+through the Skill tool without a person typing it (`/loop`, scheduled tasks,
+`claude -p`), Claude Code asks first, and in headless mode the ask is a denial.
+`/review:sweep` and `/review:sweep-all` also invoke `/review:pr`,
+`/review:resolve` and `/review:triage` that way. Allow the whole family before
+an unattended run, in `permissions.allow` or with `--allowedTools`:
+
+```json
+{ "permissions": { "allow": ["Skill(yellow-review:review:*)"] } }
+```
+
+The rule needs the plugin prefix: `Skill(review:sweep)` does not match. Checked
+on Claude Code 2.1.325, where scheduled tasks and `/loop` started asking too;
+headless runs already denied on 2.1.322.
+
 ### Dispositions
 
 `/review:resolve` ends every unresolved thread with one of five dispositions,
