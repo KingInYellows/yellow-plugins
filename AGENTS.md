@@ -246,6 +246,19 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   `pnpm validate:versions:dry` to inspect it and `pnpm apply:changesets` or
   `node scripts/sync-manifests.js` to complete an interrupted sync.
 
+## Linear Linking
+
+Every branch and PR must reference a Linear issue in the `CLAUDE` team; the
+`linear-link` check (`.github/workflows/linear-link.yml`) fails the PR
+otherwise. Linear auto-creates an issue for a PR still unlinked at merge and
+guesses its team, which has misfiled work.
+
+- Existing work: start the branch from Linear's "Copy git branch name", or put
+  `Fixes CLAUDE-123` in the PR description (`Refs CLAUDE-123` for partial work).
+- New work: put `Fixes CLAUDE-NEW` in the PR description.
+- Never reference another team's key unless the work genuinely belongs there.
+- If Linear links the wrong issue, add `Ignore <ID>` to the PR description.
+
 ## Plugin Manifest Rules
 
 - Every plugin directory must have `.claude-plugin/plugin.json` with `name`,

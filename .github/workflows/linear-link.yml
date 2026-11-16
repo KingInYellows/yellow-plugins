@@ -1,0 +1,83 @@
+name: Linear Link
+
+# Every PR must reference a Linear issue in the CLAUDE team before it merges.
+# Linear's "Automatically link or create issues on merge" setting only creates
+# an issue for a PR that is still unlinked at merge, and then it guesses the
+# team. A PR that names CLAUDE-<number> or CLAUDE-NEW is never guessed.
+#
+# Passes when any of these holds (word-boundary match):
+#   branch name     CLAUDE-<number>, claude-<number> (Linear's lowercase form)
+#                   or CLAUDE-NEW
+#   PR title / body CLAUDE-<number> or CLAUDE-NEW (case-sensitive; text
+#                   inside <!-- --> comments in the body does not count)
+#
+# PR fields reach the script only through env, never through ${{ }} inside
+# run:, so a crafted title, body or branch name cannot inject shell. The job
+# checks out nothing and holds no token scope.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+concurrency:
+  group: linear-link-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  linear-link:
+    name: linear-link
+    # Bot PRs (the Changesets "chore: version packages" PR, Graphite merge
+    # queue drafts on gtmq_* branches) carry no Linear reference by design.
+    # A skipped job still satisfies a required status check.
+    if: >-
+      github.event.pull_request.user.type != 'Bot' &&
+      !startsWith(github.event.pull_request.head.ref, 'gtmq_')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Check for a CLAUDE issue reference
+        env:
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          # Word boundary = start/end of line or a non-[A-Za-z0-9_] character.
+          upper='(^|[^A-Za-z0-9_])CLAUDE-([0-9]+|NEW)([^A-Za-z0-9_]|$)'
+          lower='(^|[^A-Za-z0-9_])claude-[0-9]+([^A-Za-z0-9_]|$)'
+          found=''
+          if printf '%s\n' "$PR_BRANCH" | grep -Eq -- "$upper|$lower"; then
+            found='branch name'
+          elif printf '%s\n' "$PR_TITLE" | grep -Eq -- "$upper"; then
+            found='PR title'
+          # HTML comments are dropped first, so the template's example
+          # reference in a comment never counts as a link.
+          elif printf '%s\n' "${PR_BODY:-}" | perl -0pe 's/<!--.*?-->//gs' \
+            | grep -Eq -- "$upper"; then
+            found='PR description'
+          fi
+          if [ -n "$found" ]; then
+            echo "Linear link found in the $found."
+            exit 0
+          fi
+          # The untrusted fields are never echoed, so they cannot emit
+          # workflow commands.
+          msg='This PR does not reference a Linear issue in the CLAUDE team.'
+          echo "::error title=Missing Linear issue::$msg Add 'Fixes CLAUDE-123' (or 'Refs CLAUDE-123' for partial work) to the PR description, or 'Fixes CLAUDE-NEW' if no issue exists yet. Saving the edited description re-runs this check."
+          {
+            echo "## Missing Linear issue"
+            echo
+            echo "$msg Linear would otherwise create an issue at merge and guess its team."
+            echo
+            echo "Fix it in one of these ways, then save the PR description (this check re-runs on edit):"
+            echo
+            echo "- Existing issue: add \`Fixes CLAUDE-123\` to the PR description (\`Refs CLAUDE-123\` for partial work)."
+            echo "- No issue yet: add \`Fixes CLAUDE-NEW\` to the PR description, and Linear files one in CLAUDE."
+            echo "- Or start the branch from Linear's \"Copy git branch name\" (\`…/claude-123-…\`)."
+            echo
+            echo "The key is case-sensitive: \`CLAUDE-123\`, not \`claude-123\`, in the title and description."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
