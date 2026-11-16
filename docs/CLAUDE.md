@@ -98,8 +98,10 @@ procedure in `docs/operations/release-checklist.md` Section 5.2, which pins the
 dispatch to the release merge.
 
 Third-party marketplaces auto-update at session start only when auto-update is
-on for the marketplace. Users who don't see a new version can run
-`/plugin marketplace update`.
+on for the marketplace. Users who don't see a new version can refresh
+the catalog with `/plugin marketplace update`, update the plugin with
+`claude plugin update <name>@yellow-plugins`, then run `/reload-plugins`; a
+running session keeps its loaded version until then.
 
 ## Solution Docs
 

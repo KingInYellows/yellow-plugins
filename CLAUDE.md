@@ -152,9 +152,9 @@ still rely on review:
   "be thorough" exhortations, or self-verification loops — these degrade
   their output. Per-model notes (effort defaults, early stops) are in
   docs/research/best-practices/gpt-claude-latest-model-prompting-guidance.md.
-- `.gitattributes` normalizes to LF on commit, but a script written with CRLF
-  on WSL2 fails when run before that (`sed -i 's/\r$//'`); prefer heredocs or
-  scripts for new `.sh` files.
+- `.gitattributes` normalizes only the committed copy, so a script written
+  with CRLF on WSL2 keeps failing locally until you strip the CRs
+  (`sed -i 's/\r$//'`); prefer heredocs or scripts for new `.sh` files.
 
 ## Skill and Workflow Execution Rules
 
