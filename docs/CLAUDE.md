@@ -97,8 +97,9 @@ the current `main` and can re-publish under a stale tag. Follow the guarded
 procedure in `docs/operations/release-checklist.md` Section 5.2, which pins the
 dispatch to the release merge.
 
-Third-party marketplaces auto-update at session start only when auto-update is
-on for the marketplace. Users who don't see a new version can refresh
+Third-party marketplaces auto-update only when auto-update is on for the
+marketplace; the check runs after a session's first message and can take up to
+ten minutes. Users who don't see a new version can refresh
 the catalog with `/plugin marketplace update`, update the plugin with
 `claude plugin update <name>@yellow-plugins`, then run `/reload-plugins`; a
 running session keeps its loaded version until then.

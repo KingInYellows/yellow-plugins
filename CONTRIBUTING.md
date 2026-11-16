@@ -381,8 +381,9 @@ _partial_ run (tags created, Release missing or failed).
 
 ### Note on auto-updates
 
-Third-party marketplaces auto-update at session start only when auto-update is
-on for the marketplace. The old bug where they never did (GitHub issue #26744)
+Third-party marketplaces auto-update only when auto-update is on for the
+marketplace; the check runs after a session's first message and can take up to
+ten minutes. The old bug where they never did (GitHub issue #26744)
 was reported fixed in Claude Code 2.1.72 and the issue is closed. Users who
 don't see a new version can refresh the catalog with
 `/plugin marketplace update`, update the plugin with
