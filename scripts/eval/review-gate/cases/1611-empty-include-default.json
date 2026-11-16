@@ -1,0 +1,23 @@
+{
+  "id": "1611-empty-include-default",
+  "repo": "KingInYellows/yellow-plugins",
+  "pr": 1611,
+  "base": "8c283de91496686e598899a3afc959eddbe530db",
+  "head": "58b6ef7c5e562441044dc97e27d9031005f9dfac",
+  "lane": "correctness",
+  "tier": "medium",
+  "golden": [
+    {
+      "file": "scripts/eval/review-gate/eval.py",
+      "line": 266,
+      "match": [
+        "\\binclude\\b",
+        "empty|\\[\\]|default|reject|refus|at least one"
+      ]
+    }
+  ],
+  "source": "fix #1735 (20a74bd): prepare sent include: [] for rows without include, and review-gate.js refuses an empty include, so every eval row failed at launch",
+  "confirmed_by": "KingInYellow18",
+  "confirmed_at": "2026-11-16",
+  "notes": "Second defect in #1611 (see 1611-bg-wait-ceiling). The refusal is review-gate.js:257 at base, outside the diff, so finding it needs a read beyond the changed lines."
+}
