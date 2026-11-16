@@ -97,9 +97,9 @@ the current `main` and can re-publish under a stale tag. Follow the guarded
 procedure in `docs/operations/release-checklist.md` Section 5.2, which pins the
 dispatch to the release merge.
 
-**Known issue:** Claude Code's background auto-update has a bug (GH #26744) where
-it doesn't prompt users when a new version is available. Users can run
-`/plugin marketplace update` manually.
+Third-party marketplaces auto-update at session start only when auto-update is
+on for the marketplace. Users who don't see a new version can run
+`/plugin marketplace update`.
 
 ## Solution Docs
 
