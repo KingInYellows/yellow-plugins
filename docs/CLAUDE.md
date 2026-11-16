@@ -99,10 +99,10 @@ dispatch to the release merge.
 
 Third-party marketplaces auto-update only when auto-update is on for the
 marketplace; the check runs after a session's first message and can take up to
-ten minutes. Users who don't see a new version can refresh
-the catalog with `/plugin marketplace update yellow-plugins`, update the plugin with
-`claude plugin update <name>@yellow-plugins`, then run `/reload-plugins`; a
-running session keeps its loaded version until then.
+ten minutes. Users who don't see a new version can refresh the catalog with
+`/plugin marketplace update yellow-plugins`, update the plugin with `claude
+plugin update <name>@yellow-plugins`, then run `/reload-plugins`; a running
+session keeps its loaded version until then.
 
 ## Solution Docs
 

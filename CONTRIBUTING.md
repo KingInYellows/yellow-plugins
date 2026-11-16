@@ -383,12 +383,12 @@ _partial_ run (tags created, Release missing or failed).
 
 Third-party marketplaces auto-update only when auto-update is on for the
 marketplace; the check runs after a session's first message and can take up to
-ten minutes. The old bug where they never did (GitHub issue #26744)
-was reported fixed in Claude Code 2.1.72 and the issue is closed. Users who
-don't see a new version can refresh the catalog with
-`/plugin marketplace update yellow-plugins`, update the plugin with
-`claude plugin update <name>@yellow-plugins`, then run `/reload-plugins`; a
-running session keeps its loaded version until then.
+ten minutes. The old bug where they never did (GitHub issue #26744) was reported
+fixed in Claude Code 2.1.72 and the issue is closed. Users who don't see a new
+version can refresh the catalog with `/plugin marketplace update
+yellow-plugins`, update the plugin with `claude plugin update
+<name>@yellow-plugins`, then run `/reload-plugins`; a running session keeps its
+loaded version until then.
 
 ### Manual cache refresh for non-interactive sessions
 
