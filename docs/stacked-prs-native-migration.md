@@ -53,13 +53,31 @@ to #1824 as stack #1825, and #1827 and #1828 as stack #1829):
   GitHub's GraphQL API, which those sessions block. It pushed the branches,
   opened nothing and exited 0, which the adapter now reports as `INCOMPLETE`
 - `init` on a detached HEAD creates the branch and then fails with exit 2
+- a second full run with the adapter as of commit 9ad234e: `init --branch` from
+  the trunk, two `add`, `submit` (#1834 to #1836 as stack #1837), an amend
+  without a conflict, `rebase --mode upstack` and a second `submit`; and a
+  second adoption (#1838 and #1839 as stack #1840)
+- `sync` after the trunk moved: the three branches were rebased and pushed, and
+  numbers, bases and the stack were unchanged
+- partial merge: `merge --target 1823 --confirm` on the middle layer landed
+  #1822 and #1823 on `main` as two squash commits, one per pull request, and
+  left #1824 open. No merge method was passed; `gh-stack` chose squash. The
+  result text ("Merged #1822, #1823 into main") is on `stderr`. GitHub then
+  retargeted #1824 to `main` and rebased its head on the server before any local
+  command ran, and deleted the two merged head branches. Both merged pull
+  requests keep their `stack` field
+- `sync` after that merge: skipped the two merged branches, rebased the top
+  branch onto `main`, force-pushed it over the server-side rebase, and reported
+  the stack up to date with one open pull request
 
-The submit, rebase and adoption runs used the adapter as of commit e8b9cba,
-before the `INCOMPLETE` status and the pull request URL check were added.
+The first submit, rebase and adoption runs used the adapter as of commit
+e8b9cba, before the `INCOMPLETE` status and the pull request URL check were
+added. Every test pull request and `pilot/*` branch has since been closed or
+deleted.
 
 **Not verified — needs a live GitHub repository:**
 
-- `merge`, partial-stack merge, and what `sync` does afterwards
+- merging a whole stack by its top layer or stack number, and `--merge-method`
 - adoption of pull requests that Graphite opened (the live adoption used plain
   `gh` pull requests)
 - that `gh stack merge` refuses an ordinary, unstacked pull request (read from
@@ -68,9 +86,11 @@ before the `INCOMPLETE` status and the pull request URL check were added.
 - whether a server-side "Rebase stack" produces signed commits
 - how `gh pr merge` and the REST merge endpoint behave on a stacked pull request
 
-No complete live lifecycle (through merge) has been run yet, and no machine has
-GitHub selected as its provider. Statements about the unverified items below
-come from GitHub's documentation and are marked "documented".
+One live lifecycle (submit, restack, sync, partial merge, sync) has been run,
+from a workstation clone that called the adapter directly. No machine has GitHub
+selected as its provider, and the skills themselves have not been run live.
+Statements about the unverified items below come from GitHub's documentation and
+are marked "documented".
 
 ## Versions
 
@@ -288,7 +308,8 @@ Expiry of a plan is not the same as non-renewal being configured.
       the workstation on 2026-11-17).
 - [ ] Pilot with throwaway `pilot/*` branches. Done on 2026-11-17: submit a
       three-layer stack, amend the bottom layer, restack, adopt two existing
-      pull requests. Still open: merge the bottom two, sync again, clean up.
+      pull requests, sync onto a newer trunk, merge the bottom two, sync again,
+      clean up.
 - [ ] `/stack:select github` on each machine, `/stack:status` shows
       `READY_GITHUB`.
 - [ ] No open Graphite stacks in any repository in the inventory, and nothing in

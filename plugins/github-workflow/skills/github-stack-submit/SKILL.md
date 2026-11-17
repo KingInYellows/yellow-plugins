@@ -50,11 +50,24 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
 - **`NOT_IN_STACK`** — first check that Graphite does not own the branch,
   before running anything that registers it. Skip this check on the trunk,
   which Graphite always lists and nobody owns. If `gt log short` lists the
-  current branch, or `.git/.graphite_repo_config` exists and the branch has
+  current branch, or Graphite's repo config exists and the branch has
   a pull request Graphite opened, stop here without calling `init`: one
   provider owns a stack. Finish it with Graphite or follow the adoption
-  steps in `docs/stacked-prs-native-migration.md`. If `gt` is not installed
-  and the config file is absent, Graphite does not own it.
+  steps in `docs/stacked-prs-native-migration.md`. The config is
+  `.graphite_repo_config` inside the directory that
+  `git rev-parse --git-common-dir` prints; in a linked worktree `.git` is a
+  file, so do not test `.git/.graphite_repo_config`.
+
+  If `gt` is not installed and the config is absent, this clone cannot tell
+  who opened an existing pull request. Check whether the branch has one:
+
+  ```bash
+  gh api "repos/{owner}/{repo}/pulls?state=open&head={owner}:$(git branch --show-current)" --jq 'length'
+  ```
+
+  On `0`, Graphite does not own the branch. On anything else, or if the call
+  fails, ask with `AskUserQuestion`: "This branch already has a pull request.
+  Did Graphite open it?" with options "Yes, Graphite" / "No". Stop on yes.
 
   Otherwise register it. Independent work is a one-branch stack
   on the trunk; GitHub only forms a stack object once two pull requests
