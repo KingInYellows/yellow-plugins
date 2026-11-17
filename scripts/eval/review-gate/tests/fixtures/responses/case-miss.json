@@ -8,7 +8,7 @@
       "display": "Important",
       "file": "lib/x.sh",
       "line": 9,
-      "title": "Unquoted path variable",
+      "title": "Unquoted variable",
       "category": "correctness",
       "rule": "unclassified",
       "confidence": 75,
@@ -16,7 +16,7 @@
       "votes": { "confirmed": 2, "refuted": 1, "unverifiable": 0 },
       "unverified": false,
       "evidence": { "file": "lib/x.sh", "line": 9 },
-      "suggested_fix": "Quote the path"
+      "suggested_fix": "Quote it"
     },
     {
       "id": "f2",

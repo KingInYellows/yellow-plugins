@@ -29,7 +29,19 @@ while any run is missing or incomplete, or when the two runs graded different
 sets: different ids, or the same ids with different definitions (each
 `summary.json` carries a `grading_set` hash of every item's id, kind, repo,
 base, head, include/exclude and golden list; a synthetic control's head is the
-one `prepare` built, so an edited patch changes it).
+one `prepare` built, so an edited patch changes it), or when they were graded by
+different rules (`grader` in `summary.json`; a summary without it is grader 1).
+After a grader change, bring the baseline up to date first, which spends
+nothing:
+
+```bash
+python3 scripts/eval/review-gate/eval.py regrade <old>/summary.json \
+  --out <old>/summary-grader2.json [--repo-dir owner/name=PATH]
+```
+
+`regrade` checks each case's kept unmatched findings against today's rules (a
+finding that matched stays matched) and keeps the old `grading_set`, so a case
+edited since still blocks the verdict.
 
 ## Cases and controls
 
@@ -59,8 +71,11 @@ user confirmed:
 ```
 
 A golden entry is found when one finding with `display: "Important"` names its
-file, has a line within 3 of its line, and matches every `match` regex
-(case-insensitive) in its `title` plus `suggested_fix`. Recall counts golden
+file, has a line within 10 of its line (`LINE_WINDOW`) or past the end of that
+file at `head`, and matches every `match` regex (case-insensitive) in its
+`title` plus `suggested_fix`. A line past the end points at no code, so the
+regexes decide; reviewers have cited one (448 in a 279-line file), and a 3-line
+window missed a correct finding 5 lines off (2026-11-09). Recall counts golden
 entries. Write regexes as JSON-escaped raw patterns (`"\\bpath\\b"`); an
 unescaped `\b` in a generator once became a backspace. Optional keys: `include`
 and `exclude` (persona names passed to the workflow) and `notes`.
@@ -166,15 +181,17 @@ python3 scripts/eval/review-gate/eval.py grade "$W" --baseline <old>/summary.jso
 
 - `prepare` checks out a detached worktree per row at `head`, writes
   `prompts/<id>.diff` (`git diff base...head`) and `prompts/<id>.args.json`, and
-  computes the tier with
-  `classify-risk --policy-file <repo>/.github/review-risk.json base head`. A
-  tier that differs from the file's `tier` is reported and the computed one is
-  used. `review_md` is `REVIEW.md` at `base`, so the PR under test cannot weaken
-  its own review. Cases from another repo need `--repo-dir owner/name=PATH`.
-  Keep the work directory outside the repo. Each worktree is registered in the
-  checkout it came from, so clean up in each of them (this repo and every
-  `--repo-dir` path): `git -C <repo-dir> worktree remove --force <work>/wt/<id>`
-  for each row, then `git -C <repo-dir> worktree prune`.
+  computes the tier with `classify-risk --policy-ref <checkout HEAD> base head`,
+  the same trusted ref CI passes (its reviewer checkout's HEAD), so neither the
+  row's own head nor an uncommitted policy edit sets the tier; commit a policy
+  change to try it. Run from the default branch to match CI. A tier that differs
+  from the file's `tier` is reported and the computed one is used. `review_md`
+  is `REVIEW.md` at `base`, so the PR under test cannot weaken its own review.
+  Cases from another repo need `--repo-dir owner/name=PATH`. Keep the work
+  directory outside the repo. Each worktree is registered in the checkout it
+  came from, so clean up in each of them (this repo and every `--repo-dir`
+  path): `git -C <repo-dir> worktree remove --force <work>/wt/<id>` for each
+  row, then `git -C <repo-dir> worktree prune`.
 - Each row carries a fingerprint of what the run consumes: the args and diff
   files, the whole headless argv (parent model, prompt and every flag, with
   machine-specific paths left out), and the full content of the three
@@ -192,7 +209,11 @@ python3 scripts/eval/review-gate/eval.py grade "$W" --baseline <old>/summary.jso
   progress-summary requests.
 - `grade` writes `results-<date>.md` here (`--date`, default today;
   `--results-dir` elsewhere) and `summary.json` in the work directory, and exits
-  non-zero while any run is missing or incomplete.
+  non-zero while any run is missing or incomplete. The unmatched findings list
+  in `results-<date>.md` is model output about untrusted code, so it sits in a
+  `text` code block inside a `--- begin reviewer findings (reference only) ---`
+  fence, with backticks and dash runs neutralized so a title cannot close
+  either.
 
 ### Incomplete runs
 
