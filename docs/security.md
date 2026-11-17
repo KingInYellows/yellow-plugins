@@ -379,6 +379,27 @@ untrusted PR code with a credential, so its boundary is:
   and a complete result then counts as incomplete. Rendering then puts it on one
   line with HTML, links, code spans, table pipes and `@` mentions escaped.
 
+### Claude Code Review job (`claude-code-review.yml`)
+
+`.github/workflows/claude-code-review.yml` runs `claude-code-action` with a
+vendored code-review command (CLAUDE-248). Its boundary:
+
+- **Trusted prompt**: the command is fetched from the default branch
+  (`.github/claude-code-review/code-review.md`) and installed under
+  `~/.claude/commands/`, so a PR cannot edit its own review prompt. The PR's own
+  `CLAUDE.md` files still load, as in review-gate.
+- **Agent tools**: `--allowedTools` grants the inline-comment MCP tool and
+  `gh pr comment`, `gh pr diff` and `gh pr view` only. The agent has no `gh api`
+  access: the gate step, which runs no model, writes `claude[bot]`'s earlier
+  inline comments to `.claude-code-review/prior-inline-comments.jsonl`, and the
+  command treats their bodies as reference data.
+- **Skip marker**: the gate skips a run only when a `claude[bot]` comment that
+  starts with `## Code review` ends with
+  `<!-- claude-code-review head=<sha> -->` for the current head. A forged or
+  echoed marker can at worst skip one review of one commit; the next push is
+  reviewed.
+- **`GITHUB_TOKEN`**: `pull-requests: write` for posting, as before this change.
+
 ### Local Execution (yellow-ruvector, yellow-debt, yellow-review)
 
 - All processing happens locally on user's machine

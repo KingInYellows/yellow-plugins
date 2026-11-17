@@ -40,14 +40,15 @@ counts, whatever commit it reviewed and whether the run that posted it finished.
   `~/.claude/commands/`, so a PR cannot edit its own review prompt. The action
   loads user, project and local setting sources by default, so user commands are
   found.
-- The command always posts its summary comment last, ending with
-  `<!-- claude-code-review head=<sha> -->`. A shell step before the action skips
-  the run only when a `claude[bot]` comment already carries the current head
-  SHA. Same-SHA events (`reopened`, `ready_for_review`) skip; a new push or a
-  cancelled run does not.
-- Before posting inline comments the command lists the PR's existing ones and
-  skips issues `claude[bot]` already raised, so a re-run after a cancel does not
-  duplicate them.
+- The command always posts its summary comment last: it starts with
+  `## Code review` and ends with `<!-- claude-code-review head=<sha> -->`. A
+  shell step before the action skips the run only when such a `claude[bot]`
+  comment exists for the current head SHA. Same-SHA events (`reopened`,
+  `ready_for_review`) skip; a new push or a cancelled run does not. A failure to
+  fetch the command other than 404 fails the job instead of skipping.
+- The same step saves `claude[bot]`'s earlier inline comments to
+  `.claude-code-review/prior-inline-comments.jsonl`, and the command skips
+  issues already raised there. The agent itself gets no `gh api` access.
 
 Each push now costs a full review (about $1 of subscription usage on #1645).
 CLAUDE-285 chose to keep this job, so that cost is accepted.

@@ -42,9 +42,11 @@ jobs:
       # Upstream stops once Claude has commented on a PR at all, so later
       # pushes were never reviewed. The copy is read from the default branch,
       # so a PR cannot change its own review, and installed as a user command.
-      # A run is skipped only when a claude[bot] summary comment already
-      # carries this exact head SHA. The command posts that comment last, so
-      # a run cancelled partway through is reviewed again on the next event.
+      # A run is skipped only when a claude[bot] "## Code review" summary ends
+      # with this exact head SHA's marker. The command posts that comment
+      # last, so a run cancelled partway through is reviewed again.
+      # This step also saves claude[bot]'s earlier inline comments for the
+      # command to read, so the review agent needs no gh api access.
       - name: Install review command and check for a completed review
         id: gate
         env:
@@ -55,24 +57,36 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           mkdir -p "$HOME/.claude/commands"
-          if ! gh api -H 'Accept: application/vnd.github.raw+json' \
-              "repos/$REPO/contents/.github/claude-code-review/code-review.md?ref=$DEFAULT_BRANCH" \
-              > "$HOME/.claude/commands/ci-code-review.md"; then
-            echo "::notice::review command is not on the default branch yet; skipping"
+          url="repos/$REPO/contents/.github/claude-code-review/code-review.md?ref=$DEFAULT_BRANCH"
+          if ! gh api -H 'Accept: application/vnd.github.raw+json' "$url" \
+              > "$HOME/.claude/commands/ci-code-review.md" 2> fetch.err; then
+            if grep -q 'HTTP 404' fetch.err; then
+              echo "::notice::review command is not on the default branch yet; skipping"
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            cat fetch.err >&2
+            echo "::error::could not fetch the review command"
+            exit 1
+          fi
+          export MARKER="<!-- claude-code-review head=$HEAD_SHA -->"
+          found=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --jq '.[]
+              | select(.user.login == "claude[bot]")
+              | select(.body | startswith("## Code review"))
+              | select(.body | rtrimstr("\n") | endswith(env.MARKER))
+              | .id')
+          if [ -n "$found" ]; then
+            echo "::notice::head $HEAD_SHA already has a completed Claude review; skipping"
             echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          marker="<!-- claude-code-review head=$HEAD_SHA -->"
-          # Read all bodies first: grep -q in a pipe can SIGPIPE gh under
-          # pipefail and turn a match into a miss.
-          bodies=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
-            --jq '.[] | select(.user.login == "claude[bot]") | .body')
-          if grep -qF -- "$marker" <<< "$bodies"; then
-            echo "::notice::head $HEAD_SHA already has a completed Claude review; skipping"
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          fi
+          mkdir -p .claude-code-review
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/comments" \
+            --jq '.[] | select(.user.login == "claude[bot]")
+              | {path, line: (.line // .original_line), body}' \
+            > .claude-code-review/prior-inline-comments.jsonl
+          echo "run=true" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude Code Review
         id: claude-review
@@ -110,10 +124,10 @@ jobs:
           # pricier model and drain the subscription token's limits.
           # --allowedTools: the action starts its inline-comment MCP server only
           # when that tool is listed here, and the command posts findings with
-          # it. The gh api rule lets it list earlier inline comments of this PR
-          # only, so a re-review does not repeat them.
+          # it. No gh api rule: earlier inline comments come from the gate
+          # step's file, so the agent cannot call the API.
           claude_args: >-
             --model claude-sonnet-5-5
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
