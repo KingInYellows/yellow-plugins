@@ -108,7 +108,7 @@ emit_pages() {
   [ "${MOCK_GH_ISSUES_DISABLED:-0}" = 1 ] && _en=false
   case " $ALL_ARGS " in
     *" --paginate "*)
-      printf '%s' "$1" | jq -c --argjson en "$_en" '[_nwise(100)] | (if length == 0 then [[]] else . end) as $pages
+      printf '%s' "$1" | jq -c --argjson en "$_en" '[range(0; length; 100) as $i | .[$i:$i + 100]] | (if length == 0 then [[]] else . end) as $pages
         | $pages | to_entries[]
         | {data:{repository:{hasIssuesEnabled:$en, issues:{nodes:.value,
             pageInfo:{hasNextPage:(.key < (($pages | length) - 1)), endCursor:"c\(.key)"}}}}}'

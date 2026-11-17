@@ -1652,9 +1652,13 @@ CFG_CMD_KEYS=(
 }
 
 @test "yr_safe_path falls back to yr_canon_path per link when no GNU realpath is available" {
-  mkdir -p tools "$BATS_TEST_TMPDIR/badbin" "$BATS_TEST_TMPDIR/okbin"
+  mkdir -p tools "$BATS_TEST_TMPDIR/badbin" "$BATS_TEST_TMPDIR/okbin" "$BATS_TEST_TMPDIR/real"
   ln -s "$PWD/tools/none" "$BATS_TEST_TMPDIR/badbin/ssh"
-  ln -s "$(command -v ls)" "$BATS_TEST_TMPDIR/okbin/ssh"
+  # A single-link target: on uutils systems (ubuntu-26.04) /usr/bin/ls is a
+  # hard link of the multicall binary, which this mode drops (CLAUDE-346).
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/real/ssh"
+  chmod +x "$BATS_TEST_TMPDIR/real/ssh"
+  ln -s "$BATS_TEST_TMPDIR/real/ssh" "$BATS_TEST_TMPDIR/okbin/ssh"
   # A fixed-location lookup that finds readlink but not realpath.
   yr_helper() { case "$1" in realpath) return 1 ;; *) command -p which "$1" 2>/dev/null || return 1 ;; esac; }
   out=$(PATH="$BATS_TEST_TMPDIR/badbin:$BATS_TEST_TMPDIR/okbin:/usr/bin:/bin" yr_safe_path)

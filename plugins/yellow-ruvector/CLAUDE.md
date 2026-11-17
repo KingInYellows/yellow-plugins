@@ -203,8 +203,9 @@ progress.
   `.ruvector/coedit.json`. Paths are root-relative and physical; paths
   outside the root, in `.ruvector/`, `.git/`, or `docs/solutions/`, with
   control characters, or over 512 chars are ignored. Writes are temp file +
-  rename. A per-session mkdir lock covers the session file's
-  read-decide-write, and the store lock only the pair update; together they
+  rename. A per-session directory lock (mkdir plus an exclusive `.owner`
+  file, since uutils mkdir is not exclusive under a race) covers the
+  session file's read-decide-write, and the store lock only the pair update; together they
   wait at most ~0.4s per edit (a linked worktree's 0.15s main-worktree
   lookup comes out of that), then skip (a busy store loses one increment,
   never the session's latest edit). A lock over a minute old is reclaimed
