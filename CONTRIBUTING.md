@@ -191,7 +191,9 @@ effort pins; orchestration (fan-out, workflows, background agents). **Exempt:**
 validators, CI, description-budget trims, headless budget caps, docs, tests.
 Description rewrites are gated by the triggering suite (CLAUDE-315), not this
 corpus. Run every area the change can reach: review, resolve, plan, or the
-`model-swap` fixture for a model swap.
+`model-swap` fixture for a model swap. The plan area is reached only by edits to
+`/flow:plan`, its references, or the research agents it starts; other changes
+skip it.
 
 **Method** (from CLAUDE-216). Before editing:
 
@@ -203,6 +205,13 @@ corpus. Run every area the change can reach: review, resolve, plan, or the
    every file the area loads are unchanged since (for review, the weekly runs).
 2. Register the bar in the PR description, before the diff: the area, `R`, both
    baseline pass rates and the noise floor.
+
+**Saturated areas.** When the area's latest archived baseline passed at least
+95% of its rows, skip the new baselines and the full repetitions: reuse that
+baseline, run the candidate once (`reps` 1), then rerun only the cases that
+failed, twice more each. A case that fails 2 of its 3 runs is a regression, and
+the change passes with none. The plan area is saturated today (18/18), so a
+gated planning run costs one pass plus reruns instead of nine passes.
 
 The change passes when its own run (same `R`) has a pass rate no lower than the
 baseline mean minus the larger of the noise floor and **5 points**, and no case

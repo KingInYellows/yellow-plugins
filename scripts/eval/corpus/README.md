@@ -104,9 +104,11 @@ cases are a follow-up.
 | 2026-11-17 | plan    | opus, high     | 18/18                        | 1.39 USD          | 25 USD                  | 242 s     |
 | 2026-11-16 | review  | review-gate    | 6/17 recall, 0/10 control FP |                   | about 103 USD (25 rows) |           |
 
-A gated change runs the area three times at the gate's repeat count (two
-baselines and one candidate, each `R` = 3), so 9 passes for resolve or plan:
-about 24 USD for resolve and 225 USD for plan. The review gate runs at `R` = 2:
-with two weekly runs on unchanged reviewer files as the baselines, only the
-candidate's 2 passes are new, about 206 USD. The review numbers are the
-2026-11-16 weekly run (`scripts/eval/review-gate/results-2026-11-16.md`).
+A gated resolve change runs the area three times at the gate's repeat count (two
+baselines and one candidate, each `R` = 3): 9 passes, about 24 USD. The plan
+area is saturated, so under the gate's saturated-area rule a planning change
+reuses the archived baseline and runs one candidate pass plus reruns of any
+failed cases: about 25 to 30 USD. The review gate runs at `R` = 2: with two
+weekly runs on unchanged reviewer files as the baselines, only the candidate's 2
+passes are new, about 206 USD. The review numbers are the 2026-11-16 weekly run
+(`scripts/eval/review-gate/results-2026-11-16.md`).
