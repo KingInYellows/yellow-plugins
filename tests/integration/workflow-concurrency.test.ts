@@ -33,6 +33,10 @@ const WORKFLOW_POLICIES: Record<string, WorkflowPolicy> = {
     reason:
       'Comment, review, and issue-driven Claude requests are independent user invocations; this workflow has no pull_request trigger.',
   },
+  'linear-link.yml': {
+    category: 'supersedable-pr-validation',
+    workflowKey: 'linear-link',
+  },
   'lint-plugins.yml': {
     category: 'supersedable-pr-validation',
     workflowKey: 'lint-plugins',
