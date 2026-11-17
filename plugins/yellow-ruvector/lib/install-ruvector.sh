@@ -327,7 +327,10 @@ yellow_ruvector_acquire_install_lock() {
            sleep 1
            continue ;;
       esac
-      rm -rf -- "$lock_dir" 2>/dev/null
+      # Non-recursive: a racing caller that has since claimed the directory
+      # keeps it, because its pid file makes rmdir fail.
+      rm -f -- "${lock_dir}/start.$$" 2>/dev/null
+      rmdir -- "$lock_dir" 2>/dev/null
       return 1
     fi
     # A missing pid file (owner killed between mkdir and the pid write) reads
@@ -408,7 +411,9 @@ yellow_ruvector_reclaim_dir() {
   marker="${lock_dir}.reclaim.$(printf '%s' "${expected:-none}" | tr -c '0-9A-Za-z' '_')-${ino}-${mt}"
   # The marker is claimed like a lock (uutils mkdir is not exclusive).
   mkdir "$marker" 2>/dev/null || return 0
-  (set -C; : > "$marker/.owner") 2>/dev/null || return 0
+  # A failed create leaves the marker ownerless: drop it (rmdir keeps one
+  # that a racing caller has since claimed) so a later attempt can reclaim.
+  (set -C; : > "$marker/.owner") 2>/dev/null || { rmdir -- "$marker" 2>/dev/null; return 0; }
   [ "$(ls -di "$lock_dir" 2>/dev/null | awk '{print $1}')" = "$ino" ] || return 0
   [ "$(yellow_ruvector_mtime "$lock_dir")" = "$mt" ] || return 0
   [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ] || return 0
