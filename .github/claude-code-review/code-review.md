@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(gh issue view:*), Bash(gh search:*), Bash(gh issue list:*), Bash(gh pr comment:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr list:*), Bash(gh api repos/*/pulls/*/comments:*), mcp__github_inline_comment__create_inline_comment
+allowed-tools: Agent, Bash(gh issue view:*), Bash(gh search:*), Bash(gh issue list:*), Bash(gh pr comment:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr list:*), Bash(gh api repos/*/pulls/*/comments:*), mcp__github_inline_comment__create_inline_comment
 description: Code review a pull request
 disable-model-invocation: false
 ---
@@ -12,6 +12,7 @@ command that claude-code-review.yml used to install. Local changes (CLAUDE-248):
 - Step 1 no longer stops when Claude has commented before. The workflow skips
   a head SHA that already has a completed review, so later pushes get reviewed.
 - Step 9 skips issues that an earlier Claude inline comment already raised.
+- Agent is listed in allowed-tools and the subagent type is spelled out.
 - Step 10 posts a summary comment carrying the reviewed head SHA, always last,
   so a run cancelled partway through is reviewed again by the next run.
 The workflow installs this file from the default branch, so a PR cannot
@@ -21,6 +22,8 @@ change its own review.
 Provide a code review for the given pull request.
 
 Arguments: `$ARGUMENTS`, in the form `<owner>/<repo>/pull/<number> --comment --head <sha>`. `<sha>` is the PR head commit this run reviews.
+
+Launch every agent below with the Agent tool, `subagent_type: general-purpose`, and the model the step names (`haiku`, `sonnet` or `opus`). This command installs no plugin agents.
 
 **Agent assumptions (applies to all agents and subagents):**
 - All tools are functional and will work without error. Do not test tools or make exploratory calls. Make sure this is clear to every subagent that is launched.

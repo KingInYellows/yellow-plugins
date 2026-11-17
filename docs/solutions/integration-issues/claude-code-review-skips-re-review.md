@@ -55,7 +55,7 @@ CLAUDE-285 chose to keep this job, so that cost is accepted.
 ## Maintaining the copy
 
 When upstream changes the command, diff it against the header's pinned commit
-and port the change. Keep the three local changes listed in the header comment.
+and port the change. Keep the local changes listed in the header comment.
 
 ## Verifying in CI
 
