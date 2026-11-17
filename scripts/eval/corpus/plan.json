@@ -1,0 +1,391 @@
+{
+  "$comment": "Planning corpus (CLAUDE-304). Each case gives /flow:plan --non-interactive a feature request that walks into a past incident recorded under docs/solutions/ (named in `incident`), in a tree at prompt_commit where that doc exists. A case passes when the run writes exactly one new plan under plans/ with an Acceptance Criteria section that names the incident's lesson. `eval.py check` proves each lesson regex matches its incident doc. Runs load yellow-core from the checkout under test. See scripts/eval/corpus/README.md.",
+  "prompt_commit": "32f60d97c39e347d21de4b82d1d6804886a91cd1",
+  "configs": {
+    "default": [
+      {
+        "model": "opus",
+        "effort": "high",
+        "reps": 3
+      }
+    ]
+  },
+  "agents": {
+    "plan": {
+      "file": "plugins/yellow-core/commands/flow/plan.md",
+      "kind": "prompt",
+      "configs": "default",
+      "isolated": true,
+      "fence": false,
+      "plugins": ["yellow-core"],
+      "fixtures": ["plugins/yellow-core"],
+      "env": {
+        "EVAL_MAX_BUDGET_USD": "15",
+        "EVAL_TIMEOUT_S": "2400"
+      },
+      "prompt": "/yellow-core:flow:plan {context} --non-interactive",
+      "expect": {
+        "p01-heredoc-delimiter": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": ["^#+\\s.*Acceptance Criteria", "heredoc", "delimiter"]
+            }
+          ]
+        },
+        "p02-noclobber-mktemp": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": ["^#+\\s.*Acceptance Criteria", "noclobber|2>\\||>\\|"]
+            }
+          ]
+        },
+        "p03-name-status-nul": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "(?<![\\w-])-z\\b|\\bNUL\\b|non-ASCII|quotePath"
+              ]
+            }
+          ]
+        },
+        "p04-dollar-anchor": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": ["^#+\\s.*Acceptance Criteria", "fullmatch|\\\\[Zz]\\b|trailing newline"]
+            }
+          ]
+        },
+        "p05-json-null-envelope": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "\\bnull\\b[^\\n]{0,120}(envelope|object|payload|stdin|shape)|(envelope|object|payload|shape)[^\\n]{0,120}\\bnull\\b"
+              ]
+            }
+          ]
+        },
+        "p06-pipe-head-guard": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "pipefail|head[^\\n]{0,100}(exit (code|status)|succeed|mask|0\\b)|(exit (code|status)|mask)[^\\n]{0,100}head"
+              ]
+            }
+          ]
+        },
+        "p07-hook-json-exit": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "\\\"?continue\\\"?\\s*:\\s*true",
+                "set -e|set -euo|set -uo|json_exit|-e\\b[^\\n]{0,60}exit"
+              ]
+            }
+          ]
+        },
+        "p08-bg-wait-ceiling": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS|ten.minute|10.minute|600\\s?000"
+              ]
+            }
+          ]
+        },
+        "p09-npm-ignore-scripts": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": ["^#+\\s.*Acceptance Criteria", "--ignore-scripts|lifecycle script"]
+            }
+          ]
+        },
+        "p10-printf-percent-b": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": ["^#+\\s.*Acceptance Criteria", "%b", "escape"]
+            }
+          ]
+        },
+        "p11-ifs-tab-empty-field": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": ["^#+\\s.*Acceptance Criteria", "collaps|IFS whitespace|leading empty|shift"]
+            }
+          ]
+        },
+        "p12-fence-breakout": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "(delimiter|fence)[^\\n]{0,120}(escap|substitut|replac|break.?out|forg)|(escap|substitut|replac|break.?out|forg)[^\\n]{0,120}(delimiter|fence)"
+              ]
+            }
+          ]
+        },
+        "p13-changelog-key": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "remote validator|Unrecognized key|additionalProperties"
+              ]
+            }
+          ]
+        },
+        "p14-merged-at-null": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "\\.merged\\b|merged`? (flag|boolean|field)|mergeQueueEntry|eject"
+              ]
+            }
+          ]
+        },
+        "p15-opencode-snapshot": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": ["^#+\\s.*Acceptance Criteria", "snapshot|back.?up|cp -a|diff -r"]
+            }
+          ]
+        },
+        "p16-merge-base-empty-ref": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "merge-base[^\\n]{0,160}(empty|fail|exit|unrelated|shallow)|(empty|fail|unrelated|shallow)[^\\n]{0,160}merge-base|\\bthe index\\b|staged"
+              ]
+            }
+          ]
+        },
+        "p17-userconfig-required": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "startup|start-?up|MCP (server )?start|not (block|stop|fail) (the )?install|does(n't| not) (block|stop|fail)"
+              ]
+            }
+          ]
+        },
+        "p18-trap-across-calls": {
+          "files": [
+            {
+              "glob": "plans/*.md",
+              "changed": true,
+              "count": 1,
+              "match": [
+                "^#+\\s.*Acceptance Criteria",
+                "trap[^\\n]{0,160}(fire|exit|same (Bash )?call|consum|separate|own call)|(fire|exit|same (Bash )?call|consum|separate|own call)[^\\n]{0,160}trap"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "prompts": [
+    {
+      "id": "p01-heredoc-delimiter",
+      "incident": "docs/solutions/security-issues/heredoc-delimiter-collision.md",
+      "text": "Add a /linear:comment command that takes a free-text comment body from the user and passes it to the Linear API call through a bash heredoc.",
+      "selfcheck": {
+        "doc": "docs/solutions/security-issues/heredoc-delimiter-collision.md"
+      }
+    },
+    {
+      "id": "p02-noclobber-mktemp",
+      "incident": "docs/solutions/logic-errors/zsh-noclobber-mktemp-stderr-redirect.md",
+      "text": "In the yellow-codex setup skill, capture the codex CLI's stderr into a mktemp file and grep it for an authentication error.",
+      "selfcheck": {
+        "doc": "docs/solutions/logic-errors/zsh-noclobber-mktemp-stderr-redirect.md"
+      }
+    },
+    {
+      "id": "p03-name-status-nul",
+      "incident": "docs/solutions/logic-errors/git-diff-name-status-nul-safe-parsing.md",
+      "text": "Write a Node validator that lists the files a PR changes under docs/solutions with git diff --name-status against the base branch and checks each one's frontmatter.",
+      "selfcheck": {
+        "doc": "docs/solutions/logic-errors/git-diff-name-status-nul-safe-parsing.md"
+      }
+    },
+    {
+      "id": "p04-dollar-anchor",
+      "incident": "docs/solutions/logic-errors/regex-dollar-anchor-trailing-newline-bypass.md",
+      "text": "Add a Python helper to the context-observer hook that validates the session id from the hook JSON against a regex allow-list before using it in a file name.",
+      "selfcheck": {
+        "doc": "docs/solutions/logic-errors/regex-dollar-anchor-trailing-newline-bypass.md"
+      }
+    },
+    {
+      "id": "p05-json-null-envelope",
+      "incident": "docs/solutions/logic-errors/json-parse-null-envelope-validity-guard.md",
+      "text": "Add a Node PreToolUse hook to yellow-core that reads the tool-call JSON envelope from stdin and blocks Bash commands that match a deny list.",
+      "selfcheck": {
+        "doc": "docs/solutions/logic-errors/json-parse-null-envelope-validity-guard.md"
+      }
+    },
+    {
+      "id": "p06-pipe-head-guard",
+      "incident": "docs/solutions/logic-errors/bash-pipe-head-exit-code-masking.md",
+      "text": "Make /flow:decompose stop with an error when plans/specs/ has no spec files, using `ls -t plans/specs/*.md | head -1 || error` to pick the newest one.",
+      "selfcheck": {
+        "doc": "docs/solutions/logic-errors/bash-pipe-head-exit-code-masking.md"
+      }
+    },
+    {
+      "id": "p07-hook-json-exit",
+      "incident": "docs/solutions/code-quality/hook-set-e-and-json-exit-pattern.md",
+      "text": "Add a SessionStart hook script to yellow-ci that checks the gh CLI is installed and signed in and reports the result.",
+      "selfcheck": {
+        "doc": "docs/solutions/code-quality/hook-set-e-and-json-exit-pattern.md"
+      }
+    },
+    {
+      "id": "p08-bg-wait-ceiling",
+      "incident": "docs/solutions/integration-issues/claude-p-background-workflow-ten-minute-kill.md",
+      "text": "Run the yellow-review review-gate workflow headless with claude -p in a nightly GitHub Actions job and post its findings as a PR comment.",
+      "selfcheck": {
+        "doc": "docs/solutions/integration-issues/claude-p-background-workflow-ten-minute-kill.md"
+      }
+    },
+    {
+      "id": "p09-npm-ignore-scripts",
+      "incident": "docs/solutions/security-issues/npm-install-missing-ignore-scripts-and-integrity.md",
+      "text": "Have yellow-codex install the Codex CLI on first use by running npm install --prefix into the plugin's data directory.",
+      "selfcheck": {
+        "doc": "docs/solutions/security-issues/npm-install-missing-ignore-scripts-and-integrity.md"
+      }
+    },
+    {
+      "id": "p10-printf-percent-b",
+      "incident": "docs/solutions/security-issues/printf-percent-b-terminal-escape-injection.md",
+      "text": "Add colored error, warning and success output helpers to the yellow-devin install script, used to print messages from the CLI's stderr.",
+      "selfcheck": {
+        "doc": "docs/solutions/security-issues/printf-percent-b-terminal-escape-injection.md"
+      }
+    },
+    {
+      "id": "p11-ifs-tab-empty-field",
+      "incident": "docs/solutions/logic-errors/ifs-tab-read-collapses-leading-empty-tsv-field.md",
+      "text": "In the ruvector health check, read three fields from a jq @tsv row with IFS=$'\\t' read -r, where the first field is often empty.",
+      "selfcheck": {
+        "doc": "docs/solutions/logic-errors/ifs-tab-read-collapses-leading-empty-tsv-field.md"
+      }
+    },
+    {
+      "id": "p12-fence-breakout",
+      "incident": "docs/solutions/security-issues/prompt-injection-fence-breakout-literal-delimiter.md",
+      "text": "Have the debt audit command embed each scanned source file inside --- begin/end --- fences in its scanner subagent prompts.",
+      "selfcheck": {
+        "doc": "docs/solutions/security-issues/prompt-injection-fence-breakout-literal-delimiter.md"
+      }
+    },
+    {
+      "id": "p13-changelog-key",
+      "incident": "docs/solutions/build-errors/plugin-json-changelog-key-schema-drift-remote-validator.md",
+      "text": "Add a changelog URL field to every plugin.json and to the local plugin schema so users can find release notes from the plugin list.",
+      "selfcheck": {
+        "doc": "docs/solutions/build-errors/plugin-json-changelog-key-schema-drift-remote-validator.md"
+      }
+    },
+    {
+      "id": "p14-merged-at-null",
+      "incident": "docs/solutions/integration-issues/merge-queue-closed-pr-null-mergedat-detection.md",
+      "text": "Teach the merge-queue watcher to report a PR as not merged when GitHub shows it closed with mergedAt null.",
+      "selfcheck": {
+        "doc": "docs/solutions/integration-issues/merge-queue-closed-pr-null-mergedat-detection.md"
+      }
+    },
+    {
+      "id": "p15-opencode-snapshot",
+      "incident": "docs/solutions/integration-issues/opencode-cli-listing-rewrites-user-config-in-place.md",
+      "text": "Spike: run opencode models against my real OpenCode config to confirm a DeepSeek route exists before we depend on it.",
+      "selfcheck": {
+        "doc": "docs/solutions/integration-issues/opencode-cli-listing-rewrites-user-config-in-place.md"
+      }
+    },
+    {
+      "id": "p16-merge-base-empty-ref",
+      "incident": "docs/solutions/logic-errors/git-ref-empty-string-and-ambient-config-footguns.md",
+      "text": "In the review-ledger script, read each changed file's old version with git show \"$(git merge-base origin/main HEAD):<path>\" to compare frontmatter.",
+      "selfcheck": {
+        "doc": "docs/solutions/logic-errors/git-ref-empty-string-and-ambient-config-footguns.md"
+      }
+    },
+    {
+      "id": "p17-userconfig-required",
+      "incident": "docs/solutions/build-errors/userconfig-required-fires-at-startup-not-install.md",
+      "text": "Make the yellow-research API key mandatory by marking its userConfig entry required: true, so install fails when it is missing.",
+      "selfcheck": {
+        "doc": "docs/solutions/build-errors/userconfig-required-fires-at-startup-not-install.md"
+      }
+    },
+    {
+      "id": "p18-trap-across-calls",
+      "incident": "docs/solutions/code-quality/trap-cleanup-across-tool-call-boundaries.md",
+      "text": "In the /debt:audit command, create a temp dir with mktemp -d and register its cleanup trap in one Bash call, then stage the report there with the Write tool in a later step.",
+      "selfcheck": {
+        "doc": "docs/solutions/code-quality/trap-cleanup-across-tool-call-boundaries.md"
+      }
+    }
+  ]
+}

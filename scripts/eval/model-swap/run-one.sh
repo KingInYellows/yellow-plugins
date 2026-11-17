@@ -12,6 +12,9 @@
 # sets it from every run input), so a stopped matrix resumes. With
 # EVAL_SCAN=1 (eval.py sets it for scan rows), a file the run writes to
 # <workdir>/.debt/scanner-output/ is copied to <out-dir>/<run-id>.scan.json.
+# With EVAL_PLUGIN_DIRS (colon-separated plugin directories; eval.py sets it
+# for an agent with `plugins`), <agent.md> is a command: the prompt invokes it
+# as a slash command with those plugins loaded, and no system prompt is set.
 set -u
 [ $# -ge 7 ] || { printf 'usage: %s <out-dir> <run-id> <agent.md> <workdir> <model> <effort> <prompt-file> [tools]\n' "$0" >&2; exit 2; }
 out_dir=$1 id=$2 agent=$3 workdir=$4 model=$5 effort=$6 prompt_file=$7 tools=${8:-}
@@ -41,13 +44,16 @@ fi
 # Approve Read/Grep/Glob only under <workdir>, plus Read of <prompt-file>'s
 # directory (a replay prompt points the reviewer at its .patch there): a
 # fixture that names a host path (~/.ssh/...) gets a permission denial instead
-# of the file. Other tools keep their bare names.
+# of the file. Write and Edit get no rule: acceptEdits mode below approves them
+# inside <workdir> only (a `Write(./**)` rule denied writes there). Other tools
+# keep their bare names.
 prompt_dir=$(cd "$(dirname "$prompt_file")" && pwd -P) || exit 1
 case $prompt_dir in *[,\(\)]*) printf 'run-one: prompt dir %s has a comma or parenthesis\n' "$prompt_dir" >&2; exit 2 ;; esac
 allowed=$(printf '%s' "$tools" | awk -v RS=, -v pd="$prompt_dir" '{ gsub(/^[ \t\n]+|[ \t\n]+$/, "") }
   $0 == "" { next }
   $0 == "Read" { $0 = "Read(./**),Read(/" pd "/**)" }
   $0 == "Grep" || $0 == "Glob" { $0 = $0 "(./**)" }
+  $0 == "Write" || $0 == "Edit" { next }
   { printf "%s%s", s, $0; s = "," }')
 # Keep the parent session's effort, memory and extra CLAUDE.md out of the run.
 unset CLAUDE_EFFORT CLAUDE_CODE_EFFORT_LEVEL CLAUDE_COWORK_MEMORY_PATH_OVERRIDE \
@@ -58,10 +64,18 @@ export CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1
 # subscription too). A run that hits it prints is_error JSON and is rerun.
 budget=${EVAL_MAX_BUDGET_USD-5}
 case $budget in '' | *[!0-9.]* | *.*.* | .* | *.) printf 'run-one: EVAL_MAX_BUDGET_USD must be a decimal\n' >&2; exit 2 ;; esac
+# An agent runs as the system prompt with slash commands off; a command runs
+# as a slash command from its --plugin-dir plugins.
+mode=(--disable-slash-commands --system-prompt-file "$sys")
+if [ -n "${EVAL_PLUGIN_DIRS:-}" ]; then
+  mode=()
+  IFS=: read -r -a dirs <<<"$EVAL_PLUGIN_DIRS"
+  for d in "${dirs[@]}"; do mode+=(--plugin-dir "$d"); done
+fi
 start=$(date +%s)
-(cd "$workdir" && timeout 1200 claude -p --setting-sources "" --strict-mcp-config \
-  --disable-slash-commands --model "$model" --effort "$effort" --max-budget-usd "$budget" \
-  --tools "$tools" --allowedTools "$allowed" --system-prompt-file "$sys" \
+(cd "$workdir" && timeout "${EVAL_TIMEOUT_S:-1200}" claude -p --setting-sources "" --strict-mcp-config \
+  "${mode[@]}" --model "$model" --effort "$effort" --max-budget-usd "$budget" \
+  --tools "$tools" --allowedTools "$allowed" --permission-mode acceptEdits \
   --output-format json --no-session-persistence "$(cat "$prompt_file")") \
   >"$out.tmp" 2>"$out_dir/$id.err"
 rc=$?

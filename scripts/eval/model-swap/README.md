@@ -100,6 +100,31 @@ Add a spec under `fixtures/`, or extend one:
 
 An agent's optional `replays` or `scans` list limits it to those targets.
 
+Keys the eval corpus (`scripts/eval/corpus/`) uses, all for `isolated` prompt
+agents:
+
+- a case's `tree`: a 40-character commit that replaces `prompt_commit` for that
+  case's run tree;
+- an agent's `overlay`: repo files copied from the checkout into every run tree
+  after checkout, so an old tree still gets the version under test (also hashed
+  into the fingerprint);
+- `{wt}` in an agent's `prompt`: the run's own tree path (each row then gets its
+  own prompt file);
+- an agent's `plugins`: run `file` as a slash command with those plugins loaded
+  by `--plugin-dir`, no system prompt and its `allowed-tools` minus MCP tools
+  and `AskUserQuestion`; list the plugin directories under `fixtures` so an edit
+  reruns the rows. `EVAL_TIMEOUT_S` in its `env` raises the 1,200 s run timeout;
+- a `files` check's `changed`: only files the run added or modified count, and
+  `count: 0` then asserts a file was left alone;
+- a case's `incident` (required by `check`) and `selfcheck`:
+  `{"fix": <sha>, "paths": [...]}` or `{"doc": <repo file>}`.
+
+`eval.py check <work-dir> <spec>...` spends nothing: it validates the specs,
+fetches missing commits by id, compiles every regex and runs each `selfcheck`
+through the real grader (the case must fail on the incident tree and pass with
+the fix's files, or pass with the doc written as the run's only new plan). Write
+and Edit, like Read, Grep and Glob, are approved only under the run's tree.
+
 ## Results
 
 | Date       | Spec                                     | Write-up                                                                                                                                                                                                                                                                        |
