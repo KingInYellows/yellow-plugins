@@ -717,6 +717,22 @@ SH
   [ "$output" = 0 ]
 }
 
+@test "a lock stays exclusive when mkdir reports success for an existing directory (uutils, CLAUDE-346)" {
+  run bash -c '
+    . "$1"
+    d=$(mktemp -d); l="$d/.s.lock"
+    # uutils mkdir on Ubuntu 26.04 can tell two racing callers they both
+    # created the directory; model the loser of that race.
+    mkdir() { command mkdir "$@" 2>/dev/null || [ -d "${!#}" ]; }
+    coedit_mkdir_excl "$l" || exit 7
+    coedit_mkdir_excl "$l" && exit 8
+    coedit_unlock_path "$l"; [ ! -e "$l" ] || exit 9
+    coedit_mkdir_excl "$l" || exit 10
+    echo held' _ "$BATS_TEST_DIRNAME/../hooks/scripts/lib/coedit.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = held ]
+}
+
 @test "a stale lock that is not empty is still reclaimed" {
   edit r2 "$PROJECT_ROOT/src/a.ts"
   mkdir -p "$RUVECTOR_DIR/.coedit.lock/junk"; : > "$RUVECTOR_DIR/.coedit.lock/file"

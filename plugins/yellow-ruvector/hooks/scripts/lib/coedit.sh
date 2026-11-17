@@ -255,15 +255,26 @@ coedit_write_atomic() {
   return 1
 }
 
-# coedit_lock_path <lock-dir> — take a mkdir lock, waiting 50ms per try out
-# of the hook call's shared budget (_coedit_tries_left, reset to
-# COEDIT_LOCK_TRIES by each coedit_record / coedit_suggest_once call), so
-# concurrent edits queue up instead of dropping their work while the session
-# and store locks together never outlast ~0.4s. Out of budget: the caller
+# coedit_mkdir_excl <dir> — create <dir> as a lock only this caller holds.
+# uutils mkdir (Ubuntu 26.04's default coreutils) can report success to two
+# racing callers, so mkdir alone is not exclusive there. The holder is
+# whoever then creates <dir>/.owner under noclobber, which the shell does
+# itself with O_EXCL. A caller whose mkdir "succeeded" but lost the .owner
+# race leaves the directory alone: it belongs to the winner.
+coedit_mkdir_excl() {
+  mkdir "$1" 2>/dev/null && (set -C; : > "$1/.owner") 2>/dev/null
+}
+
+# coedit_lock_path <lock-dir> — take a directory lock (coedit_mkdir_excl),
+# waiting 50ms per try out of the hook call's shared budget
+# (_coedit_tries_left, reset to COEDIT_LOCK_TRIES by each coedit_record /
+# coedit_suggest_once call), so concurrent edits queue up instead of
+# dropping their work while the session and store locks together never
+# outlast ~0.4s. Out of budget: the caller
 # skips. A lock older than a minute is from a killed hook (the hook timeout
 # is 1s). Each stale lock generation (directory inode + mtime; inodes alone
 # are reused at once) is reclaimed at most once: the reclaimer first creates
-# the marker <lock>.reclaim.<inode>-<mtime> (atomic mkdir) and re-checks
+# the marker <lock>.reclaim.<inode>-<mtime> (coedit_mkdir_excl) and re-checks
 # the inode and mtime (an unchanged mtime keeps it stale), so two waiters
 # that judged the same lock stale cannot both act and neither can delete a
 # fresh lock that replaced it. Ages come from stat + date, not find -mmin.
@@ -271,7 +282,7 @@ coedit_write_atomic() {
 coedit_lock_path() {
   local lock="$1" ino mt marker reclaim_tried="" blocker_tried="" aside
   : "${_coedit_tries_left:=$COEDIT_LOCK_TRIES}"
-  until mkdir "$lock" 2>/dev/null; do
+  until coedit_mkdir_excl "$lock"; do
     # A symlink (dangling or not) or non-directory at the lock path, from a
     # checkout or restore, is never a live lock (locks are directories made
     # by mkdir), and its mtime is not the lock's: unlink it (never followed)
@@ -306,7 +317,7 @@ coedit_lock_path() {
         if [ -d "$marker" ] && [ ! -L "$marker" ]; then
           # The rename runs in the foreground (the reclaim below needs the
           # path free); only the delete of the renamed tree is detached.
-          rmdir "$marker" 2>/dev/null \
+          { rm -f -- "$marker/.owner"; rmdir "$marker" 2>/dev/null; } \
             || { aside=$(coedit_move_aside "$marker" "${lock}.stale.m${ino}-${mt}.$$.") \
                  && { ( rm -rf -- "$aside" ) </dev/null >/dev/null 2>&1 & }; }
         else
@@ -320,7 +331,7 @@ coedit_lock_path() {
       # in it): rename it aside atomically (that alone frees the lock), then
       # remove the renamed copy in a detached job, so a large tree never
       # holds the hook past its 1s budget.
-      if mkdir "$marker" 2>/dev/null \
+      if coedit_mkdir_excl "$marker" \
          && [ "$(ls -di "$lock" 2>/dev/null | awk '{print $1}')" = "$ino" ] \
          && [ "$(coedit_mtime "$lock")" = "$mt" ] \
          && aside=$(coedit_move_aside "$lock" "${lock}.stale.${ino}-${mt}.$$."); then
@@ -359,7 +370,7 @@ coedit_older_than() {
   [ $((now - $1)) -gt "$2" ]
 }
 
-coedit_unlock_path() { rmdir "$1" 2>/dev/null; }
+coedit_unlock_path() { rm -f -- "$1/.owner"; rmdir "$1" 2>/dev/null; }
 
 # coedit_move_aside <path> <prefix> — move <path> into a fresh directory
 # mktemp creates exclusively (<prefix>XXXXXX) and print that directory. A
@@ -632,7 +643,7 @@ coedit_prune_sessions() {
         m=${markers[$(( (i + tried) % total ))]}
         tried=$((tried + 1))
         [ -d "$m" ] && [ ! -L "$m" ] || continue
-        coedit_older_than "$(coedit_mtime "$m")" 600 && rmdir -- "$m" 2>/dev/null && removed=$((removed + 1))
+        coedit_older_than "$(coedit_mtime "$m")" 600 && { rm -f -- "$m/.owner"; rmdir -- "$m" 2>/dev/null; } && removed=$((removed + 1))
       done
       SECONDS=0
       # Stale lock trees a reclaim renamed aside (<lock>.stale.*) whose

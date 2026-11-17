@@ -1563,17 +1563,14 @@ jobs:
           f=$(mktemp); head -c 200054 /dev/zero | tr '\0' a > "$f"; bad=0
           for i in $(seq 1 50); do n=$(tail -c 98304 < "$f" | cat | wc -c); m=$(cat "$f" | tail -c 98304 | wc -c); [ "$m" -ne 98304 ] && bad=$((bad+1)); done
           echo "piped tail -c wrong sizes: $bad/50"
-      - name: yellow-core bats (timed)
-        run: bats -T plugins/yellow-core/tests/
-      - name: compound-stop-hook x10
-        run: for i in $(seq 1 10); do bats -f 'larger than one argv' plugins/yellow-core/tests/compound-stop-hook.bats | tail -1; done
-      - name: yellow-ruvector failing cases x3 (timed)
-        run: for i in 1 2 3; do bats -T -f 'concurrent sessions queue|two parallel edits' plugins/yellow-ruvector/tests/post-tool-use.bats; done
-      - name: yellow-ruvector failing cases x3 with GNU coreutils first on PATH
+      - name: yellow-ruvector lock cases x5 (timed)
         run: |
-          g=$(mktemp -d); for b in /usr/bin/gnu*; do n=${b#/usr/bin/gnu}; ln -s "$b" "$g/$n"; done
-          export PATH="$g:$PATH"; readlink -f "$(command -v mkdir)"; readlink -f "$(command -v timeout)"
-          for i in 1 2 3; do bats -T -f 'concurrent sessions queue|two parallel edits' plugins/yellow-ruvector/tests/post-tool-use.bats; done
+          set +e
+          for i in 1 2 3 4 5; do bats -T -f 'concurrent sessions queue|two parallel edits|uutils' plugins/yellow-ruvector/tests/post-tool-use.bats; done
+      - name: yellow-ruvector full suite
+        run: bats plugins/yellow-ruvector/tests/
+      - name: yellow-core full suite
+        run: bats plugins/yellow-core/tests/
 
   # ============================================================================
   # PLUGIN SHELL TESTS — ADVISORY LOOP (bats)
