@@ -52,7 +52,8 @@ Read the JSON result's `status`:
 
 - **`REQUIRES_CONFIRMATION`** — the pull request is open, not a draft, not
   in a GitHub stack and based on the default branch. `pullRequest` holds
-  its `number`, `repository`, `baseRef`, `headRef` and `headSha`. Go on.
+  its `number`, `repository`, `baseRef`, `headRef` and `headSha`, and
+  `previewToken` is a fingerprint of what this preview showed. Go on.
 - **`INVALID_ARGS`** — report `refusalReason` inside the fence below and
   stop. When it says the
   pull request belongs to a stack, point the user to the
@@ -90,18 +91,21 @@ options "Merge" / "Cancel". On "Cancel", stop — nothing has run.
 
 ### Step 4: Merge
 
-Pass back the head commit and base branch from Step 2, unchanged:
+Pass back `previewToken` from Step 2. It must be exactly 64 hexadecimal
+characters (`^[0-9a-f]{64}$`); if it is not, stop. Never put the branch or
+repository names in the command: the token stands for them.
+
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge-single --target "<number>" --merge-method <method> --head-sha "<headSha>" --base-ref "<baseRef>" --confirm
+node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge-single --target "<number>" --merge-method <method> --preview-token "<previewToken>" --confirm
 ```
 
 ### Step 5: Report
 
 - **`SUCCESS`** — GitHub answered `merged: true`. Report the merge and
   quote `stdout` inside the fence below.
-- **`INVALID_ARGS`** with a reason that the head or base changed — nothing
-  was merged. Go back to Step 2 so the user sees the new state; never reuse
+- **`INVALID_ARGS`** with a reason that the confirmation does not match —
+  the head, base or method changed and nothing was merged. Go back to Step 2 so the user sees the new state; never reuse
   the earlier confirmation.
 - Any other status — nothing is known to have merged. Report `status`,
   `recoveryAction` and `stdout` (GitHub's reason, for example a required

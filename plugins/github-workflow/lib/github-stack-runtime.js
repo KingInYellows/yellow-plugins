@@ -69,6 +69,7 @@
 'use strict';
 
 const { spawnSync } = require('child_process');
+const { createHash } = require('crypto');
 
 const MAX_OUTPUT_CHARS = 8000;
 const DEFAULT_TIMEOUT_MS = 120000;
@@ -822,6 +823,29 @@ function readOrdinaryPullRequest(op, target) {
 }
 
 /**
+ * A fingerprint of what a `merge-single` preview showed: the repository,
+ * pull request, base branch, head commit and merge method. The caller
+ * passes it back to confirm, so no branch or repository name (which the
+ * pull request's author chooses) ever has to be copied into a command line.
+ * @param {{ number: number, repository: string, baseRef: string, headSha: string }} pullRequest
+ * @param {string} mergeMethod
+ * @returns {string} 64 hexadecimal characters
+ */
+function previewTokenOf(pullRequest, mergeMethod) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        pullRequest.repository,
+        pullRequest.number,
+        pullRequest.baseRef,
+        pullRequest.headSha,
+        mergeMethod,
+      ])
+    )
+    .digest('hex');
+}
+
+/**
  * Land ONE ordinary pull request: one that GitHub does not report as part of
  * a stack. `gh stack merge` refuses such a pull request, and `merge` above
  * must never land a stacked one the plain way, so this is a separate
@@ -833,10 +857,12 @@ function readOrdinaryPullRequest(op, target) {
  *   other than the repository's default branch, or is not reported as
  *   mergeable;
  * - without `confirm: true` nothing is merged and the result reports the
- *   head commit and base branch that were read;
- * - with `confirm: true` the caller must pass both back as `headSha` and
- *   `baseRef`. It is refused when either has changed, and GitHub checks the
- *   head again (`sha` on the merge call), so what lands is what was shown.
+ *   head commit and base branch that were read, with a `previewToken`
+ *   that fingerprints them;
+ * - with `confirm: true` the caller must pass that token back. It is
+ *   refused when the repository, base, head or method no longer match, and
+ *   GitHub checks the head again (`sha` on the merge call), so what lands
+ *   is what was shown.
  *
  * Both calls are `gh api` with the `{owner}/{repo}` placeholders, so the
  * check and the merge always address the same repository, whichever way
@@ -845,7 +871,7 @@ function readOrdinaryPullRequest(op, target) {
  * mergeable (`mergeable_state`) is refused before the call. No auto-merge,
  * no branch deletion.
  */
-function mergeSingle({ target, mergeMethod, headSha, baseRef, confirm }) {
+function mergeSingle({ target, mergeMethod, previewToken, confirm }) {
   const op = 'merge-single';
   if (typeof target !== 'string' || !/^[1-9][0-9]*$/.test(target)) {
     return refusalResult(op, `target must be a pull request number, got "${target === undefined ? '' : target}"`);
@@ -855,13 +881,13 @@ function mergeSingle({ target, mergeMethod, headSha, baseRef, confirm }) {
   }
   const methodCheck = validateEnum(mergeMethod, MERGE_METHODS, 'mergeMethod');
   if (!methodCheck.ok) return refusalResult(op, methodCheck.reason);
-  if (headSha !== undefined && !SHA_RE.test(headSha)) {
-    return refusalResult(op, `headSha must be a full 40-character commit id, got "${headSha}"`);
+  if (previewToken !== undefined && !/^[0-9a-f]{64}$/.test(previewToken)) {
+    return refusalResult(op, 'previewToken must be the 64 hexadecimal characters a preview reported');
   }
-  if (confirm === true && (headSha === undefined || baseRef === undefined)) {
+  if (confirm === true && previewToken === undefined) {
     return refusalResult(
       op,
-      'confirm needs headSha and baseRef: run once without confirm, show the reported head commit and base branch, then pass both back'
+      'confirm needs previewToken: run once without confirm, show what it reports, then pass its previewToken back'
     );
   }
 
@@ -869,11 +895,12 @@ function mergeSingle({ target, mergeMethod, headSha, baseRef, confirm }) {
   if (read.result) return read.result;
   const { pullRequest } = read;
   const shown = `pull request #${target} of ${pullRequest.repository} into ${pullRequest.baseRef} at head ${pullRequest.headSha}`;
+  const currentToken = previewTokenOf(pullRequest, methodCheck.value);
   if (confirm !== true) {
     return {
       ...confirmationRequiredResult(
         op,
-        `merge-single lands ${shown} with method ${methodCheck.value}, and cannot be undone by this runtime; re-run with that headSha and baseRef and confirm`
+        `merge-single lands ${shown} with method ${methodCheck.value}, and cannot be undone by this runtime; re-run with previewToken ${currentToken} and confirm`
       ),
       pullRequest: {
         ...pullRequest,
@@ -881,12 +908,13 @@ function mergeSingle({ target, mergeMethod, headSha, baseRef, confirm }) {
         baseRef: redact(pullRequest.baseRef),
         headRef: redact(pullRequest.headRef),
       },
+      previewToken: currentToken,
     };
   }
-  if (headSha !== pullRequest.headSha || baseRef !== pullRequest.baseRef) {
+  if (previewToken !== currentToken) {
     return refusalResult(
       op,
-      `the confirmation was for head ${headSha} into "${baseRef}", but GitHub now shows ${shown}; nothing was merged. Show the new state and ask again`
+      `the confirmation does not match what GitHub shows now (${shown}, method ${methodCheck.value}): the head, base or method changed since the preview. Nothing was merged. Preview again and ask again`
     );
   }
   const args = [
@@ -1026,8 +1054,7 @@ function main(argv) {
     remote: typeof args.remote === 'string' ? args.remote : undefined,
     mode: typeof args.mode === 'string' ? args.mode : undefined,
     mergeMethod: typeof args['merge-method'] === 'string' ? args['merge-method'] : undefined,
-    headSha: typeof args['head-sha'] === 'string' ? args['head-sha'] : undefined,
-    baseRef: typeof args['base-ref'] === 'string' ? args['base-ref'] : undefined,
+    previewToken: typeof args['preview-token'] === 'string' ? args['preview-token'] : undefined,
     open: args.open === true,
     prune: args.prune === true,
     local: args.local === true,
@@ -1064,5 +1091,6 @@ module.exports = {
   submit,
   merge,
   mergeSingle,
+  previewTokenOf,
   unstack,
 };

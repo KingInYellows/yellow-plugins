@@ -57,7 +57,7 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
 @test "github-stack-merge-single: previews without --confirm and merges with the previewed head" {
   run grep -F 'merge-single --target "<number>" --merge-method <method>' "$MERGE_SINGLE_SKILL"
   [ "$status" -eq 0 ]
-  run grep -F -- '--head-sha "<headSha>" --base-ref "<baseRef>" --confirm' "$MERGE_SINGLE_SKILL"
+  run grep -F -- '--preview-token "<previewToken>" --confirm' "$MERGE_SINGLE_SKILL"
   [ "$status" -eq 0 ]
 }
 
@@ -84,4 +84,9 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
   [ "$output" -eq 2 ]
   run grep -F '<pullRequest fields, or refusalReason>' "$MERGE_SINGLE_SKILL"
   [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge-single: no GitHub-supplied name is interpolated into a command" {
+  run grep -E '^node .*<(baseRef|headRef|repository|headSha)>' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 1 ]
 }
