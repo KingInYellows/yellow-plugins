@@ -379,6 +379,40 @@ untrusted PR code with a credential, so its boundary is:
   and a complete result then counts as incomplete. Rendering then puts it on one
   line with HTML, links, code spans, table pipes and `@` mentions escaped.
 
+### Claude Code Review job (`claude-code-review.yml`)
+
+`.github/workflows/claude-code-review.yml` runs `claude-code-action` with a
+vendored code-review command (CLAUDE-248). Its boundary:
+
+- **Trusted prompt**: the command is fetched from the default branch
+  (`.github/claude-code-review/code-review.md`) and installed under
+  `~/.claude/commands/`, so a PR cannot edit the command file. The gate step
+  deletes `.claude-code-review/` before writing it, so a committed symlink there
+  cannot redirect the write. The fetch's stderr goes to `$RUNNER_TEMP`, not the
+  checkout.
+- **PR configuration does not load**: the action runs with
+  `--setting-sources user` (CLAUDE-350), so the PR's `.claude/settings.json`
+  (hooks, permissions, including the SessionStart hook), its project commands,
+  skills and agents, and its `CLAUDE.md` files are not loaded. The command's
+  compliance agents read `CLAUDE.md` files as reference data instead. The gate
+  also deletes `.claude/commands/`, `.claude/skills/` and `.claude/agents/` from
+  the checkout as a second guard.
+- **Agent tools**: `--allowedTools` pre-approves the inline-comment MCP tool and
+  `gh pr comment`, `gh pr diff` and `gh pr view`. It does not restrict the tool
+  set (the workflow passes no `--tools`), and the command's frontmatter also
+  grants `Agent`, `Read`, `gh issue view`, `gh issue list`, `gh search` and
+  `gh pr list`, all read-only. Neither grants `gh api`, and project settings
+  cannot add permissions because they do not load. The gate step, which runs no
+  model, writes `claude[bot]`'s earlier inline comments to
+  `.claude-code-review/prior-inline-comments.jsonl`, and the command treats
+  their bodies as reference data.
+- **Skip marker**: the gate skips a run only when a `claude[bot]` comment that
+  starts with `## Code review` ends with
+  `<!-- claude-code-review head=<sha> -->` for the current head. A forged or
+  echoed marker can at worst skip one review of one commit; the next push is
+  reviewed.
+- **`GITHUB_TOKEN`**: `pull-requests: write` for posting, as before this change.
+
 ### Local Execution (yellow-ruvector, yellow-debt, yellow-review)
 
 - All processing happens locally on user's machine
