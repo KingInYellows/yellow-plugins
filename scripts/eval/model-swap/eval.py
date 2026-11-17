@@ -273,9 +273,11 @@ def run_env(agent, rid, wt):
     return env
 
 
-def changed_files(wt):
+def changed_files(wt, added_only=False):
     """Absolute paths the run touched, as (added or modified, removed). Untracked
-    files count as added; a rename's source path counts as removed."""
+    files count as added; a rename's source path counts as removed. With
+    added_only, the first set holds only new files (untracked, added, or a
+    rename or copy target)."""
     out = subprocess.run(["git", "status", "--porcelain", "-z", "--untracked-files=all"], cwd=wt,
                          capture_output=True, text=True, check=True).stdout
     paths, removed = set(), set()
@@ -289,7 +291,7 @@ def changed_files(wt):
                 removed.add(os.path.join(wt, source))
         if "D" in entry[:2]:
             removed.add(os.path.join(wt, entry[3:]))
-        else:
+        elif not added_only or entry[:2] == "??" or entry[0] in "ARC":
             paths.add(os.path.join(wt, entry[3:]))
     return paths, removed
 
@@ -297,20 +299,23 @@ def changed_files(wt):
 def files_pass(expect, wt, content_only=False):
     """The case's `files` checks (glob, optional exact count, regexes over the
     matched files' text) and `no_files` globs, against a run's tree. A check
-    with `changed` only counts files the run added or modified, so `count: 0`
+    with `changed` only counts files the run added or modified (`"added"`: only
+    files it created), so `count: 0`
     asserts a file was left alone (removing a matched file fails the check). content_only (the offline check) skips
     `changed` and the counts and judges only the regexes."""
-    changed = None
+    changed = {}
     for check in expect.get("files", []):
         found = sorted(glob.glob(os.path.join(wt, check["glob"])))
         if check.get("changed") and not content_only:
-            if changed is None:
-                changed, removed = changed_files(wt)
+            mode = check["changed"] == "added"
+            if mode not in changed:
+                changed[mode] = changed_files(wt, added_only=mode)
+            touched, removed = changed[mode]
             # Removing a matched file is never the expected change, and it
             # would otherwise slip past `count: 0`.
             if any(fnmatch.fnmatch(os.path.relpath(f, wt), check["glob"]) for f in removed):
                 return False
-            found = [f for f in found if f in changed]
+            found = [f for f in found if f in touched]
         if not content_only and (len(found) != check.get("count", len(found))
                                  or (not found and check.get("count") != 0)):
             return False

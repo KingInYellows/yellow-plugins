@@ -117,9 +117,9 @@ agents:
   by `--plugin-dir`, no system prompt and its `allowed-tools` minus MCP tools
   and `AskUserQuestion`; list the plugin directories under `fixtures` so an edit
   reruns the rows. `EVAL_TIMEOUT_S` in its `env` raises the 1,200 s run timeout;
-- a `files` check's `changed`: only files the run added or modified count (a
-  removed or renamed-away match fails the check), and `count: 0` then asserts a
-  file was left alone;
+- a `files` check's `changed`: only files the run added or modified count
+  (`"added"`: only files it created; a removed or renamed-away match fails the
+  check either way), and `count: 0` then asserts a file was left alone;
 - a case's `incident` and `selfcheck` (both required by `check`):
   `{"fix": <sha>, "paths": [...]}`, `{"doc": <repo file>}` or
   `{"protects": [...]}`.

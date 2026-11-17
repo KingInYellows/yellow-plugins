@@ -50,6 +50,16 @@ class FilesPassTest(unittest.TestCase):
         self.write("plans/second.md", "## Acceptance Criteria\n")
         self.assertFalse(harness.files_pass(plan, self.wt))
 
+    def test_added_ignores_edits_to_existing_files(self):
+        plan = {"files": [{"glob": "plans/*.md", "changed": "added", "count": 1,
+                           "match": ["Acceptance Criteria"]}]}
+        self.write("plans/old.md", "## Acceptance Criteria\nold, edited\n")
+        self.assertFalse(harness.files_pass(plan, self.wt))
+        self.assertTrue(harness.files_pass(dict(plan, files=[dict(plan["files"][0], changed=True)]),
+                                           self.wt))
+        self.write("plans/new.md", "## Acceptance Criteria\nnew\n")
+        self.assertTrue(harness.files_pass(plan, self.wt))
+
     def test_count_zero_asserts_a_file_was_left_alone(self):
         oos = {"files": [{"glob": "docs/security.md", "changed": True, "count": 0}]}
         self.assertTrue(harness.files_pass(oos, self.wt))

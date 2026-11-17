@@ -41,10 +41,12 @@ reviewed file.
 ## Plan cases
 
 `incident` is the `docs/solutions/` doc the case comes from. A case passes when
-the run leaves exactly one new file under `plans/`, with an Acceptance Criteria
-heading, that names the incident's lesson (the `match` regexes after the
-heading). The request never states the lesson, so the case measures whether
-planning finds and applies what the repo already learned (the
+the run creates exactly one new file under `plans/` (`changed: "added"`, so
+editing an existing plan does not count) that has an Acceptance Criteria heading
+and names the incident's lesson anywhere in the plan (the `match` regexes after
+the heading one). Where in the plan the lesson lands is not graded: a risk or
+step that applies it counts. The request never states the lesson, so the case
+measures whether planning finds and applies what the repo already learned (the
 `learnings-researcher` pre-pass, repo research, spec-flow analysis).
 `selfcheck.doc` makes `eval.py check` confirm the lesson regexes match the
 incident doc itself.
