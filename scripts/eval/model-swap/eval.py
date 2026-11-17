@@ -18,8 +18,9 @@ Grades each candidate model against golden findings, not a model judge:
   eval.py prepare <spec.json> <work-dir>   worktrees, diffs, prompts, matrix
   eval.py run <work-dir> [-j N] [--dry-run] run the matrix (spends usage)
   eval.py grade <work-dir>                 recall, cost and latency tables
+  eval.py check <work-dir> <spec.json>...  offline corpus self-check
 
-prepare and grade spend nothing. run calls run-one.sh once per matrix row
+prepare, grade and check spend nothing. run calls run-one.sh once per matrix row
 and skips rows that already have output.
 """
 
@@ -27,6 +28,7 @@ import argparse
 import collections
 import concurrent.futures
 import csv
+import fnmatch
 import glob
 import hashlib
 import json
@@ -112,15 +114,25 @@ def fixture_parts(agent):
     """Content hash of the agent's `fixtures` (repo-relative files or directories),
     as a fingerprint part: an edited stand-in CLI or canned response reruns its rows.
     Empty when the agent lists none, so other specs keep their fingerprints."""
-    if not agent.get("fixtures"):
+    rels = [*agent.get("fixtures", []), *agent.get("overlay", [])]
+    if not rels:
         return []
     h = hashlib.sha256()
-    for f in (f for rel in agent["fixtures"] for f in fixture_files(rel)):
+    for f in (f for rel in rels for f in fixture_files(rel)):
         with open(f, "rb") as handle:
             data = handle.read()
         # The exec bit matters too: a stand-in without it fails differently.
         name = os.path.relpath(f, REPO).encode()
         h.update(b"%d:%s%d%d:" % (len(name), name, os.access(f, os.X_OK), len(data)) + data)
+    if "plugins" in agent or "overlay" in agent:
+        # Corpus agents: how the row runs is an input too, so a changed runner
+        # or plugin list reruns the rows instead of reusing old output.
+        with open(os.path.join(HERE, "run-one.sh"), "rb") as handle:
+            h.update(b"run-one.sh:" + handle.read())
+        h.update(json.dumps(agent.get("plugins", [])).encode())
+        if "plugins" in agent:
+            # Whether Bash was approved changes what a command run can do.
+            h.update(b"bash:" + os.environ.get("EVAL_ALLOW_BASH", "0").encode())
     return [h.hexdigest()]
 
 
@@ -210,17 +222,34 @@ def case_context(c):
     return "\n".join(lines).strip() + "\n"
 
 
-def case_tree(wt, commit, c):
-    """A per-run tree at commit with the case's `files` written and, with `commit`, committed."""
+def symlink_on_path(wt, path):
+    """The first component of path under wt that is a symlink, or None. The
+    commit may hold symlinks; a write must never follow one out of the tree."""
+    cur = wt
+    for part in path.split("/"):
+        cur = os.path.join(cur, part)
+        if os.path.islink(cur):
+            return os.path.relpath(cur, wt)
+    return None
+
+
+def case_tree(wt, commit, c, overlay=()):
+    """A per-run tree at commit with the agent's `overlay` files copied from the
+    checkout (the version under test), then the case's `files` written and, with
+    `commit`, committed."""
     fresh_worktree(wt, commit)
+    for path in overlay:
+        dest = os.path.join(wt, path)
+        through = symlink_on_path(wt, path)
+        if through:
+            sys.exit("overlay %s goes through symlink %s in the case tree" % (path, through))
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copyfile(os.path.join(REPO, path), dest)
     for path, text in c.get("files", {}).items():
-        # The commit may hold symlinks; never follow one out of the tree.
-        cur = wt
-        for part in path.split("/"):
-            cur = os.path.join(cur, part)
-            if os.path.islink(cur):
-                sys.exit("case %s: file path %s goes through symlink %s"
-                         % (c.get("id"), path, os.path.relpath(cur, wt)))
+        through = symlink_on_path(wt, path)
+        if through:
+            sys.exit("case %s: file path %s goes through symlink %s"
+                     % (c.get("id"), path, through))
         os.makedirs(os.path.dirname(os.path.join(wt, path)) or wt, exist_ok=True)
         with open(os.path.join(wt, path), "w", encoding="utf-8") as handle:
             handle.write(text)
@@ -247,12 +276,51 @@ def run_env(agent, rid, wt):
     return env
 
 
-def files_pass(expect, wt):
+def changed_files(wt, added_only=False):
+    """Absolute paths the run touched, as (added or modified, removed). Untracked
+    files count as added; a rename's source path counts as removed. With
+    added_only, the first set holds only new files (untracked, added, or a
+    rename or copy target)."""
+    out = subprocess.run(["git", "status", "--porcelain", "-z", "--untracked-files=all"], cwd=wt,
+                         capture_output=True, text=True, check=True).stdout
+    paths, removed = set(), set()
+    entries = iter(out.split("\0"))
+    for entry in entries:
+        if len(entry) < 4:
+            continue
+        if entry[0] in "RC":
+            source = next(entries, None)  # -z puts a rename's source path in its own field
+            if entry[0] == "R" and source:
+                removed.add(os.path.join(wt, source))
+        if "D" in entry[:2]:
+            removed.add(os.path.join(wt, entry[3:]))
+        elif not added_only or entry[:2] == "??" or entry[0] in "ARC":
+            paths.add(os.path.join(wt, entry[3:]))
+    return paths, removed
+
+
+def files_pass(expect, wt, content_only=False):
     """The case's `files` checks (glob, optional exact count, regexes over the
-    matched files' text) and `no_files` globs, against a run's tree."""
+    matched files' text) and `no_files` globs, against a run's tree. A check
+    with `changed` only counts files the run added or modified (`"added"`: only
+    files it created), so `count: 0`
+    asserts a file was left alone (removing a matched file fails the check). content_only (the offline check) skips
+    `changed` and the counts and judges only the regexes."""
+    changed = {}
     for check in expect.get("files", []):
         found = sorted(glob.glob(os.path.join(wt, check["glob"])))
-        if len(found) != check.get("count", len(found)) or not found:
+        if check.get("changed") and not content_only:
+            mode = check["changed"] == "added"
+            if mode not in changed:
+                changed[mode] = changed_files(wt, added_only=mode)
+            touched, removed = changed[mode]
+            # Removing a matched file is never the expected change, and it
+            # would otherwise slip past `count: 0`.
+            if any(fnmatch.fnmatch(os.path.relpath(f, wt), check["glob"]) for f in removed):
+                return False
+            found = [f for f in found if f in touched]
+        if not content_only and (len(found) != check.get("count", len(found))
+                                 or (not found and check.get("count") != 0)):
             return False
         text = ""
         for path in found:
@@ -281,10 +349,18 @@ def check_spec(spec):
     names = [*spec["agents"], *(r["id"] for r in spec["replays"]), *(s["id"] for s in spec["scans"]),
              *(c["id"] for c in spec["prompts"]),
              *(c[k] for cs in spec["configs"].values() for c in cs for k in ("model", "effort"))]
+    # Plugin names are single directory names: run passes them to run-one.sh
+    # joined by ":", so a name must not carry a separator or a path.
+    names += [n for a in spec["agents"].values() for n in a.get("plugins", [])]
     bad = [n for n in names if not isinstance(n, str) or not re.fullmatch(SAFE_NAME, n) or ".." in n]
     paths = [*(a["file"] for a in spec["agents"].values()),
              *(f for a in spec["agents"].values() for f in a.get("preload_skills", [])),
              *(f for a in spec["agents"].values() for f in a.get("fixtures", [])),
+             *(f for a in spec["agents"].values() for f in a.get("overlay", [])),
+             *("plugins/" + n for a in spec["agents"].values() for n in a.get("plugins", [])),
+             *(p for c in spec["prompts"] for p in c.get("selfcheck", {}).get("paths", [])),
+             *(p for c in spec["prompts"] for p in c.get("selfcheck", {}).get("protects", [])),
+             *(c["selfcheck"]["doc"] for c in spec["prompts"] if "doc" in c.get("selfcheck", {})),
              *(p["file"] for r in spec["replays"] for p in r["plants"]),
              *(f for s in spec["scans"] for f in s["files"]),
              *(p["file"] for s in spec["scans"] for p in s.get("plants", [])),
@@ -297,19 +373,23 @@ def check_spec(spec):
                for g in e.get("no_files", []))]
     bad += [f for f in paths if not isinstance(f, str) or os.path.isabs(f)
             or os.path.normpath(f) != f or f.split("/")[0] == ".."]
+    bad += [c["tree"] for c in spec["prompts"]
+            if "tree" in c and not re.fullmatch(r"[0-9a-f]{40}", str(c["tree"]))]
     if bad:
         sys.exit("prepare: unsafe spec values (names must match %s; files must be "
                  "relative paths without ..): %s" % (SAFE_NAME, ", ".join(map(str, bad))))
 
 
-def agent_tools(path):
-    """The `tools:` frontmatter as a comma list: block list, flow list or plain string."""
+def agent_tools(path, command=False):
+    """The `tools:` frontmatter as a comma list: block list, flow list or plain
+    string. A command (`command`) uses `allowed-tools:` instead, without MCP
+    tools (no MCP servers load) or AskUserQuestion (runs are headless)."""
     with open(path, encoding="utf-8") as handle:
         text = handle.read()
     end = text.find("\n---", 3)
     lines = text[4:end].splitlines() if text.startswith("---\n") and end > 0 else []
     for i, line in enumerate(lines):
-        m = re.match(r"tools:\s*(.*)$", line)
+        m = re.match(r"%s:\s*(.*)$" % ("allowed-tools" if command else "tools"), line)
         if not m:
             continue
         value = re.sub(r"\s+#.*$", "", m.group(1)).strip()
@@ -322,7 +402,10 @@ def agent_tools(path):
                 if not im:
                     break
                 items.append(re.sub(r"\s+#.*$", "", im.group(1)))
-        return ",".join(t.strip().strip("'\"") for t in items if t.strip())
+        items = [t.strip().strip("'\"") for t in items if t.strip()]
+        if command:
+            items = [t for t in items if not t.startswith("mcp__") and t != "AskUserQuestion"]
+        return ",".join(items)
     return ""
 
 
@@ -330,6 +413,8 @@ def prepare(spec_path, work):
     with open(spec_path, encoding="utf-8") as handle:
         spec = json.load(handle)
     check_spec(spec)
+    # Recorded so `run` approves Bash exactly as the fingerprints say.
+    spec["eval_allow_bash"] = "1" if os.environ.get("EVAL_ALLOW_BASH") == "1" else "0"
     # Hashed before anything under <work> changes: a missing fixture stops here.
     fixtures = {aid: fixture_parts(agent) for aid, agent in spec["agents"].items()}
     for sub in ("wt", "prompts", "out"):
@@ -368,10 +453,12 @@ def prepare(spec_path, work):
             golden.append({"lane": p["lane"], "id": "%s#%d" % (s["id"], i), "regions": regions})
         with open(os.path.join(work, "golden-%s.json" % s["id"]), "w", encoding="utf-8") as handle:
             json.dump(golden, handle, indent=1)
-    shared = [c for c in spec["prompts"] if "files" in c or "commit" in c]
-    if any(not a.get("isolated") and set(a.get("expect", {})) & {c["id"] for c in shared}
+    shared = [c for c in spec["prompts"] if "files" in c or "commit" in c or "tree" in c]
+    if any(not a.get("isolated") and (set(a.get("expect", {})) & {c["id"] for c in shared}
+                                      or a.get("overlay") or a.get("plugins"))
            for a in spec["agents"].values() if a["kind"] == "prompt"):
-        sys.exit("prepare: cases with `files` or `commit` need an `isolated` agent")
+        sys.exit("prepare: cases with `files`, `commit` or `tree`, and agents with `overlay` "
+                 "or `plugins`, need an `isolated` agent")
     if spec["prompts"]:
         # Recreated each time: a finder's answers depend on the docs at prompt_commit.
         fresh_worktree(os.path.join(work, "wt", "prompt"), spec["prompt_commit"])
@@ -385,20 +472,27 @@ def prepare(spec_path, work):
                         context = case_context(cases[cid])
                         if agent.get("fence", True):
                             context = CONTEXT_FENCE.format(context=context.rstrip("\n"))
-                        prompt = os.path.join(work, "prompts", "%s-%s.txt" % (aid, cid))
-                        with open(prompt, "w", encoding="utf-8") as handle:
-                            handle.write(agent["prompt"].replace("{context}", context))
+                        text = agent["prompt"].replace("{context}", context)
                         rid = "%s-%s-%s-%s-r%d" % (aid, cid, c["model"], c["effort"], rep)
+                        wt = os.path.join(work, "wt", "prompt")
+                        if agent.get("isolated"):
+                            wt = os.path.join(work, "wt", "prompt-run", rid)
+                        prompt = os.path.join(work, "prompts", "%s-%s.txt" % (aid, cid))
+                        if "{wt}" in text:
+                            # The run's own tree: one prompt file per row.
+                            text = text.replace("{wt}", wt)
+                            prompt = os.path.join(work, "prompts", rid + ".txt")
+                        with open(prompt, "w", encoding="utf-8") as handle:
+                            handle.write(text)
                         fp = fingerprint(agent["expect"][cid], cases[cid], spec["prompt_commit"],
                                          c["model"], c["effort"], sys_prompt, prompt,
                                          agent.get("env", {}), agent.get("isolated", False), *fixtures[aid])
-                        wt = os.path.join(work, "wt", "prompt")
                         if agent.get("isolated"):
                             # The agent writes files, so each run gets its own tree. A run
                             # that `run` will skip keeps its tree: grade reads the files in it.
-                            wt = os.path.join(work, "wt", "prompt-run", rid)
                             if not (os.path.isdir(wt) and output_fingerprint(work, rid) == fp):
-                                case_tree(wt, spec["prompt_commit"], cases[cid])
+                                case_tree(wt, cases[cid].get("tree", spec["prompt_commit"]),
+                                          cases[cid], agent.get("overlay", ()))
                         rows.append([rid, sys_prompt, wt, c["model"], c["effort"], prompt, aid, cid, fp])
                     continue
                 if agent["kind"] == "replay":
@@ -454,15 +548,21 @@ def run(work, jobs, dry_run):
     for row in rows:
         # A failed attempt can leave files behind; a rerun starts from a clean tree.
         if agents[row[6]].get("isolated") and output_fingerprint(work, row[0]) != row[8]:
-            case_tree(row[2], spec["prompt_commit"], cases[row[7]])
+            case = cases[row[7]]
+            case_tree(row[2], case.get("tree", spec["prompt_commit"]), case,
+                      agents[row[6]].get("overlay", ()))
 
     def one(row):
         rid, sys_prompt, wt, model, effort, prompt = row[:6]
         env = run_env(agents[row[6]], rid, wt)
         env["EVAL_FINGERPRINT"] = row[8]
+        env["EVAL_ALLOW_BASH"] = spec.get("eval_allow_bash", "0")
         env["EVAL_SCAN"] = "1" if agents[row[6]]["kind"] == "scan" else "0"
+        # A command agent runs as a slash command with its plugins loaded.
+        plugins = agents[row[6]].get("plugins", [])
+        env["EVAL_PLUGIN_DIRS"] = ":".join(os.path.join(REPO, "plugins", n) for n in plugins)
         rc = subprocess.run([os.path.join(HERE, "run-one.sh"), out, rid, sys_prompt, wt,
-                             model, effort, prompt, agent_tools(sys_prompt)],
+                             model, effort, prompt, agent_tools(sys_prompt, bool(plugins))],
                             env=env).returncode
         return rid, rc
 
@@ -650,6 +750,7 @@ def grade(work):
     usage = collections.defaultdict(lambda: collections.Counter())
     other = []
     missing = []
+    denied = []
     out = os.path.join(work, "out")
     for row in read_matrix(work):
         rid, model, effort, aid, target, fp = row[0], row[3], row[4], row[6], row[7], row[8]
@@ -664,6 +765,9 @@ def grade(work):
             missing.append(rid)
             continue
         key = (aid, model, effort)
+        if d.get("permission_denials"):
+            denied.append("%s (%s)" % (rid, ", ".join(sorted({x.get("tool_name", "?")
+                                                             for x in d["permission_denials"]}))))
         if agent["kind"] == "prompt":
             ok = case_passes(agent["expect"][target], d.get("result") or "")
             if agent.get("isolated"):
@@ -728,10 +832,126 @@ def grade(work):
         handle.writelines("%s: %s\n\n" % row for row in other)
     print("\n%d non-golden findings to adjudicate by hand: %s" % (
         len(other), os.path.join(work, "unmatched-findings.txt")))
+    if denied:
+        # A denied tool call can fail a case for the harness's sake, not the agent's.
+        print("\n%d runs had a permission denial; check they are the agent's doing: %s"
+              % (len(denied), "; ".join(denied)))
     if missing:
         # Recall above leaves these runs out of its denominators.
         sys.exit("grade: %d matrix runs have no current result (%s); rerun `run` before trusting recall"
                  % (len(missing), ", ".join(missing)))
+
+
+def have_commit(sha):
+    """True once sha is in the clone, fetching it by id when missing (PR heads
+    that never reached the default branch)."""
+    if subprocess.run(["git", "cat-file", "-e", sha + "^{commit}"], cwd=REPO,
+                      capture_output=True).returncode == 0:
+        return True
+    subprocess.run(["git", "fetch", "--quiet", "--no-tags", "origin", sha], cwd=REPO, capture_output=True)
+    return subprocess.run(["git", "cat-file", "-e", sha + "^{commit}"], cwd=REPO,
+                          capture_output=True).returncode == 0
+
+
+def check(spec_paths, work):
+    """Offline corpus check; spends nothing. For every case: it names its
+    incident, its commits exist, and its regexes compile. A case's `selfcheck`
+    then replays the incident through the real grader: `fix` (a commit) must
+    turn a tree that fails the case's file checks into one that passes them;
+    `doc` (a repo file) written as the run's only new plan must pass them;
+    `protects` (files an out-of-scope case must leave alone) must pass
+    untouched and fail once one is edited or removed. Every case needs one."""
+    problems = []
+    for spec_path in spec_paths:
+        with open(spec_path, encoding="utf-8") as handle:
+            spec = json.load(handle)
+        check_spec(spec)
+        name = os.path.basename(spec_path)
+        cases = {c["id"]: c for c in spec["prompts"]}
+        if not have_commit(spec["prompt_commit"]):
+            problems.append("%s: prompt_commit %s is not reachable" % (name, spec["prompt_commit"]))
+            continue
+        expects = collections.defaultdict(list)
+        for agent in spec["agents"].values():
+            for cid, e in agent.get("expect", {}).items():
+                expects[cid].append(e)
+                for rx in [*e.get("match", []), *e.get("not", []),
+                           *(r for f in e.get("files", []) for r in [*f.get("match", []), *f.get("not", [])])]:
+                    try:
+                        re.compile(rx)
+                    except re.error as err:
+                        problems.append("%s %s: bad regex %r: %s" % (name, cid, rx, err))
+        for cid, c in cases.items():
+            if not c.get("incident"):
+                problems.append("%s %s: no `incident`" % (name, cid))
+            if cid not in expects:
+                problems.append("%s %s: no agent expects it" % (name, cid))
+            sc = c.get("selfcheck")
+            if not sc:
+                problems.append("%s %s: no `selfcheck`" % (name, cid))
+                continue
+            tree = c.get("tree", spec["prompt_commit"])
+            if not have_commit(tree) or ("fix" in sc and not have_commit(sc["fix"])):
+                problems.append("%s %s: a commit is not reachable" % (name, cid))
+                continue
+            wt = os.path.join(work, "wt", cid)
+            case_tree(wt, tree, c)
+            try:
+                if "protects" in sc:
+                    # Out-of-scope case: passes on the untouched tree, fails once
+                    # a protected file is edited or removed.
+                    if not all(files_pass(e, wt) for e in expects[cid]):
+                        problems.append("%s %s: file checks fail on the untouched tree" % (name, cid))
+                    for path in sc["protects"]:
+                        target = os.path.join(wt, path)
+                        if symlink_on_path(wt, path) or not os.path.isfile(target):
+                            problems.append("%s %s: protected %s is not a file in the tree"
+                                            % (name, cid, path))
+                            continue
+                        with open(target, "rb") as handle:
+                            original = handle.read()
+                        mode = os.stat(target).st_mode
+                        with open(target, "a", encoding="utf-8") as handle:
+                            handle.write("\nselfcheck edit\n")
+                        edited = any(files_pass(e, wt) for e in expects[cid])
+                        os.remove(target)
+                        removed = any(files_pass(e, wt) for e in expects[cid])
+                        with open(target, "wb") as handle:
+                            handle.write(original)
+                        os.chmod(target, mode)
+                        if edited or removed:
+                            problems.append("%s %s: file checks still pass with %s %s"
+                                            % (name, cid, path, "edited" if edited else "removed"))
+                    continue
+                if "fix" in sc:
+                    if any(files_pass(e, wt, content_only=True) for e in expects[cid]):
+                        problems.append("%s %s: file checks already pass before the fix" % (name, cid))
+                    for path in sc["paths"]:
+                        through = symlink_on_path(wt, path)
+                        if through:
+                            sys.exit("%s %s: selfcheck path %s goes through symlink %s"
+                                     % (name, cid, path, through))
+                        with open(os.path.join(wt, path), "w", encoding="utf-8") as handle:
+                            handle.write(git("show", "%s:%s" % (sc["fix"], path)))
+                else:
+                    rel = "plans/selfcheck-%s.md" % cid
+                    through = symlink_on_path(wt, rel)
+                    if through:
+                        sys.exit("%s %s: plan path %s goes through symlink %s"
+                                 % (name, cid, rel, through))
+                    os.makedirs(os.path.join(wt, "plans"), exist_ok=True)
+                    with open(os.path.join(wt, "plans", "selfcheck-%s.md" % cid), "w",
+                              encoding="utf-8") as handle:
+                        handle.write("# Plan\n\n## Acceptance Criteria\n\n"
+                                     + git("show", "%s:%s" % (spec["prompt_commit"], sc["doc"])))
+                if not all(files_pass(e, wt) for e in expects[cid]):
+                    problems.append("%s %s: file checks fail on the incident's %s"
+                                    % (name, cid, "fix" if "fix" in sc else "doc"))
+            finally:
+                git("worktree", "remove", "--force", wt)
+        print("checked %s: %d cases" % (name, len(cases)))
+    if problems:
+        sys.exit("check:\n  " + "\n  ".join(problems))
 
 
 def main():
@@ -746,9 +966,14 @@ def main():
     r.add_argument("--dry-run", action="store_true")
     g = sub.add_parser("grade")
     g.add_argument("work")
+    k = sub.add_parser("check")
+    k.add_argument("work")
+    k.add_argument("spec", nargs="+")
     a = ap.parse_args()
     work = os.path.abspath(a.work)
-    if a.cmd == "prepare":
+    if a.cmd == "check":
+        check(a.spec, work)
+    elif a.cmd == "prepare":
         prepare(a.spec, work)
     elif a.cmd == "run":
         run(work, a.jobs, a.dry_run)

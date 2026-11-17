@@ -10,6 +10,7 @@ This document provides guidelines and processes for contributing to the project.
 - [Development Workflow](#development-workflow)
 - [Plugin Structure](#plugin-structure)
 - [Testing Requirements](#testing-requirements)
+- [Eval Gate](#eval-gate)
 - [Pull Request Process](#pull-request-process)
 - [Solution Docs](#solution-docs)
 - [Coding Standards](#coding-standards)
@@ -177,6 +178,70 @@ pnpm release:check
 - Test both happy paths and error cases
 - Use descriptive test names that explain intent
 - Shell scripts: use [Bats](https://github.com/bats-core/bats-core) for testing
+
+## Eval Gate
+
+A change to how Claude behaves ships only when the eval set shows no quality
+loss. The corpus and its commands are in
+[`scripts/eval/corpus/README.md`](scripts/eval/corpus/README.md).
+
+**Gated:** edits to command, agent or skill prompts; the review pipeline
+(reviewer agents, `review-gate` workflow, `REVIEW.md`, risk policy); model or
+effort pins; orchestration (fan-out, workflows, background agents). **Exempt:**
+validators, CI, description-budget trims, headless budget caps, docs, tests.
+Description rewrites are gated by the triggering suite (CLAUDE-315), not this
+corpus. Run every area the change can reach: review, resolve, plan, or the
+`model-swap` fixture for a model swap. The plan area is reached only by edits to
+`/flow:plan`, its references, or the research agents it starts; other changes
+skip it.
+
+**Method** (from CLAUDE-216). Before editing:
+
+1. Run the area twice on the unchanged base (two identical builds), `R`
+   repetitions per case each. `R` is 3, and 2 for the review area, whose rows
+   each run a full multi-agent review. The noise floor is the gap between the
+   two pass rates, in percentage points. Over 10 points, double `R` and measure
+   again before going on. Earlier runs count as baselines when the corpus and
+   every file the area loads are unchanged since (for review, the weekly runs).
+2. Register the bar in the PR description, before the diff: the area, `R`, both
+   baseline pass rates and the noise floor.
+
+**Saturated areas.** When the area's latest archived baseline passed at least
+95% of its rows, skip the new baselines and the full repetitions: reuse that
+baseline, run the candidate once (`reps` 1), then rerun only the cases that
+failed, twice more each. A case that fails 2 of its 3 runs is a regression, and
+the change passes with none. The plan area is saturated today (18/18), so a
+gated planning run costs one pass plus reruns instead of nine passes. The
+candidate must use the archived baseline's `EVAL_ALLOW_BASH` setting; a change
+that cannot (an outside contributor's PR runs without Bash) takes fresh
+baselines.
+
+The change passes when its own run (same `R`) has a pass rate no lower than the
+baseline mean minus the larger of the noise floor and **5 points**, and no case
+that passed in every baseline repetition fails in every candidate repetition.
+The review area also keeps its own rule (`grade --baseline`): control false
+positives must not rise. A change that claims a cost saving must show the cost
+drop outside the baseline-to-baseline spread.
+
+No primary source defines a non-inferiority margin for agent evals, so 5 points
+is ours. At 18 cases and 3 repetitions, one case failing every repetition costs
+5.6 points, so the margin forgives scattered flakes but not a whole case. The
+every-repetition rule above catches that case even when gains elsewhere hide it
+in the rate.
+
+**Where it runs.** CI runs only the free part, the `eval-offline` job: the
+graders' unit tests, replay of recorded outputs, and `eval.py check`, which
+proves each case's regexes fail on the incident and pass on its real fix. Paid
+runs are manual and local, never from CI, with each run capped by
+`EVAL_MAX_BUDGET_USD` (5 USD, 15 for planning; API-equivalent, counted on a
+subscription too). One full pass per area costs the amounts recorded in the
+corpus README; check them against your plan's usage before starting.
+
+**Results.** The PR description carries the registered bar and the before/after
+table. Raw outputs (`<work>/out/`, `matrix.tsv`, the `grade` output) stay
+outside the repository, archived by date and area (`eval/runs/<date>-<area>/`).
+Baselines and weekly runs add a row to the corpus README or a
+`results-<date>.md` beside their harness.
 
 ## Pull Request Process
 

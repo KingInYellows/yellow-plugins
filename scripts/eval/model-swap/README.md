@@ -66,6 +66,11 @@ servers, slash commands and memory, so model and effort are the only variables.
 Project `CLAUDE.md` files still load. Agents listed with `preload_skills` get
 those `SKILL.md` bodies appended, which is what `skills:` frontmatter does.
 `--plugin-dir` is not used: in cloud sessions it did not register plugin agents.
+An agent with a `plugins` key is the exception: it runs its `file` as a slash
+command with those plugins loaded by `--plugin-dir`, no system prompt, and Write
+and Edit allowed only under the run's tree (`--permission-mode acceptEdits`).
+Unless `EVAL_ALLOW_BASH=1`, that run gets no Bash tool and its plugins' hooks
+are off, since the command text and hooks come from the checkout under test.
 
 Runs set `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1`, since nobody watches
 the subagent progress lines. When settings block the requested model, Claude
@@ -99,6 +104,34 @@ Add a spec under `fixtures/`, or extend one:
   editing one reruns those rows instead of reusing old output.
 
 An agent's optional `replays` or `scans` list limits it to those targets.
+
+Keys the eval corpus (`scripts/eval/corpus/`) uses, all for `isolated` prompt
+agents:
+
+- a case's `tree`: a 40-character commit that replaces `prompt_commit` for that
+  case's run tree;
+- an agent's `overlay`: repo files copied from the checkout into every run tree
+  after checkout, so an old tree still gets the version under test (also hashed
+  into the fingerprint);
+- `{wt}` in an agent's `prompt`: the run's own tree path (each row then gets its
+  own prompt file);
+- an agent's `plugins`: run `file` as a slash command with those plugins loaded
+  by `--plugin-dir`, no system prompt and its `allowed-tools` minus MCP tools
+  and `AskUserQuestion`; list the plugin directories under `fixtures` so an edit
+  reruns the rows. `EVAL_TIMEOUT_S` in its `env` raises the 1,200 s run timeout;
+- a `files` check's `changed`: only files the run added or modified count
+  (`"added"`: only files it created; a removed or renamed-away match fails the
+  check either way), and `count: 0` then asserts a file was left alone;
+- a case's `incident` and `selfcheck` (both required by `check`):
+  `{"fix": <sha>, "paths": [...]}`, `{"doc": <repo file>}` or
+  `{"protects": [...]}`.
+
+`eval.py check <work-dir> <spec>...` spends nothing: it validates the specs,
+fetches missing commits by id, compiles every regex and runs each `selfcheck`
+through the real grader (the case must fail on the incident tree and pass with
+the fix's files, pass with the doc written as the run's only new plan, or pass
+untouched and fail once a protected file is edited or removed). Write and Edit,
+like Read, Grep and Glob, are approved only under the run's tree.
 
 ## Results
 

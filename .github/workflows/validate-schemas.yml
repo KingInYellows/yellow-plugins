@@ -1833,6 +1833,35 @@ jobs:
           bash scripts/verify-goal-release.sh
 
   # ============================================================================
+  # EVAL OFFLINE (free: grader unit tests, recorded-output replay and the
+  # corpus self-check; paid eval runs are manual and local, see CONTRIBUTING.md
+  # "Eval Gate")
+  # ============================================================================
+  eval-offline:
+    name: Eval Offline Checks
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Grader unit tests and recorded-output replay
+        run: |
+          set -euo pipefail
+          git config --global user.name "Eval Fixture"
+          git config --global user.email "eval@example.invalid"
+          python3 -m unittest discover -s scripts/eval/review-gate/tests
+          python3 -m unittest discover -s scripts/eval/model-swap/tests
+
+      # Fetches each case's commit by id (a public repo needs no token): PR
+      # heads that never reached the default branch are not in the clone.
+      - name: Corpus self-check
+        run: python3 scripts/eval/model-swap/eval.py check "$RUNNER_TEMP/eval-check" scripts/eval/corpus/*.json
+
+  # ============================================================================
   # FINAL STATUS CHECK
   # ============================================================================
   ci-status:
@@ -1855,6 +1884,7 @@ jobs:
         yellow-review-shell-tests,
         shell-compat-tests,
         goal-engine-compat,
+        eval-offline,
       ]
 
     steps:
@@ -1873,6 +1903,7 @@ jobs:
           BUILD_RESULT: ${{ needs.build.result }}
           GOAL_ENGINE_COMPAT_RESULT: ${{ needs.goal-engine-compat.result }}
           CHANGESET_CHECK_RESULT: ${{ needs.changeset-check.result }}
+          EVAL_OFFLINE_RESULT: ${{ needs.eval-offline.result }}
         run: |
           if [ "$VALIDATE_SCHEMAS_RESULT" == "success" ] && \
              [ "$VALIDATE_VERSIONS_RESULT" == "success" ] && \
@@ -1886,6 +1917,7 @@ jobs:
              [ "$SHELL_COMPAT_RESULT" == "success" ] && \
              [ "$BUILD_RESULT" == "success" ] && \
              [ "$GOAL_ENGINE_COMPAT_RESULT" == "success" ] && \
+             [ "$EVAL_OFFLINE_RESULT" == "success" ] && \
              { [ "$CHANGESET_CHECK_RESULT" == "success" ] || [ "$CHANGESET_CHECK_RESULT" == "skipped" ]; }; then
             echo "::notice::✅ All CI validation checks passed"
             exit 0
@@ -1903,6 +1935,7 @@ jobs:
             echo "Shell Compatibility: $SHELL_COMPAT_RESULT"
             echo "Build Verification: $BUILD_RESULT"
             echo "Released Goal Engine Compatibility: $GOAL_ENGINE_COMPAT_RESULT"
+            echo "Eval Offline Checks: $EVAL_OFFLINE_RESULT"
             echo "Changeset Required: $CHANGESET_CHECK_RESULT"
             exit 1
           fi
