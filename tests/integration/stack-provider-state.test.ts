@@ -24,6 +24,7 @@ const provider = require('../../plugins/yellow-core/lib/stack-provider-state.js'
 
 const {
   STATES,
+  RECOMMENDED_PROVIDER,
   PROVIDERS,
   PROVIDER_GROUP,
   INTENT_INVALID_REASONS,
@@ -280,6 +281,26 @@ describe('classifyProviderState — the eight states', () => {
     expect(result.providers.graphite.installed).toBe(true);
     expect(result.providers.github.installed).toBe(true);
     expect(result.detail).toContain('Installed but not enabled');
+  });
+
+  it('UNSELECTED recommends github without selecting it', () => {
+    const result = classifyProviderState({
+      plugins: fixture('none-enabled'),
+      projectPath: PROJECT_PATH,
+    });
+    expect(RECOMMENDED_PROVIDER).toBe('github');
+    expect(result.recommendedProvider).toBe('github');
+    expect(result.detail).toContain('/stack:select github');
+  });
+
+  it('an enabled Graphite provider is never given a recommendation to move', () => {
+    const result = classifyProviderState({
+      plugins: fixture('both-installed-graphite-enabled'),
+      projectPath: PROJECT_PATH,
+    });
+    expect(result.state).toBe(STATES.READY_GRAPHITE);
+    expect(result).not.toHaveProperty('recommendedProvider');
+    expect(result.detail ?? '').not.toContain('/stack:select github');
   });
 
   it('case 6a: repository intent mismatches the enabled provider => CONFIG_MISMATCH', () => {

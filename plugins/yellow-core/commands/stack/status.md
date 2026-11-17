@@ -213,7 +213,7 @@ Stacked-PR Provider Status
 
 | State | Meaning | Next step to print |
 | --- | --- | --- |
-| `UNSELECTED` | No intent recorded and no provider enabled | `/stack:select graphite` or `/stack:select github` |
+| `UNSELECTED` | No intent recorded and no provider enabled | `/stack:select github` (recommended for new work) or `/stack:select graphite` |
 | `READY_GRAPHITE` | `gt-workflow` is the single enabled provider | none — report and stop |
 | `READY_GITHUB` | `github-workflow` is the single enabled provider | none — report and stop |
 | `CONFLICT` | Both providers enabled | `/stack:select <provider>` to disable the other |

@@ -67,6 +67,15 @@ const PROVIDERS = Object.freeze([
 ]);
 // provider-table:end
 
+/**
+ * Provider recommended when nothing is selected yet. It is advice printed
+ * with UNSELECTED, never an automatic choice: classification still stops and
+ * `/stack:select` still asks. An enabled provider or a recorded
+ * `.yellow-stack.yml` intent always wins, so an existing Graphite setup is
+ * never moved by this constant. See docs/stacked-prs-native-migration.md.
+ */
+const RECOMMENDED_PROVIDER = 'github';
+
 /** Marketplace this repository's provider plugins are published under. */
 const DEFAULT_MARKETPLACE = 'yellow-plugins';
 
@@ -613,15 +622,17 @@ function classifyProviderState({
     const installed = PROVIDERS.map(
       (provider) => providers[provider.id]
     ).filter((entry) => entry.installed);
+    const recommendation = ` Recommended for new work: /stack:select ${RECOMMENDED_PROVIDER}.`;
     return {
       ...result,
       state: STATES.UNSELECTED,
+      recommendedProvider: RECOMMENDED_PROVIDER,
       detail:
-        installed.length === 0
+        (installed.length === 0
           ? 'No stacked-PR provider is installed and none is recorded in .yellow-stack.yml.'
           : `Installed but not enabled: ${installed
               .map((entry) => entry.plugin)
-              .join(', ')}. No provider is recorded in .yellow-stack.yml.`,
+              .join(', ')}. No provider is recorded in .yellow-stack.yml.`) + recommendation,
     };
   }
 
@@ -1056,6 +1067,7 @@ if (require.main === module) {
 module.exports = {
   PROVIDER_GROUP,
   PROVIDERS,
+  RECOMMENDED_PROVIDER,
   STATES,
   INTENT_INVALID_REASONS,
   WRITABLE_SCOPES,

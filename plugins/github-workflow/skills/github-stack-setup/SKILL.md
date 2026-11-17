@@ -8,7 +8,7 @@ user-invocable: false
 
 Verifies that this machine can act as the `github` provider of the
 `stacked-pr` capability group, and reports exactly what is missing. It
-checks three things:
+checks four things:
 
 1. `gh` is installed and at least v2.0.
 2. `gh auth status` succeeds.
@@ -16,6 +16,9 @@ checks three things:
    — verified by owner in `gh extension list`, not by the command
    resolving. Several third-party extensions expose the same `gh stack`
    command name.
+4. The extension is at least the version this plugin is tested against,
+   and `git` is 2.36 or later. An older `gh-stack` stores stack state in a
+   different place and lacks flags the adapter passes.
 
 It installs nothing on its own and runs no stack operation. Extension
 installation is offered, never performed silently.
@@ -50,11 +53,12 @@ node "$PROBE" probe --provider github
 
 Read the `github` object's `readiness` (`ready`/`not-ready`/`unknown`) and
 `checks` (`present`, `version`, `authValid`, `extensionIdentity`:
-`verified`/`wrong-owner`/`missing`/`unavailable`). Print each check, then
-classify:
+`verified`/`wrong-owner`/`missing`/`unavailable`, `extensionVersion`,
+`testedExtensionVersion`, `gitVersion`). Print each check, then classify:
 
-- **READY** — `readiness: "ready"` (requires `present`, `authValid`, and
-  `extensionIdentity: "verified"` together).
+- **READY** — `readiness: "ready"` (requires `present`, `authValid`,
+  `extensionIdentity: "verified"`, an extension at or above
+  `testedExtensionVersion`, and a supported `git` together).
 - **NEEDS SETUP** — anything else.
 
 Name the specific gap using `detail` and `checks.extensionIdentity`.
@@ -96,16 +100,26 @@ remove-then-install flow instead:
   report.
 - "Skip" — report the gap and stop.
 
+If `extensionIdentity` is `verified` but `detail` says the extension is
+older than `testedExtensionVersion`, use `AskUserQuestion` to offer:
+
+- "Upgrade github/gh-stack" — on confirmation, run
+  `gh extension upgrade stack`, then re-run Step 1 and report. Before
+  offering, say that every clone and worktree of a repository must use the
+  same `gh-stack` version: 0.2.0 moved stack state, and upstream says not to
+  mix old and new versions within one clone.
+- "Skip" — report the gap and stop.
+
 If `extensionIdentity` is `unavailable`, do not offer either flow — report
 that the extension state could not be determined and stop.
 
 Both install commands are deliberately unpinned. `--pin` is the right
 call for a third-party extension, but `github/gh-stack` is first-party
-(the Step 1 identity check exists to guarantee that) and is still in
-active preview, so pinning would freeze every installer to a tag that
-goes stale as GitHub ships fixes, in exchange for no reduction in trust
-surface for someone already running `gh`. Revisit if gh-stack leaves
-preview or ownership changes.
+(the Step 1 identity check exists to guarantee that) and still ships
+frequent fixes, so pinning would freeze every installer to a tag that goes
+stale, in exchange for no reduction in trust surface for someone already
+running `gh`. The probe's minimum-version check covers the other direction.
+Revisit if ownership changes.
 
 Do not offer to install `gh` itself, change authentication, or install the
 `gh skill` package: `gh skill` is an explicitly preview surface ("subject to
@@ -119,7 +133,8 @@ provider-neutral command in `yellow-core`. Say it plainly; do not run it.
 
 ## Boundaries
 
-- Read-only apart from the confirmed `gh extension install`, and — for the
+- Read-only apart from the confirmed `gh extension install` or
+  `gh extension upgrade stack`, and — for the
   `WRONG OWNER` replacement flow only — the confirmed `gh extension remove
   stack` that immediately precedes it. Both mutations require explicit
   `AskUserQuestion` confirmation; nothing else is mutated.

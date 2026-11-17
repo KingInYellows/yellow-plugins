@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# Fake `git` for github-stack-runtime.js tests. Only implements the three
+# Fake `git` for github-stack-runtime.js tests. Only implements the
 # subcommands the runtime calls (check-ref-format, remote, config
-# remote.pushDefault); behavior for remote/config is env-var controlled so
-# tests never depend on this repository's real remotes.
+# remote.pushDefault, rev-parse --verify, merge-base --is-ancestor); behavior
+# is env-var controlled so tests never depend on this repository's real
+# remotes or branches.
+#   FAKE_GIT_BRANCHES      space-separated local branches that exist
+#   FAKE_GIT_NOT_ANCESTOR  space-separated "below:above" pairs that are NOT
+#                          ancestor/descendant (every other pair is)
+#   FAKE_GIT_ANCESTRY_EXIT exit code forced on merge-base (e.g. 128)
+#   FAKE_GIT_REVPARSE_EXIT exit code forced on rev-parse --verify (e.g. 128)
 if [ "$1" = "check-ref-format" ] && [ "$2" = "--branch" ]; then
   name="$3"
   if [ -z "$name" ] || [[ "$name" == -* ]] || [[ "$name" == *..* ]] || \
@@ -27,6 +33,34 @@ if [ "$1" = "config" ] && [ "$2" = "remote.pushDefault" ]; then
     exit 0
   fi
   exit 1
+fi
+if [ "$1" = "config" ] && [ "$2" = "--get-regexp" ]; then
+  # FAKE_GIT_REMOTE_URLS: "name=url" pairs separated by spaces.
+  [ -n "${FAKE_GIT_REMOTE_URLS:-}" ] || exit 1
+  for pair in $FAKE_GIT_REMOTE_URLS; do
+    printf 'remote.%s.url %s\n' "${pair%%=*}" "${pair#*=}"
+  done
+  exit 0
+fi
+if [ "$1" = "rev-parse" ] && [ "$2" = "--verify" ] && [ "$3" = "--quiet" ]; then
+  if [ -n "${FAKE_GIT_REVPARSE_EXIT:-}" ]; then
+    exit "$FAKE_GIT_REVPARSE_EXIT"
+  fi
+  name="${4#refs/heads/}"
+  case " ${FAKE_GIT_BRANCHES:-} " in
+    *" $name "*) exit 0 ;;
+  esac
+  exit 1
+fi
+if [ "$1" = "merge-base" ] && [ "$2" = "--is-ancestor" ]; then
+  if [ -n "${FAKE_GIT_ANCESTRY_EXIT:-}" ]; then
+    exit "$FAKE_GIT_ANCESTRY_EXIT"
+  fi
+  pair="${3#refs/heads/}:${4#refs/heads/}"
+  case " ${FAKE_GIT_NOT_ANCESTOR:-} " in
+    *" $pair "*) exit 1 ;;
+  esac
+  exit 0
 fi
 echo "unrecognized fake git invocation: $*" >&2
 exit 5

@@ -17,8 +17,17 @@ import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const probe = require('../../plugins/yellow-core/lib/stack-tooling-probe.js');
 
-const { READINESS, OFFICIAL_EXTENSION, parseExtensionIdentity, probeGraphite, probeGithub, probeRepositoryStackAvailability } =
-  probe;
+const {
+  READINESS,
+  OFFICIAL_EXTENSION,
+  TESTED_GH_STACK_VERSION,
+  parseExtensionIdentity,
+  parseExtensionVersion,
+  parseVersion,
+  probeGraphite,
+  probeGithub,
+  probeRepositoryStackAvailability,
+} = probe;
 
 const FIXTURE_BIN = join(__dirname, 'fixtures', 'stack-tooling-probe', 'bin');
 const LIB = join(__dirname, '..', '..', 'plugins', 'yellow-core', 'lib', 'stack-tooling-probe.js');
@@ -134,10 +143,100 @@ describe('parseExtensionIdentity', () => {
   });
 });
 
+describe('parseExtensionVersion / parseVersion', () => {
+  it('reads the version column of the official row, with or without a header', () => {
+    expect(parseExtensionVersion('gh stack\tgithub/gh-stack\tv0.3.0\n')).toBe('0.3.0');
+    expect(parseExtensionVersion('NAME       REPO             VERSION\ngh-stack   github/gh-stack  v0.1.0\n')).toBe('0.1.0');
+  });
+
+  it('ignores a version on another extension\'s row and returns null when the official row has none', () => {
+    expect(parseExtensionVersion('gh foo\tsomeone/gh-foo\tv9.9.9\ngh stack\tgithub/gh-stack\t\n')).toBeNull();
+    expect(parseExtensionVersion('gh stack\tboneskull/gh-stack\tv1.0.0\n')).toBeNull();
+  });
+
+  it('parses git and gh version lines', () => {
+    expect(parseVersion('git version 2.43.0')).toEqual([2, 43, 0]);
+    expect(parseVersion('git version 2.55.0.windows.3')).toEqual([2, 55, 0]);
+    expect(parseVersion('no digits here')).toBeNull();
+  });
+});
+
+describe('probeGithub — a verified extension must also be a tested version', () => {
+  it('not-ready when github/gh-stack is older than the tested version', () => {
+    process.env.FAKE_GH_AUTH_EXIT = '0';
+    process.env.FAKE_GH_EXT_OUTPUT = `gh stack\\t${OFFICIAL_EXTENSION}\\tv0.1.0\\n`;
+    const result = probeGithub();
+    expect(result.readiness).toBe(READINESS.NOT_READY);
+    expect(result.checks.extensionVersion).toBe('0.1.0');
+    expect(result.checks.testedExtensionVersion).toBe(TESTED_GH_STACK_VERSION);
+    expect(result.detail).toContain('gh extension upgrade stack');
+  });
+
+  it('ready on a newer release than the tested one', () => {
+    process.env.FAKE_GH_AUTH_EXIT = '0';
+    process.env.FAKE_GH_EXT_OUTPUT = `gh stack\\t${OFFICIAL_EXTENSION}\\tv0.4.1\\n`;
+    expect(probeGithub().readiness).toBe(READINESS.READY);
+  });
+
+  it('unknown, not ready, when the official row carries no version (locally linked build)', () => {
+    process.env.FAKE_GH_AUTH_EXIT = '0';
+    process.env.FAKE_GH_EXT_OUTPUT = `gh stack\\t${OFFICIAL_EXTENSION}\\t\\n`;
+    const result = probeGithub();
+    expect(result.readiness).toBe(READINESS.UNKNOWN);
+    expect(result.checks.extensionVersion).toBeNull();
+  });
+
+  it('an old version never outranks invalid auth as the reported gap', () => {
+    process.env.FAKE_GH_AUTH_EXIT = '1';
+    process.env.FAKE_GH_EXT_OUTPUT = `gh stack\\t${OFFICIAL_EXTENSION}\\tv0.1.0\\n`;
+    const result = probeGithub();
+    expect(result.readiness).toBe(READINESS.NOT_READY);
+    expect(result.detail).toContain('authentication');
+  });
+
+  it('not-ready when git is older than gh-stack requires', () => {
+    const oldGitBin = mkdtempSync(join(tmpdir(), 'stack-tooling-probe-old-git-'));
+    try {
+      const fakeGit = join(oldGitBin, 'git');
+      writeFileSync(fakeGit, '#!/usr/bin/env bash\nprintf "git version 2.30.2\\n"\n');
+      chmodSync(fakeGit, 0o755);
+      process.env.PATH = `${oldGitBin}:${process.env.PATH}`;
+      process.env.FAKE_GH_AUTH_EXIT = '0';
+      process.env.FAKE_GH_EXT_OUTPUT = `gh stack\\t${OFFICIAL_EXTENSION}\\tv0.3.0\\n`;
+      const result = probeGithub();
+      expect(result.readiness).toBe(READINESS.NOT_READY);
+      expect(result.checks.gitVersion).toBe('2.30.2');
+      expect(result.detail).toContain('2.36.0');
+    } finally {
+      rmSync(oldGitBin, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('probeGithub — an unreadable git version is unknown, not ready', () => {
+  it('unknown when git --version prints nothing parseable', () => {
+    const badGitBin = mkdtempSync(join(tmpdir(), 'stack-tooling-probe-bad-git-'));
+    try {
+      const fakeGit = join(badGitBin, 'git');
+      writeFileSync(fakeGit, '#!/usr/bin/env bash\nexit 1\n');
+      chmodSync(fakeGit, 0o755);
+      process.env.PATH = `${badGitBin}:${process.env.PATH}`;
+      process.env.FAKE_GH_AUTH_EXIT = '0';
+      process.env.FAKE_GH_EXT_OUTPUT = `gh stack\\t${OFFICIAL_EXTENSION}\\tv0.3.0\\n`;
+      const result = probeGithub();
+      expect(result.readiness).toBe(READINESS.UNKNOWN);
+      expect(result.checks.gitVersion).toBeNull();
+      expect(result.detail).toContain('git --version');
+    } finally {
+      rmSync(badGitBin, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('probeGithub — READY requires auth AND verified extension identity together', () => {
   it('is ready only when auth is valid and the extension is verified', () => {
     process.env.FAKE_GH_AUTH_EXIT = '0';
-    process.env.FAKE_GH_EXT_OUTPUT = `NAME       REPO             VERSION\\ngh-stack   ${OFFICIAL_EXTENSION}  v0.1.0\\n`;
+    process.env.FAKE_GH_EXT_OUTPUT = `NAME       REPO             VERSION\\ngh-stack   ${OFFICIAL_EXTENSION}  v0.3.0\\n`;
     const result = probeGithub();
     expect(result.readiness).toBe(READINESS.READY);
     expect(result.checks.authValid).toBe(true);
@@ -146,7 +245,7 @@ describe('probeGithub — READY requires auth AND verified extension identity to
 
   it('READY_GITHUB is impossible when auth is invalid, even with the extension verified', () => {
     process.env.FAKE_GH_AUTH_EXIT = '1';
-    process.env.FAKE_GH_EXT_OUTPUT = `NAME       REPO             VERSION\\ngh-stack   ${OFFICIAL_EXTENSION}  v0.1.0\\n`;
+    process.env.FAKE_GH_EXT_OUTPUT = `NAME       REPO             VERSION\\ngh-stack   ${OFFICIAL_EXTENSION}  v0.3.0\\n`;
     const result = probeGithub();
     expect(result.readiness).toBe(READINESS.NOT_READY);
     expect(result.checks.authValid).toBe(false);
@@ -201,11 +300,12 @@ describe('probeRepositoryStackAvailability', () => {
     expect(result.detail).toContain('exit 9');
   });
 
-  it('available: true on exit 2 (ErrNotInStack — feature works, branch just is not in a stack)', () => {
+  it('available: null on exit 2 (ErrNotInStack is a local answer, not evidence about the repository)', () => {
     process.env.FAKE_GH_STACK_VIEW_EXIT = '2';
     const result = probeRepositoryStackAvailability();
-    expect(result.available).toBe(true);
+    expect(result.available).toBeNull();
     expect(result.detail).toContain('exit 2');
+    expect(result.detail).toContain('not checked');
   });
 
   it('available: null on an unrecognized exit code', () => {
@@ -218,7 +318,7 @@ describe('probeRepositoryStackAvailability', () => {
 describe('CLI: probe subcommand', () => {
   it('emits both providers by default and respects --provider', () => {
     process.env.FAKE_GH_AUTH_EXIT = '0';
-    process.env.FAKE_GH_EXT_OUTPUT = `NAME       REPO             VERSION\\ngh-stack   ${OFFICIAL_EXTENSION}  v0.1.0\\n`;
+    process.env.FAKE_GH_EXT_OUTPUT = `NAME       REPO             VERSION\\ngh-stack   ${OFFICIAL_EXTENSION}  v0.3.0\\n`;
     const both = JSON.parse(
       execFileSync(process.execPath, [LIB, 'probe'], { encoding: 'utf8', env: process.env })
     );
@@ -246,7 +346,7 @@ describe('CLI: probe subcommand', () => {
 
   it('--check-repo only runs the repository probe when the extension is verified', () => {
     process.env.FAKE_GH_AUTH_EXIT = '0';
-    process.env.FAKE_GH_EXT_OUTPUT = `NAME       REPO             VERSION\\ngh-stack   ${OFFICIAL_EXTENSION}  v0.1.0\\n`;
+    process.env.FAKE_GH_EXT_OUTPUT = `NAME       REPO             VERSION\\ngh-stack   ${OFFICIAL_EXTENSION}  v0.3.0\\n`;
     process.env.FAKE_GH_STACK_VIEW_EXIT = '9';
     const withVerified = JSON.parse(
       execFileSync(process.execPath, [LIB, 'probe', '--provider', 'github', '--check-repo'], {

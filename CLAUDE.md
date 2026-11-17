@@ -98,6 +98,9 @@ Exactly one of Graphite (`gt-workflow`) or GitHub-native stacks
 branch or PR mutation run `/stack:status`; only `READY_GRAPHITE` and
 `READY_GITHUB` route to work, and then only through that provider's own
 commands (`gt` + gt-workflow skills, or `gh stack` via github-workflow).
+GitHub is the recommended provider for new work and Graphite stays supported
+for stacks already submitted with it; one provider owns a given stack
+(`docs/stacked-prs-native-migration.md`).
 Every other state stops the workflow with the classifier's `detail` — never
 fall back to raw `git push` or `gh pr create`. `/stack:select` switches
 providers; `plugins/yellow-core/lib/stack-operation-registry.js` maps

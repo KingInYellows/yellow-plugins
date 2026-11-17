@@ -25,13 +25,17 @@
  *     when the caller explicitly requests it. `checkout`/`init`/`add`
  *     always receive an explicit target/branch argument — this runtime
  *     never lets the underlying CLI fall through to its interactive
- *     picker. `modify` and `switch` are NEVER invoked — both are
+ *     picker. `init` with several branches adopts existing branches, and
+ *     refuses an order in which a branch does not contain the one below
+ *     it, because gh-stack accepts that order and the next rebase would
+ *     then rewrite the branches to match it. `modify` and `switch` are NEVER invoked — both are
  *     TUI-only per the Phase 0 source read; there is no non-interactive
  *     path this runtime could use even if it wanted to. `gh pr merge` is
  *     never invoked for a stack — `merge()` below is the only merge path.
- *   - Destructive operations (`unstack`, `sync --prune`, `merge`) require
- *     the caller to pass `confirm: true` explicitly; without it they
- *     return a REQUIRES_CONFIRMATION result and run nothing.
+ *   - Destructive operations (`unstack`, `sync --prune`, `merge`, and
+ *     `--accept-base-change` on `sync`/`rebase`) require the caller to pass
+ *     `confirm: true` explicitly; without it they return a
+ *     REQUIRES_CONFIRMATION result and run nothing.
  *   - Every result reports `mayHaveMutated` truthfully — `true` for any
  *     operation beyond `view`, even on failure, because a failed `submit`
  *     or `sync` may still have partially pushed or partially updated PRs
@@ -48,7 +52,9 @@
  * CLI:
  *   node github-stack-runtime.js <op> [--flag value ...] [--confirm] [--json-args <path|->]
  *
- * Operations: view, init, add, checkout, rebase, sync, submit, merge, unstack.
+ * Operations: view, init, add, checkout, rebase, sync, push, submit, merge,
+ * unstack. Argument shapes are verified against gh-stack v0.3.0 (the
+ * `TESTED_GH_STACK_VERSION` yellow-core's stack-tooling-probe.js reports).
  * Output is a single JSON result object on stdout. Exit code is always 0
  * for a completed probe/operation attempt (the result's own `status` field
  * carries the outcome) and 1 only when the CLI was invoked incorrectly
@@ -108,9 +114,22 @@ const MERGE_METHODS = Object.freeze(['merge', 'squash', 'rebase']);
  * @param {string} bin
  * @param {string[]} args
  */
+/**
+ * The child's environment. gh-stack 0.3.0 reads `GH_STACK_NO_ATOMIC` as the
+ * default of `--no-atomic` on push, sync and submit, so an inherited value
+ * would turn off the all-or-nothing push this runtime promises. It is
+ * dropped here rather than overridden per command.
+ */
+function childEnv() {
+  const env = { ...process.env };
+  delete env.GH_STACK_NO_ATOMIC;
+  return env;
+}
+
 function run(bin, args) {
   const result = spawnSync(bin, args, {
     encoding: 'utf8',
+    env: childEnv(),
     timeout: spawnTimeoutMs,
     shell: false,
     windowsHide: true,
@@ -285,6 +304,22 @@ function resolveRemote(explicitRemote) {
   };
 }
 
+/**
+ * `owner/repo` (lower-cased) of every github.com remote of this clone.
+ * Empty when the remotes cannot be read — callers fail closed on that.
+ */
+function githubReposOfRemotes() {
+  const result = run('git', ['config', '--get-regexp', '^remote\\..*\\.url$']);
+  if (!result.ok || result.code !== 0) return [];
+  const repos = new Set();
+  for (const line of result.stdout.split('\n')) {
+    const url = line.trim().split(/\s+/)[1] || '';
+    const match = /^(?:https:\/\/(?:[^@/]*@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec(url);
+    if (match) repos.add(`${match[1]}/${match[2]}`.toLowerCase());
+  }
+  return [...repos];
+}
+
 function validateEnum(value, allowed, label) {
   if (!allowed.includes(value)) {
     return { ok: false, reason: `${label} must be one of ${allowed.join(', ')}, got "${value}"` };
@@ -310,6 +345,10 @@ const RECOVERY_ACTIONS = Object.freeze({
     'The subprocess did not finish (timed out or failed to start). The operation may have partially applied — inspect repository state before retrying.',
   ERROR: 'The command failed; see stderr for the printed error.',
   SYNC_ABORTED: 'Sync detected a divergence it cannot resolve non-interactively and made no changes. Re-run in an interactive terminal, or import the remote stack explicitly.',
+  INCOMPLETE:
+    'gh-stack exited 0 but reported that a step failed (see stderr). Branches may have been pushed without their pull requests being created, updated or linked. Check each pull request on GitHub before retrying; do not report the stack as submitted or synchronized.',
+  BASE_CHANGE_UNCONFIRMED:
+    'GitHub retargeted this stack to a new base and the old base did not merge, so the stack was not rebased. Rebasing onto the new base drops the old base\'s commits from the stack. Show the user that, then re-run with acceptBaseChange and confirm: true.',
   REQUIRES_CONFIRMATION: 'This is a destructive operation. Re-invoke with confirm: true after showing the caller exactly what will change.',
 });
 
@@ -329,13 +368,29 @@ function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck
   let status;
   if (!execResult.ok) {
     status = 'SPAWN_FAILURE';
-  } else if (syncAbortCheck && execResult.code === 0 && /Sync aborted/.test(execResult.stdout)) {
-    // Exit 0 with "Sync aborted" in stdout is UNRESOLVED, not success — the
+  } else if (/rerun with --accept-base-change/.test(`${execResult.stdout}\n${execResult.stderr}`)) {
+    // gh-stack 0.3.0 leaves the stack un-rebased when GitHub retargeted its
+    // base and the old base never merged. Whatever the exit code, the stack
+    // is not synchronized, so this must never report SUCCESS.
+    status = 'BASE_CHANGE_UNCONFIRMED';
+  } else if (
+    syncAbortCheck &&
+    execResult.code === 0 &&
+    /Sync aborted/.test(`${execResult.stdout}\n${execResult.stderr}`)
+  ) {
+    // Exit 0 with "Sync aborted" is UNRESOLVED, not success — the
     // CLI's own exit code cannot distinguish "sync completed" from "sync
     // silently declined to act" (source-verified, see cmd/utils.go
     // resolveStackDivergence). Checked BEFORE the exit-code map so a
-    // literal 0 never reports SUCCESS in this specific case.
+    // literal 0 never reports SUCCESS in this specific case. Both streams
+    // are searched: gh-stack 0.3.0 writes its progress to stderr.
     status = 'SYNC_ABORTED';
+  } else if (execResult.code === 0 && /^\s*⚠ failed to /m.test(execResult.stderr)) {
+    // gh-stack 0.3.0 exits 0 when a GitHub call inside submit/sync/push
+    // fails (seen live: every pull request lookup returned 403, the branches
+    // were pushed, no pull request was opened, exit 0). A warning that a
+    // step failed means the operation is not known to be complete.
+    status = 'INCOMPLETE';
   } else {
     status = EXIT_STATUS[execResult.code] || 'UNKNOWN_ERROR';
   }
@@ -415,28 +470,86 @@ function view() {
   return shapeResult({ op: 'view', bin: 'gh', args: ['stack', 'view', '--json'], execResult, mayHaveMutated: false });
 }
 
-/** `gh stack init -b <base> <branch>` — base and branch are both explicit, never omitted. */
-function init({ base, branch }) {
+/**
+ * Whether `refs/heads/<name>` exists locally: true, false (git's own
+ * "not found" exit 1), or null when the lookup itself failed.
+ */
+function localBranchExists(name) {
+  const result = run('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`]);
+  if (!result.ok) return null;
+  if (result.code === 0) return true;
+  return result.code === 1 ? false : null;
+}
+
+/**
+ * `gh stack init -b <base> <branch> [<branch> ...]` — base and branches are
+ * explicit, never omitted. One branch starts a stack. Several branches,
+ * bottom to top, adopt existing branches into one (this is how a stack built
+ * with another tool is taken over without recreating its branches or PRs).
+ *
+ * gh-stack 0.3.0 accepts existing branches in any order and only marks the
+ * result as needing a rebase. That rebase would rewrite the branches to fit
+ * the order given, so a wrong order is refused here: each existing branch
+ * must contain the existing branch below it.
+ */
+function init({ base, branch, branches }) {
   const baseCheck = validateBranchName(base);
   if (!baseCheck.ok) return refusalResult('init', `base: ${baseCheck.reason}`);
-  const branchCheck = validateBranchName(branch);
-  if (!branchCheck.ok) return refusalResult('init', `branch: ${branchCheck.reason}`);
-  const args = ['stack', 'init', '-b', baseCheck.value, branchCheck.value];
+  const requested = Array.isArray(branches) && branches.length > 0 ? branches : [branch];
+  const names = [];
+  for (const candidate of requested) {
+    const branchCheck = validateBranchName(candidate);
+    if (!branchCheck.ok) return refusalResult('init', `branch: ${branchCheck.reason}`);
+    if (names.includes(branchCheck.value)) {
+      return refusalResult('init', `branch "${branchCheck.value}" is listed twice`);
+    }
+    if (branchCheck.value === baseCheck.value) {
+      return refusalResult('init', `branch "${branchCheck.value}" is the base branch`);
+    }
+    names.push(branchCheck.value);
+  }
+  if (names.length > 1) {
+    let below = null;
+    for (const name of names) {
+      // gh-stack creates a branch that does not exist yet; only existing
+      // branches carry an order that can be wrong.
+      const exists = localBranchExists(name);
+      if (exists === null) {
+        return refusalResult('init', `could not check whether branch "${name}" exists`);
+      }
+      if (!exists) continue;
+      if (below !== null) {
+        const ancestry = run('git', ['merge-base', '--is-ancestor', `refs/heads/${below}`, `refs/heads/${name}`]);
+        if (!ancestry.ok || (ancestry.code !== 0 && ancestry.code !== 1)) {
+          return refusalResult('init', `could not check that "${name}" contains "${below}"`);
+        }
+        if (ancestry.code === 1) {
+          return refusalResult(
+            'init',
+            `"${name}" does not contain "${below}", so these branches are not a stack in this order (list them bottom to top, or rebase them first)`
+          );
+        }
+      }
+      below = name;
+    }
+  }
+  const args = ['stack', 'init', '-b', baseCheck.value, ...names];
   const execResult = run('gh', args);
   return shapeResult({ op: 'init', bin: 'gh', args, execResult, mayHaveMutated: true });
 }
 
-/** `gh stack add -m <message> <branch>` — branch is always explicit. */
-function add({ branch, message, remote }) {
+/**
+ * `gh stack add -m <message> <branch>` — branch is always explicit. `add` is
+ * a local operation and takes no `--remote` (gh-stack 0.3.0 rejects the flag
+ * as unknown), so no remote is resolved here.
+ */
+function add({ branch, message }) {
   const branchCheck = validateBranchName(branch);
   if (!branchCheck.ok) return refusalResult('add', branchCheck.reason);
   if (typeof message !== 'string' || message.trim().length === 0) {
     return refusalResult('add', 'a non-empty commit message is required');
   }
-  const remoteResult = resolveRemote(remote);
-  if (!remoteResult.ok) return refusalResult('add', remoteResult.reason);
   const args = ['stack', 'add', '-m', message, branchCheck.value];
-  if (remoteResult.remote) args.push('--remote', remoteResult.remote);
   const execResult = run('gh', args);
   return shapeResult({ op: 'add', bin: 'gh', args, execResult, mayHaveMutated: true });
 }
@@ -460,22 +573,30 @@ function checkout({ target }) {
   return shapeResult({ op: 'checkout', bin: 'gh', args, execResult, mayHaveMutated: true });
 }
 
+const ACCEPT_BASE_CHANGE_DETAIL =
+  '--accept-base-change rebases the stack onto a base GitHub retargeted it to and drops the old base\'s unmerged commits from the stack';
+
 /**
  * `gh stack rebase` — exactly one of upstack/downstack/continue/abort.
  * `modify` is NEVER used (TUI-only); this is the only rebase-family entry
  * point this runtime exposes.
  */
-function rebase({ mode, remote }) {
+function rebase({ mode, remote, acceptBaseChange, confirm }) {
   const modeCheck = validateEnum(mode, ['upstack', 'downstack', 'continue', 'abort'], 'mode');
   if (!modeCheck.ok) return refusalResult('rebase', modeCheck.reason);
-  const args = ['stack', 'rebase'];
-  if (mode === 'continue' || mode === 'abort') {
-    args.push(`--${mode}`);
-  } else {
-    args.push(`--${mode}`);
+  const starts = mode === 'upstack' || mode === 'downstack';
+  if (acceptBaseChange && !starts) {
+    return refusalResult('rebase', 'acceptBaseChange applies only when a rebase starts (upstack or downstack)');
+  }
+  if (acceptBaseChange && confirm !== true) {
+    return confirmationRequiredResult('rebase', ACCEPT_BASE_CHANGE_DETAIL);
+  }
+  const args = ['stack', 'rebase', `--${mode}`];
+  if (starts) {
     const remoteResult = resolveRemote(remote);
     if (!remoteResult.ok) return refusalResult('rebase', remoteResult.reason);
     if (remoteResult.remote) args.push('--remote', remoteResult.remote);
+    if (acceptBaseChange) args.push('--accept-base-change');
   }
   const execResult = run('gh', args);
   return shapeResult({ op: 'rebase', bin: 'gh', args, execResult, mayHaveMutated: true });
@@ -486,17 +607,37 @@ function rebase({ mode, remote }) {
  * `confirm: true` — it removes local branches. The exit-0-"Sync aborted"
  * case is checked in `shapeResult` (`syncAbortCheck: true`).
  */
-function sync({ remote, prune, confirm }) {
+function sync({ remote, prune, acceptBaseChange, confirm }) {
   if (prune && confirm !== true) {
     return confirmationRequiredResult('sync', 'sync --prune removes local branches for merged PRs');
+  }
+  if (acceptBaseChange && confirm !== true) {
+    return confirmationRequiredResult('sync', ACCEPT_BASE_CHANGE_DETAIL);
   }
   const remoteResult = resolveRemote(remote);
   if (!remoteResult.ok) return refusalResult('sync', remoteResult.reason);
   const args = ['stack', 'sync'];
   if (remoteResult.remote) args.push('--remote', remoteResult.remote);
   if (prune) args.push('--prune');
+  if (acceptBaseChange) args.push('--accept-base-change');
   const execResult = run('gh', args);
   return shapeResult({ op: 'sync', bin: 'gh', args, execResult, mayHaveMutated: true, syncAbortCheck: true });
+}
+
+/**
+ * `gh stack push [--remote <r>]` — pushes every active branch of the stack in
+ * one atomic `--force-with-lease` push. Creates and updates no pull request;
+ * this is the step after a local `rebase` (upstream: "To push up your
+ * changes, run `gh stack push`"). `--no-atomic` is never passed: a partial
+ * push leaves pull requests pointing at a half-rebased stack.
+ */
+function push({ remote }) {
+  const remoteResult = resolveRemote(remote);
+  if (!remoteResult.ok) return refusalResult('push', remoteResult.reason);
+  const args = ['stack', 'push'];
+  if (remoteResult.remote) args.push('--remote', remoteResult.remote);
+  const execResult = run('gh', args);
+  return shapeResult({ op: 'push', bin: 'gh', args, execResult, mayHaveMutated: true });
 }
 
 /**
@@ -514,10 +655,19 @@ function submit({ open, remote }) {
   return shapeResult({ op: 'submit', bin: 'gh', args, execResult, mayHaveMutated: true });
 }
 
+/** A github.com pull-request URL, capturing its number. */
+const PR_URL_RE = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/([1-9][0-9]*)\/?$/;
+
 /**
- * `gh stack merge <target> --yes [--merge-method <m>]`. Requires an
+ * `gh stack merge <number> --yes [--merge-method <m>]`. Requires an
  * explicit target AND `confirm: true` — this lands code. Never `gh pr
  * merge` for a stack.
+ *
+ * The merge is atomic and covers every unmerged pull request BELOW the
+ * target as well as the target itself; callers must show that whole set
+ * before confirming. gh-stack 0.3.0 accepts only a stack number or a pull
+ * request number here (a URL exits 5), so a pull-request URL is reduced to
+ * its number before it reaches argv.
  */
 function merge({ target, mergeMethod, confirm }) {
   if (typeof target !== 'string' || target.length === 0) {
@@ -530,15 +680,45 @@ function merge({ target, mergeMethod, confirm }) {
   // target (e.g. `--squash`) must never reach argv unvalidated, since
   // cobra parses flags in any position and would silently redirect the
   // merge to the current branch's PR context instead of refusing.
-  const looksLikeNumber = /^[1-9][0-9]*$/.test(target);
-  const looksLikeUrl = /^https:\/\/github\.com\//.test(target);
-  if (!looksLikeNumber && !looksLikeUrl) {
-    return refusalResult('merge', `target "${target}" is neither a positive integer (PR/stack number) nor a github.com URL`);
+  const urlMatch = PR_URL_RE.exec(target);
+  const number = urlMatch ? urlMatch[3] : target;
+  if (urlMatch) {
+    // The number alone would merge pull request N of THIS repository, so a
+    // URL that names another repository must never be reduced to it.
+    const wanted = `${urlMatch[1]}/${urlMatch[2]}`.toLowerCase();
+    const repos = githubReposOfRemotes();
+    if (!repos.includes(wanted)) {
+      return refusalResult(
+        'merge',
+        repos.length === 0
+          ? `target "${target}" is a pull request URL, but no github.com remote of this clone could be read to confirm it is the same repository; pass the pull request number instead`
+          : `target "${target}" is a pull request in ${wanted}, which is not a remote of this clone (${repos.join(', ')})`
+      );
+    }
+    // gh-stack picks its repository the way gh does, so `GH_REPO`
+    // ([HOST/]OWNER/REPO) overrides the clone's remotes. The number must not
+    // land in a repository other than the one the URL names.
+    const override = (process.env.GH_REPO || '').trim().toLowerCase();
+    if (override && override !== wanted && override !== `github.com/${wanted}`) {
+      return refusalResult(
+        'merge',
+        `target "${target}" is a pull request in ${wanted}, but GH_REPO points gh at "${override}"; unset GH_REPO or pass the pull request number`
+      );
+    }
+  }
+  if (!/^[1-9][0-9]*$/.test(number)) {
+    return refusalResult(
+      'merge',
+      `target "${target}" is neither a positive integer (PR/stack number) nor a github.com pull request URL`
+    );
   }
   if (confirm !== true) {
-    return confirmationRequiredResult('merge', `merge target "${target}" lands code and cannot be undone by this runtime`);
+    return confirmationRequiredResult(
+      'merge',
+      `merge target "${number}"${urlMatch ? ` in ${urlMatch[1]}/${urlMatch[2]}` : ''} lands that pull request and every unmerged pull request below it in the stack, and cannot be undone by this runtime`
+    );
   }
-  const args = ['stack', 'merge', target, '--yes'];
+  const args = ['stack', 'merge', number, '--yes'];
   if (mergeMethod !== undefined) {
     const methodCheck = validateEnum(mergeMethod, MERGE_METHODS, 'mergeMethod');
     if (!methodCheck.ok) return refusalResult('merge', methodCheck.reason);
@@ -574,7 +754,7 @@ function unstack({ local, confirm }) {
   return shapeResult({ op: 'unstack', bin: 'gh', args, execResult, mayHaveMutated: true });
 }
 
-const OPERATIONS = Object.freeze({ view, init, add, checkout, rebase, sync, submit, merge, unstack });
+const OPERATIONS = Object.freeze({ view, init, add, checkout, rebase, sync, push, submit, merge, unstack });
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -590,6 +770,10 @@ function parseArgs(argv) {
       if (value === undefined || value.startsWith('--')) {
         args[key] = true;
         continue;
+      }
+      if (key === 'branch') {
+        // `--branch` may repeat: `init` adopts several branches, bottom to top.
+        args.branches = [...(args.branches || []), value];
       }
       args[key] = value;
       index += 1;
@@ -632,6 +816,7 @@ function main(argv) {
   const params = {
     base: typeof args.base === 'string' ? args.base : undefined,
     branch: typeof args.branch === 'string' ? args.branch : undefined,
+    branches: Array.isArray(args.branches) ? args.branches : undefined,
     message: typeof args.message === 'string' ? args.message : undefined,
     target: typeof args.target === 'string' ? args.target : undefined,
     remote: typeof args.remote === 'string' ? args.remote : undefined,
@@ -640,6 +825,7 @@ function main(argv) {
     open: args.open === true,
     prune: args.prune === true,
     local: args.local === true,
+    acceptBaseChange: args['accept-base-change'] === true,
     confirm: args.confirm === true,
   };
   const result = OPERATIONS[op](params);
@@ -668,6 +854,7 @@ module.exports = {
   checkout,
   rebase,
   sync,
+  push,
   submit,
   merge,
   unstack,
