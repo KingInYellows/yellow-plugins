@@ -191,6 +191,61 @@ describe('linear-link workflow script', () => {
     }
   });
 
+  // [name, branch, title, body, expected warning or null when it links]
+  const NEW_CASES: Array<[string, string, string, string, string | null]> = [
+    [
+      'other team in branch',
+      'u/eng-123-change',
+      'fix',
+      'Fixes CLAUDE-NEW',
+      'ENG-123',
+    ],
+    [
+      'other team in description',
+      'feat/x',
+      'fix',
+      'Fixes ENG-9\nFixes CLAUDE-NEW',
+      'ENG-9',
+    ],
+    [
+      'other team ignored',
+      'u/eng-123-change',
+      'fix',
+      'Ignore ENG-123\nFixes CLAUDE-NEW',
+      null,
+    ],
+    [
+      'bare key without a magic word',
+      'feat/x',
+      'fix',
+      'Uses SHA-256\nFixes CLAUDE-NEW',
+      null,
+    ],
+    [
+      'numeric CLAUDE beats other team',
+      'u/eng-1-x',
+      'fix',
+      'Fixes CLAUDE-7',
+      null,
+    ],
+    ['non-Linear branch segment', 'deps/node', 'fix', 'Fixes CLAUDE-NEW', null],
+  ];
+
+  it.each(NEW_CASES)('CLAUDE-NEW: %s', (_name, branch, title, body, other) => {
+    const result = runCheck(branch, title, body);
+    expect(result.status, result.stderr).toBe(0);
+    if (other === null) {
+      expect(result.stdout).toContain('Linear link found');
+    } else {
+      expect(result.stdout).toContain(
+        `::warning title=CLAUDE-NEW will not create an issue::This PR also references ${other},`
+      );
+      expect(result.summaryText).toContain(
+        '## CLAUDE-NEW will not create an issue'
+      );
+    }
+  });
+
   it('never executes PR fields', () => {
     const marker = join(workDir, 'pwned');
     const result = runCheck(

@@ -13,6 +13,9 @@ name: Linear Link
 #   PR description  CLAUDE-<number> or CLAUDE-NEW (case-sensitive; text inside
 #                   <!-- --> comments does not count)
 # An ID named by "Ignore <ID>" in the description never counts, from any source.
+# CLAUDE-NEW creates an issue only when the PR links no other issue, so it
+# warns when the branch (Linear's team-123-slug form) or a "Fixes/Refs <ID>"
+# phrase in the description names another team's issue.
 # The check is syntax-only: it does not ask Linear whether the issue exists.
 #
 # PR fields reach the script only through env, never through ${{ }} inside
@@ -73,8 +76,8 @@ jobs:
           # the rendered body) so the template's example never counts.
           body=$(printf '%s' "${PR_BODY:-}" | perl -0pe 's/<!--.*?(?:-->|\z)//gs')
           # "Ignore <ID>" tells Linear never to link that ID from any source.
-          ignored=$(perl -0ne 'print uc($1), "\n" while /(?<![A-Za-z0-9_])ignore[:\s]*(claude-\d+)(?![A-Za-z0-9_])/gi' <<<"$body")
-          body=$(perl -0pe 's/\bignore\b[:\s]*claude-(?:\d+|new)\b//gi' <<<"$body")
+          ignored=$(perl -0ne 'print uc($1), "\n" while /(?<![A-Za-z0-9_])ignore[:\s]*([A-Za-z][A-Za-z0-9]*-\d+)(?![A-Za-z0-9_])/gi' <<<"$body")
+          body=$(perl -0pe 's/\bignore\b[:\s]*[A-Za-z][A-Za-z0-9]*-(?:\d+|new)\b//gi' <<<"$body")
           linked() {
             local id
             while IFS= read -r id; do
@@ -88,11 +91,37 @@ jobs:
             found='branch name'
           elif linked "$(ids "$PR_TITLE" title)"; then
             found='PR title'
-          elif linked "$(ids "$body" body)"; then
+          elif linked "$(ids "$body" body | grep -vx CLAUDE-NEW || true)"; then
             found='PR description'
           fi
           if [ -n "$found" ]; then
             echo "Linear link found in the $found."
+            exit 0
+          fi
+          if grep -qx CLAUDE-NEW <<<"$(ids "$body" body)"; then
+            # Other-team references that stop CLAUDE-NEW from creating an
+            # issue: a Linear-style branch segment (eng-123-slug) or a
+            # magic-word phrase in the description. Output is limited to
+            # [A-Z0-9-], so it is safe to print.
+            others=$(
+              {
+                perl -ne 'print uc($1), "\n" while m{(?:^|/)([A-Za-z][A-Za-z0-9]*-\d+)(?=-|$)}g' <<<"$PR_BRANCH"
+                perl -0ne 'print uc($1), "\n" while /\b(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?|complete[sd]?|refs?|references|part of|related to|contributes to|towards?)\b[:\s]+([A-Z][A-Z0-9]*-\d+)(?![A-Za-z0-9_])/gi' <<<"$body"
+              } | grep -v '^CLAUDE-' | grep -vxF -f <(printf '%s\n' "$ignored") | sort -u | paste -sd ' ' -
+            ) || true
+            if [ -z "$others" ]; then
+              echo "Linear link found in the PR description (CLAUDE-NEW)."
+              exit 0
+            fi
+            echo "::warning title=CLAUDE-NEW will not create an issue::This PR also references $others, so Linear will link that instead of creating a CLAUDE issue. Create the CLAUDE issue in Linear and put 'Fixes CLAUDE-123' in the PR description, or add 'Ignore <ID>' for a reference that should not link. (Advisory only; this check does not block the merge.)"
+            {
+              echo "## CLAUDE-NEW will not create an issue"
+              echo
+              echo "This PR also references $others. Linear creates a CLAUDE-NEW issue only when the PR links no other issue, so this PR would end up linked only to that issue. This check is advisory and does not block the merge."
+              echo
+              echo "- Create the CLAUDE issue in Linear and put \`Fixes CLAUDE-123\` in the PR description, or"
+              echo "- add \`Ignore <ID>\` to the description for a reference that should not link."
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           # The untrusted fields are never echoed, so they cannot emit
