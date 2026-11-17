@@ -377,7 +377,9 @@ cs_stage_entry() {
   if [ "${size:-0}" -gt 8192 ] 2>/dev/null; then
     # The last kept line is whole when byte 8192 or 8193 is a newline;
     # otherwise the cap cut it mid-way and it is dropped.
-    case "$(head -c 8193 "$src" | tail -c 2 | od -An -c)" in
+    # tail reads the file, never a pipe: uutils tail (Ubuntu 26.04) can
+    # return more than N bytes when `tail -c N` reads a pipe.
+    case "$(tail -c +8192 "$src" | head -c 2 | od -An -c)" in
       *'\n'*) capped=$(head -c 8192 "$src" | tr -d '\000') ;;
       *) capped=$(head -c 8192 "$src" | LC_ALL=C sed '$d' | tr -d '\000') ;;
     esac

@@ -68,7 +68,9 @@ jev_project_dialogue() {
   if [ "$(printf '%s' "$all" | wc -c)" -gt "$JEV_STATE_MAX_CHARS" ]; then
     local cut nl='
 '
-    cut=$(printf '%s' "$all" | tail -c "$JEV_STATE_MAX_CHARS")
+    # Bytewise suffix in the shell, not `tail -c` on a pipe: uutils tail
+    # (Ubuntu 26.04) can return more than N bytes from a pipe.
+    cut=$(LC_ALL=C; printf '%s' "${all: -JEV_STATE_MAX_CHARS}")
     # Drop the partial first line only when a complete line follows it, so
     # one oversized final message is kept as its suffix rather than lost.
     case "$cut" in

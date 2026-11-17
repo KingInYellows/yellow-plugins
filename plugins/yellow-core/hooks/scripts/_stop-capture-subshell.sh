@@ -115,7 +115,10 @@ fi
 # could drop a `password=` style label and leave its value unrecognized.
 TAIL_REDACTED=$(printf '%s' "$TAIL_RAW" | cs_redact_secrets 2>/dev/null || printf '')
 if [ "$(printf '%s' "$TAIL_REDACTED" | wc -c)" -gt "$TAIL_MAX_BYTES" ]; then
-  TAIL_REDACTED=$(printf '%s' "$TAIL_REDACTED" | tail -c "$TAIL_MAX_BYTES")
+  # Bytewise suffix in bash, not `tail -c` on a pipe: uutils tail (the
+  # default coreutils on Ubuntu 26.04) can return more than N bytes from a
+  # pipe. LC_ALL=C makes the substring count bytes, as tail -c does.
+  TAIL_REDACTED=$(LC_ALL=C; printf '%s' "${TAIL_REDACTED: -TAIL_MAX_BYTES}")
   # Drop the partial first line unless it is the only one.
   case "$TAIL_REDACTED" in
     *$'\n'*) TAIL_REDACTED=${TAIL_REDACTED#*$'\n'} ;;
