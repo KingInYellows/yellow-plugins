@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.6
+
+### Patch Changes
+
+- [#1832](https://github.com/KingInYellows/yellow-plugins/pull/1832)
+  [`bffc2d6`](https://github.com/KingInYellows/yellow-plugins/commit/bffc2d6503414bb939429deb2af8ee501a8878ab)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make the
+  co-edit session and store locks exclusive on Ubuntu 26.04. Its uutils `mkdir`
+  can report success to two racing callers, so a lock is now held by whoever
+  also creates `<lock>/.owner` under noclobber (an `O_EXCL` create done by the
+  shell). Unlock and the reclaim-marker sweep remove the owner file first.
+
 ## 2.0.5
 
 ### Patch Changes

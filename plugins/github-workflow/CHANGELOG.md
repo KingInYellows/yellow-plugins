@@ -1,5 +1,39 @@
 # github-workflow
 
+## 0.5.0
+
+### Minor Changes
+
+- [#1841](https://github.com/KingInYellows/yellow-plugins/pull/1841)
+  [`fe68e55`](https://github.com/KingInYellows/yellow-plugins/commit/fe68e5518ccd428c8e85a8b3d786663063be0ac1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `/github-stack:merge-single` for an ordinary, unstacked pull request. The
+  adapter's new `merge-single` operation takes a pull request number and an
+  explicit merge method, refuses a draft, a closed pull request and one GitHub
+  reports as part of a stack, and merges only the head commit that was
+  confirmed. `/github-stack:merge` now points an ordinary pull request to it
+  instead of the repository's merge page.
+
+- [#1819](https://github.com/KingInYellows/yellow-plugins/pull/1819)
+  [`32f60d9`](https://github.com/KingInYellows/yellow-plugins/commit/32f60d97c39e347d21de4b82d1d6804886a91cd1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make
+  GitHub-native stacked pull requests the recommended provider and bring the
+  integration up to `gh-stack` 0.3.0.
+
+  github-workflow: `add` no longer passes `--remote` (gh-stack rejects it),
+  `init` adopts existing branches bottom to top and refuses a wrong order, a new
+  `push` operation, `merge` reduces a pull request URL to its number, and a
+  retargeted base is reported as `BASE_CHANGE_UNCONFIRMED` instead of success
+  (`--accept-base-change` needs confirmation). The amend skill rebases the
+  branches above before re-submitting, submit registers an untracked branch as a
+  one-branch stack, the merge preview lists every pull request that will land,
+  and setup offers the extension upgrade.
+
+  yellow-core: the tooling probe reports `github/gh-stack` older than 0.3.0 or
+  Git older than 2.36 as not ready, `UNSELECTED` recommends
+  `/stack:select github` without selecting it, and `/setup:all` reports an
+  outdated extension. Adds `docs/stacked-prs-native-migration.md`.
+
 ## 0.4.0
 
 ### Minor Changes
