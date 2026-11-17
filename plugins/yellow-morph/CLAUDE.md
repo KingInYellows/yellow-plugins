@@ -107,10 +107,12 @@ do not apply.
 - `lib/install-morphmcp.sh` is the shared primitive library sourced by the MCP
   wrapper (`bin/start-morph.sh`), the SessionStart prewarm hook
   (`hooks/scripts/prewarm-morph.sh`), and `/morph:setup`.
-- Install lock: `${CLAUDE_PLUGIN_DATA}/.install.lock` (atomic `mkdir`,
-  stale-PID recovery). The wrapper waits 20s, then fails and tells the user to
-  `rmdir` it — the most likely cause of "morph MCP won't start". The lock is
-  released explicitly before `exec` because bash EXIT traps do not survive exec.
+- Install lock: `${CLAUDE_PLUGIN_DATA}/.install.lock` (`mkdir`, held by whoever
+  creates its `pid` file exclusively, since uutils `mkdir` is not exclusive
+  under a race; stale-PID recovery). The wrapper waits 20s, then fails and tells
+  the user to `rm -rf` it — the most likely cause of "morph MCP won't start".
+  The lock is released explicitly before `exec` because bash EXIT traps do not
+  survive exec.
 - SessionStart contract: manifest `timeout: 5`; every code path must print
   `{"continue": true}` or session startup blocks. Hook config lives in
   `catalog/plugins/yellow-morph.json` and is generated into `plugin.json` by

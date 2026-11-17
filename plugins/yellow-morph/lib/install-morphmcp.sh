@@ -84,7 +84,8 @@ yellow_morph_needs_install() {
             "${CLAUDE_PLUGIN_DATA}/package-lock.json" >/dev/null 2>&1
 }
 
-# Try to acquire the atomic mkdir-based install lock. $1 = max retry count
+# Try to acquire the mkdir-based install lock (claimed by an exclusive pid
+# file create). $1 = max retry count
 # (1s sleep between attempts). Returns 0 on success, 1 on timeout.
 #
 # Stale-lock recovery: when mkdir fails with EEXIST, read the recorded
@@ -104,10 +105,20 @@ yellow_morph_acquire_install_lock() {
 
   for ((i=1; i<=max_attempts; i++)); do
     if mkdir "$lock_dir" 2>/dev/null; then
-      # Record owner PID — best-effort. Failure to write the PID file does
-      # not invalidate the lock (we still hold the directory).
-      printf '%s' "$$" > "${lock_dir}/pid" 2>/dev/null || true
-      return 0
+      # The pid file is the claim: uutils mkdir (ubuntu-26.04) can tell
+      # several racing callers they created the directory, so only the one
+      # whose exclusive create of pid succeeds holds the lock. `sh -C` is
+      # an O_EXCL open in every shell (zsh's CLOBBER_EMPTY would not be).
+      if command sh -C -c ': > "$1"' sh "${lock_dir}/pid" 2>/dev/null; then
+        # Writing the PID is best-effort: the claim already holds the lock.
+        printf '%s' "$$" >| "${lock_dir}/pid" 2>/dev/null || true
+        return 0
+      fi
+      # Lost the race: the winner's pid is there. With no pid at all the
+      # create failed (full disk): drop the ownerless directory.
+      [ -e "${lock_dir}/pid" ] || rmdir "$lock_dir" 2>/dev/null
+      sleep 1
+      continue
     fi
 
     if [ "$stale_recovered" -eq 0 ] && [ -f "${lock_dir}/pid" ]; then

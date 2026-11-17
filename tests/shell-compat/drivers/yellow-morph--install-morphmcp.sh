@@ -15,3 +15,11 @@ yellow_morph_acquire_install_lock 1 2>/dev/null
 printf 'lock_again=%s\n' "$?"
 yellow_morph_release_install_lock
 printf 'released=%s\n' "$([ -d "$CLAUDE_PLUGIN_DATA/.install.lock" ] && printf no || printf yes)"
+# uutils-style mkdir: a second caller told it created the held lock directory
+# still loses on the exclusive pid create.
+yellow_morph_acquire_install_lock 1
+mkdir() { command mkdir "$@" 2>/dev/null; return 0; }
+yellow_morph_acquire_install_lock 1 2>/dev/null
+printf 'uutils_lock_again=%s\n' "$?"
+unset -f mkdir
+yellow_morph_release_install_lock

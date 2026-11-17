@@ -110,7 +110,7 @@ if yellow_morph_needs_install; then
     printf 'yellow-morph: timed out (20s) waiting for install lock at %s\n' \
       "${CLAUDE_PLUGIN_DATA}/.install.lock"
     printf 'yellow-morph: another install may be running. Manual cleanup if stuck:\n'
-    printf 'yellow-morph:   rmdir %s\n' "${CLAUDE_PLUGIN_DATA}/.install.lock"
+    printf 'yellow-morph:   rm -rf %s\n' "${CLAUDE_PLUGIN_DATA}/.install.lock"
     exit 1
   fi
   trap 'yellow_morph_release_install_lock' EXIT INT TERM

@@ -612,7 +612,7 @@ Operators: `docs/operations/runbook.md` — `gh run view`, local
 | Credential-status missing/malformed | `/setup:all` falls back to shell-env checks where a plugin defines one, else unknown; suggest restart. Never read the keychain                                                      |
 | `disableAllHooks`                   | all plugin hooks skipped (dashboard reports it)                                                                                                                                     |
 | Drain recursion                     | `COMPOUND_DRAIN_IN_PROGRESS=1` no-ops Stop/SessionStart                                                                                                                             |
-| Concurrent drain                    | `mkdir .drain-lock` fails → skip; stale dir lock >30 min reaped; stray file lock deleted                                                                                            |
+| Concurrent drain                    | `cs_lock_take .drain-lock` fails → skip; stale dir lock >30 min reaped; stray file lock deleted                                                                                     |
 | Untrusted hook/cache I/O            | `O_NOFOLLOW`, `O_NONBLOCK` (no FIFO stall), uid check, 500-byte cap, defang + fence                                                                                                 |
 | Compaction                          | PreCompact never exit-2; compaction proceeds even if preserve-list is all that survives                                                                                             |
 

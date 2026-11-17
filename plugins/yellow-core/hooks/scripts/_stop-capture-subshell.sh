@@ -181,7 +181,9 @@ fi
 # of the newest published capture; a capture that read a smaller transcript
 # skips publishing so it cannot replace a newer pending entry, or re-stage
 # older dialogue after the drain took the newer one. The check and the
-# publish run under a per-session mkdir lock. A lock older than a minute
+# publish run under a per-session directory lock (cs_lock_take: mkdir plus an
+# exclusive .owner file, since uutils mkdir is not exclusive under a race).
+# A lock older than a minute
 # belongs to a capture that died holding it; a separate reclaim lock makes
 # sure only that stale lock is removed, never a fresh one another waiter just
 # took. A capture that cannot get the lock within five seconds does not
@@ -192,18 +194,18 @@ LOCK="${MARK}.lock"
 ( umask 077; mkdir -p "$MARK_DIR" ) 2>/dev/null || true
 _lock_stale() { [ -n "$(find "$LOCK" -maxdepth 0 -mmin +1 2>/dev/null)" ]; }
 tries=0
-while ! mkdir "$LOCK" 2>/dev/null; do
+while ! cs_lock_take "$LOCK"; do
   tries=$((tries + 1))
   [ "$tries" -gt 50 ] && exit 0
-  if _lock_stale && mkdir "${LOCK}.reclaim" 2>/dev/null; then
-    _lock_stale && { rmdir "$LOCK" 2>/dev/null || true; }
-    rmdir "${LOCK}.reclaim" 2>/dev/null || true
+  if _lock_stale && cs_lock_take "${LOCK}.reclaim"; then
+    _lock_stale && { cs_lock_drop "$LOCK" || true; }
+    cs_lock_drop "${LOCK}.reclaim" || true
     continue
   fi
   sleep 0.1
 done
 # Single quotes: LOCK holds a project path and must never become trap source.
-trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+trap 'cs_lock_drop "$LOCK" || true' EXIT
 PREV_BYTES=$(cat "$MARK" 2>/dev/null) || PREV_BYTES=0
 case "$PREV_BYTES" in '' | *[!0-9]*) PREV_BYTES=0 ;; esac
 case "$TRANSCRIPT_BYTES" in '' | *[!0-9]*) TRANSCRIPT_BYTES=0 ;; esac
@@ -225,7 +227,7 @@ find "$MARK_DIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
 # Release before the Jev shadow request, which can outlast the waiters' five
 # seconds. Clear the trap first so it cannot remove a later capture's lock.
 trap - EXIT
-rmdir "$LOCK" 2>/dev/null || true
+cs_lock_drop "$LOCK" || true
 
 if [ "$JEV_ON" = 1 ]; then
   # Raw tail: the lib redacts the projected text itself, because redacting

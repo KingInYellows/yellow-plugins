@@ -410,6 +410,28 @@ STUB
   [ -f "$STUB_MARKER" ]
 }
 
+@test "session-start reaps a stale .drain-lock that holds its .owner file (CLAUDE-348)" {
+  _plant_pending 5
+  mkdir -p "$STAGING/.drain-lock"
+  : > "$STAGING/.drain-lock/.owner"
+  touch -t "$(date -d '35 minutes ago' +%Y%m%d%H%M 2>/dev/null \
+    || date -v-35M +%Y%m%d%H%M)" "$STAGING/.drain-lock"
+  run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_stub 3
+  [ -f "$STUB_MARKER" ]
+}
+
+@test "session-start holds the drain lock with an .owner file and leaves no lock behind (CLAUDE-348)" {
+  _plant_pending 5
+  run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_stub 3
+  for _ in $(seq 1 50); do [ -e "$STAGING/.drain-lock" ] || break; sleep 0.1; done
+  [ ! -e "$STAGING/.drain-lock" ]
+  [ -z "$(find "$STAGING" -maxdepth 1 -name '.drain-lock*' -print)" ]
+}
+
 # --- PII TTL reaper ---
 
 @test "session-start reaps pending entries older than 7 days" {

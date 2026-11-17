@@ -126,16 +126,21 @@ Use this when:
    - **Question:** `Drain N pending entries to docs/solutions/ and MEMORY.md? Sample titles above.` (substitute N)
    - **Header:** `Drain staging`
    - **Options:**
-     - Label: `Drain all N entries`, description: `Spawn disowned claude -p drain session; non-blocking. Promotions land in docs/solutions/<category>/<slug>.md and append to MEMORY.md ## Session Notes.`
-     - Label: `Cancel`, description: `Make no changes. Pending entries remain for next SessionStart auto-drain or future manual /compound:review-staged.`
+     - Label: `Drain all N entries`, description:
+       `Spawn disowned claude -p drain session; non-blocking. Promotions land in docs/solutions/<category>/<slug>.md and append to MEMORY.md ## Session Notes.`
+     - Label: `Cancel`, description:
+       `Make no changes. Pending entries remain for next SessionStart auto-drain or future manual /compound:review-staged.`
 
-   **If the user selects Cancel:** print `[compound:review-staged] Cancelled by user. No changes.` and exit. Make no writes.
+   **If the user selects Cancel:** print
+   `[compound:review-staged] Cancelled by user. No changes.` and exit. Make no
+   writes.
 
-5. **Acquire drain lock.** Atomic `mkdir`. If lock exists, another drain
-   is in flight (or a stale lock not yet reaped) — refuse to spawn a
-   concurrent dispatch. A yellow-review resolve or sweep holding the
-   review-run lock in this checkout refuses it too: the promoter would only
-   defer, leaving the entries in `processing/` until the next drain.
+5. **Acquire drain lock.** `cs_lock_take` (`mkdir` plus an exclusive `.owner`
+   file). If lock exists, another drain is in flight (or a stale lock not yet
+   reaped) — refuse to spawn a concurrent dispatch. A yellow-review resolve or
+   sweep holding the review-run lock in this checkout refuses it too: the
+   promoter would only defer, leaving the entries in `processing/` until the
+   next drain.
 
    ```bash
    . "${CLAUDE_PLUGIN_ROOT}/lib/compound-staging.sh"
@@ -143,7 +148,7 @@ Use this when:
      printf '[compound:review-staged] A review run holds this checkout (review-run lock). Try again after it ends.\n' >&2
      exit 1
    fi
-   if ! mkdir "$STAGING_DIR/.drain-lock" 2>/dev/null; then
+   if ! cs_lock_take "$STAGING_DIR/.drain-lock"; then
      printf '[compound:review-staged] Concurrent drain already in flight (.drain-lock exists). Try again in a few minutes.\n' >&2
      exit 1
    fi
@@ -181,7 +186,7 @@ Use this when:
      CLAUDE_BIN="$(command -v claude 2>/dev/null)"
    fi
    if [ -z "$CLAUDE_BIN" ] || [ ! -x "$CLAUDE_BIN" ]; then
-     rmdir "$STAGING_DIR/.drain-lock" 2>/dev/null || true
+     cs_lock_drop "$STAGING_DIR/.drain-lock" || true
      printf '[compound:review-staged] claude binary not found. Install Claude Code CLI.\n' >&2
      exit 1
    fi
@@ -245,7 +250,7 @@ Use this when:
    # `"` in its name would silently disable concurrent-drain protection.
    export STAGING_DIR
    (
-     trap 'rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true' EXIT INT TERM
+     trap 'cs_lock_drop "${STAGING_DIR}/.drain-lock" || true' EXIT INT TERM
      export COMPOUND_DRAIN_IN_PROGRESS=1
      printf '[compound:review-staged] manual drain dispatch %s (auth=%s, pending=%s, timeout=%s)\n' \
        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" \

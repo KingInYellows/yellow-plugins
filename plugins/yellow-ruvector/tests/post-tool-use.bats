@@ -720,7 +720,7 @@ SH
 @test "a lock stays exclusive when mkdir reports success for an existing directory (uutils, CLAUDE-346)" {
   run bash -c '
     . "$1"
-    d=$(mktemp -d); l="$d/.s.lock"
+    l="$2/.s.lock"
     # uutils mkdir on Ubuntu 26.04 can tell two racing callers they both
     # created the directory; model the loser of that race.
     mkdir() { command mkdir "$@" 2>/dev/null || [ -d "${!#}" ]; }
@@ -728,9 +728,37 @@ SH
     coedit_mkdir_excl "$l" && exit 8
     coedit_unlock_path "$l"; [ ! -e "$l" ] || exit 9
     coedit_mkdir_excl "$l" || exit 10
-    echo held' _ "$BATS_TEST_DIRNAME/../hooks/scripts/lib/coedit.sh"
+    echo held' _ "$BATS_TEST_DIRNAME/../hooks/scripts/lib/coedit.sh" "$BATS_TEST_TMPDIR"
   [ "$status" -eq 0 ]
   [ "$output" = held ]
+}
+
+@test "a lock whose .owner cannot be created is not left behind (CLAUDE-348)" {
+  [ "$(id -u)" -ne 0 ] || skip "root ignores directory permissions"
+  run bash -c '
+    . "$1"
+    l="$2/.s.lock"
+    # The owner create fails with no owner present (a full disk): the
+    # ownerless directory must not wait out the one-minute reclaim.
+    mkdir() { command mkdir "$@" && chmod 500 "${!#}"; }
+    coedit_mkdir_excl "$l" && exit 7
+    [ ! -e "$l" ] || exit 8
+    echo clean' _ "$BATS_TEST_DIRNAME/../hooks/scripts/lib/coedit.sh" "$BATS_TEST_TMPDIR"
+  [ "$status" -eq 0 ]
+  [ "$output" = clean ]
+}
+
+@test "an expired marker is renamed aside whole, never emptied in place (CLAUDE-348)" {
+  sd="$RUVECTOR_DIR/coedit-sessions"; l="$sd/.s1.lock"; mkdir -p "$l"
+  touch -d '5 minutes ago' "$l" 2>/dev/null || skip "touch -d unsupported"
+  ino=$(ls -di "$l" | awk '{print $1}'); mt=$(stat -c %Y "$l" 2>/dev/null || stat -f %m "$l")
+  m="$l.reclaim.$ino-$mt"; mkdir -p "$m"; : > "$m/.owner"; touch -d '20 minutes ago' "$m"
+  rmb="$BATS_TEST_TMPDIR/rmbin"; mkdir -p "$rmb"
+  printf '#!/bin/sh\ncase "$*" in *.reclaim.*/.owner*) echo hit >> "%s/rm-owner" ;; esac\nexec %s "$@"\n' "$rmb" "$(command -v rm)" > "$rmb/rm"
+  chmod +x "$rmb/rm"
+  PATH="$rmb:$PATH" edit s1 "$PROJECT_ROOT/src/a.ts"
+  [ ! -e "$rmb/rm-owner" ]
+  [ ! -e "$l" ]
 }
 
 @test "a stale lock that is not empty is still reclaimed" {

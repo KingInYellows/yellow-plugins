@@ -465,20 +465,21 @@ detail):**
   `system:`), in that order; returns 0 staged, 1 bad args, 2 no jq, 3
   sanitisation failed, 4 write failed.
 - SessionStart hook checks thresholds (`count >= 5` OR `oldest > 48h`), acquires
-  an atomic `.drain-lock` (mkdir-based), and disowns a `claude -p` drain
-  subshell with `COMPOUND_DRAIN_IN_PROGRESS=1` env var set (recursion guard for
-  the drain's own Stop + SessionStart hooks). The drain runs `--model haiku`
-  (override with `COMPOUND_DRAIN_MODEL`, e.g. `sonnet`; any value other than
-  `haiku|sonnet|opus|claude-<id>` is logged to `drain-logs/` and falls back to
-  haiku); unpinned it would run on the user's default model and draw on the same
-  limit window as their own session. It also runs `--max-budget-usd 3.00`
-  (override with `COMPOUND_DRAIN_MAX_BUDGET_USD`, a positive decimal; anything
-  else is logged and ignored), a runaway stop beside `--max-turns 50` and the
-  timeout. `/compound:review-staged` passes the same model and cap
-  (`cs_drain_model`, `cs_drain_max_budget_usd`). The drain log records the
-  `claude -p` exit status, a `drain cost_usd=<n> turns=<n> subtype=<s>` line
-  from the CLI's JSON result (API-equivalent cost; usage, not spend, on a
-  subscription), and how many dispatched entries left `pending/`.
+  a `.drain-lock` (`cs_lock_take`: mkdir plus an exclusive `.owner` file), and
+  disowns a `claude -p` drain subshell with `COMPOUND_DRAIN_IN_PROGRESS=1` env
+  var set (recursion guard for the drain's own Stop + SessionStart hooks). The
+  drain runs `--model haiku` (override with `COMPOUND_DRAIN_MODEL`, e.g.
+  `sonnet`; any value other than `haiku|sonnet|opus|claude-<id>` is logged to
+  `drain-logs/` and falls back to haiku); unpinned it would run on the user's
+  default model and draw on the same limit window as their own session. It also
+  runs `--max-budget-usd 3.00` (override with `COMPOUND_DRAIN_MAX_BUDGET_USD`, a
+  positive decimal; anything else is logged and ignored), a runaway stop beside
+  `--max-turns 50` and the timeout. `/compound:review-staged` passes the same
+  model and cap (`cs_drain_model`, `cs_drain_max_budget_usd`). The drain log
+  records the `claude -p` exit status, a
+  `drain cost_usd=<n> turns=<n> subtype=<s>` line from the CLI's JSON result
+  (API-equivalent cost; usage, not spend, on a subscription), and how many
+  dispatched entries left `pending/`.
   `WARNING drain left all <n> dispatched entries` means the lead never handed
   off to staging-reviewer; those entries are retried, but reaped after 7 days,
   so a repeated warning calls for `COMPOUND_DRAIN_MODEL=sonnet`.

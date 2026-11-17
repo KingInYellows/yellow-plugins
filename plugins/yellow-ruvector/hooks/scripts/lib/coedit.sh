@@ -260,9 +260,14 @@ coedit_write_atomic() {
 # racing callers, so mkdir alone is not exclusive there. The holder is
 # whoever then creates <dir>/.owner under noclobber, which the shell does
 # itself with O_EXCL. A caller whose mkdir "succeeded" but lost the .owner
-# race leaves the directory alone: it belongs to the winner.
+# race leaves the directory alone: it belongs to the winner. One whose create
+# failed with no .owner present (full disk) removes the ownerless directory,
+# so the next caller does not wait out the one-minute stale reclaim.
 coedit_mkdir_excl() {
-  mkdir "$1" 2>/dev/null && (set -C; : > "$1/.owner") 2>/dev/null
+  mkdir "$1" 2>/dev/null || return 1
+  (set -C; : > "$1/.owner") 2>/dev/null && return 0
+  [ -e "$1/.owner" ] || rmdir "$1" 2>/dev/null
+  return 1
 }
 
 # coedit_lock_path <lock-dir> — take a directory lock (coedit_mkdir_excl),
@@ -315,11 +320,13 @@ coedit_lock_path() {
         rm -f -- "$marker" 2>/dev/null
       elif [ -e "$marker" ] && coedit_older_than "$(coedit_mtime "$marker")" 600; then
         if [ -d "$marker" ] && [ ! -L "$marker" ]; then
-          # The rename runs in the foreground (the reclaim below needs the
-          # path free); only the delete of the renamed tree is detached.
-          { rm -f -- "$marker/.owner"; rmdir "$marker" 2>/dev/null; } \
-            || { aside=$(coedit_move_aside "$marker" "${lock}.stale.m${ino}-${mt}.$$.") \
-                 && { ( rm -rf -- "$aside" ) </dev/null >/dev/null 2>&1 & }; }
+          # Renamed aside, never emptied in place: removing its .owner first
+          # would let a racing waiter claim the marker and then lose it to
+          # the rmdir. The rename runs in the foreground (the reclaim below
+          # needs the path free); only the delete of the renamed tree is
+          # detached.
+          aside=$(coedit_move_aside "$marker" "${lock}.stale.m${ino}-${mt}.$$.") \
+            && { ( rm -rf -- "$aside" ) </dev/null >/dev/null 2>&1 & }
         else
           rm -f -- "$marker" 2>/dev/null
         fi
@@ -370,7 +377,9 @@ coedit_older_than() {
   [ $((now - $1)) -gt "$2" ]
 }
 
-coedit_unlock_path() { rm -f -- "$1/.owner"; rmdir "$1" 2>/dev/null; }
+# coedit_unlock_path <dir> — release a lock or marker made by
+# coedit_mkdir_excl: its .owner first, then the directory.
+coedit_unlock_path() { rm -f -- "$1/.owner"; rmdir -- "$1" 2>/dev/null; }
 
 # coedit_move_aside <path> <prefix> — move <path> into a fresh directory
 # mktemp creates exclusively (<prefix>XXXXXX) and print that directory. A
@@ -643,7 +652,7 @@ coedit_prune_sessions() {
         m=${markers[$(( (i + tried) % total ))]}
         tried=$((tried + 1))
         [ -d "$m" ] && [ ! -L "$m" ] || continue
-        coedit_older_than "$(coedit_mtime "$m")" 600 && { rm -f -- "$m/.owner"; rmdir -- "$m" 2>/dev/null; } && removed=$((removed + 1))
+        coedit_older_than "$(coedit_mtime "$m")" 600 && coedit_unlock_path "$m" && removed=$((removed + 1))
       done
       SECONDS=0
       # Stale lock trees a reclaim renamed aside (<lock>.stale.*) whose
