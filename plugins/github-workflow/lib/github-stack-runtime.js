@@ -291,6 +291,22 @@ function resolveRemote(explicitRemote) {
   };
 }
 
+/**
+ * `owner/repo` (lower-cased) of every github.com remote of this clone.
+ * Empty when the remotes cannot be read — callers fail closed on that.
+ */
+function githubReposOfRemotes() {
+  const result = run('git', ['config', '--get-regexp', '^remote\\..*\\.url$']);
+  if (!result.ok || result.code !== 0) return [];
+  const repos = new Set();
+  for (const line of result.stdout.split('\n')) {
+    const url = line.trim().split(/\s+/)[1] || '';
+    const match = /^(?:https:\/\/(?:[^@/]*@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec(url);
+    if (match) repos.add(`${match[1]}/${match[2]}`.toLowerCase());
+  }
+  return [...repos];
+}
+
 function validateEnum(value, allowed, label) {
   if (!allowed.includes(value)) {
     return { ok: false, reason: `${label} must be one of ${allowed.join(', ')}, got "${value}"` };
@@ -618,7 +634,7 @@ function submit({ open, remote }) {
 }
 
 /** A github.com pull-request URL, capturing its number. */
-const PR_URL_RE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/([1-9][0-9]*)\/?$/;
+const PR_URL_RE = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/([1-9][0-9]*)\/?$/;
 
 /**
  * `gh stack merge <number> --yes [--merge-method <m>]`. Requires an
@@ -643,7 +659,21 @@ function merge({ target, mergeMethod, confirm }) {
   // cobra parses flags in any position and would silently redirect the
   // merge to the current branch's PR context instead of refusing.
   const urlMatch = PR_URL_RE.exec(target);
-  const number = urlMatch ? urlMatch[1] : target;
+  const number = urlMatch ? urlMatch[3] : target;
+  if (urlMatch) {
+    // The number alone would merge pull request N of THIS repository, so a
+    // URL that names another repository must never be reduced to it.
+    const wanted = `${urlMatch[1]}/${urlMatch[2]}`.toLowerCase();
+    const repos = githubReposOfRemotes();
+    if (!repos.includes(wanted)) {
+      return refusalResult(
+        'merge',
+        repos.length === 0
+          ? `target "${target}" is a pull request URL, but no github.com remote of this clone could be read to confirm it is the same repository; pass the pull request number instead`
+          : `target "${target}" is a pull request in ${wanted}, which is not a remote of this clone (${repos.join(', ')})`
+      );
+    }
+  }
   if (!/^[1-9][0-9]*$/.test(number)) {
     return refusalResult(
       'merge',

@@ -47,7 +47,15 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
 ```
 
 - **`SUCCESS`** — the branch is in a stack. Continue to Step 2.
-- **`NOT_IN_STACK`** — register it. Independent work is a one-branch stack
+- **`NOT_IN_STACK`** — first check that Graphite does not own the branch,
+  before running anything that registers it. If `gt log short` lists the
+  current branch, or `.git/.graphite_repo_config` exists and the branch has
+  a pull request Graphite opened, stop here without calling `init`: one
+  provider owns a stack. Finish it with Graphite or follow the adoption
+  steps in `docs/stacked-prs-native-migration.md`. If `gt` is not installed
+  and the config file is absent, Graphite does not own it.
+
+  Otherwise register it. Independent work is a one-branch stack
   on the trunk; GitHub only forms a stack object once two pull requests
   exist, so this is an ordinary pull request. Use a stack of several
   branches only when the pull requests depend on one another.
@@ -69,10 +77,6 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
   adapter's `add` operation from that stack's top branch (`/flow:work`
   does this); this skill submits the branch it is on.
 
-  If the branch is tracked by Graphite (`gt log short` lists it, or
-  `.git/.graphite_repo_config` exists and the branch has a Graphite pull
-  request), stop: one provider owns a stack. Finish it with Graphite or
-  follow the adoption steps in `docs/stacked-prs-native-migration.md`.
 - Any other status — report `status` and `recoveryAction` and stop.
 
 ### Step 2: Stage Specific Files

@@ -33,6 +33,14 @@ if [ "$1" = "config" ] && [ "$2" = "remote.pushDefault" ]; then
   fi
   exit 1
 fi
+if [ "$1" = "config" ] && [ "$2" = "--get-regexp" ]; then
+  # FAKE_GIT_REMOTE_URLS: "name=url" pairs separated by spaces.
+  [ -n "${FAKE_GIT_REMOTE_URLS:-}" ] || exit 1
+  for pair in $FAKE_GIT_REMOTE_URLS; do
+    printf 'remote.%s.url %s\n' "${pair%%=*}" "${pair#*=}"
+  done
+  exit 0
+fi
 if [ "$1" = "rev-parse" ] && [ "$2" = "--verify" ] && [ "$3" = "--quiet" ]; then
   name="${4#refs/heads/}"
   case " ${FAKE_GIT_BRANCHES:-} " in

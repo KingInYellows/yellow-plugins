@@ -47,6 +47,7 @@ const ENV_KEYS = [
   'FAKE_GIT_BRANCHES',
   'FAKE_GIT_NOT_ANCESTOR',
   'FAKE_GIT_ANCESTRY_EXIT',
+  'FAKE_GIT_REMOTE_URLS',
 ];
 let originalPath: string | undefined;
 const originalEnv: Record<string, string | undefined> = {};
@@ -321,8 +322,33 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
 
   it('reduces a github.com pull request URL to its number — gh stack merge exits 5 on a URL', () => {
     process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/O/r.git';
     const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
     expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'merge', '42', '--yes'] });
+  });
+
+  it('accepts ssh and credential-bearing remote URL forms for the same repository', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    for (const url of ['git@github.com:o/r.git', 'ssh://git@github.com/o/r', 'https://x-access-token:abc@github.com/o/r']) {
+      process.env.FAKE_GIT_REMOTE_URLS = `origin=${url}`;
+      expect(merge({ target: 'https://github.com/o/r/pull/42', confirm: true }).status).toBe('SUCCESS');
+    }
+  });
+
+  it('refuses a pull request URL from another repository — its number would merge a different PR here', () => {
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git';
+    for (const confirm of [true, false]) {
+      const result = merge({ target: 'https://github.com/other/project/pull/42', confirm });
+      expect(result.status).toBe('INVALID_ARGS');
+      expect(result.command).toBeNull();
+      expect(result.refusalReason).toContain('other/project');
+    }
+  });
+
+  it('refuses a pull request URL when no github.com remote can be read', () => {
+    const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.command).toBeNull();
   });
 
   it('refuses a github.com URL that is not a pull request', () => {

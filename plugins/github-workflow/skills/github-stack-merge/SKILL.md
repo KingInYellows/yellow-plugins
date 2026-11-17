@@ -30,7 +30,8 @@ skill name):
 - A target — a **stack number, PR number, or PR URL** — as the first token,
   if given. `gh stack merge` accepts only `[<stack-number> | <pr-number>]`
   and exits 5 on a URL, so the adapter reduces a
-  `https://github.com/<owner>/<repo>/pull/<n>` URL to `<n>` and refuses
+  `https://github.com/<owner>/<repo>/pull/<n>` URL to `<n>` only when
+  `<owner>/<repo>` is a remote of this clone, and refuses
   anything else with `INVALID_ARGS` before running. A bare **branch name is
   NOT a valid merge target**.
   If the user supplies a branch name, resolve it to its PR number first
