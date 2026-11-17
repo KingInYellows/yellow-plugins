@@ -386,8 +386,12 @@ vendored code-review command (CLAUDE-248). Its boundary:
 
 - **Trusted prompt**: the command is fetched from the default branch
   (`.github/claude-code-review/code-review.md`) and installed under
-  `~/.claude/commands/`, so a PR cannot edit its own review prompt. The PR's own
-  `CLAUDE.md` files still load, as in review-gate.
+  `~/.claude/commands/`, so a PR cannot edit the command file. The gate step
+  deletes `.claude-code-review/` before writing it, so a committed symlink there
+  cannot redirect the write.
+- **Known gap**: the action runs in the PR checkout with all setting sources, so
+  the PR's own `CLAUDE.md` files and `.claude/settings.json` (including its
+  hooks) load. Same-repository branches only; tracked in CLAUDE-350.
 - **Agent tools**: `--allowedTools` grants the inline-comment MCP tool and
   `gh pr comment`, `gh pr diff` and `gh pr view` only. The agent has no `gh api`
   access: the gate step, which runs no model, writes `claude[bot]`'s earlier

@@ -81,7 +81,10 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          mkdir -p .claude-code-review
+          # Remove whatever the PR put at this path first: a committed symlink
+          # could otherwise redirect the write onto the installed command.
+          rm -rf .claude-code-review
+          mkdir .claude-code-review
           gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/comments" \
             --jq '.[] | select(.user.login == "claude[bot]")
               | {path, line: (.line // .original_line), body}' \
