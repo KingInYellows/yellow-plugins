@@ -35,3 +35,6 @@ printf 'empty_pid_once=%s held=%s\n' "$?" "$([ -d "$CLAUDE_PLUGIN_DATA/.install.
 yellow_morph_acquire_install_lock 3 2>/dev/null
 printf 'empty_pid_stale=%s\n' "$?"
 yellow_morph_release_install_lock
+# A lock whose pid write fails (here: a 0-block file size limit) is given up,
+# not held with an empty pid that a waiter would reclaim.
+( ulimit -f 0 2>/dev/null; trap '' XFSZ; yellow_morph_acquire_install_lock 1 2>/dev/null; printf 'pid_write_fails=%s left=%s\n' "$?" "$([ -e "$CLAUDE_PLUGIN_DATA/.install.lock" ] && printf yes || printf no)" )

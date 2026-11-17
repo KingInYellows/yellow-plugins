@@ -110,9 +110,12 @@ yellow_morph_acquire_install_lock() {
       # whose exclusive create of pid succeeds holds the lock. `sh -C` is
       # an O_EXCL open in every shell (zsh's CLOBBER_EMPTY would not be).
       if command sh -C -c ': > "$1"' sh "${lock_dir}/pid" 2>/dev/null; then
-        # Writing the PID is best-effort: the claim already holds the lock.
-        printf '%s' "$$" >| "${lock_dir}/pid" 2>/dev/null || true
-        return 0
+        printf '%s' "$$" >| "${lock_dir}/pid" 2>/dev/null && return 0
+        # A pid that stays empty is reclaimed as stale a second later, so
+        # give up a lock whose pid cannot be written (full disk).
+        rm -f "${lock_dir}/pid" 2>/dev/null
+        rmdir "$lock_dir" 2>/dev/null
+        return 1
       fi
       # Lost the race: the winner's pid is there. With no pid at all the
       # create failed (full disk): drop the ownerless directory.

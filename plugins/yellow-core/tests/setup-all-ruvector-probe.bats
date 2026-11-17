@@ -113,12 +113,12 @@ probe() { run bash -c 'PATH="$1:$PATH" bash "$2"' _ "$STUBS" "$BLOCK"; }
   [[ "$output" == *"ruvector:           NOT INSTALLED (plugin-managed)"* ]]
 }
 
-@test "an orphan writer the CLI leaves behind is stopped by the 1 MiB file cap (CLAUDE-348)" {
+@test "an orphan writer the CLI leaves behind is stopped by the file cap (CLAUDE-348)" {
   candidate yellow-ruvector-o
   probe
   [ "$status" -eq 0 ]
   [[ "$output" == *"ruvector:           OK (plugin-managed 0.3.3)"* ]]
-  # The orphan writes 4 MiB and then a marker; the cap kills it at 1 MiB.
+  # The orphan writes 4 MiB and then a marker; the cap kills it at 2 MiB.
   pid=$(cat "$HOME/orphan.pid")
   for _ in $(seq 1 100); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
   ! kill -0 "$pid" 2>/dev/null

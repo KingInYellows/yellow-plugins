@@ -111,7 +111,7 @@ if [ -d "${STAGING_DIR}/.drain-lock" ]; then
   if [ "$lock_age_min" -gt 30 ] 2>/dev/null; then
     cs_lock_drop "${STAGING_DIR}/.drain-lock"
     [ ! -d "${STAGING_DIR}/.drain-lock" ] \
-      || printf '[yellow-core] compound-staging: stale lock rmdir failed\n' >&2
+      || printf '[yellow-core] compound-staging: stale lock release failed\n' >&2
   fi
 fi
 
@@ -277,7 +277,7 @@ if [ -z "$CLAUDE_BIN" ]; then
 fi
 if [ -z "$CLAUDE_BIN" ] || [ ! -x "$CLAUDE_BIN" ]; then
   # LOCK_OWNED_BY_PARENT is still 1 here — the EXIT trap will release the
-  # lock automatically when json_exit calls exit. No need to rmdir manually.
+  # lock automatically when json_exit calls exit. No need to release manually.
   json_exit "claude binary not found; skipping drain"
 fi
 
@@ -292,7 +292,7 @@ if [ -n "${COMPOUND_STAGING_REVIEWER_AGENT:-}" ] && [ -n "${BATS_VERSION:-}" ]; 
   STAGING_REVIEWER_PATH="$COMPOUND_STAGING_REVIEWER_AGENT"
 fi
 if [ ! -f "$STAGING_REVIEWER_PATH" ]; then
-  # EXIT trap will rmdir the lock since LOCK_OWNED_BY_PARENT is still 1.
+  # EXIT trap will release the lock since LOCK_OWNED_BY_PARENT is still 1.
   json_exit "staging-reviewer agent not yet deployed (stack item #2); deferring drain"
 fi
 
@@ -347,7 +347,7 @@ esac
 # (default 8 drains in rolling window); returns 1 when under or on subscription
 # auth (no cost gate). Release the lock + json_exit on the over-threshold path.
 if cs_drain_budget_warn "$STAGING_DIR" "$AUTH_ROUTE"; then
-  # EXIT trap will rmdir the lock since LOCK_OWNED_BY_PARENT is still 1.
+  # EXIT trap will release the lock since LOCK_OWNED_BY_PARENT is still 1.
   json_exit "drain budget over threshold; skipping dispatch"
 fi
 

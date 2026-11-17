@@ -126,7 +126,8 @@ _rv_probe() {
   # Only a timeout that supports --kill-after (GNU, uutils): a CLI that
   # ignores TERM is then KILLed 2s later. BusyBox-style ones use the watchdog.
   # ulimit -f caps every file the probe and anything it leaves behind can
-  # write at 1 MiB, so an orphan cannot fill the disk through the temp file.
+  # write at 2 MiB (1 MiB in zsh, which counts 512-byte blocks), so an
+  # orphan cannot fill the disk through the temp file.
   for t in timeout gtimeout; do
     if command -v "$t" >/dev/null 2>&1 && "$t" --kill-after=1 5 true >/dev/null 2>&1; then
       if [ -n "$out" ]; then

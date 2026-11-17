@@ -12,8 +12,7 @@ Keep the remaining directory locks exclusive on Ubuntu 26.04, whose uutils
 - yellow-core: the compound-staging drain lock and the Stop capture lock are
   held by whoever creates `<lock>/.owner` exclusively (`cs_lock_take`), and are
   released by renaming them aside first (`cs_lock_drop`). The `/setup:all`
-  ruvector probe caps what it and any process it leaves behind can write at 1
-  MiB, and still probes when `TMPDIR` is unusable.
+  ruvector probe caps what it and any process it leaves behind can write at 2 MiB, and still probes when `TMPDIR` is unusable.
 - yellow-morph and yellow-ruvector: the install locks, the ruvector model lock
   and its reclaim markers are claimed by an exclusive create of their `pid` or
   `.owner` file. A waiter reclaims a morph lock with an empty or invalid `pid`
