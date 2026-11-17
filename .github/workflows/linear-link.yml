@@ -87,7 +87,7 @@ jobs:
               my $id = qr/[A-Z][A-Z0-9]*-(?:\d+|NEW)/;
               # A reference is a bare ID or a Linear issue URL.
               my $ref = qr{(?:https?://linear\.app/[^/\s]+/issue/)?$id(?![A-Za-z0-9_])(?:/[^\s,]*)?};
-              my $word = qr/(?i:close[sd]?|closing|fix(?:es|ed|ing)?|resolve[sd]?|resolving|complete[sd]?|completing|refs?|references|part\s+of|related\s+to|contributes\s+to|towards?)/;
+              my $word = qr/(?i:close[sd]?|closing|fix(?:es|ed|ing)?|resolve[sd]?|resolving|complete[sd]?|completing|implement(?:s|ed|ing)?|refs?|references|part\s+of|related\s+to|relates\s+to|linear\s+issue|contributes\s+to|towards?)/;
               my $sep = qr/\s*(?:,\s*(?:and\s+)?|&|\band\b)\s*/;
               while (/(?<![A-Za-z0-9_])$word[:\s]+($ref(?:$sep$ref)*)/g) {
                 my $list = $1;

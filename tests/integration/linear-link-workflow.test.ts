@@ -201,6 +201,9 @@ const CASES: Array<[string, string, string, string | null, boolean]> = [
     'See https://linear.app/acme/issue/CLAUDE-123/some-title',
     false,
   ],
+  ['Implements links', 'feat/x', 'fix', 'Implements CLAUDE-123', true],
+  ['Relates to links', 'feat/x', 'fix', 'Relates to CLAUDE-123', true],
+  ['Linear issue links', 'feat/x', 'fix', 'Linear issue CLAUDE-123', true],
   [
     'Skip works like Ignore',
     'u/claude-123-change',
