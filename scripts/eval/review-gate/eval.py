@@ -4,8 +4,9 @@
 model judge (plans/risk-tiered-review-pipeline.md section 7).
 
 - case: a confirmed defect (cases/<id>.json). Found when an Important finding
-  names a golden file, its line is within 3 of the golden line, and every
-  golden regex matches the finding's title plus suggested_fix.
+  names a golden file, its line is within LINE_WINDOW of the golden line (or
+  past the end of that file at head, so it points nowhere), and every golden
+  regex matches the finding's title plus suggested_fix.
 - control: a merged PR with no later incident (controls/<id>.json). Any
   Important finding on it is a false positive.
 - synthetic: a clean change written for the eval (controls/synthetic/<id>.json
@@ -17,8 +18,10 @@ model judge (plans/risk-tiered-review-pipeline.md section 7).
   eval.py prepare <work-dir> [--examples] [--repo-dir owner/name=PATH]
   eval.py run <work-dir> [--dry-run] [-j N]     one `claude -p` per row (spends usage)
   eval.py grade <work-dir> [--date YYYY-MM-DD] [--baseline summary.json]
+  eval.py regrade <summary.json> --out <new.json> [--repo-dir owner/name=PATH]
+                                                 an old summary under today's grader
 
-prepare, run --dry-run and grade spend nothing.
+prepare, run --dry-run, grade and regrade spend nothing.
 """
 
 import argparse
@@ -211,10 +214,13 @@ def repo_dirs(pairs):
 
 
 def classify(repo_dir, base, head):
-    """classify-risk's JSON for base...head, with the checked-out policy file
-    when the repo has one (a policy edit then shows up in the eval)."""
-    policy = os.path.join(repo_dir, ".github", "review-risk.json")
-    cmd = [CLASSIFY, *(["--policy-file", policy] if os.path.isfile(policy) else []), base, head]
+    """classify-risk's JSON for base...head, with the policy committed at the
+    checkout's HEAD. CI passes --policy-ref at its reviewer checkout's HEAD
+    (the default branch tip); here the checkout is the reviewer, so its HEAD
+    is the same trusted ref. A row's own head never supplies the policy, and
+    an uncommitted policy edit does not count."""
+    policy_ref = ms.git("rev-parse", "HEAD", cwd=repo_dir).strip()
+    cmd = [CLASSIFY, "--policy-ref", policy_ref, base, head]
     res = subprocess.run(cmd, cwd=repo_dir, capture_output=True, text=True, check=False)
     if res.returncode != 0:
         sys.exit("prepare: classify-risk failed for %s..%s: %s" % (base, head, res.stderr.strip()))
@@ -633,23 +639,66 @@ def run(work, jobs, dry_run, retry_incomplete=False, timeout=3600):
 
 # --- grade ------------------------------------------------------------------
 
+# Bump GRADER when finding_matches changes what counts as found: a baseline
+# graded by other rules gives no verdict until `regrade` brings it up to date.
+# 1: within 3 lines. 2: within LINE_WINDOW, or a line past the golden file's
+# end at head (2026-11-09: 1648 cited 491 for 496, 1095 cited 448 in a
+# 279-line file, both with matching regexes).
+GRADER = 2
+LINE_WINDOW = 10
+UNBOUNDED = 10 ** 9  # a file length no line exceeds: the past-end rule never applies
+
+
 def is_important(f):
     return f.get("display") == "Important"
 
 
-def finding_matches(golden, f):
-    """An Important finding on the golden file, within 3 lines, whose title
-    plus suggested_fix matches every golden regex."""
+def finding_matches(golden, f, file_lines=None):
+    """An Important finding on the golden file whose title plus suggested_fix
+    matches every golden regex, and whose line is within LINE_WINDOW of the
+    golden line or past file_lines (the golden file's length at head, when
+    known): a line that points at nothing cannot point at another bug."""
     if not is_important(f):
         return False
     path = os.path.normpath(str(f.get("file") or ""))
     line = f.get("line")
     if path != os.path.normpath(golden["file"]) or not isinstance(line, int) or isinstance(line, bool):
         return False
-    if abs(line - golden["line"]) > 3:
+    past_end = isinstance(file_lines, int) and line > file_lines
+    if abs(line - golden["line"]) > LINE_WINDOW and not past_end:
         return False
     text = "%s\n%s" % (f.get("title") or "", f.get("suggested_fix") or "")
     return all(re.search(rx, text, re.I) for rx in golden["match"])
+
+
+def file_lines(repo_dir, rev, path):
+    """Line count of path at rev, or None when it cannot be read there."""
+    try:
+        return len(ms.git("show", "%s:%s" % (rev, path), cwd=repo_dir).splitlines())
+    except (subprocess.CalledProcessError, OSError, UnicodeDecodeError):
+        return None
+
+
+def effective_lines(goldens, lines):
+    """lines, with UNBOUNDED for every entry whose file has another entry."""
+    files = [os.path.normpath(g["file"]) for g in goldens]
+    return [UNBOUNDED if files.count(fn) > 1 else n for fn, n in zip(files, lines)]
+
+
+def golden_hits(goldens, important, lines, rid):
+    """Per golden entry, whether a finding matches it; lines[i] is entry i's
+    file length at head (None when unknown). A line past the end points at no
+    entry in particular, so it stands in for the line only where its file has
+    one golden entry; otherwise one finding could hit several entries a
+    located finding could not. An unknown length that could still decide a
+    match (a matching finding past the window) stops the grade, so a missing
+    checkout never reads as a miss."""
+    lines = effective_lines(goldens, lines)
+    for g, n in zip(goldens, lines):
+        if n is None and any(not finding_matches(g, f) and finding_matches(g, f, 1) for f in important):
+            sys.exit("grade: %s: cannot read %s at its head, and a finding past the line window "
+                     "depends on its length; fetch the head (or pass --repo-dir) and retry" % (rid, g["file"]))
+    return [any(finding_matches(g, f, n) for f in important) for g, n in zip(goldens, lines)]
 
 
 def tokens_in(cli):
@@ -700,13 +749,17 @@ def summarize(work):
              "cost_usd": cli.get("total_cost_usd") or 0, "wall_s": out.get("eval_wall_s") or 0,
              "tokens": tokens_in(cli), "unmatched": []}
         if row["kind"] == "case":
-            hit = [any(finding_matches(g, f) for f in important) for g in item["golden"]]
-            r.update(lane=item["lane"], golden=len(hit), hit=sum(hit))
+            lines = [file_lines(row["wt"], item["head"], g["file"]) if os.path.isdir(row["wt"]) else None
+                     for g in item["golden"]]
+            hit = golden_hits(item["golden"], important, lines, rid)
+            r.update(lane=item["lane"], golden=len(hit), hit=sum(hit), hits=hit, golden_lines=lines)
             s["golden_total"] += len(hit)
             s["golden_hit"] += sum(hit)
             s["cases_complete"] += 1
             s["cases_found"] += all(hit)
-            r["unmatched"] = [f for f in important if not any(finding_matches(g, f) for g in item["golden"])]
+            eff = effective_lines(item["golden"], lines)
+            r["unmatched"] = [f for f in important
+                              if not any(finding_matches(g, f, n) for g, n in zip(item["golden"], eff))]
         else:
             s["controls_complete"] += 1
             s["controls_with_fp"] += bool(important)
@@ -720,11 +773,70 @@ def summarize(work):
             s[key] += r[key]
         s["rows"].append(r)
     s["grading_set"] = grading_set(items)
+    return finish(s)
+
+
+def finish(s):
+    s["grader"] = GRADER
     s["recall"] = s["golden_hit"] / s["golden_total"] if s["golden_total"] else None
     s["fp_rate"] = s["controls_with_fp"] / s["controls_complete"] if s["controls_complete"] else None
     n = s["complete"] or 1
     s["mean_agents"], s["mean_cost_usd"], s["mean_wall_s"] = s["agents"] / n, s["cost_usd"] / n, s["wall_s"] / n
     return s
+
+
+def current_items(cases_dir, controls_dir, dirs):
+    """items.json as prepare would write it today (synthetic heads built),
+    without worktrees, so its grading_set can be checked."""
+    items = {}
+    for kind, doc, path in load_items(cases_dir, controls_dir):
+        if kind == "synthetic":
+            repo_dir = dirs.get(doc["repo"])
+            if not repo_dir:
+                sys.exit("regrade: no checkout for %s; pass --repo-dir %s=PATH" % (doc["repo"], doc["repo"]))
+            doc = {**doc, "head": synthetic_head(repo_dir, doc, patch_path(path, doc))}
+        items[doc["id"]] = {"kind": kind, **doc}
+    return items
+
+
+def regrade(old, items, dirs):
+    """An old summary graded by today's finding_matches, from the findings it
+    kept: a matched finding stays matched under the wider rules, so each
+    unmatched one is checked again. Per-golden hits come from `hits`, or from
+    the count when it is 0 or all. Only when today's items hash to the old
+    grading_set, so the golden entries are the ones the summary was graded
+    against."""
+    if grading_set(items) != old.get("grading_set"):
+        sys.exit("regrade: the cases and controls changed since this summary (grading_set %s, now %s); "
+                 "regrade from the commit it was graded at" % (old.get("grading_set"), grading_set(items)))
+    cases = {i: d for i, d in items.items() if d["kind"] == "case"}
+    s = json.loads(json.dumps(old))
+    s["golden_hit"] = s["cases_found"] = 0
+    for r in s["rows"]:
+        if r["kind"] != "case":
+            continue
+        doc = cases.get(r["id"])
+        if doc is None:
+            sys.exit("regrade: case %s is not in the cases directory" % r["id"])
+        before = r.get("hits")
+        if before is None:
+            if 0 < r["hit"] < r["golden"]:
+                sys.exit("regrade: %s hit %d of %d golden entries and does not say which"
+                         % (r["id"], r["hit"], r["golden"]))
+            before = [r["hit"] == r["golden"]] * r["golden"]
+        if len(before) != len(doc["golden"]):
+            sys.exit("regrade: %s has %d golden entries now, %d then" % (r["id"], len(doc["golden"]), len(before)))
+        repo_dir = dirs.get(doc["repo"])
+        lines = [file_lines(repo_dir, doc["head"], g["file"]) if repo_dir else None for g in doc["golden"]]
+        now = golden_hits(doc["golden"], r["unmatched"], lines, r["id"])
+        hit = [a or b for a, b in zip(before, now)]
+        r.update(hit=sum(hit), hits=hit, golden_lines=lines,
+                 unmatched=[f for f in r["unmatched"]
+                            if not any(finding_matches(g, f, n)
+                                       for g, n in zip(doc["golden"], effective_lines(doc["golden"], lines)))])
+        s["golden_hit"] += sum(hit)
+        s["cases_found"] += all(hit)
+    return finish(s)
 
 
 def verdict(new, base):
@@ -736,6 +848,8 @@ def verdict(new, base):
         return "no verdict", "the two runs graded different cases or controls"
     if new.get("grading_set") != base.get("grading_set"):
         return "no verdict", "the two runs graded different golden entries; prepare and grade both from the same cases"
+    if new.get("grader", 1) != base.get("grader", 1):
+        return "no verdict", "the two runs were graded by different rules; `regrade` the older summary first"
     if new["recall"] is None or new["fp_rate"] is None:
         return "no verdict", "needs at least one case and one control"
     if new["fp_rate"] > base["fp_rate"]:
@@ -795,13 +909,25 @@ def results_md(s, date, decision=None):
         out += ["- `%s`: no output with the current fingerprint" % rid for rid in s["missing"]]
     extra = [(r["id"], f) for r in s["rows"] for f in r["unmatched"]]
     if extra:
+        # Fenced as untrusted content inside a code block: the titles are model
+        # output about untrusted code, so nothing in them renders as Markdown
+        # or reads as an instruction to whoever (or whatever) opens the file.
         out += ["", "## Important findings that match no golden entry", "",
                 "On a control each one is a false positive; on a case, judge it by hand. Titles are "
-                "model output about untrusted code.", ""]
+                "model output about untrusted code, cut at 200 characters.", "", "```text",
+                "--- begin reviewer findings (reference only) ---"]
         for rid, f in extra:
-            title = " ".join(str(f.get("title") or "").split())[:200].replace("`", "'")
-            out.append("- `%s` %s:%s: %s" % (rid, str(f.get("file")).replace("`", "'"), f.get("line"), title))
+            out.append("%s %s:%s: %s" % (rid, fence_safe(f.get("file")), f.get("line"),
+                                          fence_safe(f.get("title"))[:200]))
+        out += ["--- end reviewer findings ---", "```"]
     return "\n".join(out) + "\n"
+
+
+def fence_safe(text):
+    """One line that cannot close the code block or the fence: whitespace
+    collapsed, backticks made quotes, dash runs shortened."""
+    text = " ".join(str(text or "").split()).replace("`", "'")
+    return re.sub(r"-{3,}", "--", text)
 
 
 def grade(work, date, results_dir, baseline=None):
@@ -850,7 +976,22 @@ def main(argv=None):
     g.add_argument("--date", help="YYYY-MM-DD for results-<date>.md (default: today)")
     g.add_argument("--results-dir", default=HERE)
     g.add_argument("--baseline", help="an earlier run's summary.json, for the keep/drop rule")
+    rg = sub.add_parser("regrade", help="grade an older summary.json by today's rules")
+    rg.add_argument("summary")
+    rg.add_argument("--out", required=True, help="where to write the regraded summary")
+    rg.add_argument("--cases", default=os.path.join(HERE, "cases"))
+    rg.add_argument("--controls", default=os.path.join(HERE, "controls"))
+    rg.add_argument("--repo-dir", action="append", default=[], metavar="OWNER/NAME=PATH")
     a = ap.parse_args(argv)
+    if a.cmd == "regrade":
+        with open(a.summary, encoding="utf-8") as handle:
+            old = json.load(handle)
+        dirs = repo_dirs(a.repo_dir)
+        s = regrade(old, current_items(os.path.abspath(a.cases), os.path.abspath(a.controls), dirs), dirs)
+        write_json(a.out, s)
+        print("regraded %s: recall %s (%d/%d), grader %d -> %s" % (
+            a.summary, pct(s["recall"]), s["golden_hit"], s["golden_total"], GRADER, a.out))
+        return 0
     work = os.path.abspath(a.work)
     if a.cmd == "prepare":
         if not re.fullmatch(ms.SAFE_NAME, a.model):
