@@ -62,9 +62,10 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
   way: `github-stack-merge` only lands real stacks. Use a stack of several
   branches only when the pull requests depend on one another.
 
-  The trunk is the remote's default branch: the last path component of
-  `git symbolic-ref --short refs/remotes/origin/HEAD`, or ask the user if
-  that fails.
+  The trunk is the remote's default branch: the output of
+  `git symbolic-ref --short refs/remotes/origin/HEAD` with only the leading
+  `origin/` removed (the name may contain slashes), or ask the user if that
+  fails.
 
   If the current branch is the trunk, choose a branch name from the change
   (`<type>/<short-slug>`) and create the branch with:
