@@ -13,6 +13,47 @@ and this project adheres to
 
 ---
 
+## [2.1.36] - 2026-11-17
+
+### Added
+
+- **github-workflow 0.5.0** — `/github-stack:merge-single` merges an ordinary,
+  unstacked pull request. It takes a pull request number and an explicit merge
+  method, refuses a draft, a closed pull request and one GitHub reports as part
+  of a stack, and merges only the head commit that was confirmed.
+  `/github-stack:merge` now points an ordinary pull request to it (CLAUDE-347,
+  #1841).
+
+### Changed
+
+- **github-workflow 0.5.0, yellow-core 2.17.0** — GitHub-native stacked pull
+  requests are now the recommended stack provider, and the integration targets
+  `gh-stack` 0.3.0. github-workflow drops the `--remote` flag gh-stack rejects,
+  adopts existing branches bottom to top with `init`, adds a `push` operation,
+  accepts a pull request URL in `merge`, and reports a retargeted base as
+  `BASE_CHANGE_UNCONFIRMED` instead of success. The amend skill rebases the
+  branches above before re-submitting, and the merge preview lists every pull
+  request that will land. In yellow-core, the tooling probe reports `gh-stack`
+  older than 0.3.0 or Git older than 2.36 as not ready, `UNSELECTED` recommends
+  `/stack:select github` without selecting it, and `/setup:all` reports an
+  outdated extension. Adds `docs/stacked-prs-native-migration.md` (CLAUDE-343,
+  #1819).
+
+### Fixed
+
+- **yellow-core 2.17.0, yellow-ruvector 2.0.6** — Works with the uutils
+  coreutils on Ubuntu 26.04. The `/setup:all` ruvector probe no longer stalls
+  when `timeout` kills only its direct child, the compound-staging Stop capture
+  and the Jev pre-filter cap transcript bytes without `tail -c` on a pipe, and
+  the ruvector co-edit session and store locks stay exclusive when `mkdir`
+  reports success to two racing callers (CLAUDE-346, #1832).
+
+- **yellow-review 3.18.2** — Documents the `Skill(yellow-review:review:*)` allow
+  rule that `/loop`, scheduled tasks and `claude -p` runs of `/review:sweep` and
+  the other review commands need from Claude Code 2.1.325 (CLAUDE-339, #1814).
+
+---
+
 ## [2.1.35] - 2026-11-16
 
 ### Changed
