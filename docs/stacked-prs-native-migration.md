@@ -33,20 +33,44 @@ repository with a local bare remote, through
 - `submit`, `merge` and `link` failing cleanly (`API_FAILURE`) when the remote
   is not GitHub
 
+**Verified live on 2026-11-17** with throwaway `pilot/*` branches in this
+repository, from a workstation clone with `gh-stack` v0.3.0 (pull requests #1822
+to #1824 as stack #1825, and #1827 and #1828 as stack #1829):
+
+- `init` adopting three existing branches, then `submit`: three draft pull
+  requests, each based on the branch below it, linked as one stack. The REST
+  pull request object carries a `stack` field (`number`, `position`, `size`,
+  `base`); an ordinary pull request has no such field
+- amending the bottom layer, `rebase --mode upstack` stopping on a real conflict
+  (`CONFLICT`), `submit` refused while paused (`REBASE_ACTIVE`), resolve plus
+  `rebase --mode continue`, then `submit` force-pushing the rebased branches
+  with numbers, bases and the stack unchanged
+- adoption: two ordinary draft pull requests opened with `gh pr create`, then
+  `init` of their branches and `sync`. GitHub created a stack from them without
+  recreating anything; numbers, bases, draft state and commits were unchanged,
+  and `sync` opened no pull request
+- from a Claude Code cloud session `submit` cannot work: `gh-stack` uses
+  GitHub's GraphQL API, which those sessions block. It pushed the branches,
+  opened nothing and exited 0, which the adapter now reports as `INCOMPLETE`
+- `init` on a detached HEAD creates the branch and then fails with exit 2
+
+The submit, rebase and adoption runs used the adapter as of commit e8b9cba,
+before the `INCOMPLETE` status and the pull request URL check were added.
+
 **Not verified — needs a live GitHub repository:**
 
-- `submit` opening pull requests, their base branches, and the stack object
-  appearing on GitHub
 - `merge`, partial-stack merge, and what `sync` does afterwards
-- linking pull requests that Graphite opened into a GitHub stack (adoption)
+- adoption of pull requests that Graphite opened (the live adoption used plain
+  `gh` pull requests)
+- that `gh stack merge` refuses an ordinary, unstacked pull request (read from
+  the v0.3.0 source, `cmd/merge.go`, not run)
 - merge-queue behavior for a stack
 - whether a server-side "Rebase stack" produces signed commits
 - how `gh pr merge` and the REST merge endpoint behave on a stacked pull request
 
-No live stack lifecycle has been run from this repository, and no machine has
-GitHub selected as its provider yet. The pilot in the checklist closes that gap.
-Until then, statements about those items below come from GitHub's documentation
-and are marked "documented".
+No complete live lifecycle (through merge) has been run yet, and no machine has
+GitHub selected as its provider. Statements about the unverified items below
+come from GitHub's documentation and are marked "documented".
 
 ## Versions
 
@@ -95,7 +119,10 @@ It never selects it for you, and it never moves an enabled Graphite setup.
 
 **An independent change is an ordinary pull request.** `/github-stack:submit`
 registers the branch as a one-branch stack on the trunk and opens one draft pull
-request. GitHub forms a stack only when two pull requests exist (documented).
+request. GitHub forms a stack only when two pull requests exist. Such a pull
+request lands through the repository's normal merge flow: `gh stack merge`
+accepts only a stack or a stacked pull request, so `/github-stack:merge` stops
+on it instead of merging.
 
 **Stack only when pull requests depend on one another.**
 
@@ -106,7 +133,7 @@ request. GitHub forms a stack only when two pull requests exist (documented).
 | See the stack                             | `/github-stack:plan`                                                                                             |
 | Change a lower layer                      | check it out with `/github-stack:nav`, then `/github-stack:amend` (amends, rebases the layers above, re-submits) |
 | Catch up with the trunk, or after a merge | `/github-stack:sync`                                                                                             |
-| Land                                      | `/github-stack:merge`                                                                                            |
+| Land a stack of two or more               | `/github-stack:merge`                                                                                            |
 | Stop tracking                             | `/github-stack:cleanup`                                                                                          |
 
 Things that differ from Graphite:
@@ -138,8 +165,8 @@ stack in two merge queues.
 Preferred: **finish it with Graphite.** Keep `gt-workflow` enabled, merge the
 stack (directly; see the queue note in the inventory), then switch.
 
-Alternative: **adopt it without closing pull requests.** Not verified live; try
-it on the pilot repository first.
+Alternative: **adopt it without closing pull requests.** Verified live with pull
+requests opened by plain `gh`, not yet with ones Graphite opened.
 
 1. In Graphite's stack, make sure every layer is restacked and pushed, and that
    nothing is in Graphite's merge queue.
@@ -255,13 +282,13 @@ Expiry of a plan is not the same as non-renewal being configured.
 - [ ] In Graphite's billing page, confirm the renewal setting yourself and note
       the date you checked. Do not infer it from this document.
 - [ ] `gh-stack` 0.3.0 or later in every environment that touches the clones
-      (WSL had 0.1.0 and Windows had none on 2026-11-17).
+      (WSL was upgraded from 0.1.0 to 0.3.0 during the pilot on 2026-11-17;
+      Windows had none).
 - [ ] `github-workflow` installed where work happens (it was not installed on
       the workstation on 2026-11-17).
-- [ ] Pilot on a throwaway GitHub repository: submit a three-layer stack, amend
-      the bottom layer, sync, merge the bottom two, sync again, adopt two
-      existing pull requests, clean up. Record results in the "not verified"
-      list above.
+- [ ] Pilot with throwaway `pilot/*` branches. Done on 2026-11-17: submit a
+      three-layer stack, amend the bottom layer, restack, adopt two existing
+      pull requests. Still open: merge the bottom two, sync again, clean up.
 - [ ] `/stack:select github` on each machine, `/stack:status` shows
       `READY_GITHUB`.
 - [ ] No open Graphite stacks in any repository in the inventory, and nothing in

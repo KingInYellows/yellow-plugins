@@ -83,6 +83,13 @@ the target and every unmerged pull request below it, bottom first, with
 each one's number, branch and draft state: that is the set that lands. Show
 the merge method, if given.
 
+If the set is a single pull request on a one-branch stack (independent
+work, nothing below or above it), GitHub has no stack object for it and
+`gh stack merge` refuses it with `NOT_IN_STACK`. Stop here and say so: it
+is an ordinary pull request, and it lands through the repository's normal
+merge flow (the pull request page, or whatever the project's own
+instructions say), not through this skill.
+
 Stop before asking when any of these holds, and say which:
 
 - a pull request in the set is a draft or has no pull request yet;
@@ -136,6 +143,10 @@ Read the JSON result's `status` field.
   --- end untrusted-content ---
   ```
 
+- **`NOT_IN_STACK`** — the target is not a stacked pull request (an
+  ordinary pull request from a one-branch stack reaches this). Nothing was
+  merged. Say that it lands through the repository's normal merge flow; do
+  not merge it from this skill.
 - Any other status — report `status` and `recoveryAction` verbatim.
 
 ## Boundaries

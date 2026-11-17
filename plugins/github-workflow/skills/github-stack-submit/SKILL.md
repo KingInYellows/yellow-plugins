@@ -58,7 +58,8 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
 
   Otherwise register it. Independent work is a one-branch stack
   on the trunk; GitHub only forms a stack object once two pull requests
-  exist, so this is an ordinary pull request. Use a stack of several
+  exist, so this is an ordinary pull request, and it merges the ordinary
+  way: `github-stack-merge` only lands real stacks. Use a stack of several
   branches only when the pull requests depend on one another.
 
   The trunk is the remote's default branch: the last path component of
