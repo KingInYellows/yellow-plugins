@@ -23,3 +23,13 @@ yellow_morph_acquire_install_lock 1 2>/dev/null
 printf 'uutils_lock_again=%s\n' "$?"
 unset -f mkdir
 yellow_morph_release_install_lock
+# An empty pid is an owner between its exclusive create and its write: a
+# waiter that sees it once does not reclaim it, and only one that still sees
+# it a second later does.
+mkdir "$CLAUDE_PLUGIN_DATA/.install.lock"
+: >| "$CLAUDE_PLUGIN_DATA/.install.lock/pid"
+yellow_morph_acquire_install_lock 1 2>/dev/null
+printf 'empty_pid_once=%s held=%s\n' "$?" "$([ -d "$CLAUDE_PLUGIN_DATA/.install.lock" ] && printf yes || printf no)"
+yellow_morph_acquire_install_lock 3 2>/dev/null
+printf 'empty_pid_stale=%s\n' "$?"
+yellow_morph_release_install_lock

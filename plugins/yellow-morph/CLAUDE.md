@@ -109,10 +109,11 @@ do not apply.
   (`hooks/scripts/prewarm-morph.sh`), and `/morph:setup`.
 - Install lock: `${CLAUDE_PLUGIN_DATA}/.install.lock` (`mkdir`, held by whoever
   creates its `pid` file exclusively, since uutils `mkdir` is not exclusive
-  under a race; stale-PID recovery). The wrapper waits 20s, then fails and tells
-  the user to `rm -rf` it — the most likely cause of "morph MCP won't start".
-  The lock is released explicitly before `exec` because bash EXIT traps do not
-  survive exec.
+  under a race; stale-PID recovery, where an empty or invalid `pid` counts as
+  stale only when it is unchanged a second later). The wrapper waits 20s, then
+  fails and tells the user to `rm -rf` it — the most likely cause of "morph MCP
+  won't start". The lock is released explicitly before `exec` because bash EXIT
+  traps do not survive exec.
 - SessionStart contract: manifest `timeout: 5`; every code path must print
   `{"continue": true}` or session startup blocks. Hook config lives in
   `catalog/plugins/yellow-morph.json` and is generated into `plugin.json` by

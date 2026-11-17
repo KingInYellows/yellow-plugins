@@ -100,7 +100,7 @@ yellow_morph_needs_install() {
 yellow_morph_acquire_install_lock() {
   local max_attempts="${1:-20}"
   local lock_dir="${CLAUDE_PLUGIN_DATA}/.install.lock"
-  local stale_recovered=0
+  local stale_recovered=0 prev_invalid="unset" seen=""
   local i
 
   for ((i=1; i<=max_attempts; i++)); do
@@ -135,6 +135,16 @@ yellow_morph_acquire_install_lock() {
           # installer runs (Docker, K8s init), the installer process itself
           # may legitimately be PID 1, and clearing its lock would create
           # a concurrency hazard (codex P2 #532).
+          # A new owner's pid file is empty between its exclusive create
+          # and its write, so an invalid value is only stale when it is
+          # still the same, on the same lock directory (inode), on the next
+          # attempt a second later.
+          seen="${owner_pid}@$(command ls -di "$lock_dir" 2>/dev/null)"
+          if [ "$seen" != "$prev_invalid" ]; then
+            prev_invalid="$seen"
+            sleep 1
+            continue
+          fi
           printf 'yellow-morph: lock pid file missing or invalid (got %q); clearing stale lock\n' "$owner_pid" >&2
           rm -f "${lock_dir}/pid" 2>/dev/null
           rmdir "$lock_dir" 2>/dev/null

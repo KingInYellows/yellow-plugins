@@ -16,8 +16,10 @@ Keep the remaining directory locks exclusive on Ubuntu 26.04, whose uutils
   MiB, and still probes when `TMPDIR` is unusable.
 - yellow-morph and yellow-ruvector: the install locks, the ruvector model lock
   and its reclaim markers are claimed by an exclusive create of their `pid` or
-  `.owner` file. The morph timeout hint now says `rm -rf`, since a held lock
-  always contains its `pid` file.
+  `.owner` file. A waiter reclaims a morph lock with an empty or invalid `pid`
+  only when it is unchanged a second later, so an owner between its create and
+  its write keeps the lock. The morph timeout hint now says `rm -rf`, since a
+  held lock always contains its `pid` file.
 - yellow-ruvector co-edit locks: a lock whose `.owner` could not be created is
   removed at once, and an expired reclaim marker is renamed aside whole.
 - yellow-review: the ignored-file guard skips the empty `.owner` files of
