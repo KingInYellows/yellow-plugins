@@ -28,6 +28,7 @@ import argparse
 import collections
 import concurrent.futures
 import csv
+import fnmatch
 import glob
 import hashlib
 import json
@@ -212,6 +213,17 @@ def case_context(c):
     return "\n".join(lines).strip() + "\n"
 
 
+def symlink_on_path(wt, path):
+    """The first component of path under wt that is a symlink, or None. The
+    commit may hold symlinks; a write must never follow one out of the tree."""
+    cur = wt
+    for part in path.split("/"):
+        cur = os.path.join(cur, part)
+        if os.path.islink(cur):
+            return os.path.relpath(cur, wt)
+    return None
+
+
 def case_tree(wt, commit, c, overlay=()):
     """A per-run tree at commit with the agent's `overlay` files copied from the
     checkout (the version under test), then the case's `files` written and, with
@@ -219,18 +231,16 @@ def case_tree(wt, commit, c, overlay=()):
     fresh_worktree(wt, commit)
     for path in overlay:
         dest = os.path.join(wt, path)
-        if os.path.islink(dest):
-            sys.exit("overlay %s is a symlink in the case tree" % path)
+        through = symlink_on_path(wt, path)
+        if through:
+            sys.exit("overlay %s goes through symlink %s in the case tree" % (path, through))
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         shutil.copyfile(os.path.join(REPO, path), dest)
     for path, text in c.get("files", {}).items():
-        # The commit may hold symlinks; never follow one out of the tree.
-        cur = wt
-        for part in path.split("/"):
-            cur = os.path.join(cur, part)
-            if os.path.islink(cur):
-                sys.exit("case %s: file path %s goes through symlink %s"
-                         % (c.get("id"), path, os.path.relpath(cur, wt)))
+        through = symlink_on_path(wt, path)
+        if through:
+            sys.exit("case %s: file path %s goes through symlink %s"
+                     % (c.get("id"), path, through))
         os.makedirs(os.path.dirname(os.path.join(wt, path)) or wt, exist_ok=True)
         with open(os.path.join(wt, path), "w", encoding="utf-8") as handle:
             handle.write(text)
@@ -258,33 +268,42 @@ def run_env(agent, rid, wt):
 
 
 def changed_files(wt):
-    """Absolute paths of files the run added or modified (untracked included)."""
+    """Absolute paths the run touched, as (added or modified, removed). Untracked
+    files count as added; a rename's source path counts as removed."""
     out = subprocess.run(["git", "status", "--porcelain", "-z", "--untracked-files=all"], cwd=wt,
                          capture_output=True, text=True, check=True).stdout
-    paths = set()
+    paths, removed = set(), set()
     entries = iter(out.split("\0"))
     for entry in entries:
         if len(entry) < 4:
             continue
         if entry[0] in "RC":
-            next(entries, None)  # -z puts a rename's source path in its own field
-        if "D" not in entry[:2]:
+            source = next(entries, None)  # -z puts a rename's source path in its own field
+            if entry[0] == "R" and source:
+                removed.add(os.path.join(wt, source))
+        if "D" in entry[:2]:
+            removed.add(os.path.join(wt, entry[3:]))
+        else:
             paths.add(os.path.join(wt, entry[3:]))
-    return paths
+    return paths, removed
 
 
 def files_pass(expect, wt, content_only=False):
     """The case's `files` checks (glob, optional exact count, regexes over the
     matched files' text) and `no_files` globs, against a run's tree. A check
     with `changed` only counts files the run added or modified, so `count: 0`
-    asserts a file was left alone. content_only (the offline check) skips
+    asserts a file was left alone (removing a matched file fails the check). content_only (the offline check) skips
     `changed` and the counts and judges only the regexes."""
     changed = None
     for check in expect.get("files", []):
         found = sorted(glob.glob(os.path.join(wt, check["glob"])))
         if check.get("changed") and not content_only:
             if changed is None:
-                changed = changed_files(wt)
+                changed, removed = changed_files(wt)
+            # Removing a matched file is never the expected change, and it
+            # would otherwise slip past `count: 0`.
+            if any(fnmatch.fnmatch(os.path.relpath(f, wt), check["glob"]) for f in removed):
+                return False
             found = [f for f in found if f in changed]
         if not content_only and (len(found) != check.get("count", len(found))
                                  or (not found and check.get("count") != 0)):

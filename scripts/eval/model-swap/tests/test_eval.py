@@ -70,10 +70,29 @@ class FilesPassTest(unittest.TestCase):
         self.assertTrue(harness.files_pass(fixed, self.wt, content_only=True))
         self.assertTrue(harness.files_pass(fixed, self.wt))
 
-    def test_a_deleted_file_is_not_a_changed_match(self):
-        oos = {"files": [{"glob": "docs/*.md", "changed": True, "count": 0}]}
+    def test_deleting_a_left_alone_file_fails(self):
+        oos = {"files": [{"glob": "docs/security.md", "changed": True, "count": 0}]}
         os.remove(os.path.join(self.wt, "docs/security.md"))
+        self.assertFalse(harness.files_pass(oos, self.wt))
+
+    def test_renaming_a_left_alone_file_away_fails(self):
+        oos = {"files": [{"glob": "docs/*.md", "changed": True, "count": 0}]}
+        sh("git", "mv", "docs/security.md", "security.txt", cwd=self.wt)
+        self.assertFalse(harness.files_pass(oos, self.wt))
+
+    def test_deleting_an_unrelated_file_does_not_fail(self):
+        oos = {"files": [{"glob": "docs/security.md", "changed": True, "count": 0}]}
+        os.remove(os.path.join(self.wt, "lib/a.sh"))
         self.assertTrue(harness.files_pass(oos, self.wt))
+
+
+class SymlinkOnPathTest(unittest.TestCase):
+    def test_finds_a_symlinked_parent_directory(self):
+        with tempfile.TemporaryDirectory() as wt, tempfile.TemporaryDirectory() as outside:
+            os.symlink(outside, os.path.join(wt, "references"))
+            os.makedirs(os.path.join(wt, "plugins", "x"))
+            self.assertEqual(harness.symlink_on_path(wt, "references/contract.md"), "references")
+            self.assertIsNone(harness.symlink_on_path(wt, "plugins/x/contract.md"))
 
 
 class AgentToolsTest(unittest.TestCase):
