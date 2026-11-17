@@ -20,8 +20,8 @@
  *     repository-relative, and flags/merge-methods against a fixed enum.
  *     A validation failure returns an INVALID_ARGS result; it never
  *     "escapes" the value and proceeds.
- *   - `gh stack view --json` is the only read path used — never bare
- *     `view`. `submit` always passes `--auto`; `--open` is added only
+ *   - `gh stack view --json` is the only stack read path used — never
+ *     bare `view`. `submit` always passes `--auto`; `--open` is added only
  *     when the caller explicitly requests it. `checkout`/`init`/`add`
  *     always receive an explicit target/branch argument — this runtime
  *     never lets the underlying CLI fall through to its interactive
@@ -31,8 +31,12 @@
  *     then rewrite the branches to match it. `modify` and `switch` are NEVER invoked — both are
  *     TUI-only per the Phase 0 source read; there is no non-interactive
  *     path this runtime could use even if it wanted to. `gh pr merge` is
- *     never invoked for a stack — `merge()` below is the only merge path.
- *   - Destructive operations (`unstack`, `sync --prune`, `merge`, and
+ *     never invoked — `merge()` below is the only merge path for a stack.
+ *     `mergeSingle()` is the separate path for an ordinary pull request:
+ *     it reads the pull request with `gh api`, refuses one in a stack, and
+ *     lands it with the REST merge call.
+ *   - Destructive operations (`unstack`, `sync --prune`, `merge`,
+ *     `merge-single`, and
  *     `--accept-base-change` on `sync`/`rebase`) require the caller to pass
  *     `confirm: true` explicitly; without it they return a
  *     REQUIRES_CONFIRMATION result and run nothing.
@@ -53,7 +57,7 @@
  *   node github-stack-runtime.js <op> [--flag value ...] [--confirm] [--json-args <path|->]
  *
  * Operations: view, init, add, checkout, rebase, sync, push, submit, merge,
- * unstack. Argument shapes are verified against gh-stack v0.3.0 (the
+ * merge-single, unstack. Argument shapes are verified against gh-stack v0.3.0 (the
  * `TESTED_GH_STACK_VERSION` yellow-core's stack-tooling-probe.js reports).
  * Output is a single JSON result object on stdout. Exit code is always 0
  * for a completed probe/operation attempt (the result's own `status` field
@@ -105,6 +109,14 @@ const EXIT_STATUS = Object.freeze({
 
 const MERGE_METHODS = Object.freeze(['merge', 'squash', 'rebase']);
 const SHA_RE = /^[0-9a-f]{40}$/;
+/**
+ * `mergeable_state` values under which `merge-single` will merge. `unstable`
+ * is mergeable with a failing check that is not required. Everything else
+ * (`blocked`, `behind`, `dirty`, `draft`, `unknown`) is refused: the REST
+ * merge call lets a repository admin through branch protection, so the
+ * adapter must not rely on GitHub refusing the call.
+ */
+const MERGEABLE_STATES = Object.freeze(['clean', 'has_hooks', 'unstable']);
 
 // ---------------------------------------------------------------------------
 // Execution primitive
@@ -799,6 +811,12 @@ function readOrdinaryPullRequest(op, target) {
     // example a stack that another provider manages and GitHub does not
     // report. Landing it would merge it into that branch, not the trunk.
     reason = `${where} targets "${found.baseRef}", not the default branch "${defaultBranch}"; it depends on another branch, so it is not an independent pull request`;
+  } else if (!MERGEABLE_STATES.includes(pr.mergeable_state)) {
+    const state = text(pr.mergeable_state) || 'missing';
+    reason =
+      state === 'unknown' || state === 'missing'
+        ? `GitHub has not worked out yet whether ${where} can be merged (state "${state}"); run again in a moment`
+        : `GitHub reports ${where} as "${state}", not ready to merge: a required check, review, update or the merge queue is outstanding. This operation does not override that`;
   }
   return reason ? { result: refusalResult(op, reason) } : { pullRequest: found };
 }
@@ -811,8 +829,9 @@ function readOrdinaryPullRequest(op, target) {
  *
  * - `target` is a pull request number only, and `mergeMethod` is required;
  * - the pull request is read from GitHub first and refused when it is not
- *   open, is a draft, carries a `stack` object, or is based on a branch
- *   other than the repository's default branch;
+ *   open, is a draft, carries a `stack` object, is based on a branch
+ *   other than the repository's default branch, or is not reported as
+ *   mergeable;
  * - without `confirm: true` nothing is merged and the result reports the
  *   head commit and base branch that were read;
  * - with `confirm: true` the caller must pass both back as `headSha` and
@@ -821,8 +840,10 @@ function readOrdinaryPullRequest(op, target) {
  *
  * Both calls are `gh api` with the `{owner}/{repo}` placeholders, so the
  * check and the merge always address the same repository, whichever way
- * `gh` resolves it. The REST merge call applies branch protection as usual:
- * no admin override, no auto-merge, no branch deletion.
+ * `gh` resolves it. The REST merge call would let a repository admin
+ * through branch protection, so a pull request GitHub does not report as
+ * mergeable (`mergeable_state`) is refused before the call. No auto-merge,
+ * no branch deletion.
  */
 function mergeSingle({ target, mergeMethod, headSha, baseRef, confirm }) {
   const op = 'merge-single';
@@ -889,7 +910,14 @@ function mergeSingle({ target, mergeMethod, headSha, baseRef, confirm }) {
   }
   let statusOverride = 'API_FAILURE';
   if (execResult.code === 0) statusOverride = merged ? 'SUCCESS' : 'ERROR';
-  return shapeResult({ op, bin: 'gh', args, execResult, mayHaveMutated: true, statusOverride });
+  const result = shapeResult({ op, bin: 'gh', args, execResult, mayHaveMutated: true, statusOverride });
+  if (result.status === 'API_FAILURE' || result.status === 'ERROR') {
+    // The generic API_FAILURE text says to retry. A refused merge is not
+    // transient: the pull request has to change first.
+    result.recoveryAction =
+      'GitHub did not merge the pull request; its reason is in stdout (for example a required check, or a head that moved). Check on GitHub whether it merged before doing anything else, and do not retry unchanged.';
+  }
+  return result;
 }
 
 /**

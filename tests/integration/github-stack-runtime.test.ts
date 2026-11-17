@@ -435,6 +435,7 @@ describe('merge-single — one ordinary pull request, never a stacked one', () =
       state: 'open',
       draft: false,
       merged: false,
+      mergeable_state: 'clean',
       head: { sha: HEAD, ref: 'feat/x' },
       base: { ref: 'main', repo: { full_name: 'o/r', default_branch: 'main' } },
       ...overrides,
@@ -552,6 +553,19 @@ describe('merge-single — one ordinary pull request, never a stacked one', () =
     expect(calls().some((line) => line.includes('PUT'))).toBe(false);
   });
 
+  it('refuses a pull request GitHub does not report as mergeable, so an admin token cannot bypass protection', () => {
+    for (const state of ['blocked', 'behind', 'dirty', 'unknown', undefined]) {
+      process.env.FAKE_GH_GET_STDOUT = pullRequest({ mergeable_state: state });
+      for (const confirm of [false, true]) {
+        const result = mergeSingle({ target: '42', mergeMethod: 'squash', headSha: HEAD, baseRef: 'main', confirm });
+        expect(result.status).toBe('INVALID_ARGS');
+      }
+    }
+    expect(calls().some((line) => line.includes('PUT'))).toBe(false);
+    process.env.FAKE_GH_GET_STDOUT = pullRequest({ mergeable_state: 'unstable' });
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash', headSha: HEAD, baseRef: 'main', confirm: true }).status).toBe('SUCCESS');
+  });
+
   it('refuses when the base branch changed after it was shown, with the same head', () => {
     const result = mergeSingle({ target: '42', mergeMethod: 'squash', headSha: HEAD, baseRef: 'release', confirm: true });
     expect(result.status).toBe('INVALID_ARGS');
@@ -576,7 +590,9 @@ describe('merge-single — one ordinary pull request, never a stacked one', () =
   it('a refused merge call is API_FAILURE, and exit 0 without merged: true is not SUCCESS', () => {
     process.env.FAKE_GH_PUT_EXIT = '1';
     process.env.FAKE_GH_PUT_STDOUT = '{"message":"Required status check is expected."}';
-    expect(mergeSingle({ target: '42', mergeMethod: 'squash', headSha: HEAD, baseRef: 'main', confirm: true }).status).toBe('API_FAILURE');
+    const refused = mergeSingle({ target: '42', mergeMethod: 'squash', headSha: HEAD, baseRef: 'main', confirm: true });
+    expect(refused.status).toBe('API_FAILURE');
+    expect(refused.recoveryAction).toContain('do not retry unchanged');
     process.env.FAKE_GH_PUT_EXIT = '0';
     process.env.FAKE_GH_PUT_STDOUT = '{"merged":false}';
     expect(mergeSingle({ target: '42', mergeMethod: 'squash', headSha: HEAD, baseRef: 'main', confirm: true }).status).toBe('ERROR');

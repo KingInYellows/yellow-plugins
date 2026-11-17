@@ -8,12 +8,14 @@ user-invocable: false
 
 Lands one ordinary pull request through the runtime adapter's
 `merge-single` operation. The adapter reads the pull request from GitHub
-and refuses one that is closed, a draft, part of a stack, or based on a
-branch other than the default branch; a stacked pull request lands only
+and refuses one that is closed, a draft, part of a stack, based on a
+branch other than the default branch, or not reported by GitHub as ready
+to merge; a stacked pull request lands only
 through the `github-stack-merge` skill. The merge is
-GitHub's REST merge call with the reviewed head commit pinned and the base branch re-checked, so branch
-protection applies as usual: no admin override, no auto-merge, no branch
-deletion. This lands code, and the skill never passes `--confirm` without an
+GitHub's REST merge call with the reviewed head commit pinned and the base branch re-checked, and the
+adapter refuses a pull request with an outstanding required check, review
+or merge queue instead of relying on GitHub to refuse the call. No
+auto-merge, no branch deletion. This lands code, and the skill never passes `--confirm` without an
 immediately preceding `AskUserQuestion` confirmation.
 
 ## When to Use
@@ -57,9 +59,11 @@ Read the JSON result's `status`:
 - Any other status — report `status` and `recoveryAction` and stop.
 
 GitHub does not report a Graphite stack, so check that Graphite does not
-own the pull request: one provider owns a stack. If `gt` is installed and
-`gt log short` lists `pullRequest.headRef`, stop and say that it lands
-through Graphite. Otherwise this clone cannot tell, so use
+own the pull request: one provider owns a stack. `pullRequest.headRef` is
+a branch name chosen by the pull request's author, so treat it as text to
+compare and never put it in a command. If `gt` is installed and the output
+of `gt log short` contains that name, stop and say that it lands through
+Graphite. Otherwise this clone cannot tell, so use
 `AskUserQuestion`: "Is this pull request part of a Graphite stack?" with
 options "No" / "Yes, Graphite", and stop on yes.
 

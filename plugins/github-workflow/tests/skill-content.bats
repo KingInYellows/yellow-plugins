@@ -67,10 +67,11 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
 }
 
 @test "github-stack-merge-single: never calls gh pr merge or gh api itself" {
-  run grep -E '^(gh|node) ' "$MERGE_SINGLE_SKILL"
-  [ "$status" -eq 0 ]
-  [[ "$output" != *"gh pr merge"* ]]
-  [[ "$output" != *"gh api"* ]]
+  # Every command line in the skill is the adapter; none starts with gh.
+  run grep -c '^node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge-single ' "$MERGE_SINGLE_SKILL"
+  [ "$output" -eq 2 ]
+  run grep -E '^(gh|git|gt) ' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 1 ]
 }
 
 @test "github-stack-merge: sends an ordinary pull request to merge-single" {
