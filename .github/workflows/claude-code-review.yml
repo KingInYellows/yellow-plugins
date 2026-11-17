@@ -57,20 +57,21 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           mkdir -p "$HOME/.claude/commands"
-          # A project command or skill in the PR checkout could shadow the user
-          # command installed below (a skill can take the name through its
-          # folder or its name: field), so drop both directories. The review
-          # needs neither.
-          rm -rf .claude/commands .claude/skills
+          # The review step loads user settings only (--setting-sources user),
+          # so the PR's .claude/ and CLAUDE.md files do not load. Dropping these
+          # directories as well keeps a PR command or skill from shadowing the
+          # user command installed below if that flag is ever removed.
+          rm -rf .claude/commands .claude/skills .claude/agents
+          err="$RUNNER_TEMP/fetch.err"
           url="repos/$REPO/contents/.github/claude-code-review/code-review.md?ref=$DEFAULT_BRANCH"
           if ! gh api -H 'Accept: application/vnd.github.raw+json' "$url" \
-              > "$HOME/.claude/commands/ci-code-review.md" 2> fetch.err; then
-            if grep -q 'HTTP 404' fetch.err; then
+              > "$HOME/.claude/commands/ci-code-review.md" 2> "$err"; then
+            if grep -q 'HTTP 404' "$err"; then
               echo "::notice::review command is not on the default branch yet; skipping"
               echo "run=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            cat fetch.err >&2
+            cat "$err" >&2
             echo "::error::could not fetch the review command"
             exit 1
           fi
@@ -134,8 +135,12 @@ jobs:
           # when that tool is listed here, and the command posts findings with
           # it. No gh api rule: earlier inline comments come from the gate
           # step's file, so the agent cannot call the API.
+          # --setting-sources user: the PR's .claude/settings.json (hooks,
+          # permissions), commands, skills, agents and CLAUDE.md files do not
+          # load (CLAUDE-350). The command reads CLAUDE.md files itself.
           claude_args: >-
             --model claude-sonnet-5-5
+            --setting-sources user
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options

@@ -388,19 +388,22 @@ vendored code-review command (CLAUDE-248). Its boundary:
   (`.github/claude-code-review/code-review.md`) and installed under
   `~/.claude/commands/`, so a PR cannot edit the command file. The gate step
   deletes `.claude-code-review/` before writing it, so a committed symlink there
-  cannot redirect the write, and deletes `.claude/commands/` and
-  `.claude/skills/` in the PR checkout so a project command or skill cannot
-  shadow the installed one.
-- **Known gap**: the action runs in the PR checkout with all setting sources, so
-  the PR's own `CLAUDE.md` files and `.claude/settings.json` (including its
-  hooks) load. Same-repository branches only; tracked in CLAUDE-350.
+  cannot redirect the write. The fetch's stderr goes to `$RUNNER_TEMP`, not the
+  checkout.
+- **PR configuration does not load**: the action runs with
+  `--setting-sources user` (CLAUDE-350), so the PR's `.claude/settings.json`
+  (hooks, permissions, including the SessionStart hook), its project commands,
+  skills and agents, and its `CLAUDE.md` files are not loaded. The command's
+  compliance agents read `CLAUDE.md` files as reference data instead. The gate
+  also deletes `.claude/commands/`, `.claude/skills/` and `.claude/agents/` from
+  the checkout as a second guard.
 - **Agent tools**: `--allowedTools` pre-approves the inline-comment MCP tool and
   `gh pr comment`, `gh pr diff` and `gh pr view`. It does not restrict the tool
   set (the workflow passes no `--tools`), and the command's frontmatter also
   grants `Agent`, `Read`, `gh issue view`, `gh issue list`, `gh search` and
-  `gh pr list`, all read-only. Neither grants `gh api`, though the PR's
-  `.claude/settings.json` could add permissions until CLAUDE-350 lands. The gate
-  step, which runs no model, writes `claude[bot]`'s earlier inline comments to
+  `gh pr list`, all read-only. Neither grants `gh api`, and project settings
+  cannot add permissions because they do not load. The gate step, which runs no
+  model, writes `claude[bot]`'s earlier inline comments to
   `.claude-code-review/prior-inline-comments.jsonl`, and the command treats
   their bodies as reference data.
 - **Skip marker**: the gate skips a run only when a `claude[bot]` comment that

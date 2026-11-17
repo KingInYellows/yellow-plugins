@@ -38,8 +38,9 @@ counts, whatever commit it reviewed and whether the run that posted it finished.
   `.github/claude-code-review/code-review.md`, with that one check removed.
 - The copy is fetched from the default branch with `gh api` and written to
   `~/.claude/commands/`, so a PR cannot edit its own review prompt. The action
-  loads user, project and local setting sources by default, so user commands are
-  found.
+  runs with `--setting-sources user`, so user commands are found and the PR's
+  `.claude/` settings, hooks, commands, skills, agents and `CLAUDE.md` files do
+  not load (CLAUDE-350).
 - The command always posts its summary comment last: it starts with
   `## Code review` and ends with `<!-- claude-code-review head=<sha> -->`. A
   shell step before the action skips the run only when such a `claude[bot]`
