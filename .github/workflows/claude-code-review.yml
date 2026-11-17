@@ -37,18 +37,56 @@ jobs:
         with:
           fetch-depth: 1
 
+      # The review command is a local copy of the upstream code-review plugin
+      # command (.github/claude-code-review/code-review.md; CLAUDE-248).
+      # Upstream stops once Claude has commented on a PR at all, so later
+      # pushes were never reviewed. The copy is read from the default branch,
+      # so a PR cannot change its own review, and installed as a user command.
+      # A run is skipped only when a claude[bot] summary comment already
+      # carries this exact head SHA. The command posts that comment last, so
+      # a run cancelled partway through is reviewed again on the next event.
+      - name: Install review command and check for a completed review
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          mkdir -p "$HOME/.claude/commands"
+          if ! gh api -H 'Accept: application/vnd.github.raw+json' \
+              "repos/$REPO/contents/.github/claude-code-review/code-review.md?ref=$DEFAULT_BRANCH" \
+              > "$HOME/.claude/commands/ci-code-review.md"; then
+            echo "::notice::review command is not on the default branch yet; skipping"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          marker="<!-- claude-code-review head=$HEAD_SHA -->"
+          # Read all bodies first: grep -q in a pipe can SIGPIPE gh under
+          # pipefail and turn a match into a miss.
+          bodies=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --jq '.[] | select(.user.login == "claude[bot]") | .body')
+          if grep -qF -- "$marker" <<< "$bodies"; then
+            echo "::notice::head $HEAD_SHA already has a completed Claude review; skipping"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run Claude Code Review
         id: claude-review
+        if: steps.gate.outputs.run == 'true'
         # Third-party action with write scopes: pin to a commit, not the
         # mutable v1 tag.
         uses: anthropics/claude-code-action@6fed3ca145920b639991cb756090506e1bcaf515 # v1.0.245
-        # --model below pins only the parent session. The code-review plugin
+        # --model below pins only the parent session. The review command
         # launches its own haiku, sonnet and opus subagents by family alias, so
         # pin what each alias resolves to. The action forwards exactly these
         # three variables to the Claude CLI. v1.0.245 installs Claude Code
         # 2.1.293, the first release that knows all three 5.5 IDs. Do not use
         # CLAUDE_CODE_SUBAGENT_MODEL: it would put every subagent on one model
-        # and collapse the plugin's tiering.
+        # and collapse the command's tiering.
         env:
           ANTHROPIC_DEFAULT_OPUS_MODEL: claude-opus-5-5
           ANTHROPIC_DEFAULT_SONNET_MODEL: claude-sonnet-5-5
@@ -58,13 +96,11 @@ jobs:
           # Cloud agents (cursor[bot]) push PR branches; allow that bot so review
           # runs on synchronize without a manual re-trigger.
           allowed_bots: 'cursor,graphite-app'
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
-          # Without --comment the plugin prints its findings to the hidden job
-          # log and posts nothing.
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment'
+          # Without --comment the command prints its findings to the hidden job
+          # log and posts nothing. --head is the SHA its summary marker records.
+          prompt: '/ci-code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment --head ${{ github.event.pull_request.head.sha }}'
           # The action stops at the first result message. Claude Code starts
-          # subagents in the background, so the parent launched the plugin's
+          # subagents in the background, so the parent launched the command's
           # first Haiku agent, ended its turn, and the run finished before any
           # review agent ran (CLAUDE-230). Foreground subagents make the parent
           # wait for each one.
@@ -73,9 +109,11 @@ jobs:
           # alias moving to a new release) cannot shift the review onto a
           # pricier model and drain the subscription token's limits.
           # --allowedTools: the action starts its inline-comment MCP server only
-          # when that tool is listed here, and the plugin posts findings with it.
+          # when that tool is listed here, and the command posts findings with
+          # it. The gh api rule lets it list earlier inline comments of this PR
+          # only, so a re-review does not repeat them.
           claude_args: >-
             --model claude-sonnet-5-5
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments:*)"
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
