@@ -73,6 +73,12 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
   node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" init --base "<trunk>" --branch "<current-branch>"
   ```
 
+  Read the `init` result before going on. Continue to Step 2 only on
+  `status: "SUCCESS"`. The adapter exits 0 even when it refuses or fails, so
+  the shell status proves nothing; on any other status report `status` and
+  `recoveryAction` and stop before staging, or Step 4 would commit on the
+  trunk.
+
   A dependent layer on top of an existing stack is created by the
   adapter's `add` operation from that stack's top branch (`/flow:work`
   does this); this skill submits the branch it is on.
