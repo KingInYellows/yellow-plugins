@@ -248,10 +248,10 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
 
 ## Linear Linking
 
-Every branch and PR must reference a Linear issue in the `CLAUDE` team; the
-`linear-link` check (`.github/workflows/linear-link.yml`) fails the PR
-otherwise. Linear auto-creates an issue for a PR still unlinked at merge and
-guesses its team, which has misfiled work.
+Every branch and PR must reference a Linear issue in the `CLAUDE` team. The
+advisory `linear-link` check (`.github/workflows/linear-link.yml`) warns on a PR
+without one but does not block the merge. Linear auto-creates an issue for a PR
+still unlinked at merge and guesses its team, which has misfiled work.
 
 - Existing work: start the branch from Linear's "Copy git branch name", or put
   `Fixes CLAUDE-123` in the PR description (`Refs CLAUDE-123` for partial work).

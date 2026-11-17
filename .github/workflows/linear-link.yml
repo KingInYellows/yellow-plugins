@@ -1,11 +1,13 @@
 name: Linear Link
 
-# Every PR must reference a Linear issue in the CLAUDE team before it merges.
+# Advisory: every PR should reference a Linear issue in the CLAUDE team before
+# it merges. A missing reference adds a warning annotation and a job-summary
+# note; the job never fails, so it is safe to leave out of required checks.
 # Linear's "Automatically link or create issues on merge" setting only creates
 # an issue for a PR that is still unlinked at merge, and then it guesses the
 # team. A PR that names CLAUDE-<number> or CLAUDE-NEW is never guessed.
 #
-# Passes when any of these holds (word-boundary match):
+# Finds a link when any of these holds (word-boundary match):
 #   branch name     CLAUDE-<number>, claude-<number> (Linear's lowercase form)
 #                   or CLAUDE-NEW
 #   PR title / body CLAUDE-<number> or CLAUDE-NEW (case-sensitive; text
@@ -66,11 +68,11 @@ jobs:
           # The untrusted fields are never echoed, so they cannot emit
           # workflow commands.
           msg='This PR does not reference a Linear issue in the CLAUDE team.'
-          echo "::error title=Missing Linear issue::$msg Add 'Fixes CLAUDE-123' (or 'Refs CLAUDE-123' for partial work) to the PR description, or 'Fixes CLAUDE-NEW' if no issue exists yet. Saving the edited description re-runs this check."
+          echo "::warning title=Missing Linear issue::$msg Add 'Fixes CLAUDE-123' (or 'Refs CLAUDE-123' for partial work) to the PR description, or 'Fixes CLAUDE-NEW' if no issue exists yet. Saving the edited description re-runs this check. (Advisory only; this check does not block the merge.)"
           {
             echo "## Missing Linear issue"
             echo
-            echo "$msg Linear would otherwise create an issue at merge and guess its team."
+            echo "$msg Linear would otherwise create an issue at merge and guess its team. This check is advisory and does not block the merge."
             echo
             echo "Fix it in one of these ways, then save the PR description (this check re-runs on edit):"
             echo
@@ -80,4 +82,3 @@ jobs:
             echo
             echo "The key is case-sensitive: \`CLAUDE-123\`, not \`claude-123\`, in the title and description."
           } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
