@@ -11,7 +11,9 @@ name: Linear Link
 #   branch name     CLAUDE-<number>, claude-<number> (Linear's lowercase form)
 #                   or CLAUDE-NEW
 #   PR title / body CLAUDE-<number> or CLAUDE-NEW (case-sensitive; text
-#                   inside <!-- --> comments in the body does not count)
+#                   inside <!-- --> comments and "Ignore <ID>" references in
+#                   the body do not count)
+# The check is syntax-only: it does not ask Linear whether the issue exists.
 #
 # PR fields reach the script only through env, never through ${{ }} inside
 # run:, so a crafted title, body or branch name cannot inject shell. The job
@@ -50,15 +52,20 @@ jobs:
           # Word boundary = start/end of line or a non-[A-Za-z0-9_] character.
           upper='(^|[^A-Za-z0-9_])CLAUDE-([0-9]+|NEW)([^A-Za-z0-9_]|$)'
           lower='(^|[^A-Za-z0-9_])claude-[0-9]+([^A-Za-z0-9_]|$)'
+          # Here-strings and command substitution, not pipes into grep -q: with
+          # pipefail, a writer killed by SIGPIPE after an early grep match
+          # would turn a found link into a miss.
+          # Body cleanup: drop HTML comments (an unclosed one hides the rest of
+          # the rendered body) so the template's example never counts, and drop
+          # "Ignore <ID>" references, which tell Linear not to link.
+          body=$(printf '%s' "${PR_BODY:-}" \
+            | perl -0pe 's/<!--.*?(?:-->|\z)//gs; s/\bignore\b[:\s]*claude-(?:\d+|new)\b//gi')
           found=''
-          if printf '%s\n' "$PR_BRANCH" | grep -Eq -- "$upper|$lower"; then
+          if grep -Eq -- "$upper|$lower" <<<"$PR_BRANCH"; then
             found='branch name'
-          elif printf '%s\n' "$PR_TITLE" | grep -Eq -- "$upper"; then
+          elif grep -Eq -- "$upper" <<<"$PR_TITLE"; then
             found='PR title'
-          # HTML comments are dropped first, so the template's example
-          # reference in a comment never counts as a link.
-          elif printf '%s\n' "${PR_BODY:-}" | perl -0pe 's/<!--.*?-->//gs' \
-            | grep -Eq -- "$upper"; then
+          elif grep -Eq -- "$upper" <<<"$body"; then
             found='PR description'
           fi
           if [ -n "$found" ]; then
