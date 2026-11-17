@@ -8,9 +8,10 @@ user-invocable: false
 
 Lands one ordinary pull request through the runtime adapter's
 `merge-single` operation. The adapter reads the pull request from GitHub
-and refuses one that is closed, a draft, or part of a stack; a stacked pull
-request lands only through the `github-stack-merge` skill. The merge is
-GitHub's REST merge call with the reviewed head commit pinned, so branch
+and refuses one that is closed, a draft, part of a stack, or based on a
+branch other than the default branch; a stacked pull request lands only
+through the `github-stack-merge` skill. The merge is
+GitHub's REST merge call with the reviewed head commit pinned and the base branch re-checked, so branch
 protection applies as usual: no admin override, no auto-merge, no branch
 deletion. This lands code, and the skill never passes `--confirm` without an
 immediately preceding `AskUserQuestion` confirmation.
@@ -47,13 +48,20 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge-single --target "
 
 Read the JSON result's `status`:
 
-- **`REQUIRES_CONFIRMATION`** — the pull request is open, not a draft and
-  not in a stack. `pullRequest` holds its `number`, `repository`, `baseRef`
-  and `headSha`. Go on.
+- **`REQUIRES_CONFIRMATION`** — the pull request is open, not a draft, not
+  in a GitHub stack and based on the default branch. `pullRequest` holds
+  its `number`, `repository`, `baseRef`, `headRef` and `headSha`. Go on.
 - **`INVALID_ARGS`** — report `refusalReason` and stop. When it says the
   pull request belongs to a stack, point the user to the
   `github-stack-merge` skill; do not try another way to land it.
 - Any other status — report `status` and `recoveryAction` and stop.
+
+GitHub does not report a Graphite stack, so check that Graphite does not
+own the pull request: one provider owns a stack. If `gt` is installed and
+`gt log short` lists `pullRequest.headRef`, stop and say that it lands
+through Graphite. Otherwise this clone cannot tell, so use
+`AskUserQuestion`: "Is this pull request part of a Graphite stack?" with
+options "No" / "Yes, Graphite", and stop on yes.
 
 Stop before asking when the tests or review evidence the user relies on
 was produced for a head commit other than `pullRequest.headSha`, and say
@@ -67,19 +75,19 @@ options "Merge" / "Cancel". On "Cancel", stop — nothing has run.
 
 ### Step 4: Merge
 
-Pass back the head commit from Step 2, unchanged:
+Pass back the head commit and base branch from Step 2, unchanged:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge-single --target "<number>" --merge-method <method> --head-sha "<headSha>" --confirm
+node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge-single --target "<number>" --merge-method <method> --head-sha "<headSha>" --base-ref "<baseRef>" --confirm
 ```
 
 ### Step 5: Report
 
 - **`SUCCESS`** — GitHub answered `merged: true`. Report the merge and
   quote `stdout` inside the fence below.
-- **`INVALID_ARGS`** with a reason that the head moved — nothing was
-  merged. Go back to Step 2 so the user sees the new head; never reuse the
-  earlier confirmation.
+- **`INVALID_ARGS`** with a reason that the head or base changed — nothing
+  was merged. Go back to Step 2 so the user sees the new state; never reuse
+  the earlier confirmation.
 - Any other status — nothing is known to have merged. Report `status`,
   `recoveryAction` and `stdout` (GitHub's reason, for example a required
   check or review) and stop.
@@ -94,6 +102,7 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge-single --target "
 
 - Never lands a pull request that GitHub reports as part of a stack, and
   never removes it from its stack to get around that.
+- Never lands a pull request that Graphite owns.
 - Never calls `gh pr merge`, and never calls the REST merge endpoint
   directly; the adapter's `merge-single` operation is the only path.
 - Never passes `--confirm` without an immediately preceding

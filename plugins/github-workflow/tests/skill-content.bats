@@ -57,7 +57,12 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
 @test "github-stack-merge-single: previews without --confirm and merges with the previewed head" {
   run grep -F 'merge-single --target "<number>" --merge-method <method>' "$MERGE_SINGLE_SKILL"
   [ "$status" -eq 0 ]
-  run grep -F -- '--head-sha "<headSha>" --confirm' "$MERGE_SINGLE_SKILL"
+  run grep -F -- '--head-sha "<headSha>" --base-ref "<baseRef>" --confirm' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge-single: checks Graphite ownership before asking to merge" {
+  run grep -F 'Is this pull request part of a Graphite stack?' "$MERGE_SINGLE_SKILL"
   [ "$status" -eq 0 ]
 }
 

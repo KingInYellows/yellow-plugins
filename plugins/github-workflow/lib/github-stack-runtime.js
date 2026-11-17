@@ -735,6 +735,75 @@ function merge({ target, mergeMethod, confirm }) {
 }
 
 /**
+ * Read pull request `target` from GitHub for `merge-single` and decide
+ * whether it is an ordinary one that may be landed on its own.
+ * @param {string} op
+ * @param {string} target a validated pull request number
+ * @returns {{ result: object } | { pullRequest: { number: number, repository: string, baseRef: string, headRef: string, headSha: string } }}
+ *   `result` is the finished refusal or lookup failure.
+ */
+function readOrdinaryPullRequest(op, target) {
+  const lookupArgs = ['api', `repos/{owner}/{repo}/pulls/${target}`];
+  const lookup = run('gh', lookupArgs);
+  if (!lookup.ok || lookup.code !== 0) {
+    return {
+      result: shapeResult({
+        op,
+        bin: 'gh',
+        args: lookupArgs,
+        execResult: lookup,
+        mayHaveMutated: false,
+        statusOverride: 'API_FAILURE',
+      }),
+    };
+  }
+  let pr;
+  try {
+    pr = JSON.parse(lookup.stdout);
+  } catch {
+    pr = null;
+  }
+  const text = (value) => (typeof value === 'string' ? value : '');
+  const head = (pr && pr.head) || {};
+  const base = (pr && pr.base) || {};
+  const repo = base.repo || {};
+  const found = {
+    number: Number(target),
+    repository: text(repo.full_name),
+    baseRef: text(base.ref),
+    headRef: text(head.ref),
+    headSha: text(head.sha),
+  };
+  const defaultBranch = text(repo.default_branch);
+  const readable =
+    pr !== null &&
+    typeof pr === 'object' &&
+    String(pr.number) === target &&
+    SHA_RE.test(found.headSha) &&
+    typeof pr.draft === 'boolean' &&
+    [found.repository, found.baseRef, found.headRef, defaultBranch].every(Boolean);
+  const where = `pull request #${target} in ${found.repository}`;
+  let reason = null;
+  if (!readable) {
+    reason = `GitHub's answer for pull request #${target} could not be read; nothing was merged`;
+  } else if (pr.state !== 'open') {
+    reason = `${where} is ${pr.merged ? 'already merged' : 'not open'}`;
+  } else if (pr.draft) {
+    reason = `${where} is a draft; mark it ready for review first`;
+  } else if (pr.stack !== undefined && pr.stack !== null) {
+    const stackNumber =
+      typeof pr.stack === 'object' && Number.isInteger(pr.stack.number) ? ` (stack #${pr.stack.number})` : '';
+    reason = `${where} belongs to a stack${stackNumber}; land it with the merge operation, which merges it together with the pull requests below it`;
+  } else if (found.baseRef !== defaultBranch) {
+    // A pull request based on another branch is a layer of something, for
+    // example a stack that another provider manages and GitHub does not
+    // report. Landing it would merge it into that branch, not the trunk.
+    reason = `${where} targets "${found.baseRef}", not the default branch "${defaultBranch}"; it depends on another branch, so it is not an independent pull request`;
+  }
+  return reason ? { result: refusalResult(op, reason) } : { pullRequest: found };
+}
+
+/**
  * Land ONE ordinary pull request: one that GitHub does not report as part of
  * a stack. `gh stack merge` refuses such a pull request, and `merge` above
  * must never land a stacked one the plain way, so this is a separate
@@ -742,19 +811,20 @@ function merge({ target, mergeMethod, confirm }) {
  *
  * - `target` is a pull request number only, and `mergeMethod` is required;
  * - the pull request is read from GitHub first and refused when it is not
- *   open, is a draft, or carries a `stack` object;
+ *   open, is a draft, carries a `stack` object, or is based on a branch
+ *   other than the repository's default branch;
  * - without `confirm: true` nothing is merged and the result reports the
- *   head commit that was read;
- * - with `confirm: true` the caller must pass that commit back as `headSha`.
- *   It is refused when the head has moved, and GitHub checks it again
- *   (`sha` on the merge call), so what lands is what was shown.
+ *   head commit and base branch that were read;
+ * - with `confirm: true` the caller must pass both back as `headSha` and
+ *   `baseRef`. It is refused when either has changed, and GitHub checks the
+ *   head again (`sha` on the merge call), so what lands is what was shown.
  *
  * Both calls are `gh api` with the `{owner}/{repo}` placeholders, so the
  * check and the merge always address the same repository, whichever way
  * `gh` resolves it. The REST merge call applies branch protection as usual:
  * no admin override, no auto-merge, no branch deletion.
  */
-function mergeSingle({ target, mergeMethod, headSha, confirm }) {
+function mergeSingle({ target, mergeMethod, headSha, baseRef, confirm }) {
   const op = 'merge-single';
   if (typeof target !== 'string' || !/^[1-9][0-9]*$/.test(target)) {
     return refusalResult(op, `target must be a pull request number, got "${target === undefined ? '' : target}"`);
@@ -767,74 +837,35 @@ function mergeSingle({ target, mergeMethod, headSha, confirm }) {
   if (headSha !== undefined && !SHA_RE.test(headSha)) {
     return refusalResult(op, `headSha must be a full 40-character commit id, got "${headSha}"`);
   }
-  if (confirm === true && headSha === undefined) {
+  if (confirm === true && (headSha === undefined || baseRef === undefined)) {
     return refusalResult(
       op,
-      'confirm needs headSha: run once without confirm, show the reported head commit, then pass it back'
+      'confirm needs headSha and baseRef: run once without confirm, show the reported head commit and base branch, then pass both back'
     );
   }
 
-  const lookupArgs = ['api', `repos/{owner}/{repo}/pulls/${target}`];
-  const lookup = run('gh', lookupArgs);
-  if (!lookup.ok || lookup.code !== 0) {
-    return shapeResult({
-      op,
-      bin: 'gh',
-      args: lookupArgs,
-      execResult: lookup,
-      mayHaveMutated: false,
-      statusOverride: 'API_FAILURE',
-    });
-  }
-  let pr;
-  try {
-    pr = JSON.parse(lookup.stdout);
-  } catch {
-    pr = null;
-  }
-  const currentHead = pr && pr.head && typeof pr.head.sha === 'string' ? pr.head.sha : '';
-  const baseRef = pr && pr.base && typeof pr.base.ref === 'string' ? pr.base.ref : '';
-  const repository =
-    pr && pr.base && pr.base.repo && typeof pr.base.repo.full_name === 'string' ? pr.base.repo.full_name : '';
-  if (
-    !pr ||
-    typeof pr !== 'object' ||
-    String(pr.number) !== target ||
-    !SHA_RE.test(currentHead) ||
-    !baseRef ||
-    !repository ||
-    typeof pr.draft !== 'boolean'
-  ) {
-    return refusalResult(op, `GitHub's answer for pull request #${target} could not be read; nothing was merged`);
-  }
-  if (pr.state !== 'open') {
-    return refusalResult(op, `pull request #${target} in ${repository} is ${pr.merged ? 'already merged' : 'not open'}`);
-  }
-  if (pr.draft) {
-    return refusalResult(op, `pull request #${target} in ${repository} is a draft; mark it ready for review first`);
-  }
-  if (pr.stack !== undefined && pr.stack !== null) {
-    const stackNumber =
-      typeof pr.stack === 'object' && Number.isInteger(pr.stack.number) ? ` (stack #${pr.stack.number})` : '';
-    return refusalResult(
-      op,
-      `pull request #${target} in ${repository} belongs to a stack${stackNumber}; land it with the merge operation, which merges it together with the pull requests below it`
-    );
-  }
-  const pullRequest = { number: Number(target), repository, baseRef, headSha: currentHead };
+  const read = readOrdinaryPullRequest(op, target);
+  if (read.result) return read.result;
+  const { pullRequest } = read;
+  const shown = `pull request #${target} of ${pullRequest.repository} into ${pullRequest.baseRef} at head ${pullRequest.headSha}`;
   if (confirm !== true) {
     return {
       ...confirmationRequiredResult(
         op,
-        `merge-single lands pull request #${target} of ${repository} into ${baseRef} at head ${currentHead} with method ${methodCheck.value}, and cannot be undone by this runtime; re-run with headSha ${currentHead} and confirm`
+        `merge-single lands ${shown} with method ${methodCheck.value}, and cannot be undone by this runtime; re-run with that headSha and baseRef and confirm`
       ),
-      pullRequest: { ...pullRequest, repository: redact(repository), baseRef: redact(baseRef) },
+      pullRequest: {
+        ...pullRequest,
+        repository: redact(pullRequest.repository),
+        baseRef: redact(pullRequest.baseRef),
+        headRef: redact(pullRequest.headRef),
+      },
     };
   }
-  if (headSha !== currentHead) {
+  if (headSha !== pullRequest.headSha || baseRef !== pullRequest.baseRef) {
     return refusalResult(
       op,
-      `pull request #${target} now has head ${currentHead}, not the confirmed ${headSha}; nothing was merged. Show the new head and ask again`
+      `the confirmation was for head ${headSha} into "${baseRef}", but GitHub now shows ${shown}; nothing was merged. Show the new state and ask again`
     );
   }
   const args = [
@@ -845,7 +876,7 @@ function mergeSingle({ target, mergeMethod, headSha, confirm }) {
     '-f',
     `merge_method=${methodCheck.value}`,
     '-f',
-    `sha=${currentHead}`,
+    `sha=${pullRequest.headSha}`,
   ];
   const execResult = run('gh', args);
   let merged = false;
@@ -968,6 +999,7 @@ function main(argv) {
     mode: typeof args.mode === 'string' ? args.mode : undefined,
     mergeMethod: typeof args['merge-method'] === 'string' ? args['merge-method'] : undefined,
     headSha: typeof args['head-sha'] === 'string' ? args['head-sha'] : undefined,
+    baseRef: typeof args['base-ref'] === 'string' ? args['base-ref'] : undefined,
     open: args.open === true,
     prune: args.prune === true,
     local: args.local === true,
