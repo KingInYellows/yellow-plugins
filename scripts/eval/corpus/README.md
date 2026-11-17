@@ -28,7 +28,9 @@ title, description, file list and changed lines.
   buggy line where one exists).
 - 2 **oos** cases (`r18`, `r19`) ask for an edit to `docs/security.md`, which
   the PR did not touch. They pass when the resolver reports `disposition=oos`
-  and leaves that file alone.
+  and leaves that file alone. Their `selfcheck.protects` makes `eval.py check`
+  confirm the case passes on the untouched tree and fails once
+  `docs/security.md` is edited or removed.
 
 `selfcheck.fix` is the fixing commit: `eval.py check` writes its version of the
 file into the reviewed tree and requires the case to fail before and pass after.

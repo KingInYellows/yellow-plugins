@@ -124,6 +124,12 @@ def fixture_parts(agent):
         # The exec bit matters too: a stand-in without it fails differently.
         name = os.path.relpath(f, REPO).encode()
         h.update(b"%d:%s%d%d:" % (len(name), name, os.access(f, os.X_OK), len(data)) + data)
+    if "plugins" in agent or "overlay" in agent:
+        # Corpus agents: how the row runs is an input too, so a changed runner
+        # or plugin list reruns the rows instead of reusing old output.
+        with open(os.path.join(HERE, "run-one.sh"), "rb") as handle:
+            h.update(b"run-one.sh:" + handle.read())
+        h.update(json.dumps(agent.get("plugins", [])).encode())
     return [h.hexdigest()]
 
 
@@ -335,12 +341,18 @@ def check_spec(spec):
     names = [*spec["agents"], *(r["id"] for r in spec["replays"]), *(s["id"] for s in spec["scans"]),
              *(c["id"] for c in spec["prompts"]),
              *(c[k] for cs in spec["configs"].values() for c in cs for k in ("model", "effort"))]
+    # Plugin names are single directory names: run passes them to run-one.sh
+    # joined by ":", so a name must not carry a separator or a path.
+    names += [n for a in spec["agents"].values() for n in a.get("plugins", [])]
     bad = [n for n in names if not isinstance(n, str) or not re.fullmatch(SAFE_NAME, n) or ".." in n]
     paths = [*(a["file"] for a in spec["agents"].values()),
              *(f for a in spec["agents"].values() for f in a.get("preload_skills", [])),
              *(f for a in spec["agents"].values() for f in a.get("fixtures", [])),
              *(f for a in spec["agents"].values() for f in a.get("overlay", [])),
              *("plugins/" + n for a in spec["agents"].values() for n in a.get("plugins", [])),
+             *(p for c in spec["prompts"] for p in c.get("selfcheck", {}).get("paths", [])),
+             *(p for c in spec["prompts"] for p in c.get("selfcheck", {}).get("protects", [])),
+             *(c["selfcheck"]["doc"] for c in spec["prompts"] if "doc" in c.get("selfcheck", {})),
              *(p["file"] for r in spec["replays"] for p in r["plants"]),
              *(f for s in spec["scans"] for f in s["files"]),
              *(p["file"] for s in spec["scans"] for p in s.get("plants", [])),
@@ -835,7 +847,9 @@ def check(spec_paths, work):
     incident, its commits exist, and its regexes compile. A case's `selfcheck`
     then replays the incident through the real grader: `fix` (a commit) must
     turn a tree that fails the case's file checks into one that passes them;
-    `doc` (a repo file) written as the run's only new plan must pass them."""
+    `doc` (a repo file) written as the run's only new plan must pass them;
+    `protects` (files an out-of-scope case must leave alone) must pass
+    untouched and fail once one is edited or removed. Every case needs one."""
     problems = []
     for spec_path in spec_paths:
         with open(spec_path, encoding="utf-8") as handle:
@@ -863,6 +877,7 @@ def check(spec_paths, work):
                 problems.append("%s %s: no agent expects it" % (name, cid))
             sc = c.get("selfcheck")
             if not sc:
+                problems.append("%s %s: no `selfcheck`" % (name, cid))
                 continue
             tree = c.get("tree", spec["prompt_commit"])
             if not have_commit(tree) or ("fix" in sc and not have_commit(sc["fix"])):
@@ -871,10 +886,38 @@ def check(spec_paths, work):
             wt = os.path.join(work, "wt", cid)
             case_tree(wt, tree, c)
             try:
+                if "protects" in sc:
+                    # Out-of-scope case: passes on the untouched tree, fails once
+                    # a protected file is edited or removed.
+                    if not all(files_pass(e, wt) for e in expects[cid]):
+                        problems.append("%s %s: file checks fail on the untouched tree" % (name, cid))
+                    for path in sc["protects"]:
+                        target = os.path.join(wt, path)
+                        if symlink_on_path(wt, path) or not os.path.isfile(target):
+                            problems.append("%s %s: protected %s is not a file in the tree"
+                                            % (name, cid, path))
+                            continue
+                        with open(target, encoding="utf-8") as handle:
+                            original = handle.read()
+                        with open(target, "a", encoding="utf-8") as handle:
+                            handle.write("\nselfcheck edit\n")
+                        edited = any(files_pass(e, wt) for e in expects[cid])
+                        os.remove(target)
+                        removed = any(files_pass(e, wt) for e in expects[cid])
+                        with open(target, "w", encoding="utf-8") as handle:
+                            handle.write(original)
+                        if edited or removed:
+                            problems.append("%s %s: file checks still pass with %s %s"
+                                            % (name, cid, path, "edited" if edited else "removed"))
+                    continue
                 if "fix" in sc:
                     if any(files_pass(e, wt, content_only=True) for e in expects[cid]):
                         problems.append("%s %s: file checks already pass before the fix" % (name, cid))
                     for path in sc["paths"]:
+                        through = symlink_on_path(wt, path)
+                        if through:
+                            sys.exit("%s %s: selfcheck path %s goes through symlink %s"
+                                     % (name, cid, path, through))
                         with open(os.path.join(wt, path), "w", encoding="utf-8") as handle:
                             handle.write(git("show", "%s:%s" % (sc["fix"], path)))
                 else:

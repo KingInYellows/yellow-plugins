@@ -66,6 +66,9 @@ servers, slash commands and memory, so model and effort are the only variables.
 Project `CLAUDE.md` files still load. Agents listed with `preload_skills` get
 those `SKILL.md` bodies appended, which is what `skills:` frontmatter does.
 `--plugin-dir` is not used: in cloud sessions it did not register plugin agents.
+An agent with a `plugins` key is the exception: it runs its `file` as a slash
+command with those plugins loaded by `--plugin-dir`, no system prompt, and Write
+and Edit allowed only under the run's tree (`--permission-mode acceptEdits`).
 
 Runs set `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1`, since nobody watches
 the subagent progress lines. When settings block the requested model, Claude
@@ -117,14 +120,16 @@ agents:
 - a `files` check's `changed`: only files the run added or modified count (a
   removed or renamed-away match fails the check), and `count: 0` then asserts a
   file was left alone;
-- a case's `incident` (required by `check`) and `selfcheck`:
-  `{"fix": <sha>, "paths": [...]}` or `{"doc": <repo file>}`.
+- a case's `incident` and `selfcheck` (both required by `check`):
+  `{"fix": <sha>, "paths": [...]}`, `{"doc": <repo file>}` or
+  `{"protects": [...]}`.
 
 `eval.py check <work-dir> <spec>...` spends nothing: it validates the specs,
 fetches missing commits by id, compiles every regex and runs each `selfcheck`
 through the real grader (the case must fail on the incident tree and pass with
-the fix's files, or pass with the doc written as the run's only new plan). Write
-and Edit, like Read, Grep and Glob, are approved only under the run's tree.
+the fix's files, pass with the doc written as the run's only new plan, or pass
+untouched and fail once a protected file is edited or removed). Write and Edit,
+like Read, Grep and Glob, are approved only under the run's tree.
 
 ## Results
 

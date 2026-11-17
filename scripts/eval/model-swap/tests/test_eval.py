@@ -59,6 +59,8 @@ class FilesPassTest(unittest.TestCase):
     def test_count_zero_without_changed_still_needs_no_match(self):
         none = {"files": [{"glob": "missing/*.md", "count": 0}]}
         self.assertTrue(harness.files_pass(none, self.wt))
+        present = {"files": [{"glob": "docs/security.md", "count": 0}]}
+        self.assertFalse(harness.files_pass(present, self.wt))
         legacy = {"files": [{"glob": "missing/*.md"}]}
         self.assertFalse(harness.files_pass(legacy, self.wt))
 
@@ -66,6 +68,11 @@ class FilesPassTest(unittest.TestCase):
         fixed = {"files": [{"glob": "lib/a.sh", "changed": True, "count": 1,
                             "match": ["trap '[^'\\n]*\"\\$LOCK\""], "not": ["trap \"rmdir '\\$LOCK'"]}]}
         self.assertFalse(harness.files_pass(fixed, self.wt, content_only=True))
+        # Unchanged in git, but its content matches: content_only still passes.
+        clean = {"files": [{"glob": "docs/security.md", "changed": True, "count": 1,
+                            "match": ["boundary"]}]}
+        self.assertTrue(harness.files_pass(clean, self.wt, content_only=True))
+        self.assertFalse(harness.files_pass(clean, self.wt))
         self.write("lib/a.sh", "trap 'rmdir \"$LOCK\"' EXIT\n")
         self.assertTrue(harness.files_pass(fixed, self.wt, content_only=True))
         self.assertTrue(harness.files_pass(fixed, self.wt))
@@ -73,6 +80,10 @@ class FilesPassTest(unittest.TestCase):
     def test_deleting_a_left_alone_file_fails(self):
         oos = {"files": [{"glob": "docs/security.md", "changed": True, "count": 0}]}
         os.remove(os.path.join(self.wt, "docs/security.md"))
+        changed, removed = harness.changed_files(self.wt)
+        gone = os.path.join(self.wt, "docs/security.md")
+        self.assertNotIn(gone, changed)
+        self.assertIn(gone, removed)
         self.assertFalse(harness.files_pass(oos, self.wt))
 
     def test_renaming_a_left_alone_file_away_fails(self):
@@ -123,6 +134,19 @@ class CheckSpecTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             harness.check_spec(self.spec(tree="main"))
         harness.check_spec(self.spec(tree="a" * 40))
+
+    def test_plugin_names_are_single_directory_names(self):
+        for name in ("yellow-core:evil", "a/b"):
+            spec = self.spec()
+            spec["agents"] = {"a": {"file": "a.md", "plugins": [name]}}
+            with self.assertRaises(SystemExit):
+                harness.check_spec(spec)
+
+    def test_selfcheck_paths_must_be_repo_relative(self):
+        for sc in ({"fix": "a" * 40, "paths": ["/etc/passwd"]}, {"fix": "a" * 40, "paths": ["../x"]},
+                   {"doc": "../x.md"}):
+            with self.assertRaises(SystemExit):
+                harness.check_spec(self.spec(selfcheck=sc))
 
     def test_overlay_and_plugins_must_be_repo_relative(self):
         for agent in ({"file": "a.md", "overlay": ["../x"]}, {"file": "a.md", "plugins": ["../x"]}):
