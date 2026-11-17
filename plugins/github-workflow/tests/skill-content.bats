@@ -12,6 +12,7 @@ SUBMIT_SKILL="$SKILLS_DIR/github-stack-submit/SKILL.md"
 NAV_SKILL="$SKILLS_DIR/github-stack-nav/SKILL.md"
 AMEND_SKILL="$SKILLS_DIR/github-stack-amend/SKILL.md"
 MERGE_SKILL="$SKILLS_DIR/github-stack-merge/SKILL.md"
+MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
 
 @test "github-stack-submit: Step 2 reviews pre-staged (cached) files before staging" {
   run grep -F 'git diff --cached --name-only' "$SUBMIT_SKILL"
@@ -50,5 +51,24 @@ MERGE_SKILL="$SKILLS_DIR/github-stack-merge/SKILL.md"
 
 @test "github-stack-merge: direct-argument target is validated before use" {
   run grep -F '^[1-9][0-9]*$' "$MERGE_SKILL"
+  [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge-single: previews without --confirm and merges with the previewed head" {
+  run grep -F 'merge-single --target "<number>" --merge-method <method>' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+  run grep -F -- '--head-sha "<headSha>" --confirm' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge-single: never calls gh pr merge or gh api itself" {
+  run grep -E '^(gh|node) ' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"gh pr merge"* ]]
+  [[ "$output" != *"gh api"* ]]
+}
+
+@test "github-stack-merge: sends an ordinary pull request to merge-single" {
+  run grep -F 'github-stack-merge-single' "$MERGE_SKILL"
   [ "$status" -eq 0 ]
 }

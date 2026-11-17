@@ -104,6 +104,7 @@ const EXIT_STATUS = Object.freeze({
 });
 
 const MERGE_METHODS = Object.freeze(['merge', 'squash', 'rebase']);
+const SHA_RE = /^[0-9a-f]{40}$/;
 
 // ---------------------------------------------------------------------------
 // Execution primitive
@@ -360,14 +361,19 @@ const RECOVERY_ACTIONS = Object.freeze({
  *   execResult: { ok: boolean, code: number|null, stdout: string, stderr: string },
  *   mayHaveMutated: boolean,
  *   syncAbortCheck?: boolean,
+ *   statusOverride?: string,
  * }} input
  */
-function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck = false }) {
+function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck = false, statusOverride }) {
   const stdout = bound(execResult.stdout);
   const stderr = bound(execResult.stderr);
   let status;
   if (!execResult.ok) {
     status = 'SPAWN_FAILURE';
+  } else if (statusOverride) {
+    // The command is not `gh stack`, so gh-stack's exit codes and progress
+    // text say nothing about it; the caller read the outcome itself.
+    status = statusOverride;
   } else if (/rerun with --accept-base-change/.test(`${execResult.stdout}\n${execResult.stderr}`)) {
     // gh-stack 0.3.0 leaves the stack un-rebased when GitHub retargeted its
     // base and the old base never merged. Whatever the exit code, the stack
@@ -729,6 +735,133 @@ function merge({ target, mergeMethod, confirm }) {
 }
 
 /**
+ * Land ONE ordinary pull request: one that GitHub does not report as part of
+ * a stack. `gh stack merge` refuses such a pull request, and `merge` above
+ * must never land a stacked one the plain way, so this is a separate
+ * operation with its own gates:
+ *
+ * - `target` is a pull request number only, and `mergeMethod` is required;
+ * - the pull request is read from GitHub first and refused when it is not
+ *   open, is a draft, or carries a `stack` object;
+ * - without `confirm: true` nothing is merged and the result reports the
+ *   head commit that was read;
+ * - with `confirm: true` the caller must pass that commit back as `headSha`.
+ *   It is refused when the head has moved, and GitHub checks it again
+ *   (`sha` on the merge call), so what lands is what was shown.
+ *
+ * Both calls are `gh api` with the `{owner}/{repo}` placeholders, so the
+ * check and the merge always address the same repository, whichever way
+ * `gh` resolves it. The REST merge call applies branch protection as usual:
+ * no admin override, no auto-merge, no branch deletion.
+ */
+function mergeSingle({ target, mergeMethod, headSha, confirm }) {
+  const op = 'merge-single';
+  if (typeof target !== 'string' || !/^[1-9][0-9]*$/.test(target)) {
+    return refusalResult(op, `target must be a pull request number, got "${target === undefined ? '' : target}"`);
+  }
+  if (mergeMethod === undefined) {
+    return refusalResult(op, `mergeMethod is required: one of ${MERGE_METHODS.join(', ')}`);
+  }
+  const methodCheck = validateEnum(mergeMethod, MERGE_METHODS, 'mergeMethod');
+  if (!methodCheck.ok) return refusalResult(op, methodCheck.reason);
+  if (headSha !== undefined && !SHA_RE.test(headSha)) {
+    return refusalResult(op, `headSha must be a full 40-character commit id, got "${headSha}"`);
+  }
+  if (confirm === true && headSha === undefined) {
+    return refusalResult(
+      op,
+      'confirm needs headSha: run once without confirm, show the reported head commit, then pass it back'
+    );
+  }
+
+  const lookupArgs = ['api', `repos/{owner}/{repo}/pulls/${target}`];
+  const lookup = run('gh', lookupArgs);
+  if (!lookup.ok || lookup.code !== 0) {
+    return shapeResult({
+      op,
+      bin: 'gh',
+      args: lookupArgs,
+      execResult: lookup,
+      mayHaveMutated: false,
+      statusOverride: 'API_FAILURE',
+    });
+  }
+  let pr;
+  try {
+    pr = JSON.parse(lookup.stdout);
+  } catch {
+    pr = null;
+  }
+  const currentHead = pr && pr.head && typeof pr.head.sha === 'string' ? pr.head.sha : '';
+  const baseRef = pr && pr.base && typeof pr.base.ref === 'string' ? pr.base.ref : '';
+  const repository =
+    pr && pr.base && pr.base.repo && typeof pr.base.repo.full_name === 'string' ? pr.base.repo.full_name : '';
+  if (
+    !pr ||
+    typeof pr !== 'object' ||
+    String(pr.number) !== target ||
+    !SHA_RE.test(currentHead) ||
+    !baseRef ||
+    !repository ||
+    typeof pr.draft !== 'boolean'
+  ) {
+    return refusalResult(op, `GitHub's answer for pull request #${target} could not be read; nothing was merged`);
+  }
+  if (pr.state !== 'open') {
+    return refusalResult(op, `pull request #${target} in ${repository} is ${pr.merged ? 'already merged' : 'not open'}`);
+  }
+  if (pr.draft) {
+    return refusalResult(op, `pull request #${target} in ${repository} is a draft; mark it ready for review first`);
+  }
+  if (pr.stack !== undefined && pr.stack !== null) {
+    const stackNumber =
+      typeof pr.stack === 'object' && Number.isInteger(pr.stack.number) ? ` (stack #${pr.stack.number})` : '';
+    return refusalResult(
+      op,
+      `pull request #${target} in ${repository} belongs to a stack${stackNumber}; land it with the merge operation, which merges it together with the pull requests below it`
+    );
+  }
+  const pullRequest = { number: Number(target), repository, baseRef, headSha: currentHead };
+  if (confirm !== true) {
+    return {
+      ...confirmationRequiredResult(
+        op,
+        `merge-single lands pull request #${target} of ${repository} into ${baseRef} at head ${currentHead} with method ${methodCheck.value}, and cannot be undone by this runtime; re-run with headSha ${currentHead} and confirm`
+      ),
+      pullRequest: { ...pullRequest, repository: redact(repository), baseRef: redact(baseRef) },
+    };
+  }
+  if (headSha !== currentHead) {
+    return refusalResult(
+      op,
+      `pull request #${target} now has head ${currentHead}, not the confirmed ${headSha}; nothing was merged. Show the new head and ask again`
+    );
+  }
+  const args = [
+    'api',
+    '-X',
+    'PUT',
+    `repos/{owner}/{repo}/pulls/${target}/merge`,
+    '-f',
+    `merge_method=${methodCheck.value}`,
+    '-f',
+    `sha=${currentHead}`,
+  ];
+  const execResult = run('gh', args);
+  let merged = false;
+  if (execResult.ok && execResult.code === 0) {
+    try {
+      merged = JSON.parse(execResult.stdout).merged === true;
+    } catch {
+      merged = false;
+    }
+  }
+  let statusOverride = 'API_FAILURE';
+  if (execResult.code === 0) statusOverride = merged ? 'SUCCESS' : 'ERROR';
+  return shapeResult({ op, bin: 'gh', args, execResult, mayHaveMutated: true, statusOverride });
+}
+
+/**
  * `gh stack unstack [--local]`. Verified against `cmd/unstack.go` at the
  * pinned SHA: the DEFAULT (no `--local`) call removes local stack
  * tracking AND remote-unstacks every PR in the stack via the GitHub API —
@@ -754,7 +887,19 @@ function unstack({ local, confirm }) {
   return shapeResult({ op: 'unstack', bin: 'gh', args, execResult, mayHaveMutated: true });
 }
 
-const OPERATIONS = Object.freeze({ view, init, add, checkout, rebase, sync, push, submit, merge, unstack });
+const OPERATIONS = Object.freeze({
+  view,
+  init,
+  add,
+  checkout,
+  rebase,
+  sync,
+  push,
+  submit,
+  merge,
+  'merge-single': mergeSingle,
+  unstack,
+});
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -822,6 +967,7 @@ function main(argv) {
     remote: typeof args.remote === 'string' ? args.remote : undefined,
     mode: typeof args.mode === 'string' ? args.mode : undefined,
     mergeMethod: typeof args['merge-method'] === 'string' ? args['merge-method'] : undefined,
+    headSha: typeof args['head-sha'] === 'string' ? args['head-sha'] : undefined,
     open: args.open === true,
     prune: args.prune === true,
     local: args.local === true,
@@ -857,5 +1003,6 @@ module.exports = {
   push,
   submit,
   merge,
+  mergeSingle,
   unstack,
 };

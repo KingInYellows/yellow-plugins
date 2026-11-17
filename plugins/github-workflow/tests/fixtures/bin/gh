@@ -16,6 +16,29 @@ if [ -n "${FAKE_GH_REPORT_NO_ATOMIC:-}" ]; then
     echo "no-atomic: absent" >&2
   fi
 fi
+# `gh api` calls (merge-single makes a GET, then a PUT). FAKE_GH_LOG=<file>
+# records each call's arguments on one line. FAKE_GH_GET_STDOUT / _EXIT answer
+# the read and FAKE_GH_PUT_STDOUT / _EXIT the merge; unset, the generic
+# variables below answer.
+if [ "${1:-}" = "api" ]; then
+  if [ -n "${FAKE_GH_LOG:-}" ]; then
+    echo "$*" >>"$FAKE_GH_LOG"
+  fi
+  case " $* " in
+    *" -X PUT "*)
+      if [ -n "${FAKE_GH_PUT_STDOUT:-}${FAKE_GH_PUT_EXIT:-}" ]; then
+        printf '%b' "${FAKE_GH_PUT_STDOUT:-}"
+        exit "${FAKE_GH_PUT_EXIT:-0}"
+      fi
+      ;;
+    *)
+      if [ -n "${FAKE_GH_GET_STDOUT:-}${FAKE_GH_GET_EXIT:-}" ]; then
+        printf '%b' "${FAKE_GH_GET_STDOUT:-}"
+        exit "${FAKE_GH_GET_EXIT:-0}"
+      fi
+      ;;
+  esac
+fi
 if [ -n "${FAKE_GH_STDOUT:-}" ]; then
   printf '%b' "$FAKE_GH_STDOUT"
 fi
