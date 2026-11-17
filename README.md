@@ -15,8 +15,13 @@ Add the marketplace, then install individual plugins:
 
 ```
 /plugin marketplace add KingInYellows/yellow-plugins
-/plugin install gt-workflow@yellow-plugins
+/plugin install github-workflow@yellow-plugins
 ```
+
+For stacked pull requests, `github-workflow` (GitHub-native) is recommended
+for new work and `gt-workflow` (Graphite) remains available; enable one of
+them with `/stack:select`. See
+[docs/stacked-prs-native-migration.md](docs/stacked-prs-native-migration.md).
 
 ## Plugins
 

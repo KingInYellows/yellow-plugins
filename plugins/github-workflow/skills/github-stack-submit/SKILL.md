@@ -8,7 +8,9 @@ user-invocable: false
 
 Stages specific changed files, creates a conventional commit, and submits
 the branch via the runtime adapter's `submit` operation
-(`gh stack submit --auto`, draft by default). This is the commit+submit
+(`gh stack submit --auto`, draft by default). A branch that is not in a
+stack yet is first registered as a one-branch stack, which GitHub shows as
+an ordinary pull request. This is the commit+submit
 mechanics only — it does not run the parallel code-review audit that
 Graphite's `smart-submit` skill runs; that is out of scope here.
 
@@ -35,6 +37,73 @@ git diff --stat
 ```
 
 If there are no uncommitted changes, tell the user and exit.
+
+### Step 1b: Make Sure the Branch Is Tracked
+
+`gh stack submit` only works on a branch that belongs to a tracked stack.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
+```
+
+- **`SUCCESS`** — the branch is in a stack. Continue to Step 2.
+- **`NOT_IN_STACK`** — first check that Graphite does not own the branch,
+  before running anything that registers it. Skip this check on the trunk,
+  which Graphite always lists and nobody owns. If `gt log short` lists the
+  current branch, or Graphite's repo config exists and the branch has
+  a pull request Graphite opened, stop here without calling `init`: one
+  provider owns a stack. Finish it with Graphite or follow the adoption
+  steps in `docs/stacked-prs-native-migration.md`. The config is
+  `.graphite_repo_config` inside the directory that
+  `git rev-parse --git-common-dir` prints; in a linked worktree `.git` is a
+  file, so do not test `.git/.graphite_repo_config`.
+
+  If `gt` is not installed and the config is absent, this clone cannot tell
+  who opened an existing pull request. Check whether the branch has one:
+
+  ```bash
+  gh api "repos/{owner}/{repo}/pulls?state=open&head={owner}:$(git branch --show-current)" --jq 'length'
+  ```
+
+  On `0`, Graphite does not own the branch. On anything else, or if the call
+  fails, ask with `AskUserQuestion`: "This branch already has a pull request.
+  Did Graphite open it?" with options "Yes, Graphite" / "No". Stop on yes.
+
+  Otherwise register it. Independent work is a one-branch stack
+  on the trunk; GitHub only forms a stack object once two pull requests
+  exist, so this is an ordinary pull request, and it merges the ordinary
+  way: `github-stack-merge` only lands real stacks. Use a stack of several
+  branches only when the pull requests depend on one another.
+
+  The trunk is the remote's default branch: the output of
+  `git symbolic-ref --short refs/remotes/origin/HEAD` with only the leading
+  `origin/` removed (the name may contain slashes), or ask the user if that
+  fails.
+
+  If the current branch is the trunk, choose a branch name from the change
+  (`<type>/<short-slug>`) and create the branch with:
+
+  ```bash
+  node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" init --base "<trunk>" --branch "<new-branch>"
+  ```
+
+  Otherwise adopt the current branch as it is:
+
+  ```bash
+  node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" init --base "<trunk>" --branch "<current-branch>"
+  ```
+
+  Read the `init` result before going on. Continue to Step 2 only on
+  `status: "SUCCESS"`. The adapter exits 0 even when it refuses or fails, so
+  the shell status proves nothing; on any other status report `status` and
+  `recoveryAction` and stop before staging, or Step 4 would commit on the
+  trunk.
+
+  A dependent layer on top of an existing stack is created by the
+  adapter's `add` operation from that stack's top branch (`/flow:work`
+  does this); this skill submits the branch it is on.
+
+- Any other status — report `status` and `recoveryAction` and stop.
 
 ### Step 2: Stage Specific Files
 
@@ -154,6 +223,9 @@ Read the JSON result's `status` field.
   --- end untrusted-content ---
   ```
 
+- **`INCOMPLETE`** — `gh stack` exited 0 but a step failed. The branch may
+  be pushed with no pull request. Report the failed lines from `stderr`
+  (fenced as untrusted content) and do not say the branch was submitted.
 - Any other status — report `status` and `recoveryAction` verbatim. The
   commit has already happened at this point even if submit fails; say so
   explicitly so the user knows the local state changed even though the
@@ -162,7 +234,8 @@ Read the JSON result's `status` field.
 ## Boundaries
 
 - Never `git add .` or `git add -A` — files are staged by name only.
-- Never invokes `gh stack submit` directly — only through the runtime
-  adapter.
+- Never invokes `gh stack submit` or `gh stack init` directly — only
+  through the runtime adapter.
+- Never registers a branch that Graphite already tracks.
 - Never reinvents the audit-agent review flow from Graphite's
   `smart-submit` — that is a separate concern, out of scope here.

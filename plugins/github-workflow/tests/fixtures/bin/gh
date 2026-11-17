@@ -7,6 +7,15 @@
 if [ -n "${FAKE_GH_SLEEP:-}" ]; then
   exec sleep "$FAKE_GH_SLEEP"
 fi
+# FAKE_GH_REPORT_NO_ATOMIC=1: say on stderr whether GH_STACK_NO_ATOMIC reached
+# this process, so a test can see what environment the runtime passes on.
+if [ -n "${FAKE_GH_REPORT_NO_ATOMIC:-}" ]; then
+  if [ -n "${GH_STACK_NO_ATOMIC:-}" ]; then
+    echo "no-atomic: inherited" >&2
+  else
+    echo "no-atomic: absent" >&2
+  fi
+fi
 if [ -n "${FAKE_GH_STDOUT:-}" ]; then
   printf '%b' "$FAKE_GH_STDOUT"
 fi

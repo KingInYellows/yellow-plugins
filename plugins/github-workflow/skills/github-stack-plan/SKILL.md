@@ -29,10 +29,11 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
 Read the JSON result's `status` field.
 
 - **`SUCCESS`** — parse `stdout` as the `gh stack view --json` output and
-  report the stack structure to the user. Confirmed shape (live smoke test,
-  `gh-stack` v0.1.0): `{trunk, currentBranch, branches: [{name, head, base,
-  isCurrent, isMerged, isQueued, needsRebase, pr: {number, url, state} |
-  null}]}` — `head`/`base` are commit SHAs, not branch names; `branches` is
+  report the stack structure to the user. Shape observed with `gh-stack`
+  v0.3.0: `{trunk, currentBranch, branches: [{name, head, base,
+  isCurrent, isMerged, isQueued, needsRebase, pr: {number, url, state}}]}`
+  — `head` and `pr` are omitted for a branch with no commits of its own or
+  no pull request; `head`/`base` are commit SHAs, not branch names; `branches` is
   ordered bottom-to-top (trunk-adjacent first). Report trunk, each branch's
   name/PR number+URL+state in stack order, and flag any `needsRebase: true`
   or `isQueued: true` branch explicitly. Treat this shape as a documented

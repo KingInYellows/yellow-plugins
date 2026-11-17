@@ -68,7 +68,8 @@ GitHub stacked-PR provider
 
   gh                  OK (gh version 2.97.0 (2026-07-31))
   gh auth             OK
-  github/gh-stack     MISSING
+  github/gh-stack     MISSING (tested with v0.3.0)
+  git                 OK (2.55.0)
 
   Tooling:            NOT READY — install with `gh extension install github/gh-stack`
   Active provider:    run /stack:status (yellow-core) for the authoritative answer
@@ -76,8 +77,10 @@ GitHub stacked-PR provider
 
 Classify tooling from the probe's `readiness` field:
 
-- **READY** — `readiness: "ready"` (present, authenticated, and
-  `extensionIdentity: "verified"`).
+- **READY** — `readiness: "ready"` (present, authenticated,
+  `extensionIdentity: "verified"`, extension at or above
+  `checks.testedExtensionVersion`, and `git` 2.36 or later). Print
+  `checks.extensionVersion` beside the extension line.
 - **NOT READY** — anything else, naming the specific gap from `detail` and
   `checks.extensionIdentity`. If `extensionIdentity` is `wrong-owner`, say
   a non-official `gh stack` extension is installed and must be removed
@@ -88,9 +91,9 @@ determine readiness (a `gh auth status` or `gh extension list` failure,
 not a "not installed" result) — report tooling as NOT READY for this
 unresolved reason and stop; do not treat it as `MISSING`.
 
-State the preview caveat once when tooling is READY: GitHub's native
-stacked pull requests were in public preview as of 2026-08-17 and
-merge-queue support was still rolling out.
+When tooling is READY, state once that readiness is local: whether the
+repository accepts stacks, and how its merge queue treats them, is only
+known after a real `submit` or `merge`.
 
 ## Boundaries
 

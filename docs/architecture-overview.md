@@ -149,7 +149,8 @@ validator.
 Catalog field `capabilityProvider` marks interchangeable implementations.
 
 1. **`stacked-pr`**: `gt-workflow` (graphite) vs `github-workflow` (github).
-   Exactly one enabled at runtime.
+   Exactly one enabled at runtime. `github` is recommended when none is
+   selected (`RECOMMENDED_PROVIDER`); nothing selects it automatically.
 2. **`remote-agent`**: `yellow-cursor` preferred over `yellow-devin` and the
    experimental `yellow-jules`.
 
