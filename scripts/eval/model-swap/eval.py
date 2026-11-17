@@ -413,6 +413,8 @@ def prepare(spec_path, work):
     with open(spec_path, encoding="utf-8") as handle:
         spec = json.load(handle)
     check_spec(spec)
+    # Recorded so `run` approves Bash exactly as the fingerprints say.
+    spec["eval_allow_bash"] = "1" if os.environ.get("EVAL_ALLOW_BASH") == "1" else "0"
     # Hashed before anything under <work> changes: a missing fixture stops here.
     fixtures = {aid: fixture_parts(agent) for aid, agent in spec["agents"].items()}
     for sub in ("wt", "prompts", "out"):
@@ -554,6 +556,7 @@ def run(work, jobs, dry_run):
         rid, sys_prompt, wt, model, effort, prompt = row[:6]
         env = run_env(agents[row[6]], rid, wt)
         env["EVAL_FINGERPRINT"] = row[8]
+        env["EVAL_ALLOW_BASH"] = spec.get("eval_allow_bash", "0")
         env["EVAL_SCAN"] = "1" if agents[row[6]]["kind"] == "scan" else "0"
         # A command agent runs as a slash command with its plugins loaded.
         plugins = agents[row[6]].get("plugins", [])
@@ -905,15 +908,17 @@ def check(spec_paths, work):
                             problems.append("%s %s: protected %s is not a file in the tree"
                                             % (name, cid, path))
                             continue
-                        with open(target, encoding="utf-8") as handle:
+                        with open(target, "rb") as handle:
                             original = handle.read()
+                        mode = os.stat(target).st_mode
                         with open(target, "a", encoding="utf-8") as handle:
                             handle.write("\nselfcheck edit\n")
                         edited = any(files_pass(e, wt) for e in expects[cid])
                         os.remove(target)
                         removed = any(files_pass(e, wt) for e in expects[cid])
-                        with open(target, "w", encoding="utf-8") as handle:
+                        with open(target, "wb") as handle:
                             handle.write(original)
+                        os.chmod(target, mode)
                         if edited or removed:
                             problems.append("%s %s: file checks still pass with %s %s"
                                             % (name, cid, path, "edited" if edited else "removed"))
@@ -929,6 +934,11 @@ def check(spec_paths, work):
                         with open(os.path.join(wt, path), "w", encoding="utf-8") as handle:
                             handle.write(git("show", "%s:%s" % (sc["fix"], path)))
                 else:
+                    rel = "plans/selfcheck-%s.md" % cid
+                    through = symlink_on_path(wt, rel)
+                    if through:
+                        sys.exit("%s %s: plan path %s goes through symlink %s"
+                                 % (name, cid, rel, through))
                     os.makedirs(os.path.join(wt, "plans"), exist_ok=True)
                     with open(os.path.join(wt, "plans", "selfcheck-%s.md" % cid), "w",
                               encoding="utf-8") as handle:
