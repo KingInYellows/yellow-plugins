@@ -1,5 +1,7 @@
 # Driver for plugins/yellow-morph/lib/install-morphmcp.sh (sourced by
 # /morph:setup). Never calls the npm install. Env: REPO_ROOT, TMPD.
+# The CLAUDE_PLUGIN_DATA=/etc override is scoped to its subshell on purpose.
+# shellcheck disable=SC2030,SC2031
 . "$REPO_ROOT/plugins/yellow-morph/lib/install-morphmcp.sh"
 mkdir -p "$TMPD/root" "$TMPD/data"
 : >| "$TMPD/root/package-lock.json"
