@@ -57,6 +57,9 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           mkdir -p "$HOME/.claude/commands"
+          # A project command of the same name in the PR checkout would shadow
+          # the user command installed below.
+          rm -f .claude/commands/ci-code-review.md
           url="repos/$REPO/contents/.github/claude-code-review/code-review.md?ref=$DEFAULT_BRANCH"
           if ! gh api -H 'Accept: application/vnd.github.raw+json' "$url" \
               > "$HOME/.claude/commands/ci-code-review.md" 2> fetch.err; then

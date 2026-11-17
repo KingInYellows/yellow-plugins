@@ -388,7 +388,9 @@ vendored code-review command (CLAUDE-248). Its boundary:
   (`.github/claude-code-review/code-review.md`) and installed under
   `~/.claude/commands/`, so a PR cannot edit the command file. The gate step
   deletes `.claude-code-review/` before writing it, so a committed symlink there
-  cannot redirect the write.
+  cannot redirect the write, and deletes any
+  `.claude/commands/ci-code-review.md` in the PR checkout so a project command
+  cannot shadow the installed one.
 - **Known gap**: the action runs in the PR checkout with all setting sources, so
   the PR's own `CLAUDE.md` files and `.claude/settings.json` (including its
   hooks) load. Same-repository branches only; tracked in CLAUDE-350.

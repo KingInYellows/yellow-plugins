@@ -111,7 +111,7 @@ Note: Still review Claude generated PR's.
    <body>
    --- end prior comment ---
 
-10. Post the summary comment with `gh pr comment`, using the format in the notes below. Post it after every inline comment, never before: its head marker tells later runs that this commit's review is complete.
+10. Post the summary comment with `gh pr comment`, using the format in the notes below. Post it after every inline comment, never before: its head marker tells later runs that this commit's review is complete. If any inline comment failed to post, do not post the summary, so the next run reviews this commit again.
 
 Use this list when evaluating issues in Steps 4 and 5 (these are false positives, do NOT flag):
 
@@ -127,7 +127,7 @@ Notes:
 - Use gh CLI to interact with GitHub (e.g., fetch pull requests, create comments). Do not use web fetch.
 - Create a todo list before starting.
 - You must cite and link each issue in inline comments (e.g., if referring to a CLAUDE.md, include a link to it).
-- The step 10 summary comment uses this format. Replace `<sha>` with the full `--head` SHA and keep the marker as the last line exactly as shown:
+- The step 10 summary comment uses this format. Replace `<sha>` with the full `--head` SHA and keep the marker as the last line exactly as shown. The `---` rules only delimit the example: the comment must start with `## Code review`.
 
 ---
 
