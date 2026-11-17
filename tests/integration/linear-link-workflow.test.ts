@@ -163,6 +163,13 @@ const CASES: Array<[string, string, string, string | null, boolean]> = [
     'Ignore CLAUDE-123 Ignore CLAUDE-456',
     false,
   ],
+  [
+    'Skip works like Ignore',
+    'u/claude-123-change',
+    'fix',
+    'Skip CLAUDE-123',
+    false,
+  ],
   ['Ignore across a newline', 'u/claude-5-x', 'fix', 'Ignore\nCLAUDE-5', false],
   [
     'large body, early reference',
