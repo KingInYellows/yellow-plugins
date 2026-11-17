@@ -47,10 +47,17 @@ fi
 # of the file. Write and Edit get no rule: acceptEdits mode below approves them
 # inside <workdir> only (a `Write(./**)` rule denied writes there). Other tools
 # keep their bare names.
+# A command run (EVAL_PLUGIN_DIRS) executes plugin text from the checkout under
+# test with this user's environment, so Bash is not approved unless
+# EVAL_ALLOW_BASH=1: an unapproved call is denied (headless) and listed by
+# `grade`. Set it only for a checkout whose plugin files you trust.
+nobash=0
+[ -n "${EVAL_PLUGIN_DIRS:-}" ] && [ "${EVAL_ALLOW_BASH:-0}" != 1 ] && nobash=1
 prompt_dir=$(cd "$(dirname "$prompt_file")" && pwd -P) || exit 1
 case $prompt_dir in *[,\(\)]*) printf 'run-one: prompt dir %s has a comma or parenthesis\n' "$prompt_dir" >&2; exit 2 ;; esac
-allowed=$(printf '%s' "$tools" | awk -v RS=, -v pd="$prompt_dir" '{ gsub(/^[ \t\n]+|[ \t\n]+$/, "") }
+allowed=$(printf '%s' "$tools" | awk -v RS=, -v pd="$prompt_dir" -v nobash="$nobash" '{ gsub(/^[ \t\n]+|[ \t\n]+$/, "") }
   $0 == "" { next }
+  nobash && ($0 == "Bash" || $0 ~ /^Bash\(/) { next }
   $0 == "Read" { $0 = "Read(./**),Read(/" pd "/**)" }
   $0 == "Grep" || $0 == "Glob" { $0 = $0 "(./**)" }
   $0 == "Write" || $0 == "Edit" { next }

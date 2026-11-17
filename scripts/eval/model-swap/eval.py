@@ -130,6 +130,9 @@ def fixture_parts(agent):
         with open(os.path.join(HERE, "run-one.sh"), "rb") as handle:
             h.update(b"run-one.sh:" + handle.read())
         h.update(json.dumps(agent.get("plugins", [])).encode())
+        if "plugins" in agent:
+            # Whether Bash was approved changes what a command run can do.
+            h.update(b"bash:" + os.environ.get("EVAL_ALLOW_BASH", "0").encode())
     return [h.hexdigest()]
 
 
