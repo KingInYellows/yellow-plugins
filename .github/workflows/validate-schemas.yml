@@ -1469,7 +1469,7 @@ jobs:
   plugin-shell-tests:
     name: Plugin Shell Tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04 # CLAUDE-346: stopgap until the suites pass on ubuntu-26.04
+    runs-on: ubuntu-latest
     # The required suites took 3m18s before yellow-review's ledger suite
     # landed. Resolve suites later pushed the combined job to 7-11 min
     # against a 15-minute cap, so yellow-review moved to its own job.
@@ -1583,7 +1583,7 @@ jobs:
   plugin-shell-tests-advisory:
     name: Plugin Shell Tests (advisory loop)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04 # CLAUDE-346: stopgap until the suites pass on ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [validate-schemas]
     continue-on-error: true
@@ -1639,7 +1639,7 @@ jobs:
   yellow-review-shell-tests:
     name: Plugin Shell Tests (yellow-review)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04 # CLAUDE-346: stopgap until the suites pass on ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [validate-schemas]
 
@@ -1685,7 +1685,7 @@ jobs:
   ruvector-shell-tests:
     name: Plugin Shell Tests (yellow-ruvector, advisory)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04 # CLAUDE-346: stopgap until the suites pass on ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [validate-schemas]
     continue-on-error: true
@@ -1711,7 +1711,7 @@ jobs:
     # suite, which needs kislyuk yq. Required in ci-status.
     name: Shell Compatibility (bash + zsh)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04 # CLAUDE-346: stopgap until the suites pass on ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [validate-schemas]
 
