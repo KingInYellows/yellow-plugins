@@ -255,7 +255,9 @@ still unlinked at merge and guesses its team, which has misfiled work.
 
 - Existing work: start the branch from Linear's "Copy git branch name", or put
   `Fixes CLAUDE-123` in the PR description (`Refs CLAUDE-123` for partial work).
-- New work: put `Fixes CLAUDE-NEW` in the PR description.
+- New work: put `Fixes CLAUDE-NEW` in the PR description. Linear creates the
+  issue only when the PR links no other issue, so if the PR also references an
+  existing one, create the new issue in Linear and link it by ID instead.
 - Never reference another team's key unless the work genuinely belongs there.
 - If Linear links the wrong issue, add `Ignore <ID>` to the PR description.
 

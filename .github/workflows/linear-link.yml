@@ -49,29 +49,32 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
-          # Word boundary = start/end of line or a non-[A-Za-z0-9_] character.
-          # Numeric IDs link from the branch, title or description; CLAUDE-NEW
-          # only works in the description, where Linear reads it as "create
-          # the issue in CLAUDE".
-          b='(^|[^A-Za-z0-9_])'
-          e='([^A-Za-z0-9_]|$)'
-          num="${b}CLAUDE-[0-9]+${e}"
-          lownum="${b}claude-[0-9]+${e}"
-          new="${b}CLAUDE-NEW${e}"
-          # ids SOURCE PATTERN: print matching IDs, uppercased, one per line.
-          # Here-strings, not pipes into grep -q, so pipefail cannot turn an
-          # early match into a SIGPIPE miss.
+          # IDs are matched on word boundaries (no [A-Za-z0-9_] on either
+          # side) with zero-width lookarounds, so adjacent references such as
+          # claude-1-claude-2 are both found. Numeric IDs link from the
+          # branch, title or description; CLAUDE-NEW only works in the
+          # description, where Linear reads it as "create the issue in CLAUDE".
+          # ids SOURCE MODE: print matching IDs, uppercased, one per line.
+          # MODE: branch (CLAUDE-n or claude-n), title (CLAUDE-n),
+          # body (CLAUDE-n or CLAUDE-NEW). perl reads the whole input, so no
+          # pipe writer can take SIGPIPE under pipefail.
           ids() {
-            { grep -oE -- "$2" <<<"$1" || true; } \
-              | { grep -oiE 'claude-([0-9]+|new)' || true; } | tr '[:lower:]' '[:upper:]'
+            MODE="$2" perl -0ne '
+              my %re = (
+                branch => qr/(?<![A-Za-z0-9_])(CLAUDE-\d+|claude-\d+)(?![A-Za-z0-9_])/,
+                title  => qr/(?<![A-Za-z0-9_])(CLAUDE-\d+)(?![A-Za-z0-9_])/,
+                body   => qr/(?<![A-Za-z0-9_])(CLAUDE-(?:\d+|NEW))(?![A-Za-z0-9_])/,
+              );
+              my $re = $re{$ENV{MODE}};
+              print uc($1), "\n" while /$re/g;
+            ' <<<"$1"
           }
           # Body cleanup: drop HTML comments (an unclosed one hides the rest of
           # the rendered body) so the template's example never counts.
           body=$(printf '%s' "${PR_BODY:-}" | perl -0pe 's/<!--.*?(?:-->|\z)//gs')
           # "Ignore <ID>" tells Linear never to link that ID from any source.
-          ignored=$({ grep -oiE '(^|[^A-Za-z0-9_])ignore[:[:space:]]*claude-[0-9]+' <<<"$body" || true; } \
-            | { grep -oiE 'claude-[0-9]+' || true; } | tr '[:lower:]' '[:upper:]' | sort -u)
-          body=$(perl -pe 's/\bignore\b[:\s]*claude-(?:\d+|new)\b//gi' <<<"$body")
+          ignored=$(perl -0ne 'print uc($1), "\n" while /(?<![A-Za-z0-9_])ignore[:\s]*(claude-\d+)(?![A-Za-z0-9_])/gi' <<<"$body")
+          body=$(perl -0pe 's/\bignore\b[:\s]*claude-(?:\d+|new)\b//gi' <<<"$body")
           linked() {
             local id
             while IFS= read -r id; do
@@ -81,11 +84,11 @@ jobs:
             return 1
           }
           found=''
-          if linked "$(ids "$PR_BRANCH" "$num|$lownum")"; then
+          if linked "$(ids "$PR_BRANCH" branch)"; then
             found='branch name'
-          elif linked "$(ids "$PR_TITLE" "$num")"; then
+          elif linked "$(ids "$PR_TITLE" title)"; then
             found='PR title'
-          elif linked "$(ids "$body" "$num|$new")"; then
+          elif linked "$(ids "$body" body)"; then
             found='PR description'
           fi
           if [ -n "$found" ]; then
