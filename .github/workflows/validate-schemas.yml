@@ -1537,6 +1537,42 @@ jobs:
         # extractor under both mawk and gawk.
         run: bats plugins/yellow-codex/tests/
 
+  # TEMPORARY (CLAUDE-346): diagnostics on ubuntu-26.04. Not in ci-status.
+  # Removed before this PR leaves draft.
+  shell-tests-2604-diag:
+    name: Shell diag (ubuntu-26.04, temporary)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install bats
+        run: sudo npm install -g bats@1.11.0
+      - name: Tool versions
+        run: |
+          for t in timeout tail head wc tr sed awk jq bash; do printf '%s: ' "$t"; readlink -f "$(command -v "$t")"; "$t" --version 2>&1 | head -1 || true; done
+      - name: Trace the large-tail capture
+        run: |
+          set -x
+          d=$(mktemp -d); f="$d/t.jsonl"
+          big=$(head -c 200000 /dev/zero | tr '\0' 'a'); echo "big=${#big}"
+          printf '{"type":"user","message":{"role":"user","content":"%s"}}\n' "$big" > "$f"
+          wc -c < "$f"; wc -l < "$f"
+          raw=$(tail -n 1000 -- "$f" | jq -Rr 'select((try fromjson catch null) | type == "object" and (.type == "user" or .type == "assistant"))' | tail -n 100)
+          echo "raw=${#raw}"
+          . plugins/yellow-core/lib/compound-staging.sh
+          red=$(printf '%s' "$raw" | cs_redact_secrets); echo "redacted=${#red} rc=$?"
+          printf '%s' "$red" | head -c 80; echo
+          cut=$(printf '%s' "$red" | tail -c 98304); echo "tail_c=${#cut}"
+          printf '%s' "$red" | tail -c 98304 | wc -c
+          printf 'abcdefghij' | tail -c 4; echo
+      - name: yellow-core bats (timed)
+        run: bats -T plugins/yellow-core/tests/
+      - name: yellow-ruvector bats (timed)
+        run: bats -T plugins/yellow-ruvector/tests/
+
   # ============================================================================
   # PLUGIN SHELL TESTS — ADVISORY LOOP (bats)
   # ============================================================================
