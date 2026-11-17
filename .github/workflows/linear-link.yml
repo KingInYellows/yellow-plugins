@@ -85,10 +85,13 @@ jobs:
           refs() {
             perl -0ne '
               my $id = qr/[A-Z][A-Z0-9]*-(?:\d+|NEW)/;
+              # A reference is a bare ID or a Linear issue URL.
+              my $ref = qr{(?:https?://linear\.app/[^/\s]+/issue/)?$id(?![A-Za-z0-9_])(?:/[^\s,]*)?};
               my $word = qr/(?i:close[sd]?|closing|fix(?:es|ed|ing)?|resolve[sd]?|resolving|complete[sd]?|completing|refs?|references|part\s+of|related\s+to|contributes\s+to|towards?)/;
-              while (/(?<![A-Za-z0-9_])$word[:\s]+($id(?:\s*(?:,|&|\band\b)\s*$id)*)(?![A-Za-z0-9_])/g) {
+              my $sep = qr/\s*(?:,\s*(?:and\s+)?|&|\band\b)\s*/;
+              while (/(?<![A-Za-z0-9_])$word[:\s]+($ref(?:$sep$ref)*)/g) {
                 my $list = $1;
-                print "$1\n" while $list =~ /($id)/g;
+                print "$1\n" while $list =~ m{(?:^|[\s,&/]|\band\b)($id)(?![A-Za-z0-9_])}g;
               }
             ' <<<"$1"
           }

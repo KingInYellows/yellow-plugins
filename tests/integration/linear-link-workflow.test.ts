@@ -181,6 +181,27 @@ const CASES: Array<[string, string, string, string | null, boolean]> = [
   ],
   ['magic word inside another word', 'feat/x', 'fix', 'prefix CLAUDE-3', false],
   [
+    'list with a comma and "and"',
+    'feat/x',
+    'fix',
+    'Fixes ENG-123, DES-5, and CLAUDE-256',
+    true,
+  ],
+  [
+    'Linear issue URL after a magic word',
+    'feat/x',
+    'fix',
+    'Fixes https://linear.app/acme/issue/CLAUDE-123/some-title',
+    true,
+  ],
+  [
+    'bare Linear issue URL does not link',
+    'feat/x',
+    'fix',
+    'See https://linear.app/acme/issue/CLAUDE-123/some-title',
+    false,
+  ],
+  [
     'Skip works like Ignore',
     'u/claude-123-change',
     'fix',
