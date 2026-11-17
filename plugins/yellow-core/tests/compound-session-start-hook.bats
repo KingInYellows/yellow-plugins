@@ -427,7 +427,10 @@ STUB
   run bash "$SS_HOOK" <<< "$(_stdin_json)"
   [ "$status" -eq 0 ]
   _wait_for_stub 3
-  for _ in $(seq 1 50); do [ -e "$STAGING/.drain-lock" ] || break; sleep 0.1; done
+  for _ in $(seq 1 50); do
+    [ -z "$(find "$STAGING" -maxdepth 1 -name '.drain-lock*' -print)" ] && break
+    sleep 0.1
+  done
   [ ! -e "$STAGING/.drain-lock" ]
   [ -z "$(find "$STAGING" -maxdepth 1 -name '.drain-lock*' -print)" ]
 }

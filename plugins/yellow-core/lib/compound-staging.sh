@@ -48,7 +48,9 @@ cs_lock_drop() {
   local gone="$1.drop.$$"
   [ -d "$1" ] || return 0
   rm -rf -- "$gone" 2>/dev/null
-  mv -- "$1" "$gone" 2>/dev/null || gone="$1"
+  # A failed rename means another caller already took the lock away (and
+  # may have re-acquired it): never fall back to removing it by name.
+  mv -- "$1" "$gone" 2>/dev/null || return 0
   rm -f -- "$gone/.owner" 2>/dev/null
   rmdir -- "$gone" 2>/dev/null
 }
