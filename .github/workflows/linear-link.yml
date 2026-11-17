@@ -8,11 +8,11 @@ name: Linear Link
 # team. A PR that names CLAUDE-<number> or CLAUDE-NEW is never guessed.
 #
 # Finds a link when any of these holds (word-boundary match):
-#   branch name     CLAUDE-<number>, claude-<number> (Linear's lowercase form)
-#                   or CLAUDE-NEW
-#   PR title / body CLAUDE-<number> or CLAUDE-NEW (case-sensitive; text
-#                   inside <!-- --> comments and "Ignore <ID>" references in
-#                   the body do not count)
+#   branch name     CLAUDE-<number> or claude-<number> (Linear's lowercase form)
+#   PR title        CLAUDE-<number> (case-sensitive)
+#   PR description  CLAUDE-<number> or CLAUDE-NEW (case-sensitive; text inside
+#                   <!-- --> comments does not count)
+# An ID named by "Ignore <ID>" in the description never counts, from any source.
 # The check is syntax-only: it does not ask Linear whether the issue exists.
 #
 # PR fields reach the script only through env, never through ${{ }} inside
@@ -50,22 +50,42 @@ jobs:
         run: |
           set -euo pipefail
           # Word boundary = start/end of line or a non-[A-Za-z0-9_] character.
-          upper='(^|[^A-Za-z0-9_])CLAUDE-([0-9]+|NEW)([^A-Za-z0-9_]|$)'
-          lower='(^|[^A-Za-z0-9_])claude-[0-9]+([^A-Za-z0-9_]|$)'
-          # Here-strings and command substitution, not pipes into grep -q: with
-          # pipefail, a writer killed by SIGPIPE after an early grep match
-          # would turn a found link into a miss.
+          # Numeric IDs link from the branch, title or description; CLAUDE-NEW
+          # only works in the description, where Linear reads it as "create
+          # the issue in CLAUDE".
+          b='(^|[^A-Za-z0-9_])'
+          e='([^A-Za-z0-9_]|$)'
+          num="${b}CLAUDE-[0-9]+${e}"
+          lownum="${b}claude-[0-9]+${e}"
+          new="${b}CLAUDE-NEW${e}"
+          # ids SOURCE PATTERN: print matching IDs, uppercased, one per line.
+          # Here-strings, not pipes into grep -q, so pipefail cannot turn an
+          # early match into a SIGPIPE miss.
+          ids() {
+            { grep -oE -- "$2" <<<"$1" || true; } \
+              | { grep -oiE 'claude-([0-9]+|new)' || true; } | tr '[:lower:]' '[:upper:]'
+          }
           # Body cleanup: drop HTML comments (an unclosed one hides the rest of
-          # the rendered body) so the template's example never counts, and drop
-          # "Ignore <ID>" references, which tell Linear not to link.
-          body=$(printf '%s' "${PR_BODY:-}" \
-            | perl -0pe 's/<!--.*?(?:-->|\z)//gs; s/\bignore\b[:\s]*claude-(?:\d+|new)\b//gi')
+          # the rendered body) so the template's example never counts.
+          body=$(printf '%s' "${PR_BODY:-}" | perl -0pe 's/<!--.*?(?:-->|\z)//gs')
+          # "Ignore <ID>" tells Linear never to link that ID from any source.
+          ignored=$({ grep -oiE '(^|[^A-Za-z0-9_])ignore[:[:space:]]*claude-[0-9]+' <<<"$body" || true; } \
+            | { grep -oiE 'claude-[0-9]+' || true; } | tr '[:lower:]' '[:upper:]' | sort -u)
+          body=$(perl -pe 's/\bignore\b[:\s]*claude-(?:\d+|new)\b//gi' <<<"$body")
+          linked() {
+            local id
+            while IFS= read -r id; do
+              [ -n "$id" ] || continue
+              grep -qxF -- "$id" <<<"$ignored" || return 0
+            done <<<"$1"
+            return 1
+          }
           found=''
-          if grep -Eq -- "$upper|$lower" <<<"$PR_BRANCH"; then
+          if linked "$(ids "$PR_BRANCH" "$num|$lownum")"; then
             found='branch name'
-          elif grep -Eq -- "$upper" <<<"$PR_TITLE"; then
+          elif linked "$(ids "$PR_TITLE" "$num")"; then
             found='PR title'
-          elif grep -Eq -- "$upper" <<<"$body"; then
+          elif linked "$(ids "$body" "$num|$new")"; then
             found='PR description'
           fi
           if [ -n "$found" ]; then
