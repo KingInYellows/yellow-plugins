@@ -111,6 +111,15 @@ Graphite CLI feature). The `remote-agent` group follows the same pattern
 gt-workflow ships its entry points as skills only (RULE 24); call them from
 another plugin as `gt-workflow:<name>`.
 
+### Linear linking
+
+Every branch and PR must reference a `CLAUDE` Linear issue; the advisory
+`linear-link` check warns when one is missing. Existing work: use Linear's "Copy
+git branch name" or put `Fixes CLAUDE-123` in the PR description. New work: put
+`Fixes CLAUDE-NEW` in the PR description. Never reference another team's key
+unless the work genuinely belongs there. If Linear links the wrong issue, add
+`Ignore <ID>` to the PR description. Details: AGENTS.md "Linear Linking".
+
 ### Conventional commits
 
 `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:` — atomic and
