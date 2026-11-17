@@ -71,6 +71,7 @@ ambiguous state is reported, never silently resolved.
 | `/github-stack:nav` | Checks out a stack target (branch, PR number, PR URL, or stack number); prompts if none given. |
 | `/github-stack:cleanup` | Removes local stack tracking; by default also remote-unstacks every PR via the GitHub API (`--local` skips that). Never deletes local branches. Always behind confirmation. |
 | `/github-stack:merge` | Merges a PR and every unmerged PR below it via `gh stack merge` (never `gh pr merge`), always behind confirmation. |
+| `/github-stack:merge-single` | Merges one ordinary PR with an explicit merge method, pinned to the head commit you confirmed. Refuses a PR that belongs to a stack. |
 
 Each is a thin wrapper over a same-named skill, matching the
 `/plan:status` → `plan-status` pattern used elsewhere in this marketplace.

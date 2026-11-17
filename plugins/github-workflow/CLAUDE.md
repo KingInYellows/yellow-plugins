@@ -14,8 +14,9 @@ the provider model:
   runtime adapter is the sole owner of argument validation, confirmation
   gating, exit-code interpretation, and **credential redaction** for every
   mutating operation (`init`, `add`, `checkout`, `rebase`, `sync`, `push`,
-  `submit`, `merge`, `unstack`). Calling `gh stack` directly from a Bash
-  block bypasses `redact()` and can surface a token from a
+  `submit`, `merge`, `merge-single`, `unstack`). `merge-single` is the one
+  operation that calls `gh api` rather than `gh stack`. Calling `gh stack`
+  directly from a Bash block bypasses `redact()` and can surface a token from a
   credential-bearing remote URL straight into model context.
 - **Never disable, uninstall, or work around `gt-workflow`.** Provider
   switching is `yellow-core`'s `/stack:select` and nothing else.
@@ -28,7 +29,7 @@ the provider model:
 
 ## Components
 
-### Commands (9)
+### Commands (10)
 
 - `/github-stack:setup` — thin wrapper invoking the `github-stack-setup`
   skill via the `Skill` tool.
@@ -48,8 +49,10 @@ the provider model:
   skill via the `Skill` tool.
 - `/github-stack:merge` — thin wrapper invoking the `github-stack-merge`
   skill via the `Skill` tool.
+- `/github-stack:merge-single` — thin wrapper invoking the
+  `github-stack-merge-single` skill via the `Skill` tool.
 
-### Skills (9)
+### Skills (10)
 
 - `github-stack-setup` — prerequisite check: `gh` present and authenticated,
   the installed `gh stack` extension is the official `github/gh-stack` at or
@@ -84,6 +87,14 @@ the provider model:
   an `AskUserQuestion` confirmation; never calls `gh pr merge`. The preview
   lists the target and every unmerged PR below it, because GitHub lands
   that whole set (or queues it when the base uses a merge queue).
+- `github-stack-merge-single` — merge one ordinary pull request via the
+  runtime adapter's `merge-single` operation (Preview → Confirm → Merge →
+  Report). The adapter refuses a pull request GitHub reports as part of a
+  stack, a draft, a closed one, or one not based on the default branch,
+  needs an explicit merge method, and merges only the head commit and base
+  branch the preview reported (REST merge call with `sha`). The skill stops
+  on a pull request Graphite owns. No admin override, auto-merge or branch
+  deletion.
 
 ### MCP servers (0) · Hooks (2)
 

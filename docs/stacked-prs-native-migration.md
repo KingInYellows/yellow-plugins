@@ -85,6 +85,9 @@ deleted.
 - merge-queue behavior for a stack
 - whether a server-side "Rebase stack" produces signed commits
 - how `gh pr merge` and the REST merge endpoint behave on a stacked pull request
+- `merge-single` against GitHub: it is covered by fixture tests only. The
+  `stack` field it checks was read from live pull requests (present on #1823,
+  absent on unstacked ones)
 
 One live lifecycle (submit, restack, sync, partial merge, sync) has been run,
 from a workstation clone that called the adapter directly. No machine has GitHub
@@ -140,9 +143,10 @@ It never selects it for you, and it never moves an enabled Graphite setup.
 **An independent change is an ordinary pull request.** `/github-stack:submit`
 registers the branch as a one-branch stack on the trunk and opens one draft pull
 request. GitHub forms a stack only when two pull requests exist. Such a pull
-request lands through the repository's normal merge flow: `gh stack merge`
-accepts only a stack or a stacked pull request, so `/github-stack:merge` stops
-on it instead of merging.
+request lands with `/github-stack:merge-single <number>`, which needs a merge
+method and a confirmation and refuses a pull request that belongs to a stack.
+`gh stack merge` accepts only a stack or a stacked pull request, so
+`/github-stack:merge` stops on an ordinary one instead of merging.
 
 **Stack only when pull requests depend on one another.**
 
@@ -153,6 +157,7 @@ on it instead of merging.
 | See the stack                             | `/github-stack:plan`                                                                                             |
 | Change a lower layer                      | check it out with `/github-stack:nav`, then `/github-stack:amend` (amends, rebases the layers above, re-submits) |
 | Catch up with the trunk, or after a merge | `/github-stack:sync`                                                                                             |
+| Land an independent pull request          | `/github-stack:merge-single`                                                                                     |
 | Land a stack of two or more               | `/github-stack:merge`                                                                                            |
 | Stop tracking                             | `/github-stack:cleanup`                                                                                          |
 

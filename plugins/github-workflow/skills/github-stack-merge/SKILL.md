@@ -103,9 +103,10 @@ if given.
 If the set is a single pull request on a one-branch stack (independent
 work, nothing below or above it), GitHub has no stack object for it and
 `gh stack merge` refuses it with `NOT_IN_STACK`. Stop here and say so: it
-is an ordinary pull request, and it lands through the repository's normal
-merge flow (the pull request page, or whatever the project's own
-instructions say), not through this skill.
+is an ordinary pull request, and it lands through the
+`github-stack-merge-single` skill (`/github-stack:merge-single <number>`),
+not through this one. Do not invoke that skill yourself: it has its own
+preview and confirmation.
 
 Stop before asking when any of these holds, and say which:
 
@@ -163,15 +164,16 @@ Read the JSON result's `status` field.
 
 - **`NOT_IN_STACK`** — the target is not a stacked pull request (an
   ordinary pull request from a one-branch stack reaches this). Nothing was
-  merged. Say that it lands through the repository's normal merge flow; do
-  not merge it from this skill.
+  merged. Say that it lands through the `github-stack-merge-single` skill;
+  do not merge it from this skill.
 - Any other status — report `status` and `recoveryAction` verbatim.
 
 ## Boundaries
 
 - Never calls `gh pr merge` or the REST merge endpoint for a pull request
   in a stack — neither is the stack merge. The adapter's `merge` operation
-  (which calls `gh stack merge`) is the only merge path.
+  (which calls `gh stack merge`) is the only merge path for a stack; an
+  ordinary pull request has its own, `merge-single`.
 - Never confirms a merge whose preview omitted the pull requests below the
   target.
 - Never passes `--confirm` without an immediately preceding

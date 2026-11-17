@@ -20,8 +20,8 @@
  *     repository-relative, and flags/merge-methods against a fixed enum.
  *     A validation failure returns an INVALID_ARGS result; it never
  *     "escapes" the value and proceeds.
- *   - `gh stack view --json` is the only read path used — never bare
- *     `view`. `submit` always passes `--auto`; `--open` is added only
+ *   - `gh stack view --json` is the only stack read path used — never
+ *     bare `view`. `submit` always passes `--auto`; `--open` is added only
  *     when the caller explicitly requests it. `checkout`/`init`/`add`
  *     always receive an explicit target/branch argument — this runtime
  *     never lets the underlying CLI fall through to its interactive
@@ -31,8 +31,12 @@
  *     then rewrite the branches to match it. `modify` and `switch` are NEVER invoked — both are
  *     TUI-only per the Phase 0 source read; there is no non-interactive
  *     path this runtime could use even if it wanted to. `gh pr merge` is
- *     never invoked for a stack — `merge()` below is the only merge path.
- *   - Destructive operations (`unstack`, `sync --prune`, `merge`, and
+ *     never invoked — `merge()` below is the only merge path for a stack.
+ *     `mergeSingle()` is the separate path for an ordinary pull request:
+ *     it reads the pull request with `gh api`, refuses one in a stack, and
+ *     lands it with the REST merge call.
+ *   - Destructive operations (`unstack`, `sync --prune`, `merge`,
+ *     `merge-single`, and
  *     `--accept-base-change` on `sync`/`rebase`) require the caller to pass
  *     `confirm: true` explicitly; without it they return a
  *     REQUIRES_CONFIRMATION result and run nothing.
@@ -53,7 +57,7 @@
  *   node github-stack-runtime.js <op> [--flag value ...] [--confirm] [--json-args <path|->]
  *
  * Operations: view, init, add, checkout, rebase, sync, push, submit, merge,
- * unstack. Argument shapes are verified against gh-stack v0.3.0 (the
+ * merge-single, unstack. Argument shapes are verified against gh-stack v0.3.0 (the
  * `TESTED_GH_STACK_VERSION` yellow-core's stack-tooling-probe.js reports).
  * Output is a single JSON result object on stdout. Exit code is always 0
  * for a completed probe/operation attempt (the result's own `status` field
@@ -65,6 +69,7 @@
 'use strict';
 
 const { spawnSync } = require('child_process');
+const { createHash } = require('crypto');
 
 const MAX_OUTPUT_CHARS = 8000;
 const DEFAULT_TIMEOUT_MS = 120000;
@@ -104,6 +109,15 @@ const EXIT_STATUS = Object.freeze({
 });
 
 const MERGE_METHODS = Object.freeze(['merge', 'squash', 'rebase']);
+const SHA_RE = /^[0-9a-f]{40}$/;
+/**
+ * `mergeable_state` values under which `merge-single` will merge. `unstable`
+ * is mergeable with a failing check that is not required. Everything else
+ * (`blocked`, `behind`, `dirty`, `draft`, `unknown`) is refused: the REST
+ * merge call lets a repository admin through branch protection, so the
+ * adapter must not rely on GitHub refusing the call.
+ */
+const MERGEABLE_STATES = Object.freeze(['clean', 'has_hooks', 'unstable']);
 
 // ---------------------------------------------------------------------------
 // Execution primitive
@@ -360,14 +374,19 @@ const RECOVERY_ACTIONS = Object.freeze({
  *   execResult: { ok: boolean, code: number|null, stdout: string, stderr: string },
  *   mayHaveMutated: boolean,
  *   syncAbortCheck?: boolean,
+ *   statusOverride?: string,
  * }} input
  */
-function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck = false }) {
+function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck = false, statusOverride }) {
   const stdout = bound(execResult.stdout);
   const stderr = bound(execResult.stderr);
   let status;
   if (!execResult.ok) {
     status = 'SPAWN_FAILURE';
+  } else if (statusOverride) {
+    // The command is not `gh stack`, so gh-stack's exit codes and progress
+    // text say nothing about it; the caller read the outcome itself.
+    status = statusOverride;
   } else if (/rerun with --accept-base-change/.test(`${execResult.stdout}\n${execResult.stderr}`)) {
     // gh-stack 0.3.0 leaves the stack un-rebased when GitHub retargeted its
     // base and the old base never merged. Whatever the exit code, the stack
@@ -729,6 +748,207 @@ function merge({ target, mergeMethod, confirm }) {
 }
 
 /**
+ * Read pull request `target` from GitHub for `merge-single` and decide
+ * whether it is an ordinary one that may be landed on its own.
+ * @param {string} op
+ * @param {string} target a validated pull request number
+ * @returns {{ result: object } | { pullRequest: { number: number, repository: string, baseRef: string, headRef: string, headSha: string } }}
+ *   `result` is the finished refusal or lookup failure.
+ */
+function readOrdinaryPullRequest(op, target) {
+  const lookupArgs = ['api', `repos/{owner}/{repo}/pulls/${target}`];
+  const lookup = run('gh', lookupArgs);
+  if (!lookup.ok || lookup.code !== 0) {
+    return {
+      result: shapeResult({
+        op,
+        bin: 'gh',
+        args: lookupArgs,
+        execResult: lookup,
+        mayHaveMutated: false,
+        statusOverride: 'API_FAILURE',
+      }),
+    };
+  }
+  let pr;
+  try {
+    pr = JSON.parse(lookup.stdout);
+  } catch {
+    pr = null;
+  }
+  const text = (value) => (typeof value === 'string' ? value : '');
+  const head = (pr && pr.head) || {};
+  const base = (pr && pr.base) || {};
+  const repo = base.repo || {};
+  const found = {
+    number: Number(target),
+    repository: text(repo.full_name),
+    baseRef: text(base.ref),
+    headRef: text(head.ref),
+    headSha: text(head.sha),
+  };
+  const defaultBranch = text(repo.default_branch);
+  const readable =
+    pr !== null &&
+    typeof pr === 'object' &&
+    String(pr.number) === target &&
+    SHA_RE.test(found.headSha) &&
+    typeof pr.draft === 'boolean' &&
+    [found.repository, found.baseRef, found.headRef, defaultBranch].every(Boolean);
+  const where = `pull request #${target} in ${found.repository}`;
+  let reason = null;
+  if (!readable) {
+    reason = `GitHub's answer for pull request #${target} could not be read; nothing was merged`;
+  } else if (pr.state !== 'open') {
+    reason = `${where} is ${pr.merged ? 'already merged' : 'not open'}`;
+  } else if (pr.draft) {
+    reason = `${where} is a draft; mark it ready for review first`;
+  } else if (pr.stack !== undefined && pr.stack !== null) {
+    const stackNumber =
+      typeof pr.stack === 'object' && Number.isInteger(pr.stack.number) ? ` (stack #${pr.stack.number})` : '';
+    reason = `${where} belongs to a stack${stackNumber}; land it with the merge operation, which merges it together with the pull requests below it`;
+  } else if (found.baseRef !== defaultBranch) {
+    // A pull request based on another branch is a layer of something, for
+    // example a stack that another provider manages and GitHub does not
+    // report. Landing it would merge it into that branch, not the trunk.
+    reason = `${where} targets "${found.baseRef}", not the default branch "${defaultBranch}"; it depends on another branch, so it is not an independent pull request`;
+  } else if (!MERGEABLE_STATES.includes(pr.mergeable_state)) {
+    const state = text(pr.mergeable_state) || 'missing';
+    reason =
+      state === 'unknown' || state === 'missing'
+        ? `GitHub has not worked out yet whether ${where} can be merged (state "${state}"); run again in a moment`
+        : `GitHub reports ${where} as "${state}", not ready to merge: a required check, review, update or the merge queue is outstanding. This operation does not override that`;
+  }
+  return reason ? { result: refusalResult(op, reason) } : { pullRequest: found };
+}
+
+/**
+ * A fingerprint of what a `merge-single` preview showed: the repository,
+ * pull request, base branch, head commit and merge method. The caller
+ * passes it back to confirm, so no branch or repository name (which the
+ * pull request's author chooses) ever has to be copied into a command line.
+ * @param {{ number: number, repository: string, baseRef: string, headSha: string }} pullRequest
+ * @param {string} mergeMethod
+ * @returns {string} 64 hexadecimal characters
+ */
+function previewTokenOf(pullRequest, mergeMethod) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        pullRequest.repository,
+        pullRequest.number,
+        pullRequest.baseRef,
+        pullRequest.headSha,
+        mergeMethod,
+      ])
+    )
+    .digest('hex');
+}
+
+/**
+ * Land ONE ordinary pull request: one that GitHub does not report as part of
+ * a stack. `gh stack merge` refuses such a pull request, and `merge` above
+ * must never land a stacked one the plain way, so this is a separate
+ * operation with its own gates:
+ *
+ * - `target` is a pull request number only, and `mergeMethod` is required;
+ * - the pull request is read from GitHub first and refused when it is not
+ *   open, is a draft, carries a `stack` object, is based on a branch
+ *   other than the repository's default branch, or is not reported as
+ *   mergeable;
+ * - without `confirm: true` nothing is merged and the result reports the
+ *   head commit and base branch that were read, with a `previewToken`
+ *   that fingerprints them;
+ * - with `confirm: true` the caller must pass that token back. It is
+ *   refused when the repository, base, head or method no longer match, and
+ *   GitHub checks the head again (`sha` on the merge call), so what lands
+ *   is what was shown.
+ *
+ * Both calls are `gh api` with the `{owner}/{repo}` placeholders, so the
+ * check and the merge always address the same repository, whichever way
+ * `gh` resolves it. The REST merge call would let a repository admin
+ * through branch protection, so a pull request GitHub does not report as
+ * mergeable (`mergeable_state`) is refused before the call. No auto-merge,
+ * no branch deletion.
+ */
+function mergeSingle({ target, mergeMethod, previewToken, confirm }) {
+  const op = 'merge-single';
+  if (typeof target !== 'string' || !/^[1-9][0-9]*$/.test(target)) {
+    return refusalResult(op, `target must be a pull request number, got "${target === undefined ? '' : target}"`);
+  }
+  if (mergeMethod === undefined) {
+    return refusalResult(op, `mergeMethod is required: one of ${MERGE_METHODS.join(', ')}`);
+  }
+  const methodCheck = validateEnum(mergeMethod, MERGE_METHODS, 'mergeMethod');
+  if (!methodCheck.ok) return refusalResult(op, methodCheck.reason);
+  if (previewToken !== undefined && !/^[0-9a-f]{64}$/.test(previewToken)) {
+    return refusalResult(op, 'previewToken must be the 64 hexadecimal characters a preview reported');
+  }
+  if (confirm === true && previewToken === undefined) {
+    return refusalResult(
+      op,
+      'confirm needs previewToken: run once without confirm, show what it reports, then pass its previewToken back'
+    );
+  }
+
+  const read = readOrdinaryPullRequest(op, target);
+  if (read.result) return read.result;
+  const { pullRequest } = read;
+  const shown = `pull request #${target} of ${pullRequest.repository} into ${pullRequest.baseRef} at head ${pullRequest.headSha}`;
+  const currentToken = previewTokenOf(pullRequest, methodCheck.value);
+  if (confirm !== true) {
+    return {
+      ...confirmationRequiredResult(
+        op,
+        `merge-single lands ${shown} with method ${methodCheck.value}, and cannot be undone by this runtime; re-run with previewToken ${currentToken} and confirm`
+      ),
+      pullRequest: {
+        ...pullRequest,
+        repository: redact(pullRequest.repository),
+        baseRef: redact(pullRequest.baseRef),
+        headRef: redact(pullRequest.headRef),
+      },
+      previewToken: currentToken,
+    };
+  }
+  if (previewToken !== currentToken) {
+    return refusalResult(
+      op,
+      `the confirmation does not match what GitHub shows now (${shown}, method ${methodCheck.value}): the head, base or method changed since the preview. Nothing was merged. Preview again and ask again`
+    );
+  }
+  const args = [
+    'api',
+    '-X',
+    'PUT',
+    `repos/{owner}/{repo}/pulls/${target}/merge`,
+    '-f',
+    `merge_method=${methodCheck.value}`,
+    '-f',
+    `sha=${pullRequest.headSha}`,
+  ];
+  const execResult = run('gh', args);
+  let merged = false;
+  if (execResult.ok && execResult.code === 0) {
+    try {
+      merged = JSON.parse(execResult.stdout).merged === true;
+    } catch {
+      merged = false;
+    }
+  }
+  let statusOverride = 'API_FAILURE';
+  if (execResult.code === 0) statusOverride = merged ? 'SUCCESS' : 'ERROR';
+  const result = shapeResult({ op, bin: 'gh', args, execResult, mayHaveMutated: true, statusOverride });
+  if (result.status === 'API_FAILURE' || result.status === 'ERROR') {
+    // The generic API_FAILURE text says to retry. A refused merge is not
+    // transient: the pull request has to change first.
+    result.recoveryAction =
+      'GitHub did not merge the pull request; its reason is in stdout (for example a required check, or a head that moved). Check on GitHub whether it merged before doing anything else, and do not retry unchanged.';
+  }
+  return result;
+}
+
+/**
  * `gh stack unstack [--local]`. Verified against `cmd/unstack.go` at the
  * pinned SHA: the DEFAULT (no `--local`) call removes local stack
  * tracking AND remote-unstacks every PR in the stack via the GitHub API —
@@ -754,7 +974,19 @@ function unstack({ local, confirm }) {
   return shapeResult({ op: 'unstack', bin: 'gh', args, execResult, mayHaveMutated: true });
 }
 
-const OPERATIONS = Object.freeze({ view, init, add, checkout, rebase, sync, push, submit, merge, unstack });
+const OPERATIONS = Object.freeze({
+  view,
+  init,
+  add,
+  checkout,
+  rebase,
+  sync,
+  push,
+  submit,
+  merge,
+  'merge-single': mergeSingle,
+  unstack,
+});
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -822,6 +1054,7 @@ function main(argv) {
     remote: typeof args.remote === 'string' ? args.remote : undefined,
     mode: typeof args.mode === 'string' ? args.mode : undefined,
     mergeMethod: typeof args['merge-method'] === 'string' ? args['merge-method'] : undefined,
+    previewToken: typeof args['preview-token'] === 'string' ? args['preview-token'] : undefined,
     open: args.open === true,
     prune: args.prune === true,
     local: args.local === true,
@@ -857,5 +1090,7 @@ module.exports = {
   push,
   submit,
   merge,
+  mergeSingle,
+  previewTokenOf,
   unstack,
 };

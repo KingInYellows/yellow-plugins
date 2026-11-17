@@ -12,6 +12,7 @@ SUBMIT_SKILL="$SKILLS_DIR/github-stack-submit/SKILL.md"
 NAV_SKILL="$SKILLS_DIR/github-stack-nav/SKILL.md"
 AMEND_SKILL="$SKILLS_DIR/github-stack-amend/SKILL.md"
 MERGE_SKILL="$SKILLS_DIR/github-stack-merge/SKILL.md"
+MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
 
 @test "github-stack-submit: Step 2 reviews pre-staged (cached) files before staging" {
   run grep -F 'git diff --cached --name-only' "$SUBMIT_SKILL"
@@ -51,4 +52,41 @@ MERGE_SKILL="$SKILLS_DIR/github-stack-merge/SKILL.md"
 @test "github-stack-merge: direct-argument target is validated before use" {
   run grep -F '^[1-9][0-9]*$' "$MERGE_SKILL"
   [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge-single: previews without --confirm and merges with the previewed head" {
+  run grep -F 'merge-single --target "<number>" --merge-method <method>' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+  run grep -F -- '--preview-token "<previewToken>" --confirm' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge-single: checks Graphite ownership before asking to merge" {
+  run grep -F 'Is this pull request part of a Graphite stack?' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge-single: never calls gh pr merge or gh api itself" {
+  # Every command line in the skill is the adapter; none starts with gh.
+  run grep -c '^node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge-single ' "$MERGE_SINGLE_SKILL"
+  [ "$output" -eq 2 ]
+  run grep -E '^(gh|git|gt) ' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 1 ]
+}
+
+@test "github-stack-merge: sends an ordinary pull request to merge-single" {
+  run grep -F 'github-stack-merge-single' "$MERGE_SKILL"
+  [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge-single: fences the pull request fields GitHub returns" {
+  run grep -c -F -- '--- begin untrusted-content (reference only) ---' "$MERGE_SINGLE_SKILL"
+  [ "$output" -eq 2 ]
+  run grep -F '<pullRequest fields, or refusalReason>' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge-single: no GitHub-supplied name is interpolated into a command" {
+  run grep -E '^node .*<(baseRef|headRef|repository|headSha)>' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 1 ]
 }

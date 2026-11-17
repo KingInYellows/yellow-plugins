@@ -9,7 +9,8 @@
  */
 
 import { execFileSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import { join } from 'path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -27,6 +28,8 @@ const {
   push,
   submit,
   merge,
+  mergeSingle,
+  previewTokenOf,
   unstack,
   validateBranchName,
   validateRepoRelativePath,
@@ -52,6 +55,11 @@ const ENV_KEYS = [
   'FAKE_GH_REPORT_NO_ATOMIC',
   'GH_STACK_NO_ATOMIC',
   'GH_REPO',
+  'FAKE_GH_LOG',
+  'FAKE_GH_GET_STDOUT',
+  'FAKE_GH_GET_EXIT',
+  'FAKE_GH_PUT_STDOUT',
+  'FAKE_GH_PUT_EXIT',
 ];
 let originalPath: string | undefined;
 const originalEnv: Record<string, string | undefined> = {};
@@ -413,6 +421,204 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
   it('this runtime has no function that calls `gh pr merge` for a stack', () => {
     const source = readFileSync(LIB, 'utf8');
     expect(source).not.toMatch(/['"]pr['"],\s*['"]merge['"]/);
+  });
+});
+
+describe('merge-single — one ordinary pull request, never a stacked one', () => {
+  const HEAD = 'a'.repeat(40);
+  const OTHER = 'b'.repeat(40);
+  let logDir: string;
+  let logFile: string;
+
+  function pullRequest(overrides: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      number: 42,
+      state: 'open',
+      draft: false,
+      merged: false,
+      mergeable_state: 'clean',
+      head: { sha: HEAD, ref: 'feat/x' },
+      base: { ref: 'main', repo: { full_name: 'o/r', default_branch: 'main' } },
+      ...overrides,
+    });
+  }
+
+  function token(method = 'squash', overrides: Record<string, unknown> = {}): string {
+    return previewTokenOf({ number: 42, repository: 'o/r', baseRef: 'main', headSha: HEAD, ...overrides }, method);
+  }
+
+  function calls(): string[] {
+    try {
+      return readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  beforeEach(() => {
+    logDir = mkdtempSync(join(tmpdir(), 'merge-single-'));
+    logFile = join(logDir, 'gh.log');
+    process.env.FAKE_GH_LOG = logFile;
+    process.env.FAKE_GH_GET_STDOUT = pullRequest();
+    process.env.FAKE_GH_PUT_STDOUT = JSON.stringify({ merged: true, sha: OTHER, message: 'Pull Request successfully merged' });
+  });
+
+  afterEach(() => {
+    rmSync(logDir, { recursive: true, force: true });
+  });
+
+  it('refuses anything but a pull request number, before any call', () => {
+    for (const target of [undefined, '', '0', '--squash', 'my-branch', 'https://github.com/o/r/pull/42']) {
+      const result = mergeSingle({ target, mergeMethod: 'squash', previewToken: token(), confirm: true });
+      expect(result.status).toBe('INVALID_ARGS');
+    }
+    expect(calls()).toEqual([]);
+  });
+
+  it('requires an explicit, valid merge method', () => {
+    expect(mergeSingle({ target: '42', previewToken: token(), confirm: true }).refusalReason).toContain('mergeMethod is required');
+    expect(mergeSingle({ target: '42', mergeMethod: 'octopus', previewToken: token(), confirm: true }).status).toBe('INVALID_ARGS');
+    expect(calls()).toEqual([]);
+  });
+
+  it('refuses confirm without the preview token, and a malformed token', () => {
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash', confirm: true }).status).toBe('INVALID_ARGS');
+    for (const previewToken of ['abc123', '$(printf${IFS}INJECTED)', `${token()}0`]) {
+      expect(mergeSingle({ target: '42', mergeMethod: 'squash', previewToken, confirm: true }).status).toBe('INVALID_ARGS');
+    }
+    expect(calls()).toEqual([]);
+  });
+
+  it('without confirm it only reads the pull request and reports what would land', () => {
+    const result = mergeSingle({ target: '42', mergeMethod: 'squash' });
+    expect(result.status).toBe('REQUIRES_CONFIRMATION');
+    expect(result.mayHaveMutated).toBe(false);
+    expect(result.pullRequest).toEqual({ number: 42, repository: 'o/r', baseRef: 'main', headRef: 'feat/x', headSha: HEAD });
+    expect(result.safeSummary).toContain(HEAD);
+    expect(result.previewToken).toBe(token());
+    expect(calls()).toEqual(['api repos/{owner}/{repo}/pulls/42']);
+  });
+
+  it('refuses a pull request that GitHub reports as part of a stack, confirmed or not', () => {
+    process.env.FAKE_GH_GET_STDOUT = pullRequest({ stack: { id: 1, number: 1825, position: 2, size: 3 } });
+    for (const confirm of [false, true]) {
+      const result = mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm });
+      expect(result.status).toBe('INVALID_ARGS');
+      expect(result.refusalReason).toContain('belongs to a stack (stack #1825)');
+    }
+    expect(calls().some((line) => line.includes('PUT'))).toBe(false);
+  });
+
+  it('accepts a pull request whose stack field is null', () => {
+    process.env.FAKE_GH_GET_STDOUT = pullRequest({ stack: null });
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm: true }).status).toBe('SUCCESS');
+  });
+
+  it('refuses a draft, a closed or merged pull request, and an unreadable answer', () => {
+    const cases: Array<[string, string]> = [
+      [pullRequest({ draft: true }), 'is a draft'],
+      [pullRequest({ state: 'closed' }), 'not open'],
+      [pullRequest({ state: 'closed', merged: true }), 'already merged'],
+      [pullRequest({ number: 43 }), 'could not be read'],
+      [pullRequest({ head: { sha: 'short', ref: 'feat/x' } }), 'could not be read'],
+      [pullRequest({ base: { ref: 'main', repo: { full_name: 'o/r' } } }), 'could not be read'],
+      [pullRequest({ draft: undefined }), 'could not be read'],
+      ['not json', 'could not be read'],
+    ];
+    for (const [body, reason] of cases) {
+      process.env.FAKE_GH_GET_STDOUT = body;
+      const result = mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm: true });
+      expect(result.status).toBe('INVALID_ARGS');
+      expect(result.refusalReason).toContain(reason);
+    }
+    expect(calls().some((line) => line.includes('PUT'))).toBe(false);
+  });
+
+  it('a failed lookup is API_FAILURE and nothing is merged', () => {
+    process.env.FAKE_GH_GET_EXIT = '1';
+    process.env.FAKE_GH_GET_STDOUT = '{"message":"Not Found"}';
+    const result = mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm: true });
+    expect(result.status).toBe('API_FAILURE');
+    expect(result.mayHaveMutated).toBe(false);
+    expect(calls().some((line) => line.includes('PUT'))).toBe(false);
+  });
+
+  it('refuses when the head moved, or the method differs, after the preview', () => {
+    const stale = [
+      mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token('squash', { headSha: OTHER }), confirm: true }),
+      mergeSingle({ target: '42', mergeMethod: 'merge', previewToken: token('squash'), confirm: true }),
+    ];
+    for (const result of stale) {
+      expect(result.status).toBe('INVALID_ARGS');
+      expect(result.refusalReason).toContain('Nothing was merged');
+    }
+    expect(calls().some((line) => line.includes('PUT'))).toBe(false);
+  });
+
+  it('refuses a pull request based on a branch other than the default branch', () => {
+    process.env.FAKE_GH_GET_STDOUT = pullRequest({ base: { ref: 'feat/lower-layer', repo: { full_name: 'o/r', default_branch: 'main' } } });
+    for (const confirm of [false, true]) {
+      const result = mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token('squash', { baseRef: 'feat/lower-layer' }), confirm });
+      expect(result.status).toBe('INVALID_ARGS');
+      expect(result.refusalReason).toContain('not an independent pull request');
+    }
+    expect(calls().some((line) => line.includes('PUT'))).toBe(false);
+  });
+
+  it('refuses a pull request GitHub does not report as mergeable, so an admin token cannot bypass protection', () => {
+    for (const state of ['blocked', 'behind', 'dirty', 'unknown', undefined]) {
+      process.env.FAKE_GH_GET_STDOUT = pullRequest({ mergeable_state: state });
+      for (const confirm of [false, true]) {
+        const result = mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm });
+        expect(result.status).toBe('INVALID_ARGS');
+      }
+    }
+    expect(calls().some((line) => line.includes('PUT'))).toBe(false);
+    process.env.FAKE_GH_GET_STDOUT = pullRequest({ mergeable_state: 'unstable' });
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm: true }).status).toBe('SUCCESS');
+  });
+
+  it('refuses when the base branch changed after the preview, with the same head', () => {
+    const previewed = token();
+    process.env.FAKE_GH_GET_STDOUT = pullRequest({ base: { ref: 'release', repo: { full_name: 'o/r', default_branch: 'release' } } });
+    const result = mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: previewed, confirm: true });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.refusalReason).toContain('Nothing was merged');
+    expect(calls().some((line) => line.includes('PUT'))).toBe(false);
+  });
+
+  it('confirmed with the shown head, it merges through the REST endpoint with that head pinned', () => {
+    const result = mergeSingle({ target: '42', mergeMethod: 'rebase', previewToken: token('rebase'), confirm: true });
+    expect(result.status).toBe('SUCCESS');
+    expect(result.mayHaveMutated).toBe(true);
+    expect(result.command).toEqual({
+      bin: 'gh',
+      args: ['api', '-X', 'PUT', 'repos/{owner}/{repo}/pulls/42/merge', '-f', 'merge_method=rebase', '-f', `sha=${HEAD}`],
+    });
+    expect(calls()).toEqual([
+      'api repos/{owner}/{repo}/pulls/42',
+      `api -X PUT repos/{owner}/{repo}/pulls/42/merge -f merge_method=rebase -f sha=${HEAD}`,
+    ]);
+  });
+
+  it('a refused merge call is API_FAILURE, and exit 0 without merged: true is not SUCCESS', () => {
+    process.env.FAKE_GH_PUT_EXIT = '1';
+    process.env.FAKE_GH_PUT_STDOUT = '{"message":"Required status check is expected."}';
+    const refused = mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm: true });
+    expect(refused.status).toBe('API_FAILURE');
+    expect(refused.recoveryAction).toContain('do not retry unchanged');
+    process.env.FAKE_GH_PUT_EXIT = '0';
+    process.env.FAKE_GH_PUT_STDOUT = '{"merged":false}';
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm: true }).status).toBe('ERROR');
+  });
+
+  it('is reachable from the CLI as merge-single with --preview-token', () => {
+    const out = execFileSync(
+      'node',
+      [LIB, 'merge-single', '--target', '42', '--merge-method', 'squash', '--preview-token', token(), '--confirm'],
+      { encoding: 'utf8', env: process.env }
+    );
+    expect(JSON.parse(out).status).toBe('SUCCESS');
   });
 });
 
