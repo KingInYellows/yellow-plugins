@@ -394,15 +394,15 @@ vendored code-review command (CLAUDE-248). Its boundary:
 - **Known gap**: the action runs in the PR checkout with all setting sources, so
   the PR's own `CLAUDE.md` files and `.claude/settings.json` (including its
   hooks) load. Same-repository branches only; tracked in CLAUDE-350.
-- **Agent tools**: `--allowedTools` pre-approves the inline-comment MCP tool
-  and `gh pr comment`, `gh pr diff` and `gh pr view`. It does not restrict the
-  tool set (the workflow passes no `--tools`), and the command's frontmatter
-  also grants `Agent`, `Read`, `gh issue view`, `gh issue list`, `gh search`
-  and `gh pr list`, all read-only. Neither grants `gh api`, though the PR's
-  `.claude/settings.json` could add permissions until CLAUDE-350 lands. The
-  gate step, which runs no model, writes `claude[bot]`'s earlier
-  inline comments to `.claude-code-review/prior-inline-comments.jsonl`, and the
-  command treats their bodies as reference data.
+- **Agent tools**: `--allowedTools` pre-approves the inline-comment MCP tool and
+  `gh pr comment`, `gh pr diff` and `gh pr view`. It does not restrict the tool
+  set (the workflow passes no `--tools`), and the command's frontmatter also
+  grants `Agent`, `Read`, `gh issue view`, `gh issue list`, `gh search` and
+  `gh pr list`, all read-only. Neither grants `gh api`, though the PR's
+  `.claude/settings.json` could add permissions until CLAUDE-350 lands. The gate
+  step, which runs no model, writes `claude[bot]`'s earlier inline comments to
+  `.claude-code-review/prior-inline-comments.jsonl`, and the command treats
+  their bodies as reference data.
 - **Skip marker**: the gate skips a run only when a `claude[bot]` comment that
   starts with `## Code review` ends with
   `<!-- claude-code-review head=<sha> -->` for the current head. A forged or
