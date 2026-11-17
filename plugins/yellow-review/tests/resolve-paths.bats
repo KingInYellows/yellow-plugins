@@ -606,6 +606,41 @@ SH
   [ "$output" = .ruvector/vectors.db ]
 }
 
+@test "rp_ignored_changed_since ignores an empty co-edit lock owner file, but not a non-empty one (CLAUDE-348)" {
+  ignored_repo
+  printf '.ruvector/\n' >> .gitignore
+  mkdir -p .ruvector/.coedit.lock .ruvector/.coedit.lock.reclaim.12-34
+  : >| .ruvector/.coedit.lock/.owner
+  : >| .ruvector/.coedit.lock.reclaim.12-34/.owner
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  printf 'x\n' >| .ruvector/.coedit.lock/.owner
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = .ruvector/.coedit.lock/.owner ]
+  : >| .ruvector/.coedit.lock/.owner
+  : >| .ruvector/.coedit.lock/other
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = .ruvector/.coedit.lock/other ]
+}
+
+@test "rp_ignored_changed_since ignores an empty co-edit lock owner file through a .ruvector symlink" {
+  ignored_repo
+  printf '.ruvector\n' >> .gitignore
+  store="$BATS_TEST_TMPDIR/store"
+  mkdir -p "$store/.coedit.lock"
+  ln -s "$store" .ruvector
+  touch -h -t 201901010000 .ruvector
+  : >| "$store/.coedit.lock/.owner"
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  printf 'x\n' >| "$store/.coedit.lock/.owner"
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+}
+
 @test "rp_ignored_changed_since still judges a symlink at .ruvector/intelligence.json" {
   ignored_repo
   printf '.ruvector/\n' >> .gitignore

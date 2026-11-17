@@ -687,3 +687,39 @@ sha256_of() {
   cs_stage_entry "$STAGE_CWD" "$long_id" "$NARRATIVE"
   [ "$(find "$HOME/.claude/projects" -name '*.jsonl' | wc -l | tr -d ' ')" = 3 ]
 }
+
+# --- cs_lock_take / cs_lock_drop (CLAUDE-348) ---
+
+@test "cs_lock_take holds a lock exclusively, even when mkdir reports success for a held one" {
+  l="$STAGING_TEST_ROOT/.lk"
+  cs_lock_take "$l"
+  [ -f "$l/.owner" ]
+  ! cs_lock_take "$l"
+  # uutils mkdir (ubuntu-26.04) can tell a second racer it created the
+  # directory: the exclusive .owner create still keeps it out.
+  mkdir() { command mkdir "$@" 2>/dev/null; return 0; }
+  ! cs_lock_take "$l"
+  unset -f mkdir
+  [ -f "$l/.owner" ]
+}
+
+@test "cs_lock_drop frees the lock name and leaves nothing behind" {
+  l="$STAGING_TEST_ROOT/.lk"
+  cs_lock_take "$l"
+  cs_lock_drop "$l"
+  [ ! -e "$l" ]
+  [ -z "$(find "$STAGING_TEST_ROOT" -maxdepth 1 -name '.lk*' -print)" ]
+  cs_lock_take "$l"
+  cs_lock_drop "$l"
+  # Dropping a lock that is not there is a no-op.
+  cs_lock_drop "$l"
+}
+
+@test "cs_lock_take removes a lock directory whose .owner it could not create" {
+  [ "$(id -u)" -ne 0 ] || skip "root ignores directory permissions"
+  l="$STAGING_TEST_ROOT/.lk"
+  mkdir() { command mkdir "$@" && chmod 500 "$1"; }
+  ! cs_lock_take "$l"
+  unset -f mkdir
+  [ ! -e "$l" ]
+}

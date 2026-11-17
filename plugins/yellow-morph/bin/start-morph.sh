@@ -49,7 +49,7 @@ if yellow_morph_needs_install; then
       "${CLAUDE_PLUGIN_DATA}/.install.lock" >&2
     printf 'yellow-morph: another install may be running, or the lock is\n' >&2
     printf 'yellow-morph: held by an unkillable process — manual cleanup:\n' >&2
-    printf 'yellow-morph:   rmdir %s\n' "${CLAUDE_PLUGIN_DATA}/.install.lock" >&2
+    printf 'yellow-morph:   rm -rf %q\n' "${CLAUDE_PLUGIN_DATA}/.install.lock" >&2
     exit 1
   fi
   LOCK_ACQUIRED=1

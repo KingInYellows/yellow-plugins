@@ -27,6 +27,34 @@ if [ -n "${_COMPOUND_STAGING_LOADED:-}" ]; then
 fi
 _COMPOUND_STAGING_LOADED=1
 
+# cs_lock_take <dir> — take a directory lock exclusively. uutils mkdir
+# (ubuntu-26.04) can tell several racing callers they created <dir>, so the
+# lock belongs to the one caller whose create of <dir>/.owner succeeds. The
+# create runs in `sh -C`, an O_EXCL open in every shell; zsh's own noclobber
+# would let CLOBBER_EMPTY overwrite the empty file. A caller whose mkdir
+# succeeded but whose owner create failed with no owner present (full disk)
+# removes the ownerless directory, so it never waits out a stale reclaim.
+cs_lock_take() {
+  mkdir "$1" 2>/dev/null || return 1
+  command sh -C -c ': > "$1"' sh "$1/.owner" 2>/dev/null && return 0
+  [ -e "$1/.owner" ] || rmdir "$1" 2>/dev/null
+  return 1
+}
+
+# cs_lock_drop <dir> — release a lock this caller holds, or reap a stale one.
+# The lock is renamed aside first, so its name is free at once even if the
+# caller dies before the cleanup; a leftover <dir>.drop.* is inert.
+cs_lock_drop() {
+  local gone="$1.drop.$$"
+  [ -d "$1" ] || return 0
+  rm -rf -- "$gone" 2>/dev/null
+  # A failed rename means another caller already took the lock away (and
+  # may have re-acquired it): never fall back to removing it by name.
+  mv -- "$1" "$gone" 2>/dev/null || return 0
+  rm -f -- "$gone/.owner" 2>/dev/null
+  rmdir -- "$gone" 2>/dev/null
+}
+
 # Derive the per-project slug used as the staging-dir basename.
 # Matches knowledge-compounder.md line 44 derivation exactly:
 # git toplevel if inside a repo, otherwise $PWD. Slashes become hyphens so

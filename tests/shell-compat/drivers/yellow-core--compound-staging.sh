@@ -22,3 +22,13 @@ staged=$(find "$HOME/.claude/projects" -name 'review-pr-o-r-1.jsonl' -print)
 jq -c '{schema, session_id, content_hash, transcript_tail}' "$staged"
 cs_stage_entry "$TMPD/plain" '..' "$TMPD/narrative.txt"
 printf 'dotdot_rc=%s\n' "$?"
+cs_lock_take "$TMPD/lk"; printf 'take=%s\n' "$?"
+cs_lock_take "$TMPD/lk"; printf 'take_again=%s\n' "$?"
+# uutils-style mkdir that reports success for an existing directory: the
+# .owner create still keeps the second caller out.
+mkdir() { command mkdir "$@" 2>/dev/null; return 0; }
+cs_lock_take "$TMPD/lk"; printf 'take_uutils=%s owner_kept=%s\n' "$?" "$([ -e "$TMPD/lk/.owner" ] && printf yes || printf no)"
+unset -f mkdir
+cs_lock_drop "$TMPD/lk"; printf 'dropped=%s\n' "$([ -e "$TMPD/lk" ] && printf no || printf yes)"
+cs_lock_take "$TMPD/lk"; printf 'retake=%s\n' "$?"
+cs_lock_drop "$TMPD/lk"

@@ -84,7 +84,8 @@ yellow_morph_needs_install() {
             "${CLAUDE_PLUGIN_DATA}/package-lock.json" >/dev/null 2>&1
 }
 
-# Try to acquire the atomic mkdir-based install lock. $1 = max retry count
+# Try to acquire the mkdir-based install lock (claimed by an exclusive pid
+# file create). $1 = max retry count
 # (1s sleep between attempts). Returns 0 on success, 1 on timeout.
 #
 # Stale-lock recovery: when mkdir fails with EEXIST, read the recorded
@@ -99,19 +100,31 @@ yellow_morph_needs_install() {
 yellow_morph_acquire_install_lock() {
   local max_attempts="${1:-20}"
   local lock_dir="${CLAUDE_PLUGIN_DATA}/.install.lock"
-  local stale_recovered=0
+  local stale_recovered=0 prev_invalid="unset" seen="" owner_pid=""
   local i
 
   for ((i=1; i<=max_attempts; i++)); do
     if mkdir "$lock_dir" 2>/dev/null; then
-      # Record owner PID — best-effort. Failure to write the PID file does
-      # not invalidate the lock (we still hold the directory).
-      printf '%s' "$$" > "${lock_dir}/pid" 2>/dev/null || true
-      return 0
+      # The pid file is the claim: uutils mkdir (ubuntu-26.04) can tell
+      # several racing callers they created the directory, so only the one
+      # whose exclusive create of pid succeeds holds the lock. `sh -C` is
+      # an O_EXCL open in every shell (zsh's CLOBBER_EMPTY would not be).
+      if command sh -C -c ': > "$1"' sh "${lock_dir}/pid" 2>/dev/null; then
+        printf '%s' "$$" >| "${lock_dir}/pid" 2>/dev/null && return 0
+        # A pid that stays empty is reclaimed as stale a second later, so
+        # give up a lock whose pid cannot be written (full disk).
+        rm -f "${lock_dir}/pid" 2>/dev/null
+        rmdir "$lock_dir" 2>/dev/null
+        return 1
+      fi
+      # Lost the race: the winner's pid is there. With no pid at all the
+      # create failed (full disk): drop the ownerless directory.
+      [ -e "${lock_dir}/pid" ] || rmdir "$lock_dir" 2>/dev/null
+      sleep 1
+      continue
     fi
 
     if [ "$stale_recovered" -eq 0 ] && [ -f "${lock_dir}/pid" ]; then
-      local owner_pid
       owner_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
       # An empty or non-numeric pid file means a partial write or
       # corruption — treat it as a stale lock rather than passing garbage
@@ -124,6 +137,16 @@ yellow_morph_acquire_install_lock() {
           # installer runs (Docker, K8s init), the installer process itself
           # may legitimately be PID 1, and clearing its lock would create
           # a concurrency hazard (codex P2 #532).
+          # A new owner's pid file is empty between its exclusive create
+          # and its write, so an invalid value is only stale when it is
+          # still the same, on the same lock directory (inode), on the next
+          # attempt a second later.
+          seen="${owner_pid}@$(command ls -di "$lock_dir" 2>/dev/null)"
+          if [ "$seen" != "$prev_invalid" ]; then
+            prev_invalid="$seen"
+            sleep 1
+            continue
+          fi
           printf 'yellow-morph: lock pid file missing or invalid (got %q); clearing stale lock\n' "$owner_pid" >&2
           rm -f "${lock_dir}/pid" 2>/dev/null
           rmdir "$lock_dir" 2>/dev/null

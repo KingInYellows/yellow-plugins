@@ -552,6 +552,21 @@ describe('yellow-ruvector install lib', () => {
       expect(existsSync(join(data, '.install.lock'))).toBe(false);
     });
 
+    it('stays exclusive when mkdir reports success for a held lock (uutils, CLAUDE-348)', () => {
+      mkdirSync(join(data, '.install.lock'), { recursive: true });
+      writeFileSync(join(data, '.install.lock', 'pid'), String(process.pid));
+      // uutils mkdir on ubuntu-26.04 can tell a second racer it created the
+      // directory; the exclusive pid create must still keep it out.
+      const r = runBash(
+        'yellow_ruvector_data_dir; mkdir() { command mkdir "$@" 2>/dev/null; return 0; }; yellow_ruvector_acquire_install_lock 1',
+        env
+      );
+      expect(r.status).toBe(1);
+      expect(readFileSync(join(data, '.install.lock', 'pid'), 'utf8')).toBe(
+        String(process.pid)
+      );
+    });
+
     it('gives the lock up when its pid file cannot be written', () => {
       mkdirSync(data, { recursive: true });
       // A zero soft file-size limit makes the pid write fail (EFBIG).

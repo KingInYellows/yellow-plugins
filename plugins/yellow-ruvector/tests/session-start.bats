@@ -810,6 +810,18 @@ END"
   [ -z "$(ls -A "$RUVECTOR_DIR/coedit-sessions" | grep -v '^\.dead\.lock\.reclaim\.')" ]
 }
 
+@test "the sweep removes an expired reclaim marker that holds its .owner file (CLAUDE-348)" {
+  make_ruvector_stub 'exit 0'
+  sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
+  d="$sd/.s1.lock.reclaim.1-1"; m="$RUVECTOR_DIR/.coedit.lock.reclaim.2-2"
+  mkdir -p "$d" "$m"; : > "$d/.owner"; : > "$m/.owner"
+  touch -d '20 minutes ago' "$d" "$m" 2>/dev/null || skip "touch -d unsupported"
+  run run_hook '{"cwd":""}'
+  for i in $(seq 1 40); do [ -e "$d" ] || [ -e "$m" ] || break; sleep 0.1; done
+  [ ! -e "$d" ]
+  [ ! -e "$m" ]
+}
+
 @test "reclaim markers that cannot be removed never keep the sweep from later ones" {
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"

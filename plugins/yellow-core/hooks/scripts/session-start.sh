@@ -109,8 +109,9 @@ if [ -d "${STAGING_DIR}/.drain-lock" ]; then
     printf '[yellow-core] compound-staging: Warning: stat failed on .drain-lock; skipping stale-lock reap this cycle\n' >&2
   fi
   if [ "$lock_age_min" -gt 30 ] 2>/dev/null; then
-    rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null \
-      || printf '[yellow-core] compound-staging: stale lock rmdir failed\n' >&2
+    cs_lock_drop "${STAGING_DIR}/.drain-lock"
+    [ ! -d "${STAGING_DIR}/.drain-lock" ] \
+      || printf '[yellow-core] compound-staging: stale lock release failed\n' >&2
   fi
 fi
 
@@ -189,8 +190,8 @@ if [ "$DISPATCH" -eq 0 ]; then
   json_exit
 fi
 
-# --- Acquire drain lock (atomic mkdir) ---
-if ! mkdir "${STAGING_DIR}/.drain-lock" 2>/dev/null; then
+# --- Acquire drain lock (mkdir + exclusive .owner, see cs_lock_take) ---
+if ! cs_lock_take "${STAGING_DIR}/.drain-lock"; then
   # Concurrent drain already in flight (or stale lock not yet reaped).
   json_exit
 fi
@@ -211,18 +212,18 @@ export STAGING_DIR
 # normal completion, hook timeouts, and after the INT/TERM handlers
 # below propagate.
 # shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
-trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true' EXIT
+trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && cs_lock_drop "${STAGING_DIR}/.drain-lock" || true' EXIT
 # INT/TERM: clean up AND exit. Without an explicit exit, bash continues
 # past the trap into subsequent commands (cleanup runs but the script
 # proceeds into dispatch logic and spawns a drain even though termination
 # was requested). Use the conventional 128+signal exit codes so the
 # parent shell sees the proper status. The EXIT trap above still fires
-# on the way out — clean up here is duplicate-but-safe (rmdir is
+# on the way out — clean up here is duplicate-but-safe (cs_lock_drop is
 # idempotent under the LOCK_OWNED_BY_PARENT guard).
 # shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
-trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null; exit 130' INT
+trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && cs_lock_drop "${STAGING_DIR}/.drain-lock"; exit 130' INT
 # shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
-trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null; exit 143' TERM
+trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && cs_lock_drop "${STAGING_DIR}/.drain-lock"; exit 143' TERM
 
 # --- Requeue crashed processing entries (lock-protected) ---
 # Now that we own the drain lock, no concurrent SessionStart can race us
@@ -276,7 +277,7 @@ if [ -z "$CLAUDE_BIN" ]; then
 fi
 if [ -z "$CLAUDE_BIN" ] || [ ! -x "$CLAUDE_BIN" ]; then
   # LOCK_OWNED_BY_PARENT is still 1 here — the EXIT trap will release the
-  # lock automatically when json_exit calls exit. No need to rmdir manually.
+  # lock automatically when json_exit calls exit. No need to release manually.
   json_exit "claude binary not found; skipping drain"
 fi
 
@@ -291,7 +292,7 @@ if [ -n "${COMPOUND_STAGING_REVIEWER_AGENT:-}" ] && [ -n "${BATS_VERSION:-}" ]; 
   STAGING_REVIEWER_PATH="$COMPOUND_STAGING_REVIEWER_AGENT"
 fi
 if [ ! -f "$STAGING_REVIEWER_PATH" ]; then
-  # EXIT trap will rmdir the lock since LOCK_OWNED_BY_PARENT is still 1.
+  # EXIT trap will release the lock since LOCK_OWNED_BY_PARENT is still 1.
   json_exit "staging-reviewer agent not yet deployed (stack item #2); deferring drain"
 fi
 
@@ -346,7 +347,7 @@ esac
 # (default 8 drains in rolling window); returns 1 when under or on subscription
 # auth (no cost gate). Release the lock + json_exit on the over-threshold path.
 if cs_drain_budget_warn "$STAGING_DIR" "$AUTH_ROUTE"; then
-  # EXIT trap will rmdir the lock since LOCK_OWNED_BY_PARENT is still 1.
+  # EXIT trap will release the lock since LOCK_OWNED_BY_PARENT is still 1.
   json_exit "drain budget over threshold; skipping dispatch"
 fi
 
@@ -373,7 +374,7 @@ fi
 
 (
   DRAIN_LOCK_PATH="${STAGING_DIR}/.drain-lock"
-  trap 'rmdir "$DRAIN_LOCK_PATH" 2>/dev/null || true' EXIT INT TERM
+  trap 'cs_lock_drop "$DRAIN_LOCK_PATH" || true' EXIT INT TERM
   export COMPOUND_DRAIN_IN_PROGRESS=1
   printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s, model=%s, max_budget_usd=%s)\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" "$DRAIN_MODEL" "$DRAIN_BUDGET_USD" >> "$DRAIN_LOG" 2>/dev/null

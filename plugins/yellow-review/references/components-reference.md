@@ -304,7 +304,8 @@ flags, exit codes, trust-boundary rules and library behavior.
   and refuses when a gitignored file is newer than the marker, except
   regular-file tool state (`.ruvector/coedit.json`,
   `.ruvector/coedit-sessions/`, `.ruvector/intelligence.json` (named in a stderr
-  `Note:` line when it changed), `node_modules/.vite/vitest/results.json`);
+  `Note:` line when it changed), `node_modules/.vite/vitest/results.json`, and
+  the empty `.ruvector/.coedit.lock*/.owner` files of co-edit locks);
   `--unattended` also skips runner files; `--revert-only` reverts the listed
   files; `--revert-dirty` reverts every change in the tree and takes no file
   list; `--revert-denied` reverts only trusted-config dirty paths

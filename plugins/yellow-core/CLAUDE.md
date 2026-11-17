@@ -202,18 +202,18 @@ field stays on the yellow-review personas that are re-dispatched across reviews.
 
 Background pipeline: the Stop hook writes a redacted pending entry, the
 SessionStart hook launches a disowned `claude -p` drain (`count >= 5` or
-oldest > 48h, `mkdir` `.drain-lock`, `COMPOUND_DRAIN_IN_PROGRESS=1` recursion
-guard, `--model haiku` unless `COMPOUND_DRAIN_MODEL` is set,
-`--max-budget-usd 3.00` unless `COMPOUND_DRAIN_MAX_BUDGET_USD` is set), and
-`staging-reviewer` scores, filters, dedups and hands survivors to
-`staging-promoter`. `cs_stage_entry` is the second producer (used by
-yellow-review's `lib/stage-learning.sh`). `COMPOUND_JEV_PREFILTER=shadow` is an
-opt-in, log-only pre-filter that sends session text to a third party.
-No drain starts, and `staging-promoter` writes nothing, while a yellow-review
-resolve or sweep holds `.review-run-lock/` in the same staging dir
-(`cs_review_lock_live`; holders older than 120 min are ignored).
-`/compound:review-staged` drains manually. Architecture, thresholds, the Jev log
-layout, auth route and cost are in the reference.
+oldest > 48h, `.drain-lock` via `cs_lock_take` (`mkdir` plus an exclusive
+`.owner` file), `COMPOUND_DRAIN_IN_PROGRESS=1` recursion guard, `--model haiku`
+unless `COMPOUND_DRAIN_MODEL` is set, `--max-budget-usd 3.00` unless
+`COMPOUND_DRAIN_MAX_BUDGET_USD` is set), and `staging-reviewer` scores, filters,
+dedups and hands survivors to `staging-promoter`. `cs_stage_entry` is the second
+producer (used by yellow-review's `lib/stage-learning.sh`).
+`COMPOUND_JEV_PREFILTER=shadow` is an opt-in, log-only pre-filter that sends
+session text to a third party. No drain starts, and `staging-promoter` writes
+nothing, while a yellow-review resolve or sweep holds `.review-run-lock/` in the
+same staging dir (`cs_review_lock_live`; holders older than 120 min are
+ignored). `/compound:review-staged` drains manually. Architecture, thresholds,
+the Jev log layout, auth route and cost are in the reference.
 
 ## Plan Namespace Split
 

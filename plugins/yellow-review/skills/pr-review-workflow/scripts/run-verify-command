@@ -30,7 +30,9 @@
 #                  refuses, a dangling target does not, and a target that cannot
 #                  be examined refuses (fail closed). Skipped
 #                  while a regular file: .ruvector/coedit.json,
-#                  .ruvector/coedit-sessions/,
+#                  .ruvector/coedit-sessions/, an empty
+#                  .ruvector/.coedit.lock*/.owner (the co-edit lock's owner
+#                  file),
 #                  .ruvector/intelligence.json (the memory store a linked
 #                  worktree shares; a change is named in a stderr Note line)
 #                  and node_modules/.vite/vitest/results.json at any depth;

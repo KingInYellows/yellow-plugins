@@ -287,6 +287,19 @@ yellow_ruvector_pid_alive() {
   [ -z "$now" ] || [ "$now" = "$rec" ]
 }
 
+# yellow_ruvector_claim_pid <lock-dir> <pid> — claim the lock by creating its
+# pid file exclusively (noclobber is an O_EXCL open in bash), then write <pid>.
+# uutils mkdir (ubuntu-26.04) can tell several racing callers they created
+# the lock directory; the create decides which one holds it. Returns 1 when
+# another caller's pid file is already there, 2 when this caller's own write
+# failed (its empty pid file is removed again).
+yellow_ruvector_claim_pid() {
+  (set -C; : > "$1/pid") 2>/dev/null || return 1
+  printf '%s' "$2" >| "$1/pid" 2>/dev/null && return 0
+  rm -f -- "$1/pid" 2>/dev/null
+  return 2
+}
+
 # yellow_ruvector_unlock_dir <lock-dir> — remove a lock this shell owns.
 yellow_ruvector_unlock_dir() {
   rm -f "$1/pid" "$1"/start.* 2>/dev/null
@@ -306,10 +319,18 @@ yellow_ruvector_acquire_install_lock() {
       # A lock without a pid would be reclaimed by the next waiter while we
       # still work: give it up rather than hold it unrecorded.
       yellow_ruvector_stamp_pid "$lock_dir" "$$"
-      if printf '%s' "$$" > "${lock_dir}/pid" 2>/dev/null; then
-        return 0
-      fi
-      rm -rf -- "$lock_dir" 2>/dev/null
+      yellow_ruvector_claim_pid "$lock_dir" "$$"
+      case $? in
+        0) return 0 ;;
+        1) # Lost a uutils mkdir race: the winner's pid is there, so wait.
+           rm -f -- "${lock_dir}/start.$$" 2>/dev/null
+           sleep 1
+           continue ;;
+      esac
+      # Non-recursive: a racing caller that has since claimed the directory
+      # keeps it, because its pid file makes rmdir fail.
+      rm -f -- "${lock_dir}/start.$$" 2>/dev/null
+      rmdir -- "$lock_dir" 2>/dev/null
       return 1
     fi
     # A missing pid file (owner killed between mkdir and the pid write) reads
@@ -386,9 +407,13 @@ yellow_ruvector_reclaim_dir() {
   mt=$(yellow_ruvector_mtime "$lock_dir")
   case "$mt" in ''|*[!0-9]*) return 0 ;; esac
   find "${lock_dir%/*}" -maxdepth 1 -name "${lock_dir##*/}.reclaim.*" -type d -mmin +10 \
-    -exec rmdir {} + 2>/dev/null
+    -exec rm -rf -- {} + 2>/dev/null
   marker="${lock_dir}.reclaim.$(printf '%s' "${expected:-none}" | tr -c '0-9A-Za-z' '_')-${ino}-${mt}"
+  # The marker is claimed like a lock (uutils mkdir is not exclusive).
   mkdir "$marker" 2>/dev/null || return 0
+  # A failed create leaves the marker ownerless: drop it (rmdir keeps one
+  # that a racing caller has since claimed) so a later attempt can reclaim.
+  (set -C; : > "$marker/.owner") 2>/dev/null || { rmdir -- "$marker" 2>/dev/null; return 0; }
   [ "$(ls -di "$lock_dir" 2>/dev/null | awk '{print $1}')" = "$ino" ] || return 0
   [ "$(yellow_ruvector_mtime "$lock_dir")" = "$mt" ] || return 0
   [ "$(cat "${lock_dir}/pid" 2>/dev/null)" = "$expected" ] || return 0
@@ -771,12 +796,16 @@ yellow_ruvector_acquire_model_lock() {
   while :; do
     if mkdir "$d" 2>/dev/null; then
       yellow_ruvector_stamp_pid "$d" "${_YR_LOCK_OWNER:-${BASHPID:-$$}}"
-      if printf '%s' "${_YR_LOCK_OWNER:-${BASHPID:-$$}}" > "$d/pid" 2>/dev/null; then
-        _YR_MODEL_LOCK=${_YR_LOCK_OWNER:-${BASHPID:-$$}}
-        return 0
-      fi
-      rmdir "$d" 2>/dev/null
-      return 1
+      yellow_ruvector_claim_pid "$d" "${_YR_LOCK_OWNER:-${BASHPID:-$$}}"
+      case $? in
+        0) _YR_MODEL_LOCK=${_YR_LOCK_OWNER:-${BASHPID:-$$}}
+           return 0 ;;
+        2) rm -f -- "$d/start.${_YR_LOCK_OWNER:-${BASHPID:-$$}}" 2>/dev/null
+           rmdir "$d" 2>/dev/null
+           return 1 ;;
+      esac
+      # Lost a uutils mkdir race: the winner's pid is there, so wait.
+      rm -f -- "$d/start.${_YR_LOCK_OWNER:-${BASHPID:-$$}}" 2>/dev/null
     fi
     pid=$(cat "$d/pid" 2>/dev/null)
     case "$pid" in

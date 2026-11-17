@@ -2001,13 +2001,13 @@ rp_file_or_special() {
 # clean target. The walk is bounded: see rp_walk_cap (at the cap the target counts as changed). Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
-    local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" cjson="" ijson="" top c v dup qi queue seen
+    local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" cjson="" ijson="" owner="" top c v dup qi queue seen
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
             # The root `.ruvector` link: skip its co-edit state and memory
             # store as the literal directory scan does (see
             # rp_ignored_changed_since).
-            case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" cjson="$l/coedit.json" ijson="$l/intelligence.json" ;; esac
+            case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" cjson="$l/coedit.json" ijson="$l/intelligence.json" owner="$l/.coedit.lock*/.owner" ;; esac
             # Every visited entry counts against rp_walk_cap; the walk is
             # streamed and stops at the first newer file (changed), at the cap
             # (changed: too large to judge) or at a find error (cannot tell).
@@ -2066,6 +2066,7 @@ rp_link_target_changed() {
                     fi
                     [ "$x" -nt "$marker" ] && return 0
                 done < <(find -H "$d" -name .git -prune -o -path "$skip" -prune \
+                    -o \( -path "$owner" -type f -empty \) -prune \
                     -o \( -path "$cjson" -type f \) -prune \
                     -o \( -path "$ijson" -type f \) -prune \
                     -o \( \( -path '*/node_modules/.vite/vitest/results.json' -o -path 'node_modules/.vite/vitest/results.json' \) -type f \) -prune -o -print0 2>/dev/null || printf '\001ERR\0')
@@ -2123,7 +2124,10 @@ rp_link_target_changed() {
 # checkout, so any session's ruvector MCP server rewrites it mid-run. Unlike
 # the co-edit state it is not proven to be tool-written, so callers report it
 # with rp_shared_store_changed instead of passing silently. Anything else under
-# `.ruvector/` still counts. Vitest's
+# `.ruvector/` still counts, except the empty `.owner` files of the co-edit
+# store lock and its reclaim markers (`.ruvector/.coedit.lock*/.owner`, a
+# regular file of zero bytes only): yellow-ruvector's PostToolUse hook creates
+# one on every edit that updates the pair store. Vitest's
 # run cache `node_modules/.vite/vitest/results.json` (at any depth; a regular
 # file only) is skipped too: every vitest run rewrites it, and vitest reads it
 # only to order test files. Every other file under node_modules still counts.
@@ -2174,6 +2178,10 @@ rp_ignored_changed_since() {
             case "$f" in .git|.git/*|*/.git|*/.git/*) continue ;; esac
             case "$f" in .ruvector/coedit-sessions|.ruvector/coedit-sessions/) continue ;; esac
             case "$f" in
+                .ruvector/.coedit.lock*/.owner)
+                    if [ -f "./$f" ] && [ ! -L "./$f" ] && [ ! -s "./$f" ]; then continue; fi ;;
+            esac
+            case "$f" in
                 .ruvector/coedit.json|.ruvector/intelligence.json|node_modules/.vite/vitest/results.json|*/node_modules/.vite/vitest/results.json)
                     if [ -f "./$f" ] && [ ! -L "./$f" ]; then continue; fi ;;
             esac
@@ -2188,6 +2196,7 @@ rp_ignored_changed_since() {
                 # past 20 rejected ones still counts.
                 (set -o pipefail
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune \
+                        -o \( -path './.ruvector/.coedit.lock*/.owner' -type f -empty \) -prune \
                         -o \( -path ./.ruvector/coedit.json -type f \) -prune \
                         -o \( -path ./.ruvector/intelligence.json -type f \) -prune \
                         -o \( -path '*/node_modules/.vite/vitest/results.json' -type f \) -prune -o \( -type f -o -type l \) -newer "$marker" -print0 2>/dev/null \

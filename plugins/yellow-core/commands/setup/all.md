@@ -121,17 +121,22 @@ _rv_probe() {
   # Output goes to a file, never the caller's pipe: a child the CLI left
   # behind would hold the pipe open and stall the command substitution.
   # uutils timeout (Ubuntu 26.04) kills only its direct child, not the group.
-  out=$(mktemp) || return 1
+  # A broken TMPDIR falls back to /tmp; with no temp file at all the probe
+  # fails (the candidate reads as broken) rather than use the caller's pipe.
+  out=$(mktemp 2>/dev/null) || out=$(TMPDIR=/tmp mktemp 2>/dev/null) || return 1
   # Only a timeout that supports --kill-after (GNU, uutils): a CLI that
   # ignores TERM is then KILLed 2s later. BusyBox-style ones use the watchdog.
+  # ulimit -f caps every file the probe and anything it leaves behind can
+  # write at 2 MiB (1 MiB in zsh, which counts 512-byte blocks), so an
+  # orphan cannot fill the disk through the temp file.
   for t in timeout gtimeout; do
     if command -v "$t" >/dev/null 2>&1 && "$t" --kill-after=1 5 true >/dev/null 2>&1; then
-      "$t" --kill-after=2 10 node "$1" --version >|"$out" 2>/dev/null; rc=$?
+      ( ulimit -f 2048 2>/dev/null; exec "$t" --kill-after=2 10 node "$1" --version ) >|"$out" 2>/dev/null; rc=$?
       cat "$out"; rm -f "$out"
       return "$rc"
     fi
   done
-  node "$1" --version >|"$out" 2>/dev/null &
+  ( ulimit -f 2048 2>/dev/null; exec node "$1" --version ) >|"$out" 2>/dev/null &
   p=$!
   ( sleep 10; kill -9 "$p" 2>/dev/null ) >/dev/null 2>&1 &
   w=$!

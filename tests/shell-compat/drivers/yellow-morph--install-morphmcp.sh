@@ -1,5 +1,7 @@
 # Driver for plugins/yellow-morph/lib/install-morphmcp.sh (sourced by
 # /morph:setup). Never calls the npm install. Env: REPO_ROOT, TMPD.
+# The CLAUDE_PLUGIN_DATA=/etc override is scoped to its subshell on purpose.
+# shellcheck disable=SC2030,SC2031
 . "$REPO_ROOT/plugins/yellow-morph/lib/install-morphmcp.sh"
 mkdir -p "$TMPD/root" "$TMPD/data"
 : >| "$TMPD/root/package-lock.json"
@@ -15,3 +17,24 @@ yellow_morph_acquire_install_lock 1 2>/dev/null
 printf 'lock_again=%s\n' "$?"
 yellow_morph_release_install_lock
 printf 'released=%s\n' "$([ -d "$CLAUDE_PLUGIN_DATA/.install.lock" ] && printf no || printf yes)"
+# uutils-style mkdir: a second caller told it created the held lock directory
+# still loses on the exclusive pid create.
+yellow_morph_acquire_install_lock 1
+mkdir() { command mkdir "$@" 2>/dev/null; return 0; }
+yellow_morph_acquire_install_lock 1 2>/dev/null
+printf 'uutils_lock_again=%s\n' "$?"
+unset -f mkdir
+yellow_morph_release_install_lock
+# An empty pid is an owner between its exclusive create and its write: a
+# waiter that sees it once does not reclaim it, and only one that still sees
+# it a second later does.
+mkdir "$CLAUDE_PLUGIN_DATA/.install.lock"
+: >| "$CLAUDE_PLUGIN_DATA/.install.lock/pid"
+yellow_morph_acquire_install_lock 1 2>/dev/null
+printf 'empty_pid_once=%s held=%s\n' "$?" "$([ -d "$CLAUDE_PLUGIN_DATA/.install.lock" ] && printf yes || printf no)"
+yellow_morph_acquire_install_lock 3 2>/dev/null
+printf 'empty_pid_stale=%s\n' "$?"
+yellow_morph_release_install_lock
+# A lock whose pid write fails (here: a 0-block file size limit) is given up,
+# not held with an empty pid that a waiter would reclaim.
+( ulimit -f 0 2>/dev/null; trap '' XFSZ; yellow_morph_acquire_install_lock 1 2>/dev/null; printf 'pid_write_fails=%s left=%s\n' "$?" "$([ -e "$CLAUDE_PLUGIN_DATA/.install.lock" ] && printf yes || printf no)" )
