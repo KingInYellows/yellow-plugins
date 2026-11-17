@@ -55,6 +55,9 @@ Read the JSON result's `status` field.
   ```
 
   On "Leave it", report the stack as not synchronized and stop.
+- **`INCOMPLETE`** — `gh stack` exited 0 but a step failed, so pull
+  requests may not be linked or updated. Report the failed lines from
+  `stderr` and stop; do not prune.
 - **`CONFLICT`** — the rebase stopped on a conflict. Report the files and
   stop; the user resolves and runs `rebase --mode continue`, or
   `rebase --mode abort` to restore every branch.

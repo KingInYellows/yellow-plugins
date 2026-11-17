@@ -141,6 +141,10 @@ older extension is reported not ready. Facts the adapter depends on:
   base and the old base did not merge. The adapter reports that as
   `BASE_CHANGE_UNCONFIRMED`, never `SUCCESS`, and `--accept-base-change`
   needs `confirm: true`.
+- `gh-stack` exits 0 when a GitHub call inside `submit`/`sync` fails and
+  only prints `⚠ failed to …`. The adapter reports that as `INCOMPLETE`.
+  It talks to GitHub over GraphQL, which Claude Code cloud sessions block,
+  so `submit` cannot open pull requests from a cloud session.
 - `gh stack merge` lands the target and every PR below it. `gh pr merge` and
   the REST merge endpoint are not equivalent for a stacked PR.
 

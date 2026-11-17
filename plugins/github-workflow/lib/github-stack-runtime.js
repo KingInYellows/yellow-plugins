@@ -316,6 +316,8 @@ const RECOVERY_ACTIONS = Object.freeze({
     'The subprocess did not finish (timed out or failed to start). The operation may have partially applied — inspect repository state before retrying.',
   ERROR: 'The command failed; see stderr for the printed error.',
   SYNC_ABORTED: 'Sync detected a divergence it cannot resolve non-interactively and made no changes. Re-run in an interactive terminal, or import the remote stack explicitly.',
+  INCOMPLETE:
+    'gh-stack exited 0 but reported that a step failed (see stderr). Branches may have been pushed without their pull requests being created, updated or linked. Check each pull request on GitHub before retrying; do not report the stack as submitted or synchronized.',
   BASE_CHANGE_UNCONFIRMED:
     'GitHub retargeted this stack to a new base and the old base did not merge, so the stack was not rebased. Rebasing onto the new base drops the old base\'s commits from the stack. Show the user that, then re-run with acceptBaseChange and confirm: true.',
   REQUIRES_CONFIRMATION: 'This is a destructive operation. Re-invoke with confirm: true after showing the caller exactly what will change.',
@@ -354,6 +356,12 @@ function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck
     // literal 0 never reports SUCCESS in this specific case. Both streams
     // are searched: gh-stack 0.3.0 writes its progress to stderr.
     status = 'SYNC_ABORTED';
+  } else if (execResult.code === 0 && /^\s*⚠ failed to /m.test(execResult.stderr)) {
+    // gh-stack 0.3.0 exits 0 when a GitHub call inside submit/sync/push
+    // fails (seen live: every pull request lookup returned 403, the branches
+    // were pushed, no pull request was opened, exit 0). A warning that a
+    // step failed means the operation is not known to be complete.
+    status = 'INCOMPLETE';
   } else {
     status = EXIT_STATUS[execResult.code] || 'UNKNOWN_ERROR';
   }

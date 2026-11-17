@@ -679,3 +679,33 @@ describe('sync — "Sync aborted" on stderr (where gh-stack 0.3.0 writes progres
     expect(sync({}).status).toBe('SYNC_ABORTED');
   });
 });
+
+describe('exit 0 with a failed step is INCOMPLETE, never SUCCESS', () => {
+  const WARNING =
+    'Pushing to origin...\\n\u26a0 failed to check PR for feat/one: querying PRs: non-200 OK status code: 403 Forbidden\\n\u2713 Pushed and synced 1 branches\\n';
+
+  it('submit: a pull request lookup that failed is not a successful submit', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GH_STDERR = WARNING;
+    process.env.FAKE_GIT_REMOTES = 'origin\n';
+    const result = submit({});
+    expect(result.status).toBe('INCOMPLETE');
+    expect(result.exitCode).toBe(0);
+    expect(result.mayHaveMutated).toBe(true);
+    expect(result.recoveryAction).toContain('do not report the stack as submitted');
+  });
+
+  it('sync: the same warning is INCOMPLETE', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GH_STDERR = WARNING;
+    process.env.FAKE_GIT_REMOTES = 'origin\n';
+    expect(sync({}).status).toBe('INCOMPLETE');
+  });
+
+  it('an ordinary warning that is not a failed step stays SUCCESS', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GH_STDERR = '\u26a0 branch feat/one has no commits\\n\u2713 done\\n';
+    process.env.FAKE_GIT_REMOTES = 'origin\n';
+    expect(submit({}).status).toBe('SUCCESS');
+  });
+});
