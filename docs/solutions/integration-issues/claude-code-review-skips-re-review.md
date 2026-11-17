@@ -26,10 +26,10 @@ comments, the rest were never posted, and the next run skipped the PR too
 
 ## Root cause
 
-Step 1 of the upstream command (`anthropics/claude-plugins-official`,
-`plugins/code-review/commands/code-review.md`) stops when "Claude has already
-commented on this PR". Any earlier comment counts, whatever commit it reviewed
-and whether the run that posted it finished.
+Step 1 of the upstream command
+([code-review.md in anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/blob/fd30cee3ecd5a8ee772733c5d20c0f2bae2da2f0/plugins/code-review/commands/code-review.md))
+stops when "Claude has already commented on this PR". Any earlier comment
+counts, whatever commit it reviewed and whether the run that posted it finished.
 
 ## Fix
 
