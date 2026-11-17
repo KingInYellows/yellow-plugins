@@ -17,10 +17,11 @@ this corpus, with its repeat count, noise floor and pass bar, is in
 Each case is a Codex P1 thread from a merged PR, harvested with
 `scripts/eval/review-gate/harvest.py --bots` and paired with the PR commit that
 fixed it. `incident` is the thread's URL. The case tree is the reviewed commit
-(`tree`), with the current `references/resolve/dispositions.md` overlaid so the
-contract under test is the checkout's. The prompt is the Step 4 envelope from
-`references/resolve/envelope.md`: the real comment, diff hunk, PR title,
-description, file list and changed lines.
+(`tree`), with the current `references/resolve/dispositions.md` and
+`clusters.md` (the edit-bounds table) overlaid, so the contract under test is
+the checkout's and editing either reruns the rows. The prompt is the Step 4
+envelope from `references/resolve/envelope.md`: the real comment, diff hunk, PR
+title, description, file list and changed lines.
 
 - 17 **fixed** cases pass when the resolver reports `disposition=fixed` and the
   file it edited meets regexes taken from the real fix (`not` regexes name the

@@ -17,7 +17,10 @@
       "configs": "pinned",
       "isolated": true,
       "fence": false,
-      "overlay": ["plugins/yellow-review/references/resolve/dispositions.md"],
+      "overlay": [
+        "plugins/yellow-review/references/resolve/dispositions.md",
+        "plugins/yellow-review/references/resolve/clusters.md"
+      ],
       "prompt": "{context}",
       "expect": {
         "r01-1819-graphite-config-common-dir": {
