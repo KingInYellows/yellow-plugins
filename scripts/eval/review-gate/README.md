@@ -40,8 +40,11 @@ python3 scripts/eval/review-gate/eval.py regrade <old>/summary.json \
 ```
 
 `regrade` checks each case's kept unmatched findings against today's rules (a
-finding that matched stays matched) and keeps the old `grading_set`, so a case
-edited since still blocks the verdict.
+finding that matched stays matched). It refuses when today's cases and controls
+no longer hash to the summary's `grading_set` (run it from the commit the
+summary was graded at), and stops when a golden file's length at `head` cannot
+be read but would decide a match (fetch the head, or pass `--repo-dir`). `grade`
+stops the same way when a row's worktree is gone.
 
 ## Cases and controls
 

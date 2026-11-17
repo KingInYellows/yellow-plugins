@@ -678,9 +678,15 @@ def file_lines(repo_dir, rev, path):
         return None
 
 
-def golden_hits(goldens, important, lines):
+def golden_hits(goldens, important, lines, rid):
     """Per golden entry, whether a finding matches it; lines[i] is entry i's
-    file length at head (None when unknown)."""
+    file length at head (None when unknown). An unknown length that could
+    decide a match (a matching finding past the window) stops the grade, so a
+    missing checkout never reads as a miss."""
+    for g, n in zip(goldens, lines):
+        if n is None and any(not finding_matches(g, f) and finding_matches(g, f, 1) for f in important):
+            sys.exit("grade: %s: cannot read %s at its head, and a finding past the line window "
+                     "depends on its length; fetch the head (or pass --repo-dir) and retry" % (rid, g["file"]))
     return [any(finding_matches(g, f, n) for f in important) for g, n in zip(goldens, lines)]
 
 
@@ -734,7 +740,7 @@ def summarize(work):
         if row["kind"] == "case":
             lines = [file_lines(row["wt"], item["head"], g["file"]) if os.path.isdir(row["wt"]) else None
                      for g in item["golden"]]
-            hit = golden_hits(item["golden"], important, lines)
+            hit = golden_hits(item["golden"], important, lines, rid)
             r.update(lane=item["lane"], golden=len(hit), hit=sum(hit), hits=hit, golden_lines=lines)
             s["golden_total"] += len(hit)
             s["golden_hit"] += sum(hit)
@@ -767,12 +773,31 @@ def finish(s):
     return s
 
 
-def regrade(old, cases, dirs):
+def current_items(cases_dir, controls_dir, dirs):
+    """items.json as prepare would write it today (synthetic heads built),
+    without worktrees, so its grading_set can be checked."""
+    items = {}
+    for kind, doc, path in load_items(cases_dir, controls_dir):
+        if kind == "synthetic":
+            repo_dir = dirs.get(doc["repo"])
+            if not repo_dir:
+                sys.exit("regrade: no checkout for %s; pass --repo-dir %s=PATH" % (doc["repo"], doc["repo"]))
+            doc = {**doc, "head": synthetic_head(repo_dir, doc, patch_path(path, doc))}
+        items[doc["id"]] = {"kind": kind, **doc}
+    return items
+
+
+def regrade(old, items, dirs):
     """An old summary graded by today's finding_matches, from the findings it
     kept: a matched finding stays matched under the wider rules, so each
     unmatched one is checked again. Per-golden hits come from `hits`, or from
-    the count when it is 0 or all. grading_set is kept, so a case edited since
-    still blocks a verdict."""
+    the count when it is 0 or all. Only when today's items hash to the old
+    grading_set, so the golden entries are the ones the summary was graded
+    against."""
+    if grading_set(items) != old.get("grading_set"):
+        sys.exit("regrade: the cases and controls changed since this summary (grading_set %s, now %s); "
+                 "regrade from the commit it was graded at" % (old.get("grading_set"), grading_set(items)))
+    cases = {i: d for i, d in items.items() if d["kind"] == "case"}
     s = json.loads(json.dumps(old))
     s["golden_hit"] = s["cases_found"] = 0
     for r in s["rows"]:
@@ -791,7 +816,7 @@ def regrade(old, cases, dirs):
             sys.exit("regrade: %s has %d golden entries now, %d then" % (r["id"], len(doc["golden"]), len(before)))
         repo_dir = dirs.get(doc["repo"])
         lines = [file_lines(repo_dir, doc["head"], g["file"]) if repo_dir else None for g in doc["golden"]]
-        now = golden_hits(doc["golden"], r["unmatched"], lines)
+        now = golden_hits(doc["golden"], r["unmatched"], lines, r["id"])
         hit = [a or b for a, b in zip(before, now)]
         r.update(hit=sum(hit), hits=hit, golden_lines=lines,
                  unmatched=[f for f in r["unmatched"]
@@ -942,13 +967,14 @@ def main(argv=None):
     rg.add_argument("summary")
     rg.add_argument("--out", required=True, help="where to write the regraded summary")
     rg.add_argument("--cases", default=os.path.join(HERE, "cases"))
+    rg.add_argument("--controls", default=os.path.join(HERE, "controls"))
     rg.add_argument("--repo-dir", action="append", default=[], metavar="OWNER/NAME=PATH")
     a = ap.parse_args(argv)
     if a.cmd == "regrade":
         with open(a.summary, encoding="utf-8") as handle:
             old = json.load(handle)
-        cases = {doc["id"]: doc for kind, doc, _ in load_items(os.path.abspath(a.cases), os.path.join(HERE, "controls")) if kind == "case"}
-        s = regrade(old, cases, repo_dirs(a.repo_dir))
+        dirs = repo_dirs(a.repo_dir)
+        s = regrade(old, current_items(os.path.abspath(a.cases), os.path.abspath(a.controls), dirs), dirs)
         write_json(a.out, s)
         print("regraded %s: recall %s (%d/%d), grader %d -> %s" % (
             a.summary, pct(s["recall"]), s["golden_hit"], s["golden_total"], GRADER, a.out))
