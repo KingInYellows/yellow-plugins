@@ -48,7 +48,8 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
 
 - **`SUCCESS`** — the branch is in a stack. Continue to Step 2.
 - **`NOT_IN_STACK`** — first check that Graphite does not own the branch,
-  before running anything that registers it. If `gt log short` lists the
+  before running anything that registers it. Skip this check on the trunk,
+  which Graphite always lists and nobody owns. If `gt log short` lists the
   current branch, or `.git/.graphite_repo_config` exists and the branch has
   a pull request Graphite opened, stop here without calling `init`: one
   provider owns a stack. Finish it with Graphite or follow the adoption
@@ -59,6 +60,10 @@ node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
   on the trunk; GitHub only forms a stack object once two pull requests
   exist, so this is an ordinary pull request. Use a stack of several
   branches only when the pull requests depend on one another.
+
+  The trunk is the remote's default branch: the last path component of
+  `git symbolic-ref --short refs/remotes/origin/HEAD`, or ask the user if
+  that fails.
 
   If the current branch is the trunk, choose a branch name from the change
   (`<type>/<short-slug>`) and create the branch with:
