@@ -59,8 +59,9 @@ mkdir -p "$CLAUDE_PLUGIN_DATA" || json_exit "mkdir failed; skipping prewarm"
 # point. Budget = 2 attempts (~2s worst case): the hook's overall timeout is
 # 5s, and under live contention we must yield with budget left to spare for
 # the json_exit print, or Claude Code SIGKILLs us mid-output and blocks
-# session startup. 2 attempts is also the minimum that lets stale-lock
-# recovery succeed (i=1 detects a dead owner and continues; i=2 acquires).
+# session startup. 2 attempts still recover a dead owner's lock (i=1 detects
+# it and continues; i=2 acquires). An empty or invalid pid needs a second
+# sighting, so that lock is left to start-morph.sh's 20 attempts.
 if ! yellow_morph_acquire_install_lock 2; then
   json_exit "install lock held by another process; yielding to start-morph.sh"
 fi

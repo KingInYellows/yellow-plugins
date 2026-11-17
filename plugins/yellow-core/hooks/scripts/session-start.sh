@@ -218,7 +218,7 @@ trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && cs_lock_drop "${STAGING_DIR}/.drain-loc
 # proceeds into dispatch logic and spawns a drain even though termination
 # was requested). Use the conventional 128+signal exit codes so the
 # parent shell sees the proper status. The EXIT trap above still fires
-# on the way out — clean up here is duplicate-but-safe (rmdir is
+# on the way out — clean up here is duplicate-but-safe (cs_lock_drop is
 # idempotent under the LOCK_OWNED_BY_PARENT guard).
 # shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
 trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && cs_lock_drop "${STAGING_DIR}/.drain-lock"; exit 130' INT
