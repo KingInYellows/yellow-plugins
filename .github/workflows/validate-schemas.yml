@@ -1537,41 +1537,6 @@ jobs:
         # extractor under both mawk and gawk.
         run: bats plugins/yellow-codex/tests/
 
-  # TEMPORARY (CLAUDE-346): diagnostics on ubuntu-26.04. Not in ci-status.
-  # Removed before this PR leaves draft.
-  shell-tests-2604-diag:
-    name: Shell diag (ubuntu-26.04, temporary)
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
-    continue-on-error: true
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Install bats, gawk, zsh, python3-rapidfuzz
-        run: sudo npm install -g bats@1.11.0 && sudo apt-get update -qq && sudo apt-get install -y -qq gawk zsh python3-rapidfuzz
-      - name: Coreutils probes
-        run: |
-          set +e
-          for t in mkdir mv stat sleep date timeout; do printf '%s: ' "$t"; readlink -f "$(command -v "$t")"; done
-          ls /usr/bin/gnu* 2>/dev/null | head -5 || true
-          d=$(mktemp -d); both=0
-          for i in $(seq 1 300); do rmdir "$d/l" 2>/dev/null; n=$( { mkdir "$d/l" 2>/dev/null && echo A & mkdir "$d/l" 2>/dev/null && echo B & mkdir "$d/l" 2>/dev/null && echo C & wait; } | wc -l); [ "$n" -gt 1 ] && both=$((both+1)); done
-          echo "mkdir races with >1 winner: $both/300"
-          s=$(date +%s%N); for i in $(seq 1 20); do timeout --kill-after=0.05 0.05 true; done; echo "timeout startup avg: $(( ($(date +%s%N)-s)/20000000 )) ms"
-          s=$(date +%s%N); for i in $(seq 1 20); do sleep 0.05; done; echo "sleep 0.05 avg: $(( ($(date +%s%N)-s)/20000000 )) ms"
-          f=$(mktemp); head -c 200054 /dev/zero | tr '\0' a > "$f"; bad=0
-          for i in $(seq 1 50); do n=$(tail -c 98304 < "$f" | cat | wc -c); m=$(cat "$f" | tail -c 98304 | wc -c); [ "$m" -ne 98304 ] && bad=$((bad+1)); done
-          echo "piped tail -c wrong sizes: $bad/50"
-      - name: yellow-ruvector lock cases x5 (timed)
-        run: |
-          set +e
-          for i in 1 2 3 4 5; do bats -T -f 'concurrent sessions queue|two parallel edits|uutils' plugins/yellow-ruvector/tests/post-tool-use.bats; done
-      - name: yellow-ruvector full suite
-        run: bats plugins/yellow-ruvector/tests/
-      - name: yellow-core full suite
-        run: bats plugins/yellow-core/tests/
-
   # ============================================================================
   # PLUGIN SHELL TESTS — ADVISORY LOOP (bats)
   # ============================================================================
