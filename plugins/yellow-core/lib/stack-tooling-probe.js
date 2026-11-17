@@ -271,7 +271,7 @@ function probeGithub() {
     extensionTriple !== null && isOlder(extensionTriple, parseVersion(TESTED_GH_STACK_VERSION));
 
   // gh-stack needs Git 2.36+. A git that cannot be run or read is left
-  // unjudged (null) rather than called too old.
+  // unjudged (null): reported as unknown below, never as too old or ready.
   const git = run('git', ['--version']);
   const gitTriple = git.ok && git.code === 0 ? parseVersion(git.stdout) : null;
   const gitVersion = gitTriple ? gitTriple.join('.') : null;
@@ -289,6 +289,9 @@ function probeGithub() {
   } else if (identityReady && extensionTriple === null) {
     readiness = READINESS.UNKNOWN;
     detail = `${OFFICIAL_EXTENSION} is installed but \`gh extension list\` shows no version for it, so it could not be compared with ${TESTED_GH_STACK_VERSION}.`;
+  } else if (identityReady && gitTriple === null) {
+    readiness = READINESS.UNKNOWN;
+    detail = `\`git --version\` could not be run or read, so git could not be compared with ${MIN_GIT_VERSION}, which ${OFFICIAL_EXTENSION} requires.`;
   } else if (identityReady) {
     readiness = READINESS.READY;
     detail = `gh is authenticated and ${OFFICIAL_EXTENSION} ${extensionVersion} is installed (${versionLine}).`;

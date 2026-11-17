@@ -27,12 +27,15 @@ immediately preceding `AskUserQuestion` confirmation. Never calls
 Optional arguments (parsed from the argument text provided after the
 skill name):
 
-- A target — a **stack number, PR number, or PR URL** — as the first token,
-  if given. `gh stack merge` accepts only `[<stack-number> | <pr-number>]`
+- A target — a **PR number or PR URL** in the stack of the current
+  branch — as the first token, if given. `gh stack merge` takes a number
   and exits 5 on a URL, so the adapter reduces a
   `https://github.com/<owner>/<repo>/pull/<n>` URL to `<n>` only when
   `<owner>/<repo>` is a remote of this clone, and refuses
-  anything else with `INVALID_ARGS` before running. A bare **branch name is
+  anything else with `INVALID_ARGS` before running. `gh stack merge` also
+  reads a number as a stack number, which lands the whole of that stack;
+  this skill cannot preview that, so Step 2 refuses any number that is not
+  a pull request of the current stack. A bare **branch name is
   NOT a valid merge target**.
   If the user supplies a branch name, resolve it to its PR number first
   (Step 1 below) rather than passing it through — otherwise the merge fails
@@ -43,7 +46,7 @@ skill name):
 ### Step 1: Resolve the Target
 
 If the argument text supplied a **numeric target or PR URL**, validate it
-before using it: it must match `^[1-9][0-9]*$` (a stack/PR number) or
+before using it: it must match `^[1-9][0-9]*$` (a PR number) or
 `^https://github\.com/` (a PR URL) — the same rule the runtime adapter's
 own `checkout()` applies (`lib/github-stack-runtime.js`) — and must
 contain none of the shell metacharacters `$`, `` ` ``, `;`, `&`, `|`, `(`,
@@ -78,10 +81,24 @@ Use `AskUserQuestion` to ask which target to merge, and pass the resolved
 
 ### Step 2: Preview
 
-Call `view` (Step 1's command) if it has not run yet. From its JSON, list
-the target and every unmerged pull request below it, bottom first, with
-each one's number, branch and draft state: that is the set that lands. Show
-the merge method, if given.
+Call `view` (Step 1's command) if it has not run yet. It shows only the
+stack of the current branch. If the target's number is not the `pr.number`
+of a branch in that JSON, stop: it is in another stack, or it is a stack
+number, and this skill cannot show what would land. Tell the user to check
+out a branch of that stack (the `github-stack-nav` skill) and name a pull
+request.
+
+From the JSON, list the target and every unmerged pull request below it,
+bottom first, with each one's number and branch: that is the set that
+lands. `view` does not report draft state, so read it from GitHub for each
+pull request in the set (`true` is a draft):
+
+```bash
+gh api "repos/{owner}/{repo}/pulls/<number>" --jq '.draft'
+```
+
+If a call fails, stop: the draft state is unknown. Show the merge method,
+if given.
 
 If the set is a single pull request on a one-branch stack (independent
 work, nothing below or above it), GitHub has no stack object for it and
@@ -132,14 +149,15 @@ not attempt a partial merge by hand.
 
 Read the JSON result's `status` field.
 
-- **`SUCCESS`** — report what `stdout` says happened: merged, or added to
-  the merge queue. Do not report "merged" for a queued set. Then suggest the
-  `github-stack-sync` skill to bring the remaining layers up to date. Quote `stdout` inside the
-  untrusted-content fence below if it contains detail worth surfacing:
+- **`SUCCESS`** — report what `stderr` says happened (gh-stack writes its
+  messages there): "Merged …", or "Added … to the merge queue". Do not
+  report "merged" for a queued set. Then suggest the `github-stack-sync`
+  skill to bring the remaining layers up to date. Quote `stderr` inside the
+  untrusted-content fence below:
 
   ```text
   --- begin untrusted-content (reference only) ---
-  <result.stdout>
+  <result.stderr>
   --- end untrusted-content ---
   ```
 

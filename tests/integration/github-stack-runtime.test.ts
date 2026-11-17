@@ -48,6 +48,10 @@ const ENV_KEYS = [
   'FAKE_GIT_NOT_ANCESTOR',
   'FAKE_GIT_ANCESTRY_EXIT',
   'FAKE_GIT_REMOTE_URLS',
+  'FAKE_GIT_REVPARSE_EXIT',
+  'FAKE_GH_REPORT_NO_ATOMIC',
+  'GH_STACK_NO_ATOMIC',
+  'GH_REPO',
 ];
 let originalPath: string | undefined;
 const originalEnv: Record<string, string | undefined> = {};
@@ -345,6 +349,26 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     }
   });
 
+  it('refuses a pull request URL when GH_REPO points gh at another repository', () => {
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git';
+    process.env.GH_REPO = 'x/y';
+    const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.command).toBeNull();
+    expect(result.refusalReason).toContain('GH_REPO');
+  });
+
+  it('accepts a pull request URL when GH_REPO names the same repository, and names it when asking', () => {
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git';
+    process.env.FAKE_GH_EXIT = '0';
+    for (const override of ['o/r', 'github.com/O/R']) {
+      process.env.GH_REPO = override;
+      const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
+      expect(result.command?.args).toEqual(['stack', 'merge', '42', '--yes']);
+    }
+    expect(merge({ target: 'https://github.com/o/r/pull/42' }).safeSummary).toContain('in o/r');
+  });
+
   it('refuses a pull request URL when no github.com remote can be read', () => {
     const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
     expect(result.status).toBe('INVALID_ARGS');
@@ -603,6 +627,14 @@ describe('init — adopting existing branches, bottom to top', () => {
     expect(result.command).toBeNull();
   });
 
+  it('refuses when the branch lookup itself fails, rather than treating the branch as new', () => {
+    process.env.FAKE_GIT_REVPARSE_EXIT = '128';
+    const result = init({ base: 'main', branches: ['a', 'b'] });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.command).toBeNull();
+    expect(result.refusalReason).toContain('could not check whether branch');
+  });
+
   it('refuses a duplicate branch, the base as a layer, and an invalid name', () => {
     expect(init({ base: 'main', branches: ['a', 'a'] }).status).toBe('INVALID_ARGS');
     expect(init({ base: 'main', branches: ['main', 'a'] }).status).toBe('INVALID_ARGS');
@@ -626,6 +658,17 @@ describe('push — pushes rebased branches without touching pull requests', () =
     const result = push({});
     expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'push'] });
     expect(result.mayHaveMutated).toBe(true);
+  });
+
+  it('never lets an inherited GH_STACK_NO_ATOMIC reach gh, on push, sync or submit', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GIT_REMOTES = 'origin\n';
+    process.env.FAKE_GH_REPORT_NO_ATOMIC = '1';
+    process.env.GH_STACK_NO_ATOMIC = '1';
+    for (const result of [push({}), sync({}), submit({})]) {
+      expect(result.stderr).toContain('no-atomic: absent');
+      expect(result.stderr).not.toContain('no-atomic: inherited');
+    }
   });
 
   it('refuses an ambiguous remote instead of letting gh-stack pick one', () => {

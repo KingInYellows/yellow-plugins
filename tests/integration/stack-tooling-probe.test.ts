@@ -213,6 +213,26 @@ describe('probeGithub — a verified extension must also be a tested version', (
   });
 });
 
+describe('probeGithub — an unreadable git version is unknown, not ready', () => {
+  it('unknown when git --version prints nothing parseable', () => {
+    const badGitBin = mkdtempSync(join(tmpdir(), 'stack-tooling-probe-bad-git-'));
+    try {
+      const fakeGit = join(badGitBin, 'git');
+      writeFileSync(fakeGit, '#!/usr/bin/env bash\nexit 1\n');
+      chmodSync(fakeGit, 0o755);
+      process.env.PATH = `${badGitBin}:${process.env.PATH}`;
+      process.env.FAKE_GH_AUTH_EXIT = '0';
+      process.env.FAKE_GH_EXT_OUTPUT = `gh stack\\t${OFFICIAL_EXTENSION}\\tv0.3.0\\n`;
+      const result = probeGithub();
+      expect(result.readiness).toBe(READINESS.UNKNOWN);
+      expect(result.checks.gitVersion).toBeNull();
+      expect(result.detail).toContain('git --version');
+    } finally {
+      rmSync(badGitBin, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('probeGithub — READY requires auth AND verified extension identity together', () => {
   it('is ready only when auth is valid and the extension is verified', () => {
     process.env.FAKE_GH_AUTH_EXIT = '0';

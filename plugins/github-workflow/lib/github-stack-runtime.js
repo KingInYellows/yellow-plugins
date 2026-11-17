@@ -114,9 +114,22 @@ const MERGE_METHODS = Object.freeze(['merge', 'squash', 'rebase']);
  * @param {string} bin
  * @param {string[]} args
  */
+/**
+ * The child's environment. gh-stack 0.3.0 reads `GH_STACK_NO_ATOMIC` as the
+ * default of `--no-atomic` on push, sync and submit, so an inherited value
+ * would turn off the all-or-nothing push this runtime promises. It is
+ * dropped here rather than overridden per command.
+ */
+function childEnv() {
+  const env = { ...process.env };
+  delete env.GH_STACK_NO_ATOMIC;
+  return env;
+}
+
 function run(bin, args) {
   const result = spawnSync(bin, args, {
     encoding: 'utf8',
+    env: childEnv(),
     timeout: spawnTimeoutMs,
     shell: false,
     windowsHide: true,
@@ -457,10 +470,15 @@ function view() {
   return shapeResult({ op: 'view', bin: 'gh', args: ['stack', 'view', '--json'], execResult, mayHaveMutated: false });
 }
 
-/** True when `refs/heads/<name>` exists locally. */
+/**
+ * Whether `refs/heads/<name>` exists locally: true, false (git's own
+ * "not found" exit 1), or null when the lookup itself failed.
+ */
 function localBranchExists(name) {
   const result = run('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${name}`]);
-  return result.ok && result.code === 0;
+  if (!result.ok) return null;
+  if (result.code === 0) return true;
+  return result.code === 1 ? false : null;
 }
 
 /**
@@ -495,7 +513,11 @@ function init({ base, branch, branches }) {
     for (const name of names) {
       // gh-stack creates a branch that does not exist yet; only existing
       // branches carry an order that can be wrong.
-      if (!localBranchExists(name)) continue;
+      const exists = localBranchExists(name);
+      if (exists === null) {
+        return refusalResult('init', `could not check whether branch "${name}" exists`);
+      }
+      if (!exists) continue;
       if (below !== null) {
         const ancestry = run('git', ['merge-base', '--is-ancestor', `refs/heads/${below}`, `refs/heads/${name}`]);
         if (!ancestry.ok || (ancestry.code !== 0 && ancestry.code !== 1)) {
@@ -673,6 +695,16 @@ function merge({ target, mergeMethod, confirm }) {
           : `target "${target}" is a pull request in ${wanted}, which is not a remote of this clone (${repos.join(', ')})`
       );
     }
+    // gh-stack picks its repository the way gh does, so `GH_REPO`
+    // ([HOST/]OWNER/REPO) overrides the clone's remotes. The number must not
+    // land in a repository other than the one the URL names.
+    const override = (process.env.GH_REPO || '').trim().toLowerCase();
+    if (override && override !== wanted && override !== `github.com/${wanted}`) {
+      return refusalResult(
+        'merge',
+        `target "${target}" is a pull request in ${wanted}, but GH_REPO points gh at "${override}"; unset GH_REPO or pass the pull request number`
+      );
+    }
   }
   if (!/^[1-9][0-9]*$/.test(number)) {
     return refusalResult(
@@ -683,7 +715,7 @@ function merge({ target, mergeMethod, confirm }) {
   if (confirm !== true) {
     return confirmationRequiredResult(
       'merge',
-      `merge target "${number}" lands that pull request and every unmerged pull request below it in the stack, and cannot be undone by this runtime`
+      `merge target "${number}"${urlMatch ? ` in ${urlMatch[1]}/${urlMatch[2]}` : ''} lands that pull request and every unmerged pull request below it in the stack, and cannot be undone by this runtime`
     );
   }
   const args = ['stack', 'merge', number, '--yes'];

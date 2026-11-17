@@ -8,6 +8,7 @@
 #   FAKE_GIT_NOT_ANCESTOR  space-separated "below:above" pairs that are NOT
 #                          ancestor/descendant (every other pair is)
 #   FAKE_GIT_ANCESTRY_EXIT exit code forced on merge-base (e.g. 128)
+#   FAKE_GIT_REVPARSE_EXIT exit code forced on rev-parse --verify (e.g. 128)
 if [ "$1" = "check-ref-format" ] && [ "$2" = "--branch" ]; then
   name="$3"
   if [ -z "$name" ] || [[ "$name" == -* ]] || [[ "$name" == *..* ]] || \
@@ -42,6 +43,9 @@ if [ "$1" = "config" ] && [ "$2" = "--get-regexp" ]; then
   exit 0
 fi
 if [ "$1" = "rev-parse" ] && [ "$2" = "--verify" ] && [ "$3" = "--quiet" ]; then
+  if [ -n "${FAKE_GIT_REVPARSE_EXIT:-}" ]; then
+    exit "$FAKE_GIT_REVPARSE_EXIT"
+  fi
   name="${4#refs/heads/}"
   case " ${FAKE_GIT_BRANCHES:-} " in
     *" $name "*) exit 0 ;;
