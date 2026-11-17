@@ -8,3 +8,7 @@ stacked pull request lifecycle against GitHub (CLAUDE-344).
 
 Created with `init`, submitted as the bottom pull request.
 Amended after submit.
+
+## Layer 2
+
+Created with `add` on top of layer 1.
