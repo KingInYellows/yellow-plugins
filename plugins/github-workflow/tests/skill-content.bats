@@ -78,3 +78,10 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
   run grep -F 'github-stack-merge-single' "$MERGE_SKILL"
   [ "$status" -eq 0 ]
 }
+
+@test "github-stack-merge-single: fences the pull request fields GitHub returns" {
+  run grep -c -F -- '--- begin untrusted-content (reference only) ---' "$MERGE_SINGLE_SKILL"
+  [ "$output" -eq 2 ]
+  run grep -F '<pullRequest fields, or refusalReason>' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+}
