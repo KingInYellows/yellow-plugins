@@ -77,9 +77,10 @@ A golden entry is found when one finding with `display: "Important"` names its
 file, has a line within 10 of its line (`LINE_WINDOW`) or past the end of that
 file at `head`, and matches every `match` regex (case-insensitive) in its
 `title` plus `suggested_fix`. A line past the end points at no code, so the
-regexes decide; reviewers have cited one (448 in a 279-line file), and a 3-line
-window missed a correct finding 5 lines off (2026-11-09). Recall counts golden
-entries. Write regexes as JSON-escaped raw patterns (`"\\bpath\\b"`); an
+regexes decide, but only for a file with one golden entry (else one such finding
+could hit several); reviewers have cited one (448 in a 279-line file), and a
+3-line window missed a correct finding 5 lines off (2026-11-09). Recall counts
+golden entries. Write regexes as JSON-escaped raw patterns (`"\\bpath\\b"`); an
 unescaped `\b` in a generator once became a backspace. Optional keys: `include`
 and `exclude` (persona names passed to the workflow) and `notes`.
 

@@ -646,6 +646,7 @@ def run(work, jobs, dry_run, retry_incomplete=False, timeout=3600):
 # 279-line file, both with matching regexes).
 GRADER = 2
 LINE_WINDOW = 10
+UNBOUNDED = 10 ** 9  # a file length no line exceeds: the past-end rule never applies
 
 
 def is_important(f):
@@ -678,11 +679,21 @@ def file_lines(repo_dir, rev, path):
         return None
 
 
+def effective_lines(goldens, lines):
+    """lines, with UNBOUNDED for every entry whose file has another entry."""
+    files = [os.path.normpath(g["file"]) for g in goldens]
+    return [UNBOUNDED if files.count(fn) > 1 else n for fn, n in zip(files, lines)]
+
+
 def golden_hits(goldens, important, lines, rid):
     """Per golden entry, whether a finding matches it; lines[i] is entry i's
-    file length at head (None when unknown). An unknown length that could
-    decide a match (a matching finding past the window) stops the grade, so a
-    missing checkout never reads as a miss."""
+    file length at head (None when unknown). A line past the end points at no
+    entry in particular, so it stands in for the line only where its file has
+    one golden entry; otherwise one finding could hit several entries a
+    located finding could not. An unknown length that could still decide a
+    match (a matching finding past the window) stops the grade, so a missing
+    checkout never reads as a miss."""
+    lines = effective_lines(goldens, lines)
     for g, n in zip(goldens, lines):
         if n is None and any(not finding_matches(g, f) and finding_matches(g, f, 1) for f in important):
             sys.exit("grade: %s: cannot read %s at its head, and a finding past the line window "
@@ -746,8 +757,9 @@ def summarize(work):
             s["golden_hit"] += sum(hit)
             s["cases_complete"] += 1
             s["cases_found"] += all(hit)
+            eff = effective_lines(item["golden"], lines)
             r["unmatched"] = [f for f in important
-                              if not any(finding_matches(g, f, n) for g, n in zip(item["golden"], lines))]
+                              if not any(finding_matches(g, f, n) for g, n in zip(item["golden"], eff))]
         else:
             s["controls_complete"] += 1
             s["controls_with_fp"] += bool(important)
@@ -820,7 +832,8 @@ def regrade(old, items, dirs):
         hit = [a or b for a, b in zip(before, now)]
         r.update(hit=sum(hit), hits=hit, golden_lines=lines,
                  unmatched=[f for f in r["unmatched"]
-                            if not any(finding_matches(g, f, n) for g, n in zip(doc["golden"], lines))])
+                            if not any(finding_matches(g, f, n)
+                                       for g, n in zip(doc["golden"], effective_lines(doc["golden"], lines)))])
         s["golden_hit"] += sum(hit)
         s["cases_found"] += all(hit)
     return finish(s)
