@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.17.0
+
+### Minor Changes
+
+- [#1819](https://github.com/KingInYellows/yellow-plugins/pull/1819)
+  [`32f60d9`](https://github.com/KingInYellows/yellow-plugins/commit/32f60d97c39e347d21de4b82d1d6804886a91cd1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make
+  GitHub-native stacked pull requests the recommended provider and bring the
+  integration up to `gh-stack` 0.3.0.
+
+  github-workflow: `add` no longer passes `--remote` (gh-stack rejects it),
+  `init` adopts existing branches bottom to top and refuses a wrong order, a new
+  `push` operation, `merge` reduces a pull request URL to its number, and a
+  retargeted base is reported as `BASE_CHANGE_UNCONFIRMED` instead of success
+  (`--accept-base-change` needs confirmation). The amend skill rebases the
+  branches above before re-submitting, submit registers an untracked branch as a
+  one-branch stack, the merge preview lists every pull request that will land,
+  and setup offers the extension upgrade.
+
+  yellow-core: the tooling probe reports `github/gh-stack` older than 0.3.0 or
+  Git older than 2.36 as not ready, `UNSELECTED` recommends
+  `/stack:select github` without selecting it, and `/setup:all` reports an
+  outdated extension. Adds `docs/stacked-prs-native-migration.md`.
+
+### Patch Changes
+
+- [#1832](https://github.com/KingInYellows/yellow-plugins/pull/1832)
+  [`bffc2d6`](https://github.com/KingInYellows/yellow-plugins/commit/bffc2d6503414bb939429deb2af8ee501a8878ab)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/setup:all`'s
+  ruvector probe now writes the CLI's `--version` output to a temp file on the
+  timeout path too. On systems whose `timeout` kills only its direct child
+  (uutils coreutils, the default on Ubuntu 26.04), a leftover child of a CLI
+  that ignores TERM held the probe's pipe open and stalled the dashboard for as
+  long as that child lived (CLAUDE-346).
+
+  The compound-staging Stop capture and the Jev pre-filter now take their byte
+  cap with a shell substring instead of `tail -c` on a pipe, and the 8 KiB cap
+  check reads the file directly. On a pipe uutils `tail -c N` can return more
+  than N bytes, so a large transcript tail could be staged over the 96 KiB cap.
+
 ## 2.16.1
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.18.2
+
+### Patch Changes
+
+- [#1814](https://github.com/KingInYellows/yellow-plugins/pull/1814)
+  [`f89be4f`](https://github.com/KingInYellows/yellow-plugins/commit/f89be4f865cdac6cc8ce21e6c0c1032a6ad9ebc9)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document the
+  `Skill(yellow-review:review:*)` allow rule that `/loop`, scheduled tasks and
+  `claude -p` runs of `/review:sweep` and the other review commands need from
+  Claude Code 2.1.325 (CLAUDE-339).
+
 ## 3.18.1
 
 ### Patch Changes
