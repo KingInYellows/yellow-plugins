@@ -4,7 +4,10 @@
 
 ## Linear
 
-<!-- Replace with the existing issue: "Fixes CLAUDE-123", or "Refs CLAUDE-123" for partial work. Keep CLAUDE-NEW only if no issue exists yet. -->
+<!--
+Replace with the existing issue: "Fixes CLAUDE-123", or "Refs CLAUDE-123"
+for partial work. Keep CLAUDE-NEW only if no issue exists yet.
+-->
 
 Fixes CLAUDE-NEW
 
