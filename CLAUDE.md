@@ -102,16 +102,11 @@ Every other state stops the workflow with the classifier's `detail` — never
 fall back to raw `git push` or `gh pr create`. `/stack:select` switches
 providers; `plugins/yellow-core/lib/stack-operation-registry.js` maps
 operations to providers. `.graphite.yml` holds gt-workflow conventions (not a
-Graphite CLI feature). The same exactly-one-enabled pattern governs the
-`remote-agent` group (`yellow-cursor` preferred over `yellow-devin`; see
-`plugins/yellow-core/commands/setup/all.md` Step 2.5 and
-`plugins/yellow-core/lib/remote-agent-provider-state.js`).
+Graphite CLI feature). The `remote-agent` group follows the same pattern
+(`yellow-cursor` preferred over `yellow-devin`; `/setup:all` Step 2.5).
 
-A command and a skill in one plugin must not share a name (RULE 24): Claude
-Code 2.1.321 resolved such a pair to the command, leaving the skill body
-unreachable. gt-workflow therefore ships its entry points as user-invocable
-skills with no command files; invoke them from another plugin as
-`gt-workflow:<name>`.
+gt-workflow ships its entry points as skills only (RULE 24); call them from
+another plugin as `gt-workflow:<name>`.
 
 ### Linear linking
 
@@ -166,9 +161,9 @@ still rely on review:
   "be thorough" exhortations, or self-verification loops — these degrade
   their output. Per-model notes (effort defaults, early stops) are in
   docs/research/best-practices/gpt-claude-latest-model-prompting-guidance.md.
-- All files use LF line endings; WSL2-created files often arrive with CRLF
-  (`sed -i 's/\r$//'`). The Write tool is the usual culprit — prefer
-  heredocs or scripts for new `.sh` files.
+- `.gitattributes` normalizes only the committed copy, so a script written
+  with CRLF on WSL2 keeps failing locally until you strip the CRs
+  (`sed -i 's/\r$//'`); prefer heredocs or scripts for new `.sh` files.
 
 ## Skill and Workflow Execution Rules
 

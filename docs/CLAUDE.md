@@ -97,9 +97,12 @@ the current `main` and can re-publish under a stale tag. Follow the guarded
 procedure in `docs/operations/release-checklist.md` Section 5.2, which pins the
 dispatch to the release merge.
 
-**Known issue:** Claude Code's background auto-update has a bug (GH #26744) where
-it doesn't prompt users when a new version is available. Users can run
-`/plugin marketplace update` manually.
+Third-party marketplaces auto-update only when auto-update is on for the
+marketplace; the check runs after a session's first message and can take up to
+ten minutes. Users who don't see a new version can refresh the catalog with
+`/plugin marketplace update yellow-plugins`, update the plugin with `claude
+plugin update <name>@yellow-plugins`, then run `/reload-plugins`; a running
+session keeps its loaded version until then.
 
 ## Solution Docs
 
