@@ -164,6 +164,23 @@ const CASES: Array<[string, string, string, string | null, boolean]> = [
     false,
   ],
   [
+    'bare mention in description does not link',
+    'feat/x',
+    'fix',
+    'Notes: CLAUDE-123',
+    false,
+  ],
+  ['Part of links', 'feat/x', 'fix', 'Part of CLAUDE-3', true],
+  ['Closes: with a colon links', 'feat/x', 'fix', 'Closes: CLAUDE-3', true],
+  [
+    'list after a magic word, first ignored',
+    'feat/x',
+    'fix',
+    'Fixes CLAUDE-1, CLAUDE-2\nIgnore CLAUDE-1',
+    true,
+  ],
+  ['magic word inside another word', 'feat/x', 'fix', 'prefix CLAUDE-3', false],
+  [
     'Skip works like Ignore',
     'u/claude-123-change',
     'fix',

@@ -10,8 +10,10 @@ name: Linear Link
 # Finds a link when any of these holds (word-boundary match):
 #   branch name     CLAUDE-<number> or claude-<number> (Linear's lowercase form)
 #   PR title        CLAUDE-<number> (case-sensitive)
-#   PR description  CLAUDE-<number> or CLAUDE-NEW (case-sensitive; text inside
-#                   <!-- --> comments does not count)
+#   PR description  CLAUDE-<number> or CLAUDE-NEW after a Linear magic word
+#                   (Fixes, Closes, Resolves, Refs, Part of, ...), as Linear
+#                   requires; the key is case-sensitive and text inside
+#                   <!-- --> comments does not count
 # An ID named by "Ignore <ID>" or "Skip <ID>" in the description never counts,
 # from any source.
 # CLAUDE-NEW creates an issue only when the PR links no other issue, so it
@@ -59,15 +61,13 @@ jobs:
           # branch, title or description; CLAUDE-NEW only works in the
           # description, where Linear reads it as "create the issue in CLAUDE".
           # ids SOURCE MODE: print matching IDs, uppercased, one per line.
-          # MODE: branch (CLAUDE-n or claude-n), title (CLAUDE-n),
-          # body (CLAUDE-n or CLAUDE-NEW). perl reads the whole input, so no
-          # pipe writer can take SIGPIPE under pipefail.
+          # MODE: branch (CLAUDE-n or claude-n), title (CLAUDE-n). perl reads
+          # the whole input, so no pipe writer can take SIGPIPE under pipefail.
           ids() {
             MODE="$2" perl -0ne '
               my %re = (
                 branch => qr/(?<![A-Za-z0-9_])(CLAUDE-\d+|claude-\d+)(?![A-Za-z0-9_])/,
                 title  => qr/(?<![A-Za-z0-9_])(CLAUDE-\d+)(?![A-Za-z0-9_])/,
-                body   => qr/(?<![A-Za-z0-9_])(CLAUDE-(?:\d+|NEW))(?![A-Za-z0-9_])/,
               );
               my $re = $re{$ENV{MODE}};
               print uc($1), "\n" while /$re/g;
@@ -79,6 +79,20 @@ jobs:
           # "Ignore <ID>" (or "Skip <ID>") tells Linear never to link that ID from any source.
           ignored=$(perl -0ne 'print uc($1), "\n" while /(?<![A-Za-z0-9_])(?:ignore|skip)[:\s]*([A-Za-z][A-Za-z0-9]*-\d+)(?![A-Za-z0-9_])/gi' <<<"$body")
           body=$(perl -0pe 's/\b(?:ignore|skip)\b[:\s]*[A-Za-z][A-Za-z0-9]*-(?:\d+|new)\b//gi' <<<"$body")
+          # refs TEXT: print every issue ID (any team, or TEAM-NEW) that follows
+          # one of Linear's magic words, including lists such as
+          # "Fixes CLAUDE-1, CLAUDE-2". A bare mention does not link in Linear.
+          refs() {
+            perl -0ne '
+              my $id = qr/[A-Z][A-Z0-9]*-(?:\d+|NEW)/;
+              my $word = qr/(?i:close[sd]?|closing|fix(?:es|ed|ing)?|resolve[sd]?|resolving|complete[sd]?|completing|refs?|references|part\s+of|related\s+to|contributes\s+to|towards?)/;
+              while (/(?<![A-Za-z0-9_])$word[:\s]+($id(?:\s*(?:,|&|\band\b)\s*$id)*)(?![A-Za-z0-9_])/g) {
+                my $list = $1;
+                print "$1\n" while $list =~ /($id)/g;
+              }
+            ' <<<"$1"
+          }
+          body_refs=$(refs "$body")
           linked() {
             local id
             while IFS= read -r id; do
@@ -92,14 +106,14 @@ jobs:
             found='branch name'
           elif linked "$(ids "$PR_TITLE" title)"; then
             found='PR title'
-          elif linked "$(ids "$body" body | grep -vx CLAUDE-NEW || true)"; then
+          elif linked "$(grep -E '^CLAUDE-[0-9]+$' <<<"$body_refs" || true)"; then
             found='PR description'
           fi
           if [ -n "$found" ]; then
             echo "Linear link found in the $found."
             exit 0
           fi
-          if grep -qx CLAUDE-NEW <<<"$(ids "$body" body)"; then
+          if grep -qx CLAUDE-NEW <<<"$body_refs"; then
             # Other-team references that stop CLAUDE-NEW from creating an
             # issue: a Linear-style branch segment (eng-123-slug) or a
             # magic-word phrase in the description. Output is limited to
@@ -107,7 +121,7 @@ jobs:
             others=$(
               {
                 perl -ne 'print uc($1), "\n" while m{(?:^|/)([A-Za-z][A-Za-z0-9]*-\d+)(?=-|$)}g' <<<"$PR_BRANCH"
-                perl -0ne 'print uc($1), "\n" while /\b(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?|complete[sd]?|refs?|references|part of|related to|contributes to|towards?)\b[:\s]+([A-Z][A-Z0-9]*-\d+)(?![A-Za-z0-9_])/gi' <<<"$body"
+                grep -E -- '-[0-9]+$' <<<"$body_refs" || true
               } | grep -v '^CLAUDE-' | grep -vxF -f <(printf '%s\n' "$ignored") | sort -u | paste -sd ' ' -
             ) || true
             if [ -z "$others" ]; then
