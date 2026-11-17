@@ -8,7 +8,9 @@ user-invocable: false
 
 Stages specific changed files, creates a conventional commit, and submits
 the branch via the runtime adapter's `submit` operation
-(`gh stack submit --auto`, draft by default). This is the commit+submit
+(`gh stack submit --auto`, draft by default). A branch that is not in a
+stack yet is first registered as a one-branch stack, which GitHub shows as
+an ordinary pull request. This is the commit+submit
 mechanics only — it does not run the parallel code-review audit that
 Graphite's `smart-submit` skill runs; that is out of scope here.
 
@@ -35,6 +37,43 @@ git diff --stat
 ```
 
 If there are no uncommitted changes, tell the user and exit.
+
+### Step 1b: Make Sure the Branch Is Tracked
+
+`gh stack submit` only works on a branch that belongs to a tracked stack.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view
+```
+
+- **`SUCCESS`** — the branch is in a stack. Continue to Step 2.
+- **`NOT_IN_STACK`** — register it. Independent work is a one-branch stack
+  on the trunk; GitHub only forms a stack object once two pull requests
+  exist, so this is an ordinary pull request. Use a stack of several
+  branches only when the pull requests depend on one another.
+
+  If the current branch is the trunk, choose a branch name from the change
+  (`<type>/<short-slug>`) and create the branch with:
+
+  ```bash
+  node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" init --base "<trunk>" --branch "<new-branch>"
+  ```
+
+  Otherwise adopt the current branch as it is:
+
+  ```bash
+  node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" init --base "<trunk>" --branch "<current-branch>"
+  ```
+
+  A dependent layer on top of an existing stack is created by the
+  adapter's `add` operation from that stack's top branch (`/flow:work`
+  does this); this skill submits the branch it is on.
+
+  If the branch is tracked by Graphite (`gt log short` lists it, or
+  `.git/.graphite_repo_config` exists and the branch has a Graphite pull
+  request), stop: one provider owns a stack. Finish it with Graphite or
+  follow the adoption steps in `docs/stacked-prs-native-migration.md`.
+- Any other status — report `status` and `recoveryAction` and stop.
 
 ### Step 2: Stage Specific Files
 
@@ -162,7 +201,8 @@ Read the JSON result's `status` field.
 ## Boundaries
 
 - Never `git add .` or `git add -A` — files are staged by name only.
-- Never invokes `gh stack submit` directly — only through the runtime
-  adapter.
+- Never invokes `gh stack submit` or `gh stack init` directly — only
+  through the runtime adapter.
+- Never registers a branch that Graphite already tracks.
 - Never reinvents the audit-agent review flow from Graphite's
   `smart-submit` — that is a separate concern, out of scope here.

@@ -16,6 +16,11 @@ Make exactly one member of the `stacked-pr` capability group active:
 - `graphite` → `gt-workflow`
 - `github` → `github-workflow`
 
+`github` is the recommended provider for new work (`RECOMMENDED_PROVIDER` in
+`lib/stack-provider-state.js`). That is advice for an unselected setup, not
+an automatic choice: this command never switches without an explicit
+provider and an approved plan.
+
 Both may stay installed. Only one may be enabled. This command shows every
 command it intends to run before running any of them, and it refuses rather
 than guessing.
@@ -40,7 +45,12 @@ Parse `$ARGUMENTS`:
 
 If the provider is missing or invalid, run Step 2 first so the user sees the
 current state, then use `AskUserQuestion` with the two provider options,
-each labelled with what it would change. Do not proceed without an answer.
+each labelled with what it would change. Label `github` "(recommended for
+new work)" when the state is `UNSELECTED`. When Graphite is the enabled
+provider, label neither as recommended and say that open Graphite stacks
+should be finished or adopted first (`docs/stacked-prs-native-migration.md`
+in yellow-plugins), because one provider owns a stack. Do not proceed
+without an answer.
 
 ## Step 2: Show the current state
 
@@ -139,6 +149,11 @@ Proposed provider switch: graphite → github (scope: user)
   Nothing else is changed. Graphite stays installed; no settings file is
   edited; no branch, PR, or merge queue is touched.
 ```
+
+When the plan disables `gt-workflow`, add one line under it: stacks already
+submitted with Graphite keep working only through Graphite, so switch back
+with `/stack:select graphite` to finish them, or adopt them first. Never run
+`gt` and `gh stack` restacks against the same branches.
 
 Then use `AskUserQuestion`: "Apply this provider switch?" with options
 "Apply", "Show what each step does", and "Cancel". If any step has

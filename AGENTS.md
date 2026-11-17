@@ -227,7 +227,13 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   back to raw `git push`/`gh pr create` as a substitute for either
   provider's submission path, and never fall back to the other provider.
   See `plugins/yellow-core/lib/stack-operation-registry.js` for the full
-  operation-to-provider mapping.
+  operation-to-provider mapping. GitHub-native is the recommended provider
+  for new work; Graphite stays supported for stacks already submitted with
+  it. One provider owns a given stack: never run `gt` and `gh stack`
+  restacks, or two merge queues, against the same branches. An independent
+  change is an ordinary pull request (a one-branch stack); stack only pull
+  requests that depend on one another. Migration steps and what is verified
+  are in `docs/stacked-prs-native-migration.md`.
 - `.graphite.yml` is a `gt-workflow` plugin convention file, not a native
   Graphite CLI config file.
 - Follow Conventional Commits: `feat(scope): ...`, `fix(scope): ...`,

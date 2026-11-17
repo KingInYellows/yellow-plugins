@@ -13,7 +13,7 @@ the provider model:
   `gh stack <verb>` directly from a command or skill's Bash block. The
   runtime adapter is the sole owner of argument validation, confirmation
   gating, exit-code interpretation, and **credential redaction** for every
-  mutating operation (`init`, `add`, `checkout`, `rebase`, `sync`,
+  mutating operation (`init`, `add`, `checkout`, `rebase`, `sync`, `push`,
   `submit`, `merge`, `unstack`). Calling `gh stack` directly from a Bash
   block bypasses `redact()` and can surface a token from a
   credential-bearing remote URL straight into model context.
@@ -52,19 +52,24 @@ the provider model:
 ### Skills (9)
 
 - `github-stack-setup` — prerequisite check: `gh` present and authenticated,
-  and the installed `gh stack` extension is the official `github/gh-stack`.
-  Reports gaps; runs no installer without explicit confirmation.
+  the installed `gh stack` extension is the official `github/gh-stack` at or
+  above the tested version, and `git` is 2.36+. Reports gaps; runs no
+  installer or upgrade without explicit confirmation.
 - `github-stack-status` — read-only provider readiness report, including
   whether this plugin is the enabled `stacked-pr` provider (delegates that
   question to `yellow-core`'s `/stack:status`).
 - `github-stack-plan` — read-only stack view via the runtime adapter's
   `view` operation.
 - `github-stack-submit` — stage, commit, and submit uncommitted changes via
-  the runtime adapter's `submit` operation (draft by default).
-- `github-stack-amend` — amend the current branch commit and re-submit via
-  the runtime adapter's `submit` operation.
+  the runtime adapter's `submit` operation (draft by default). A branch
+  outside any stack is registered as a one-branch stack first (an ordinary
+  pull request); a Graphite-tracked branch is refused.
+- `github-stack-amend` — amend the current branch commit, rebase the
+  branches above it (`rebase --mode upstack`), and re-submit. No submit
+  after an unfinished rebase.
 - `github-stack-sync` — sync the local stack with trunk via the runtime
-  adapter's `sync` operation; pruning merged branches requires an
+  adapter's `sync` operation, which also pushes the rebased branches;
+  pruning merged branches and accepting a retargeted base each require an
   `AskUserQuestion` confirmation before `--confirm` is passed.
 - `github-stack-nav` — check out a stack target via the runtime adapter's
   `checkout` operation; resolves an omitted target via `view` +
@@ -76,7 +81,9 @@ the provider model:
   `AskUserQuestion` confirmation that states which of the two happens.
 - `github-stack-merge` — merge a stacked PR via the runtime adapter's
   `merge` operation (Preview → Confirm → Merge → Report), always behind
-  an `AskUserQuestion` confirmation; never calls `gh pr merge`.
+  an `AskUserQuestion` confirmation; never calls `gh pr merge`. The preview
+  lists the target and every unmerged PR below it, because GitHub lands
+  that whole set (or queues it when the base uses a merge queue).
 
 ### MCP servers (0) · Hooks (2)
 
@@ -118,13 +125,29 @@ the installed extension's **owner** via `gh extension list` (look for
 `github/gh-stack`), not merely that `gh stack` resolves. A third-party
 lookalike answering `gh stack --help` is a false READY.
 
-## Preview status (as of 2026-08-17)
+## Upstream status and tested version
 
-GitHub's native stacked PRs, the `gh skill` distribution channel, and
-`gh-stack` itself (v0.1.0) are all pre-GA. Merge-queue support for stacked
-PRs was still rolling out. Treat behaviour as unstable and re-verify before
-building on it — see
-`docs/research/2026-08-16-github-native-stacks-vs-graphite.md`.
+GitHub's stacked pull requests have been generally available since
+2026-10-06. This plugin is tested against `github/gh-stack` **v0.3.0**
+(`TESTED_GH_STACK_VERSION` in yellow-core's `stack-tooling-probe.js`); an
+older extension is reported not ready. Facts the adapter depends on:
+
+- v0.2.0 moved stack state to `<git-common-dir>/gh-stack`, shared by every
+  worktree. Never mix older and newer versions in one clone.
+- `add` takes no `--remote`; `init` adopts existing branches given bottom
+  to top; `merge` takes a stack or PR number only (the adapter reduces a
+  PR URL); `sync` pushes and links existing PRs but never opens one.
+- `rebase` and `sync` leave the stack un-rebased when GitHub retargeted its
+  base and the old base did not merge. The adapter reports that as
+  `BASE_CHANGE_UNCONFIRMED`, never `SUCCESS`, and `--accept-base-change`
+  needs `confirm: true`.
+- `gh stack merge` lands the target and every PR below it. `gh pr merge` and
+  the REST merge endpoint are not equivalent for a stacked PR.
+
+What was verified against the real extension in a local fixture, and what
+still needs a live GitHub repository, is recorded in
+`docs/stacked-prs-native-migration.md`. Bump the tested version only after
+re-running that fixture list.
 
 ## Dependency on yellow-core
 

@@ -24,6 +24,7 @@ const {
   checkout,
   rebase,
   sync,
+  push,
   submit,
   merge,
   unstack,
@@ -43,6 +44,9 @@ const ENV_KEYS = [
   'FAKE_GH_SLEEP',
   'FAKE_GIT_REMOTES',
   'FAKE_GIT_PUSH_DEFAULT',
+  'FAKE_GIT_BRANCHES',
+  'FAKE_GIT_NOT_ANCESTOR',
+  'FAKE_GIT_ANCESTRY_EXIT',
 ];
 let originalPath: string | undefined;
 const originalEnv: Record<string, string | undefined> = {};
@@ -315,10 +319,29 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'merge', '42', '--yes'] });
   });
 
-  it('accepts a github.com PR URL as target', () => {
+  it('reduces a github.com pull request URL to its number — gh stack merge exits 5 on a URL', () => {
     process.env.FAKE_GH_EXIT = '0';
     const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
-    expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'merge', 'https://github.com/o/r/pull/42', '--yes'] });
+    expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'merge', '42', '--yes'] });
+  });
+
+  it('refuses a github.com URL that is not a pull request', () => {
+    for (const target of [
+      'https://github.com/o/r/issues/42',
+      'https://github.com/o/r/pull/42/files',
+      'https://github.com/o/r/pull/0',
+      'https://github.com/o/r',
+    ]) {
+      const result = merge({ target, confirm: true });
+      expect(result.status).toBe('INVALID_ARGS');
+      expect(result.command).toBeNull();
+    }
+  });
+
+  it('the confirmation request says the pull requests below the target merge too', () => {
+    const result = merge({ target: '42' });
+    expect(result.status).toBe('REQUIRES_CONFIRMATION');
+    expect(result.safeSummary).toContain('every unmerged pull request below it');
   });
 
   it('refuses a flag-shaped target instead of letting it reach argv (argv-smuggling guard)', () => {
@@ -502,5 +525,157 @@ describe('credential redaction — subprocess output never carries secrets into 
     const padded = `${'x'.repeat(9000)}${secret}`;
     const out = redact(padded);
     expect(out).not.toContain(secret);
+  });
+});
+
+describe('add — a local operation that never takes a remote', () => {
+  it('passes no --remote even when several remotes exist and pushDefault is set (gh stack add has no such flag)', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GIT_REMOTES = 'origin\nupstream\n';
+    process.env.FAKE_GIT_PUSH_DEFAULT = 'origin';
+    const result = add({ branch: 'feat/two', message: 'feat: add layer two' });
+    expect(result.command?.args).toEqual(['stack', 'add', '-m', 'feat: add layer two', 'feat/two']);
+  });
+
+  it('is not refused for an ambiguous remote', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GIT_REMOTES = 'origin\nupstream\n';
+    expect(add({ branch: 'feat/two', message: 'feat: add layer two' }).status).toBe('SUCCESS');
+  });
+});
+
+describe('init — adopting existing branches, bottom to top', () => {
+  it('passes every branch in order when each contains the one below', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GIT_BRANCHES = 'a b c';
+    const result = init({ base: 'main', branches: ['a', 'b', 'c'] });
+    expect(result.command?.args).toEqual(['stack', 'init', '-b', 'main', 'a', 'b', 'c']);
+    expect(result.status).toBe('SUCCESS');
+  });
+
+  it('refuses an order in which a branch does not contain the one below, and runs nothing', () => {
+    process.env.FAKE_GIT_BRANCHES = 'a b';
+    process.env.FAKE_GIT_NOT_ANCESTOR = 'b:a';
+    const result = init({ base: 'main', branches: ['b', 'a'] });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.command).toBeNull();
+    expect(result.mayHaveMutated).toBe(false);
+    expect(result.refusalReason).toContain('does not contain');
+  });
+
+  it('checks ancestry across a branch that does not exist yet', () => {
+    process.env.FAKE_GIT_BRANCHES = 'a c';
+    process.env.FAKE_GIT_NOT_ANCESTOR = 'a:c';
+    expect(init({ base: 'main', branches: ['a', 'new', 'c'] }).status).toBe('INVALID_ARGS');
+  });
+
+  it('refuses when the ancestry check itself fails, rather than assuming the order is right', () => {
+    process.env.FAKE_GIT_BRANCHES = 'a b';
+    process.env.FAKE_GIT_ANCESTRY_EXIT = '128';
+    const result = init({ base: 'main', branches: ['a', 'b'] });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.command).toBeNull();
+  });
+
+  it('refuses a duplicate branch, the base as a layer, and an invalid name', () => {
+    expect(init({ base: 'main', branches: ['a', 'a'] }).status).toBe('INVALID_ARGS');
+    expect(init({ base: 'main', branches: ['main', 'a'] }).status).toBe('INVALID_ARGS');
+    expect(init({ base: 'main', branches: ['a', '--force'] }).status).toBe('INVALID_ARGS');
+  });
+
+  it('the CLI collects repeated --branch flags in order', () => {
+    const raw = execFileSync(
+      'node',
+      [LIB, 'init', '--base', 'main', '--branch', 'a', '--branch', 'b'],
+      { encoding: 'utf8', env: { ...process.env, FAKE_GH_EXIT: '0', FAKE_GIT_BRANCHES: 'a b' } }
+    );
+    expect(JSON.parse(raw).command.args).toEqual(['stack', 'init', '-b', 'main', 'a', 'b']);
+  });
+});
+
+describe('push — pushes rebased branches without touching pull requests', () => {
+  it('builds gh stack push and never passes --no-atomic', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GIT_REMOTES = 'origin\n';
+    const result = push({});
+    expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'push'] });
+    expect(result.mayHaveMutated).toBe(true);
+  });
+
+  it('refuses an ambiguous remote instead of letting gh-stack pick one', () => {
+    process.env.FAKE_GIT_REMOTES = 'origin\nupstream\n';
+    const result = push({});
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.command).toBeNull();
+  });
+
+  it('uses a verified remote.pushDefault', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GIT_REMOTES = 'origin\nupstream\n';
+    process.env.FAKE_GIT_PUSH_DEFAULT = 'origin';
+    expect(push({}).command?.args).toEqual(['stack', 'push', '--remote', 'origin']);
+  });
+
+  it('a failed push still reports mayHaveMutated: true', () => {
+    process.env.FAKE_GH_EXIT = '1';
+    process.env.FAKE_GIT_REMOTES = 'origin\n';
+    const result = push({});
+    expect(result.status).toBe('ERROR');
+    expect(result.mayHaveMutated).toBe(true);
+  });
+});
+
+describe('a retargeted base is never reported as a finished sync or rebase', () => {
+  const NOTICE = 'stack not rebased; rerun with --accept-base-change to rebase onto main\\n';
+
+  it('sync: the notice on stderr with exit 0 is BASE_CHANGE_UNCONFIRMED', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GH_STDERR = NOTICE;
+    process.env.FAKE_GIT_REMOTES = 'origin\n';
+    const result = sync({});
+    expect(result.status).toBe('BASE_CHANGE_UNCONFIRMED');
+    expect(result.recoveryAction).toContain('acceptBaseChange');
+  });
+
+  it('rebase: the notice with a failing exit code is BASE_CHANGE_UNCONFIRMED, not a generic error', () => {
+    process.env.FAKE_GH_EXIT = '1';
+    process.env.FAKE_GH_STDERR = NOTICE;
+    process.env.FAKE_GIT_REMOTES = 'origin\n';
+    expect(rebase({ mode: 'upstack' }).status).toBe('BASE_CHANGE_UNCONFIRMED');
+  });
+
+  it('--accept-base-change requires confirm: true on sync and rebase', () => {
+    expect(sync({ acceptBaseChange: true }).status).toBe('REQUIRES_CONFIRMATION');
+    expect(rebase({ mode: 'upstack', acceptBaseChange: true }).status).toBe('REQUIRES_CONFIRMATION');
+  });
+
+  it('passes --accept-base-change once confirmed', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GIT_REMOTES = 'origin\n';
+    expect(sync({ acceptBaseChange: true, confirm: true }).command?.args).toEqual([
+      'stack',
+      'sync',
+      '--accept-base-change',
+    ]);
+    expect(rebase({ mode: 'upstack', acceptBaseChange: true, confirm: true }).command?.args).toEqual([
+      'stack',
+      'rebase',
+      '--upstack',
+      '--accept-base-change',
+    ]);
+  });
+
+  it('refuses --accept-base-change on continue and abort', () => {
+    expect(rebase({ mode: 'continue', acceptBaseChange: true, confirm: true }).status).toBe('INVALID_ARGS');
+    expect(rebase({ mode: 'abort', acceptBaseChange: true, confirm: true }).status).toBe('INVALID_ARGS');
+  });
+});
+
+describe('sync — "Sync aborted" on stderr (where gh-stack 0.3.0 writes progress) is SYNC_ABORTED', () => {
+  it('detects the abort text on stderr with exit 0', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GH_STDERR = 'Sync aborted\\n';
+    process.env.FAKE_GIT_REMOTES = 'origin\n';
+    expect(sync({}).status).toBe('SYNC_ABORTED');
   });
 });

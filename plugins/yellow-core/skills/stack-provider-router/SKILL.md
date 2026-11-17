@@ -207,7 +207,8 @@ stop.
 
 Then give the one relevant next step:
 
-- `UNSELECTED` → `/stack:select graphite` or `/stack:select github`
+- `UNSELECTED` → `/stack:select github` (recommended for new work) or
+  `/stack:select graphite`. Still stop: a recommendation is not a selection.
 - `CONFIG_MISMATCH` → `/stack:status` for the mismatch, then `/stack:select`
 - `CONFIG_INVALID` → fix or remove `.yellow-stack.yml` by hand; do not offer
   to overwrite it automatically

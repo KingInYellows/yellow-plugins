@@ -28,6 +28,11 @@
  *     absent/misconfigured" — the former is `unknown`, never folded into
  *     `not-ready`, which would tell a user to reinstall tooling whose
  *     state was never actually read.
+ *   - A verified extension older than `TESTED_GH_STACK_VERSION` is
+ *     `not-ready`. github-workflow's runtime adapter is written against that
+ *     release's flags (`push`, `--accept-base-change`), and gh-stack itself
+ *     says not to mix versions in one clone after its 0.2.0 storage move. A
+ *     version the probe cannot read is `unknown`, never assumed current.
  *   - This module NEVER installs, authenticates, or mutates anything. It
  *     only runs read-only probes (`--version`, `auth status`,
  *     `extension list`, and — only with `--check-repo` — `stack view
@@ -57,6 +62,55 @@ const READINESS = Object.freeze({
 
 /** The only extension identity this repository treats as first-party. */
 const OFFICIAL_EXTENSION = 'github/gh-stack';
+
+/**
+ * The gh-stack release github-workflow's runtime adapter was verified
+ * against (its lifecycle was run on this version in a fixture repository;
+ * see docs/stacked-prs-native-migration.md). Older installs are not-ready.
+ */
+const TESTED_GH_STACK_VERSION = '0.3.0';
+
+/** gh-stack's own stated floor (its README: "Git 2.36+"). */
+const MIN_GIT_VERSION = '2.36.0';
+
+/**
+ * Parse the first `MAJOR.MINOR[.PATCH]` in a string into three integers.
+ * @param {unknown} text
+ * @returns {[number, number, number]|null}
+ */
+function parseVersion(text) {
+  const match = typeof text === 'string' ? /(\d+)\.(\d+)(?:\.(\d+))?/.exec(text) : null;
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3] || 0)];
+}
+
+/** True when version triple `a` is older than `b`. */
+function isOlder(a, b) {
+  for (let index = 0; index < 3; index += 1) {
+    if (a[index] !== b[index]) return a[index] < b[index];
+  }
+  return false;
+}
+
+/**
+ * Read the installed `github/gh-stack` version out of `gh extension list`
+ * output: the `vX.Y.Z` column on the official extension's row.
+ *
+ * @param {string} listOutput
+ * @returns {string|null} e.g. `"0.3.0"`, or null when the row has no version
+ *   (a locally linked build prints none).
+ */
+function parseExtensionVersion(listOutput) {
+  for (const line of listOutput.split('\n')) {
+    const columns = line.trim().split(/\s+/);
+    if (!columns.includes(OFFICIAL_EXTENSION)) continue;
+    for (const column of columns) {
+      if (/^v?\d+\.\d+\.\d+$/.test(column)) return column.replace(/^v/, '');
+    }
+    return null;
+  }
+  return null;
+}
 
 /**
  * Run a CLI probe with a bounded timeout, never throwing. Every caller
@@ -210,12 +264,34 @@ function probeGithub() {
     extensionIdentity = parseExtensionIdentity(extensionList.stdout);
   }
 
-  const ready = authValid && extensionIdentity === 'verified';
+  const extensionVersion =
+    extensionIdentity === 'verified' ? parseExtensionVersion(extensionList.stdout) : null;
+  const extensionTriple = parseVersion(extensionVersion);
+  const extensionOutdated =
+    extensionTriple !== null && isOlder(extensionTriple, parseVersion(TESTED_GH_STACK_VERSION));
+
+  // gh-stack needs Git 2.36+. A git that cannot be run or read is left
+  // unjudged (null) rather than called too old.
+  const git = run('git', ['--version']);
+  const gitTriple = git.ok && git.code === 0 ? parseVersion(git.stdout) : null;
+  const gitVersion = gitTriple ? gitTriple.join('.') : null;
+  const gitOutdated = gitTriple !== null && isOlder(gitTriple, parseVersion(MIN_GIT_VERSION));
+
+  const identityReady = authValid && extensionIdentity === 'verified';
   let readiness;
   let detail;
-  if (ready) {
+  if (identityReady && extensionOutdated) {
+    readiness = READINESS.NOT_READY;
+    detail = `${OFFICIAL_EXTENSION} ${extensionVersion} is older than ${TESTED_GH_STACK_VERSION}, the version this provider is tested against. Upgrade with \`gh extension upgrade stack\`, after finishing or aborting any paused gh-stack operation.`;
+  } else if (identityReady && gitOutdated) {
+    readiness = READINESS.NOT_READY;
+    detail = `git ${gitVersion} is older than ${MIN_GIT_VERSION}, which ${OFFICIAL_EXTENSION} requires.`;
+  } else if (identityReady && extensionTriple === null) {
+    readiness = READINESS.UNKNOWN;
+    detail = `${OFFICIAL_EXTENSION} is installed but \`gh extension list\` shows no version for it, so it could not be compared with ${TESTED_GH_STACK_VERSION}.`;
+  } else if (identityReady) {
     readiness = READINESS.READY;
-    detail = `gh is authenticated and ${OFFICIAL_EXTENSION} is installed (${versionLine}).`;
+    detail = `gh is authenticated and ${OFFICIAL_EXTENSION} ${extensionVersion} is installed (${versionLine}).`;
   } else if (!authProbeRan || !extensionProbeRan) {
     readiness = READINESS.UNKNOWN;
     detail = !authProbeRan
@@ -241,6 +317,9 @@ function probeGithub() {
       version: versionLine,
       authValid,
       extensionIdentity,
+      extensionVersion,
+      testedExtensionVersion: TESTED_GH_STACK_VERSION,
+      gitVersion,
     },
   };
 }
@@ -270,12 +349,14 @@ function probeRepositoryStackAvailability() {
     };
   }
   if (view.code === 2) {
-    // ErrNotInStack: the repository and extension both work; the current
-    // branch simply has no active stack. Availability of the FEATURE, not
-    // readiness of the current branch, is what this probe answers.
+    // ErrNotInStack is decided from local tracking alone: gh-stack 0.3.0
+    // returns it in a clone whose only remote is a local bare repository,
+    // without contacting GitHub. It therefore says nothing about whether
+    // the repository has stacked PRs.
     return {
-      available: true,
-      detail: 'No active stack on the current branch (exit 2), but stacked PRs are available for this repository.',
+      available: null,
+      detail:
+        'No stack is tracked on the current branch (exit 2). That is a local answer, so repository availability was not checked.',
     };
   }
   return {
@@ -344,6 +425,10 @@ if (require.main === module) {
 module.exports = {
   READINESS,
   OFFICIAL_EXTENSION,
+  TESTED_GH_STACK_VERSION,
+  MIN_GIT_VERSION,
+  parseVersion,
+  parseExtensionVersion,
   run,
   parseExtensionIdentity,
   probeGraphite,

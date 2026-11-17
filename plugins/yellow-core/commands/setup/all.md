@@ -476,7 +476,16 @@ if [ -n "$_gh" ]; then
   # whose state was never read.
   if _ext_list=$("$_gh" extension list 2>/dev/null); then
     if printf '%s\n' "$_ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
-      printf 'gh_stack_ext: OK (github/gh-stack)\n'
+      # Minimum is TESTED_GH_STACK_VERSION in lib/stack-tooling-probe.js;
+      # change both together.
+      _ext_ver=$(printf '%s\n' "$_ext_list" | awk '{ own = 0; for (i = 1; i <= NF; i++) if ($i == "github/gh-stack") own = 1; if (own) for (i = 1; i <= NF; i++) if ($i ~ /^v?[0-9]+\.[0-9]+\.[0-9]+/) { sub(/^v/, "", $i); print $i; exit } }')
+      if [ -z "$_ext_ver" ]; then
+        printf 'gh_stack_ext: UNAVAILABLE (github/gh-stack version not reported)\n'
+      elif printf '%s\n' "$_ext_ver" | awk -F. '{ exit !(($1 + 0) * 1000000 + ($2 + 0) * 1000 + ($3 + 0) < 3000) }'; then
+        printf 'gh_stack_ext: OUTDATED (github/gh-stack %s, needs 0.3.0+)\n' "$_ext_ver"
+      else
+        printf 'gh_stack_ext: OK (github/gh-stack %s)\n' "$_ext_ver"
+      fi
     elif printf '%s\n' "$_ext_list" | awk '{ for (i = 1; i <= NF; i++) if (tolower($i) ~ /(^|\/)(gh-)?stack$/) f = 1 } END { exit !f }'; then
       printf 'gh_stack_ext: WRONG_OWNER (a stack-named extension that is not github/gh-stack)\n'
     else
@@ -706,12 +715,16 @@ not change the status.
 
 **github-workflow:**
 
-Alternative provider of the `stacked-pr` capability group (see the Alternative
-Provider Groups section below). It is classified like any other plugin, but its
-setup is only ever offered when it is the **enabled** provider — a user running
-Graphite must never be asked to configure GitHub stacks as well.
+Provider of the `stacked-pr` capability group and the recommended one when none
+is selected (see the Alternative Provider Groups section below). It is
+classified like any other plugin, but its setup is only ever offered when it is
+the **enabled** provider — a user running Graphite must never be asked to
+configure GitHub stacks as well.
 
 - READY: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` OK
+- PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `OUTDATED` — the
+  official extension is older than the tested version; detail: "upgrade with
+  `gh extension upgrade stack`, in every clone's environment at once"
 - PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `MISSING` — the
   provider plugin is installed but the official `github/gh-stack` extension is
   not; detail: "install with `gh extension install github/gh-stack`"
@@ -1130,7 +1143,9 @@ readiness is worth reporting. Only the **enabled** one is offered for setup:
    `remote-agent`: not `READY_CURSOR`, `READY_DEVIN`, `READY_JULES`, `READY_AGY`
    (no remote-agent provider is enabled, but the local agent yellow-agy is; it
    sits outside the group's exactly-one rule), or `PARTIAL_TOOLING`
-   (`UNSELECTED`, `CONFLICT`, or `CONFIG_INVALID`) — do **not** pick one. Report
+   (`UNSELECTED`, `CONFLICT`, or `CONFIG_INVALID`) — do **not** pick one. For
+   `stacked-pr` `UNSELECTED`, say that `/stack:select github` is recommended for
+   new work; that is still the user's choice. Report
    the state and its `detail` (fenced as untrusted, same as `/stack:status` and
    `/linear:delegate` do), and point at `/stack:select` for `stacked-pr` (or,
    for `CONFIG_INVALID`, at fixing/removing `.yellow-stack.yml` by hand first) —
