@@ -100,7 +100,7 @@ yellow_morph_needs_install() {
 yellow_morph_acquire_install_lock() {
   local max_attempts="${1:-20}"
   local lock_dir="${CLAUDE_PLUGIN_DATA}/.install.lock"
-  local stale_recovered=0 prev_invalid="unset" seen=""
+  local stale_recovered=0 prev_invalid="unset" seen="" owner_pid=""
   local i
 
   for ((i=1; i<=max_attempts; i++)); do
@@ -122,7 +122,6 @@ yellow_morph_acquire_install_lock() {
     fi
 
     if [ "$stale_recovered" -eq 0 ] && [ -f "${lock_dir}/pid" ]; then
-      local owner_pid
       owner_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
       # An empty or non-numeric pid file means a partial write or
       # corruption — treat it as a stale lock rather than passing garbage
