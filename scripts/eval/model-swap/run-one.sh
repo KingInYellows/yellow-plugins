@@ -48,11 +48,17 @@ fi
 # inside <workdir> only (a `Write(./**)` rule denied writes there). Other tools
 # keep their bare names.
 # A command run (EVAL_PLUGIN_DIRS) executes plugin text from the checkout under
-# test with this user's environment, so Bash is not approved unless
-# EVAL_ALLOW_BASH=1: an unapproved call is denied (headless) and listed by
-# `grade`. Set it only for a checkout whose plugin files you trust.
+# test with this user's environment, so unless EVAL_ALLOW_BASH=1 the run gets
+# no Bash tool at all and its plugins' hooks are off (a hook is shell code from
+# that checkout too). Set it only for a checkout whose plugin files you trust.
 nobash=0
 [ -n "${EVAL_PLUGIN_DIRS:-}" ] && [ "${EVAL_ALLOW_BASH:-0}" != 1 ] && nobash=1
+if [ "$nobash" = 1 ]; then
+  tools=$(printf '%s' "$tools" | awk -v RS=, '{ gsub(/^[ \t\n]+|[ \t\n]+$/, "") }
+    $0 == "" || $0 == "Bash" || $0 ~ /^Bash\(/ { next }
+    { printf "%s%s", s, $0; s = "," }')
+  [ -n "$tools" ] || { printf 'run-one: no tools left for %s without Bash\n' "$agent" >&2; exit 2; }
+fi
 prompt_dir=$(cd "$(dirname "$prompt_file")" && pwd -P) || exit 1
 case $prompt_dir in *[,\(\)]*) printf 'run-one: prompt dir %s has a comma or parenthesis\n' "$prompt_dir" >&2; exit 2 ;; esac
 allowed=$(printf '%s' "$tools" | awk -v RS=, -v pd="$prompt_dir" -v nobash="$nobash" '{ gsub(/^[ \t\n]+|[ \t\n]+$/, "") }
@@ -78,6 +84,7 @@ if [ -n "${EVAL_PLUGIN_DIRS:-}" ]; then
   mode=()
   IFS=: read -r -a dirs <<<"$EVAL_PLUGIN_DIRS"
   for d in "${dirs[@]}"; do mode+=(--plugin-dir "$d"); done
+  [ "$nobash" = 1 ] && mode+=(--disallowedTools Bash --settings '{"disableAllHooks":true}')
 fi
 start=$(date +%s)
 (cd "$workdir" && timeout "${EVAL_TIMEOUT_S:-1200}" claude -p --setting-sources "" --strict-mcp-config \

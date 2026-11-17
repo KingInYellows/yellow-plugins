@@ -76,12 +76,12 @@ python3 scripts/eval/model-swap/eval.py grade /tmp/eval-resolve
 The same three commands take `plan.json`; use `-j 3` there, since every row
 starts several research agents. The pass rate is the `recall` column. A stopped
 run resumes, and `grade` refuses to report while a row is missing. Planning rows
-run plugin text from the checkout under test with your environment, so Bash is
-denied unless you set `EVAL_ALLOW_BASH=1`. Set it only for a checkout whose
-plugin files you wrote or reviewed (never for an outside contributor's PR), and
-use the same setting for the baseline and the candidate: it is part of each
-row's fingerprint. The recorded planning pass below ran with Bash approved.
-Never run either from CI.
+run plugin text from the checkout under test with your environment, so they get
+no Bash tool and no plugin hooks unless you set `EVAL_ALLOW_BASH=1`. Set it only
+for a checkout whose plugin files you wrote or reviewed (never for an outside
+contributor's PR), and use the same setting for the baseline and the candidate:
+it is part of each row's fingerprint. The recorded planning pass below ran with
+Bash approved. Never run either from CI.
 
 Each row is capped by `EVAL_MAX_BUDGET_USD`: 5 USD for resolve, 15 for plan (the
 `plan` agent's `env`). The specs pin the gate's repeat count (3); to record a

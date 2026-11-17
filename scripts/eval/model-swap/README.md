@@ -69,8 +69,8 @@ those `SKILL.md` bodies appended, which is what `skills:` frontmatter does.
 An agent with a `plugins` key is the exception: it runs its `file` as a slash
 command with those plugins loaded by `--plugin-dir`, no system prompt, and Write
 and Edit allowed only under the run's tree (`--permission-mode acceptEdits`).
-Bash is denied there unless `EVAL_ALLOW_BASH=1`, since the command text comes
-from the checkout under test.
+Unless `EVAL_ALLOW_BASH=1`, that run gets no Bash tool and its plugins' hooks
+are off, since the command text and hooks come from the checkout under test.
 
 Runs set `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1`, since nobody watches
 the subagent progress lines. When settings block the requested model, Claude

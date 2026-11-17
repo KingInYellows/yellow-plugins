@@ -211,7 +211,10 @@ skip it.
 baseline, run the candidate once (`reps` 1), then rerun only the cases that
 failed, twice more each. A case that fails 2 of its 3 runs is a regression, and
 the change passes with none. The plan area is saturated today (18/18), so a
-gated planning run costs one pass plus reruns instead of nine passes.
+gated planning run costs one pass plus reruns instead of nine passes. The
+candidate must use the archived baseline's `EVAL_ALLOW_BASH` setting; a change
+that cannot (an outside contributor's PR runs without Bash) takes fresh
+baselines.
 
 The change passes when its own run (same `R`) has a pass rate no lower than the
 baseline mean minus the larger of the noise floor and **5 points**, and no case
