@@ -38,6 +38,16 @@ The first paid pass showed three valid fixes failing over-literal regexes
 (`r02`, `r07`, `r09`); they were widened to the outcome, and still fail on the
 reviewed file.
 
+Graders are also proven against non-fixes. `selfcheck.lookalikes` are edits to
+the fixed file that only look like a fix, and `check` requires each to fail:
+`r06` defines the redaction helpers but never applies them to the `classify_run`
+result, `r12` keeps the faulty exit guard with extra parentheses or split over
+lines, and `r15` keeps `git diff` or `git log` double-quoted or on one line.
+Every case also records the resolver's real `THREAD` line from the 2026-11-17
+pass as `selfcheck.reply` (for `r08`, `r13` and `r15`, which reported `unclear`
+there, that real line is in `reply_fails` and `reply` is the same line reporting
+`fixed`), so `check` proves the reply regexes too.
+
 ## Plan cases
 
 `incident` is the `docs/solutions/` doc the case comes from. A case passes when
@@ -50,6 +60,15 @@ measures whether planning finds and applies what the repo already learned (the
 `learnings-researcher` pre-pass, repo research, spec-flow analysis).
 `selfcheck.doc` makes `eval.py check` confirm the lesson regexes match the
 incident doc itself.
+
+A plan that names the lesson can still prescribe the bug. `p07`, `p10` and `p18`
+have a `not` regex for a shell code block that does exactly that (a hook with
+`set -e` that prints `{"continue": true}`, a `printf` whose `%b` format takes
+the message, an `EXIT` trap in the `mktemp -d` block) with no warning word
+(`wrong`, `fires`, `reinterpret` and so on, but not routine words like `never`
+or `inject`) anywhere in the block, so quoting the incident's own anti-pattern
+still passes. Their `selfcheck.lookalikes` append such a block to the incident
+doc and require the case to fail.
 
 Runs load `yellow-core` from the checkout with `--plugin-dir` (agent `plugins`
 key) and invoke `/yellow-core:flow:plan` as a slash command, so the command, its
@@ -77,11 +96,12 @@ The same three commands take `plan.json`; use `-j 3` there, since every row
 starts several research agents. The pass rate is the `recall` column. A stopped
 run resumes, and `grade` refuses to report while a row is missing. Planning rows
 run plugin text from the checkout under test with your environment, so they get
-no Bash tool and no plugin hooks unless you set `EVAL_ALLOW_BASH=1`. Set it only
-for a checkout whose plugin files you wrote or reviewed (never for an outside
-contributor's PR), and use the same setting for the baseline and the candidate:
-it is part of each row's fingerprint. The recorded planning pass below ran with
-Bash approved. Never run either from CI.
+no Bash tool and no plugin hooks unless you set `EVAL_ALLOW_BASH=1` (resolve
+rows too, though the resolver has no Bash today). Set it only for a checkout
+whose plugin files you wrote or reviewed (never for an outside contributor's
+PR), and use the same setting for the baseline and the candidate: it is part of
+each row's fingerprint. The recorded planning pass below ran with Bash approved.
+Never run either from CI.
 
 Each row is capped by `EVAL_MAX_BUDGET_USD`: 5 USD for resolve, 15 for plan (the
 `plan` agent's `env`). The specs pin the gate's repeat count (3); to record a
@@ -103,6 +123,12 @@ cases are a follow-up.
 | 2026-11-17 | resolve | sonnet, medium | 16/19                        | 0.14 USD          | 2.6 USD                 | 18 s      |
 | 2026-11-17 | plan    | opus, high     | 18/18                        | 1.39 USD          | 25 USD                  | 242 s     |
 | 2026-11-16 | review  | review-gate    | 6/17 recall, 0/10 control FP |                   | about 103 USD (25 rows) |           |
+
+The 2026-11-18 grader changes (CLAUDE-355) were checked against those passes for
+free: every row's recorded edit and reply, replayed onto its case tree and
+graded with the new regexes, scores the same (resolve 16/19, plan 18/18), so the
+recorded passes stay the baselines. The row fingerprints changed with the
+runner, so a resumed `run` reruns every row.
 
 A gated resolve change runs the area three times at the gate's repeat count (two
 baselines and one candidate, each `R` = 3): 9 passes, about 24 USD. The plan

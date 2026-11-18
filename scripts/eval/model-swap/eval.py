@@ -28,6 +28,7 @@ import argparse
 import collections
 import concurrent.futures
 import csv
+import fcntl
 import fnmatch
 import glob
 import hashlib
@@ -43,17 +44,17 @@ REPO = subprocess.run(["git", "-C", HERE, "rev-parse", "--show-toplevel"],
                       capture_output=True, text=True, check=True).stdout.strip()
 
 
-def git(*args, cwd=REPO):
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True,
+def git(*args, cwd=None):
+    return subprocess.run(["git", *args], cwd=cwd or REPO, capture_output=True,
                           text=True, check=True).stdout
 
 
-def worktree(path, commit, cwd=REPO):
+def worktree(path, commit, cwd=None):
     if not os.path.isdir(path):
         git("worktree", "add", "--quiet", "--detach", path, commit, cwd=cwd)
 
 
-def fresh_worktree(path, commit, cwd=REPO):
+def fresh_worktree(path, commit, cwd=None):
     """Recreate path at commit, so a changed spec never reuses an old tree.
     cwd is the repository the worktree belongs to (review-gate passes others)."""
     if os.path.isdir(path):
@@ -110,10 +111,18 @@ def fixture_files(rel):
     return files
 
 
-def fixture_parts(agent):
+def corpus_agent(agent):
+    """Corpus agents run text from the checkout under test (`overlay` or
+    `plugins`), so they get the untrusted-checkout guard: no Bash and no hooks
+    unless EVAL_ALLOW_BASH=1."""
+    return "plugins" in agent or "overlay" in agent
+
+
+def fixture_parts(agent, allow_bash="0"):
     """Content hash of the agent's `fixtures` (repo-relative files or directories),
     as a fingerprint part: an edited stand-in CLI or canned response reruns its rows.
-    Empty when the agent lists none, so other specs keep their fingerprints."""
+    Empty when the agent lists none, so other specs keep their fingerprints.
+    allow_bash is "1" or "0", as prepare records it."""
     rels = [*agent.get("fixtures", []), *agent.get("overlay", [])]
     if not rels:
         return []
@@ -124,16 +133,49 @@ def fixture_parts(agent):
         # The exec bit matters too: a stand-in without it fails differently.
         name = os.path.relpath(f, REPO).encode()
         h.update(b"%d:%s%d%d:" % (len(name), name, os.access(f, os.X_OK), len(data)) + data)
-    if "plugins" in agent or "overlay" in agent:
+    if corpus_agent(agent):
         # Corpus agents: how the row runs is an input too, so a changed runner
         # or plugin list reruns the rows instead of reusing old output.
         with open(os.path.join(HERE, "run-one.sh"), "rb") as handle:
             h.update(b"run-one.sh:" + handle.read())
         h.update(json.dumps(agent.get("plugins", [])).encode())
-        if "plugins" in agent:
-            # Whether Bash was approved changes what a command run can do.
-            h.update(b"bash:" + os.environ.get("EVAL_ALLOW_BASH", "0").encode())
+        # Whether Bash was approved changes what the run can do.
+        h.update(b"bash:" + allow_bash.encode())
     return [h.hexdigest()]
+
+
+def inputs_digest(spec, rows, allow_bash):
+    """Hash of the checkout files `run` reads live: every agent's fixtures,
+    overlays and plugin dirs, run-one.sh, and each row's system prompt. prepare
+    records it and run recomputes it, so a checkout change between the two
+    stops the run instead of running inputs the fingerprints do not describe."""
+    parts = [fixture_parts(a, allow_bash) for _, a in sorted(spec["agents"].items())]
+    with open(os.path.join(HERE, "run-one.sh"), "rb") as handle:
+        parts.append(hashlib.sha256(handle.read()).hexdigest())
+    return fingerprint(parts, *sorted({row[1] for row in rows}))
+
+
+LOCKS = []
+
+
+def lock_work(work):
+    """Hold <work>/.eval.lock for the rest of the process. Two prepare, run or
+    grade processes on one work directory would race on its rows' outputs and
+    trees, so the second stops."""
+    os.makedirs(work, exist_ok=True)
+    handle = open(os.path.join(work, ".eval.lock"), "a")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        handle.close()
+        sys.exit("%s is in use by another eval.py process; wait for it to finish" % work)
+    LOCKS.append(handle)
+
+
+def write_atomic(path, text):
+    with open(path + ".tmp", "w", encoding="utf-8") as handle:
+        handle.write(text)
+    os.replace(path + ".tmp", path)
 
 
 def plant(wt, p):
@@ -361,6 +403,8 @@ def check_spec(spec):
              *(p for c in spec["prompts"] for p in c.get("selfcheck", {}).get("paths", [])),
              *(p for c in spec["prompts"] for p in c.get("selfcheck", {}).get("protects", [])),
              *(c["selfcheck"]["doc"] for c in spec["prompts"] if "doc" in c.get("selfcheck", {})),
+             *(la["path"] for c in spec["prompts"] for la in c.get("selfcheck", {}).get("lookalikes", [])
+               if "path" in la),
              *(p["file"] for r in spec["replays"] for p in r["plants"]),
              *(f for s in spec["scans"] for f in s["files"]),
              *(p["file"] for s in spec["scans"] for p in s.get("plants", [])),
@@ -373,11 +417,20 @@ def check_spec(spec):
                for g in e.get("no_files", []))]
     bad += [f for f in paths if not isinstance(f, str) or os.path.isabs(f)
             or os.path.normpath(f) != f or f.split("/")[0] == ".."]
-    bad += [c["tree"] for c in spec["prompts"]
-            if "tree" in c and not re.fullmatch(r"[0-9a-f]{40}", str(c["tree"]))]
+    # Commits reach git as arguments: full ids for the corpus fields, hex for
+    # the older replay and scan specs, so none can read as an option.
+    shas = [c["tree"] for c in spec["prompts"] if "tree" in c]
+    shas += [c["selfcheck"]["fix"] for c in spec["prompts"] if "fix" in c.get("selfcheck", {})]
+    if spec["prompts"]:
+        shas.append(spec.get("prompt_commit"))
+    bad += [x for x in shas if not re.fullmatch(r"[0-9a-f]{40}", str(x))]
+    bad += [x["commit"] for x in [*spec["replays"], *spec["scans"],
+                                  *(c["source"] for c in spec["prompts"] if "source" in c)]
+            if not re.fullmatch(r"[0-9a-f]{7,40}", str(x.get("commit")))]
     if bad:
         sys.exit("prepare: unsafe spec values (names must match %s; files must be "
-                 "relative paths without ..): %s" % (SAFE_NAME, ", ".join(map(str, bad))))
+                 "relative paths without ..; commits must be hex ids, 40 characters for "
+                 "prompt_commit, tree and selfcheck.fix): %s" % (SAFE_NAME, ", ".join(map(str, bad))))
 
 
 def agent_tools(path, command=False):
@@ -414,9 +467,17 @@ def prepare(spec_path, work):
         spec = json.load(handle)
     check_spec(spec)
     # Recorded so `run` approves Bash exactly as the fingerprints say.
-    spec["eval_allow_bash"] = "1" if os.environ.get("EVAL_ALLOW_BASH") == "1" else "0"
+    allow_bash = "1" if os.environ.get("EVAL_ALLOW_BASH") == "1" else "0"
+    spec["eval_allow_bash"] = allow_bash
     # Hashed before anything under <work> changes: a missing fixture stops here.
-    fixtures = {aid: fixture_parts(agent) for aid, agent in spec["agents"].items()}
+    fixtures = {aid: fixture_parts(agent, allow_bash) for aid, agent in spec["agents"].items()}
+    lock_work(work)
+    # The matrix is written last and marks a finished prepare. Removing the old
+    # one first means an interrupted prepare leaves no matrix that would pair
+    # old rows with the new prompts and trees; run and grade stop instead.
+    for name in ("matrix.tsv", "spec.json"):
+        if os.path.exists(os.path.join(work, name)):
+            os.remove(os.path.join(work, name))
     for sub in ("wt", "prompts", "out"):
         os.makedirs(os.path.join(work, sub), exist_ok=True)
     rows = []
@@ -526,10 +587,9 @@ def prepare(spec_path, work):
     dupes = sorted({r[0] for r in rows if [x[0] for x in rows].count(r[0]) > 1})
     if dupes:
         sys.exit("prepare: these run ids collide; rename an agent or target id: %s" % ", ".join(dupes))
-    with open(os.path.join(work, "matrix.tsv"), "w", encoding="utf-8") as handle:
-        handle.writelines("\t".join(row) + "\n" for row in rows)
-    with open(os.path.join(work, "spec.json"), "w", encoding="utf-8") as handle:
-        json.dump(spec, handle, indent=1)
+    spec["eval_inputs"] = inputs_digest(spec, rows, allow_bash)
+    write_atomic(os.path.join(work, "spec.json"), json.dumps(spec, indent=1))
+    write_atomic(os.path.join(work, "matrix.tsv"), "".join("\t".join(row) + "\n" for row in rows))
     print("prepared %d runs in %s/matrix.tsv" % (len(rows), work))
 
 
@@ -540,9 +600,15 @@ def run(work, jobs, dry_run):
             print(row[0])
         print("%d runs; nothing spent" % len(rows))
         return
+    lock_work(work)
+    rows = read_matrix(work)
     out = os.path.join(work, "out")
     with open(os.path.join(work, "spec.json"), encoding="utf-8") as handle:
         spec = json.load(handle)
+    allow_bash = spec.get("eval_allow_bash", "0")
+    if "eval_inputs" in spec and inputs_digest(spec, rows, allow_bash) != spec["eval_inputs"]:
+        sys.exit("run: agent, plugin, overlay or run-one.sh files changed since prepare; "
+                 "rerun prepare so the fingerprints describe what runs")
     agents = spec["agents"]
     cases = {c["id"]: c for c in spec.get("prompts", [])}
     for row in rows:
@@ -556,7 +622,8 @@ def run(work, jobs, dry_run):
         rid, sys_prompt, wt, model, effort, prompt = row[:6]
         env = run_env(agents[row[6]], rid, wt)
         env["EVAL_FINGERPRINT"] = row[8]
-        env["EVAL_ALLOW_BASH"] = spec.get("eval_allow_bash", "0")
+        env["EVAL_ALLOW_BASH"] = allow_bash
+        env["EVAL_UNTRUSTED"] = "1" if corpus_agent(agents[row[6]]) else "0"
         env["EVAL_SCAN"] = "1" if agents[row[6]]["kind"] == "scan" else "0"
         # A command agent runs as a slash command with its plugins loaded.
         plugins = agents[row[6]].get("plugins", [])
@@ -577,6 +644,8 @@ def run(work, jobs, dry_run):
 
 def read_matrix(work):
     """Rows: id, system prompt, workdir, model, effort, prompt file, agent id, target id, fingerprint."""
+    if not os.path.isfile(os.path.join(work, "matrix.tsv")):
+        sys.exit("%s has no matrix.tsv: prepare has not finished there; run prepare" % work)
     with open(os.path.join(work, "matrix.tsv"), encoding="utf-8") as handle:
         return [line.rstrip("\n").split("\t") for line in handle if line.strip()]
 
@@ -739,6 +808,8 @@ def reject(out, rid, why):
 
 
 def grade(work):
+    lock_work(work)
+    read_matrix(work)  # stops cleanly after an interrupted prepare
     with open(os.path.join(work, "spec.json"), encoding="utf-8") as handle:
         spec = json.load(handle)
     spec.setdefault("replays", [])
@@ -853,6 +924,58 @@ def have_commit(sha):
                           capture_output=True).returncode == 0
 
 
+def reply_problems(label, sc, expects):
+    """The case's recorded `reply` must pass every reply check and each of
+    `reply_fails` must fail one, so the reply regexes are proven, not only
+    compiled."""
+    graded = [e for e in expects if e.get("match") or e.get("not") or "lowest" in e]
+    if not graded:
+        return []
+    if not isinstance(sc.get("reply"), str):
+        return ["%s: its grader reads the reply but selfcheck has no recorded `reply`" % label]
+    problems = []
+    if not all(case_passes(e, sc["reply"]) for e in graded):
+        problems.append("%s: reply checks fail on the recorded `reply`" % label)
+    for i, text in enumerate(sc.get("reply_fails", [])):
+        if all(case_passes(e, text) for e in graded):
+            problems.append("%s: reply checks pass on reply_fails[%d]" % (label, i))
+    return problems
+
+
+def lookalike_problems(label, sc, expects, wt, plan_path):
+    """Each `lookalikes` entry edits the passing tree (`path`, default the
+    selfcheck plan; `old` -> `new` once, or `append`) into something that only
+    looks like the fix; the file checks must fail on it. The file is restored
+    after each one."""
+    problems = []
+    for i, la in enumerate(sc.get("lookalikes", [])):
+        rel = la.get("path", plan_path)
+        target = os.path.join(wt, rel)
+        if symlink_on_path(wt, rel) or not os.path.isfile(target):
+            problems.append("%s: lookalikes[%d] path %s is not a file in the tree" % (label, i, rel))
+            continue
+        with open(target, encoding="utf-8") as handle:
+            original = handle.read()
+        if "old" in la:
+            if original.count(la["old"]) != 1:
+                problems.append("%s: lookalikes[%d] `old` matches %d times"
+                                % (label, i, original.count(la["old"])))
+                continue
+            edited = original.replace(la["old"], la["new"])
+        else:
+            edited = original + la["append"]
+        try:
+            with open(target, "w", encoding="utf-8") as handle:
+                handle.write(edited)
+            if any(files_pass(e, wt) for e in expects):
+                problems.append("%s: file checks pass on lookalikes[%d] (%s)"
+                                % (label, i, la.get("why", "")))
+        finally:
+            with open(target, "w", encoding="utf-8") as handle:
+                handle.write(original)
+    return problems
+
+
 def check(spec_paths, work):
     """Offline corpus check; spends nothing. For every case: it names its
     incident, its commits exist, and its regexes compile. A case's `selfcheck`
@@ -860,7 +983,12 @@ def check(spec_paths, work):
     turn a tree that fails the case's file checks into one that passes them;
     `doc` (a repo file) written as the run's only new plan must pass them;
     `protects` (files an out-of-scope case must leave alone) must pass
-    untouched and fail once one is edited or removed. Every case needs one."""
+    untouched and fail once one is edited or removed. Every case needs one.
+    `lookalikes` (edits to the passing tree that only look like the fix) must
+    each fail the file checks. `reply` (a recorded reply) must pass the reply
+    regexes and each of `reply_fails` must fail them; a case whose grader reads
+    the reply needs a `reply`."""
+    lock_work(work)
     problems = []
     for spec_path in spec_paths:
         with open(spec_path, encoding="utf-8") as handle:
@@ -890,6 +1018,7 @@ def check(spec_paths, work):
             if not sc:
                 problems.append("%s %s: no `selfcheck`" % (name, cid))
                 continue
+            problems += reply_problems("%s %s" % (name, cid), sc, expects[cid])
             tree = c.get("tree", spec["prompt_commit"])
             if not have_commit(tree) or ("fix" in sc and not have_commit(sc["fix"])):
                 problems.append("%s %s: a commit is not reachable" % (name, cid))
@@ -922,6 +1051,9 @@ def check(spec_paths, work):
                         if edited or removed:
                             problems.append("%s %s: file checks still pass with %s %s"
                                             % (name, cid, path, "edited" if edited else "removed"))
+                    if sc.get("lookalikes"):
+                        problems.append("%s %s: `lookalikes` need a `fix` or `doc` selfcheck"
+                                        % (name, cid))
                     continue
                 if "fix" in sc:
                     if any(files_pass(e, wt, content_only=True) for e in expects[cid]):
@@ -947,6 +1079,8 @@ def check(spec_paths, work):
                 if not all(files_pass(e, wt) for e in expects[cid]):
                     problems.append("%s %s: file checks fail on the incident's %s"
                                     % (name, cid, "fix" if "fix" in sc else "doc"))
+                problems += lookalike_problems("%s %s" % (name, cid), sc, expects[cid], wt,
+                                               "plans/selfcheck-%s.md" % cid)
             finally:
                 git("worktree", "remove", "--force", wt)
         print("checked %s: %d cases" % (name, len(cases)))

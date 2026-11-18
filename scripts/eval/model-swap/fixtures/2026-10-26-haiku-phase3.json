@@ -1,6 +1,6 @@
 {
  "$comment": "CLAUDE-187 Phase 3 eval, run 2026-10-26. Replays plant agent-native and CLI-readiness defects for the Opus -> Sonnet reviewer check. Scans plant one duplicated block and one AI-pattern block per file set for the Sonnet -> Haiku scanner check; a finding counts when its start line falls within 3 lines of a planted region (or of the original a duplicate copies). Prompt cases feed knowledge-compounder extractor stand-ins real solution docs from `prompt_commit` (so the finder can locate them and the fixtures are not in the tree), plus two novel problems, and give the /optimize judge three candidates where B has a planted substantive flaw.",
- "prompt_commit": "31d1fb8",
+ "prompt_commit": "31d1fb8d5e20967b4522533ec2de4504369f98e6",
  "configs": {
   "opus_to_sonnet": [
    {

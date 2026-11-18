@@ -15,6 +15,8 @@
 # With EVAL_PLUGIN_DIRS (colon-separated plugin directories; eval.py sets it
 # for an agent with `plugins`), <agent.md> is a command: the prompt invokes it
 # as a slash command with those plugins loaded, and no system prompt is set.
+# A corpus row (EVAL_PLUGIN_DIRS set, or EVAL_UNTRUSTED=1) gets no Bash tool and
+# no hooks unless EVAL_ALLOW_BASH=1.
 set -u
 [ $# -ge 7 ] || { printf 'usage: %s <out-dir> <run-id> <agent.md> <workdir> <model> <effort> <prompt-file> [tools]\n' "$0" >&2; exit 2; }
 out_dir=$1 id=$2 agent=$3 workdir=$4 model=$5 effort=$6 prompt_file=$7 tools=${8:-}
@@ -47,12 +49,17 @@ fi
 # of the file. Write and Edit get no rule: acceptEdits mode below approves them
 # inside <workdir> only (a `Write(./**)` rule denied writes there). Other tools
 # keep their bare names.
-# A command run (EVAL_PLUGIN_DIRS) executes plugin text from the checkout under
-# test with this user's environment, so unless EVAL_ALLOW_BASH=1 the run gets
-# no Bash tool at all and its plugins' hooks are off (a hook is shell code from
-# that checkout too). Set it only for a checkout whose plugin files you trust.
+# A corpus row executes agent or plugin text from the checkout under test with
+# this user's environment: a command run (EVAL_PLUGIN_DIRS), or an agent run
+# whose file comes from that checkout (EVAL_UNTRUSTED=1; eval.py sets it for
+# every corpus agent, so a PR that adds Bash to an agent's tools gets none).
+# Unless EVAL_ALLOW_BASH=1 the run gets no Bash tool at all and hooks are off
+# (a hook is shell code from that checkout too). Set it only for a checkout
+# whose agent and plugin files you trust.
 nobash=0
-[ -n "${EVAL_PLUGIN_DIRS:-}" ] && [ "${EVAL_ALLOW_BASH:-0}" != 1 ] && nobash=1
+if [ -n "${EVAL_PLUGIN_DIRS:-}" ] || [ "${EVAL_UNTRUSTED:-0}" = 1 ]; then
+  [ "${EVAL_ALLOW_BASH:-0}" != 1 ] && nobash=1
+fi
 if [ "$nobash" = 1 ]; then
   tools=$(printf '%s' "$tools" | awk -v RS=, '{ gsub(/^[ \t\n]+|[ \t\n]+$/, "") }
     $0 == "" || $0 == "Bash" || $0 ~ /^Bash\(/ { next }
@@ -84,8 +91,8 @@ if [ -n "${EVAL_PLUGIN_DIRS:-}" ]; then
   mode=()
   IFS=: read -r -a dirs <<<"$EVAL_PLUGIN_DIRS"
   for d in "${dirs[@]}"; do mode+=(--plugin-dir "$d"); done
-  [ "$nobash" = 1 ] && mode+=(--disallowedTools Bash --settings '{"disableAllHooks":true}')
 fi
+[ "$nobash" = 1 ] && mode+=(--disallowedTools Bash --settings '{"disableAllHooks":true}')
 start=$(date +%s)
 (cd "$workdir" && timeout "${EVAL_TIMEOUT_S:-1200}" claude -p --setting-sources "" --strict-mcp-config \
   "${mode[@]}" --model "$model" --effort "$effort" --max-budget-usd "$budget" \
