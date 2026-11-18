@@ -90,15 +90,7 @@ request.
 
 From the JSON, list the target and every unmerged pull request below it,
 bottom first, with each one's number and branch: that is the set that
-lands. `view` does not report draft state, so read it from GitHub for each
-pull request in the set (`true` is a draft):
-
-```bash
-gh api "repos/{owner}/{repo}/pulls/<number>" --jq '.draft'
-```
-
-If a call fails, stop: the draft state is unknown. Show the merge method,
-if given.
+lands. Show the merge method, if given.
 
 If the set is a single pull request on a one-branch stack (independent
 work, nothing below or above it), GitHub has no stack object for it and
@@ -110,7 +102,7 @@ preview and confirmation.
 
 Stop before asking when any of these holds, and say which:
 
-- a pull request in the set is a draft or has no pull request yet;
+- a pull request in the set is a draft (read below) or has no pull request yet;
 - `view` reports a branch in the set with `needsRebase: true`, or a rebase
   is in progress;
 - the tests or review evidence the user relies on was produced for an
@@ -129,6 +121,20 @@ gh-stack resolves (from `GH_REPO`, `gh repo set-default` or the remotes);
 show it in the preview. On `INVALID_ARGS`, report `refusalReason` and stop:
 the repository is ambiguous, or a URL names another repository than the one
 the number would land in.
+
+Check that the set belongs to that repository and read each pull request's
+draft state there (`view` does not report it). `<repository>` must match
+`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`:
+
+```bash
+gh api "repos/<repository>/pulls/<number>" --jq '[.draft, .head.ref] | @tsv'
+```
+
+If a call fails, stop: the draft state is unknown. If a `head.ref` is not
+the branch `view` listed for that number, or a `pr.url` in `view`'s JSON is
+not `https://github.com/<repository>/pull/<number>`, the set came from
+another repository: discard it and run Step 2 again from `view`. A first
+column of `true` is a draft.
 
 GitHub evaluates required checks and approvals for every pull request in
 the set against the stack's base branch and refuses the whole merge if one

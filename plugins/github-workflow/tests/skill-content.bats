@@ -106,3 +106,12 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
   run grep -E '^node .*merge --target "<target>" (--merge-method <method> )?--confirm' "$MERGE_SKILL"
   [ "$status" -eq 1 ]
 }
+
+@test "github-stack-merge: the previewed set is checked against the resolved repository" {
+  run grep -c -F 'gh api "repos/<repository>/pulls/<number>"' "$MERGE_SKILL"
+  [ "$output" -eq 1 ]
+  run grep -F 'repos/{owner}/{repo}/pulls' "$MERGE_SKILL"
+  [ "$status" -eq 1 ]
+  run grep -F 'discard it and run Step 2 again' "$MERGE_SKILL"
+  [ "$status" -eq 0 ]
+}
