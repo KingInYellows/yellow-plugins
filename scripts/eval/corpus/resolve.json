@@ -95,7 +95,7 @@
               "count": 1,
               "match": [
                 "def (_?redact\\w*)",
-                "\\bredact\\w*\\(\\s*classify_run\\(|=\\s*classify_run\\((?:(?!write_json\\()[\\s\\S])*?\\bredact\\w*\\((?:(?!write_json\\()[\\s\\S])*?write_json\\([^\\n]*result\\.json|write_json\\([^\\n]*result\\.json[^\\n]*\\bredact\\w*\\(|def (?:classify_run|write_json)\\((?:(?!\\ndef )[\\s\\S])*?\\bredact\\w*\\("
+                "\\b_?redact\\w*\\(\\s*classify_run\\(|=\\s*classify_run\\((?:(?!write_json\\()[\\s\\S])*?\\b_?redact\\w*\\((?:(?!write_json\\()[\\s\\S])*?write_json\\([^\\n]*result\\.json|write_json\\([^\\n]*result\\.json[^\\n]*\\b_?redact\\w*\\(|def (?:classify_run|write_json)\\((?:(?!\\ndef )[\\s\\S])*?\\b_?redact\\w*\\("
               ]
             }
           ]
