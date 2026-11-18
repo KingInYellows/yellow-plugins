@@ -118,7 +118,7 @@ def corpus_agent(agent):
     return "plugins" in agent or "overlay" in agent
 
 
-def fixture_parts(agent, allow_bash):
+def fixture_parts(agent, allow_bash="0"):
     """Content hash of the agent's `fixtures` (repo-relative files or directories),
     as a fingerprint part: an edited stand-in CLI or canned response reruns its rows.
     Empty when the agent lists none, so other specs keep their fingerprints.
