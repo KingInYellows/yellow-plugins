@@ -438,7 +438,14 @@ describe('validate-agent-authoring description rules', () => {
         'alpha/skills/demo-skill/SKILL.md',
         skill('disable-model-invocation: true')
       );
-      writeBaseline({ alpha: 0 });
+      // RULE 25 needs a visible description naming the typed form.
+      const notice = 'Typed-only - /alpha:demo-skill.';
+      writeAgent(
+        plugins,
+        'alpha/commands/demo/cmd.md',
+        command(`description: ${notice}`)
+      );
+      writeBaseline({ alpha: notice.length });
       const { status, output } = runBudget();
       expect(status).toBe(0);
       expect(output).not.toContain('RULE 23');

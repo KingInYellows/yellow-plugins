@@ -1,7 +1,7 @@
 ---
 name: goal:run-stub
 # prettier-ignore
-description: 'Run one zero-spend, deterministic Provider Protocol v2 stub scenario (success | failed | budget-exhausted | await-cancel) through the pinned goal-gen engine and report the validated terminal summary. Use when verifying the engine process contract or a request packet end to end without any real executor.'
+description: 'Run one zero-spend, deterministic Provider Protocol v2 stub scenario (success | failed | budget-exhausted | await-cancel) through the pinned goal-gen engine and report the validated terminal summary. Use when verifying the engine process contract or a request packet end to end without any real executor. A real, paid run is typed-only: tell the user to run /goal:run-real.'
 argument-hint:
   '<request-file> [--scenario success|failed|budget-exhausted|await-cancel]
   [--timeout-ms <n>] [--yes]'
@@ -102,10 +102,10 @@ node "$CLI" "${ARGS[@]}" -- "$REQUEST_FILE"
 ```
 
 The plugin spawns the engine with an argument array and `shell: false`. It
-probes `version --json` and `capabilities --json --protocol v2` against the pin before the run
-and refuses incompatible engines, streams the engine's JSON Lines events with
-bounded memory, keeps only the validated terminal summary, and forwards
-SIGINT/SIGTERM to the engine.
+probes `version --json` and `capabilities --json --protocol v2` against the pin
+before the run and refuses incompatible engines, streams the engine's JSON Lines
+events with bounded memory, keeps only the validated terminal summary, and
+forwards SIGINT/SIGTERM to the engine.
 
 ### Step 5: Report
 
