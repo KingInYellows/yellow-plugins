@@ -91,14 +91,8 @@ const REVIEW_AGENT_ALLOWLIST = new Map([
   // plans/yellow-council-godmodeskill-integration.md (2026-05-04). Both also
   // carry Write to materialize their own fenced-output file (unlike
   // codex-reviewer, which does not).
-  [
-    'yellow-council/agents/review/gemini-reviewer.md',
-    new Set(['Bash', 'Write']),
-  ],
-  [
-    'yellow-council/agents/review/opencode-reviewer.md',
-    new Set(['Bash', 'Write']),
-  ],
+  ['yellow-council/agents/review/gemini-reviewer.md', new Set(['Bash', 'Write'])],
+  ['yellow-council/agents/review/opencode-reviewer.md', new Set(['Bash', 'Write'])],
   // claude-reviewer is the council's in-process slot and does NOT share the
   // CLI-wrapper rationale above: it has no Bash at all and invokes no binary.
   // Write is granted for exactly one file — the fenced-output path the
@@ -681,9 +675,7 @@ function validateAgentFile(filePath, ctx) {
 
   const hasAllowedTools = /^allowed-tools:/m.test(frontmatter);
   if (hasAllowedTools) {
-    errors.push(
-      `${relative(filePath)}: use "tools:" instead of "allowed-tools:"`
-    );
+    errors.push(`${relative(filePath)}: use "tools:" instead of "allowed-tools:"`);
   }
 
   if (!hasAllowedTools) {
@@ -731,10 +723,7 @@ function validateAgentFile(filePath, ctx) {
       const allowedExceptionTools = hasDocumentedException
         ? REVIEW_AGENT_ALLOWLIST.get(pluginsRelPath)
         : undefined;
-      if (
-        !hasDocumentedException &&
-        REVIEW_AGENT_ALLOWLIST.has(pluginsRelPath)
-      ) {
+      if (!hasDocumentedException && REVIEW_AGENT_ALLOWLIST.has(pluginsRelPath)) {
         errors.push(
           `${relative(filePath)}: listed in REVIEW_AGENT_ALLOWLIST but has no ` +
             `"## Tool Surface — Documented Exception" section — the allowlist ` +
@@ -742,13 +731,13 @@ function validateAgentFile(filePath, ctx) {
             `the section or remove the allowlist entry.`
         );
       }
-      const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) => t.toLowerCase());
+      const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) =>
+        t.toLowerCase()
+      );
       const toolsLower = tools.map((t) => t.toLowerCase());
       const violations = REVIEW_AGENT_DENIED_TOOLS.filter((deniedTool, i) => {
         if (!toolsLower.includes(deniedLower[i])) return false;
-        return !(
-          allowedExceptionTools && allowedExceptionTools.has(deniedTool)
-        );
+        return !(allowedExceptionTools && allowedExceptionTools.has(deniedTool));
       });
       if (violations.length > 0) {
         errors.push(
@@ -777,9 +766,10 @@ function validateAgentFile(filePath, ctx) {
       // regressing silently.
       const memoryScope = parseScalar(frontmatter, 'memory');
       if (memoryScope && VALID_MEMORY_SCOPES.has(memoryScope)) {
-        const disallowedLower = parseList(frontmatter, 'disallowedTools').map(
-          (t) => t.toLowerCase()
-        );
+        const disallowedLower = parseList(
+          frontmatter,
+          'disallowedTools'
+        ).map((t) => t.toLowerCase());
         const missingDenies = REVIEW_AGENT_REQUIRED_DISALLOWED_TOOLS.filter(
           (t) => !disallowedLower.includes(t.toLowerCase())
         );
@@ -960,13 +950,17 @@ function validateStagingPromoterFrontmatter(agentFiles, errors) {
   // run non-interactively under bypassPermissions; both must hard-deny
   // AskUserQuestion at the frontmatter level (prose-only enforcement is
   // insufficient — see docs/solutions/code-quality/subagent-frontmatter-field-catalog.md).
-  const checkedAgents = ['staging-promoter.md', 'staging-reviewer.md'];
+  const checkedAgents = [
+    'staging-promoter.md',
+    'staging-reviewer.md',
+  ];
 
   for (const basename of checkedAgents) {
-    const agentPath = agentFiles.find((f) =>
-      f.endsWith(
-        `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}${basename}`
-      )
+    const agentPath = agentFiles.find(
+      (f) =>
+        f.endsWith(
+          `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}${basename}`
+        )
     );
     if (!agentPath) {
       // Agent not yet present (e.g., stack item #2 not merged).
@@ -1004,10 +998,11 @@ function validateStagingPromoterFrontmatter(agentFiles, errors) {
 // common drift: someone editing the agent to also append to other
 // MEMORY.md sections (CORE_RULES, USER_PREFERENCES, KNOWN_PROJECTS).
 function validateMemoryWriteSectionGate(agentFiles, errors) {
-  const promoter = agentFiles.find((f) =>
-    f.endsWith(
-      `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}staging-promoter.md`
-    )
+  const promoter = agentFiles.find(
+    (f) =>
+      f.endsWith(
+        `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}staging-promoter.md`
+      )
   );
   if (!promoter) {
     return;
@@ -1105,7 +1100,8 @@ function validateMemoryProtocolSentinel(markdownFiles, errors) {
   // run every declared file must exist — a deleted/renamed canonical or
   // replica must not silently disable its own check.
   const fixtureRun = Boolean(process.env.VALIDATE_PLUGINS_DIR);
-  const strict = !fixtureRun || process.env.VALIDATE_SENTINEL_STRICT === '1';
+  const strict =
+    !fixtureRun || process.env.VALIDATE_SENTINEL_STRICT === '1';
 
   for (const filePath of declaredPaths) {
     if (!fs.existsSync(filePath)) {
@@ -1183,7 +1179,8 @@ function validateDurableBar(markdownFiles, errors) {
   // opts in by carrying the start marker.
   const optedIn = declaredPaths.some(
     (p) =>
-      fs.existsSync(p) && fs.readFileSync(p, 'utf8').includes(DURABLE_BAR_START)
+      fs.existsSync(p) &&
+      fs.readFileSync(p, 'utf8').includes(DURABLE_BAR_START)
   );
   const checkDeclared = strict || optedIn;
   const copies = [];
@@ -1320,13 +1317,7 @@ function validateSkillWrapperDrift(commandFiles, errors) {
     }
 
     for (const skillName of skillNames) {
-      const skillFile = path.join(
-        PLUGINS_DIR,
-        pluginName,
-        'skills',
-        skillName,
-        'SKILL.md'
-      );
+      const skillFile = path.join(PLUGINS_DIR, pluginName, 'skills', skillName, 'SKILL.md');
       if (!fs.existsSync(skillFile)) {
         errors.push(
           `${relative(filePath)}: RULE 17 — references skill "${skillName}" ` +
@@ -1512,12 +1503,7 @@ function buildDispatchTargetIndex(commandFiles, skillFiles) {
   return index;
 }
 
-function validateSkillDispatchResolution(
-  markdownFiles,
-  commandFiles,
-  skillFiles,
-  errors
-) {
+function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles, errors) {
   // `name:` is the runtime identifier a `skill: "<plugin>:<name>"` dispatch
   // resolves against. Without it there is no target to validate, and the
   // directory is not a safe stand-in (see buildDispatchTargetIndex). Hard
@@ -1569,8 +1555,7 @@ function validateSkillDispatchResolution(
       .relative(PLUGINS_DIR, filePath)
       .split(path.sep)
       .join('/');
-    const allowedPlaceholders =
-      SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST.get(pluginsRelPath);
+    const allowedPlaceholders = SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST.get(pluginsRelPath);
 
     for (const target of seen) {
       if (dispatchTargets.has(target)) continue;
@@ -1595,13 +1580,9 @@ function validateSkillDispatchResolution(
   // do not carry these two real files) unless a test opts back in, matching
   // RULE 16's VALIDATE_SENTINEL_STRICT precedent.
   const fixtureRun = Boolean(process.env.VALIDATE_PLUGINS_DIR);
-  const strict =
-    !fixtureRun || process.env.VALIDATE_PLACEHOLDER_ALLOWLIST_STRICT === '1';
+  const strict = !fixtureRun || process.env.VALIDATE_PLACEHOLDER_ALLOWLIST_STRICT === '1';
   if (strict) {
-    for (const [
-      relPath,
-      placeholders,
-    ] of SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST) {
+    for (const [relPath, placeholders] of SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST) {
       const absPath = path.join(PLUGINS_DIR, ...relPath.split('/'));
       if (!fs.existsSync(absPath)) {
         errors.push(
@@ -1940,12 +1921,7 @@ function validateModelInvocationFlag(files, errors, warnings) {
       const value = match[1] !== undefined ? match[1] : match[2];
       if (seen.has(value)) continue;
       seen.add(value);
-      report(
-        relative(filePath),
-        'dispatches `skill:`',
-        value,
-        pluginOf(filePath)
-      );
+      report(relative(filePath), 'dispatches `skill:`', value, pluginOf(filePath));
     }
   }
 
@@ -1953,12 +1929,7 @@ function validateModelInvocationFlag(files, errors, warnings) {
     const frontmatter = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
     if (!frontmatter) continue;
     for (const skill of parseList(frontmatter, 'skills')) {
-      report(
-        relative(filePath),
-        'preloads the skill',
-        skill,
-        pluginOf(filePath)
-      );
+      report(relative(filePath), 'preloads the skill', skill, pluginOf(filePath));
     }
   }
 
@@ -1996,12 +1967,7 @@ function validateModelInvocationFlag(files, errors, warnings) {
     const visit = (node) => {
       if (!node || typeof node !== 'object') return;
       if (node.type === 'command' && node.plugin && node.ref) {
-        report(
-          relative(registryPath),
-          'routes an operation to',
-          node.ref,
-          node.plugin
-        );
+        report(relative(registryPath), 'routes an operation to', node.ref, node.plugin);
         return;
       }
       for (const child of Object.values(node)) visit(child);
@@ -2455,12 +2421,7 @@ function main() {
   });
   validateCommandFiles(commandFiles, errors);
   validateSkillWrapperDrift(commandFiles, errors);
-  validateSkillDispatchResolution(
-    markdownFiles,
-    commandFiles,
-    skillFiles,
-    errors
-  );
+  validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles, errors);
   validateSkillToolGrant(commandFiles, errors, { toolsKey: 'allowed-tools' });
   validateSkillToolGrant(agentFiles, errors, { toolsKey: 'tools' });
   validateSkillFiles(skillFiles, { errors, warnings });
