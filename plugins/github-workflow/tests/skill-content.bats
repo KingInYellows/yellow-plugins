@@ -90,3 +90,28 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
   run grep -E '^node .*<(baseRef|headRef|repository|headSha)>' "$MERGE_SINGLE_SKILL"
   [ "$status" -eq 1 ]
 }
+
+@test "github-stack-merge-single: a fork's head branch is never matched against Graphite branches, but ownership is still asked" {
+  run grep -F 'pullRequest.headInRepository` is `false`' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+  run grep -F 'go straight to the question below' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+  run grep -F 'Is this pull request part of a Graphite stack?' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge: the confirmed merge passes back the previewed repository" {
+  run grep -c -F 'merge --target "<target>" --repository "<repository>"' "$MERGE_SKILL"
+  [ "$output" -eq 2 ]
+  run grep -E '^node .*merge --target "<target>" (--merge-method <method> )?--confirm' "$MERGE_SKILL"
+  [ "$status" -eq 1 ]
+}
+
+@test "github-stack-merge: the previewed set is checked against the resolved repository" {
+  run grep -c -F 'gh api --hostname github.com "repos/<repository>/pulls/<number>"' "$MERGE_SKILL"
+  [ "$output" -eq 1 ]
+  run grep -F 'repos/{owner}/{repo}/pulls' "$MERGE_SKILL"
+  [ "$status" -eq 1 ]
+  run grep -F 'view --repository "<repository>"' "$MERGE_SKILL"
+  [ "$status" -eq 0 ]
+}

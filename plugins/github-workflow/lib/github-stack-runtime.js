@@ -134,16 +134,16 @@ const MERGEABLE_STATES = Object.freeze(['clean', 'has_hooks', 'unstable']);
  * would turn off the all-or-nothing push this runtime promises. It is
  * dropped here rather than overridden per command.
  */
-function childEnv() {
-  const env = { ...process.env };
+function childEnv(extra) {
+  const env = { ...process.env, ...extra };
   delete env.GH_STACK_NO_ATOMIC;
   return env;
 }
 
-function run(bin, args) {
+function run(bin, args, extraEnv) {
   const result = spawnSync(bin, args, {
     encoding: 'utf8',
-    env: childEnv(),
+    env: childEnv(extraEnv),
     timeout: spawnTimeoutMs,
     shell: false,
     windowsHide: true,
@@ -318,20 +318,178 @@ function resolveRemote(explicitRemote) {
   };
 }
 
+/** Hosts that are github.com itself (go-gh treats ssh.github.com as github.com). */
+const GITHUB_HOSTS = Object.freeze(['github.com', 'www.github.com', 'ssh.github.com']);
+
 /**
- * `owner/repo` (lower-cased) of every github.com remote of this clone.
- * Empty when the remotes cannot be read — callers fail closed on that.
+ * Host and `owner/repo` (lower-cased) of a remote URL, or null. Takes scheme
+ * URLs with any user or port (`https://x@github.com/o/r`,
+ * `ssh://git@github.com:22/o/r.git`) and scp-style `[user@]host:o/r`.
  */
-function githubReposOfRemotes() {
-  const result = run('git', ['config', '--get-regexp', '^remote\\..*\\.url$']);
-  if (!result.ok || result.code !== 0) return [];
-  const repos = new Set();
-  for (const line of result.stdout.split('\n')) {
-    const url = line.trim().split(/\s+/)[1] || '';
-    const match = /^(?:https:\/\/(?:[^@/]*@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec(url);
-    if (match) repos.add(`${match[1]}/${match[2]}`.toLowerCase());
+function splitRemoteUrl(url) {
+  let host;
+  let path;
+  let ssh;
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(url)) {
+    try {
+      const parsed = new URL(url);
+      host = parsed.hostname;
+      path = parsed.pathname;
+      ssh = /^(?:ssh|git\+ssh|ssh\+git):$/i.test(parsed.protocol);
+    } catch {
+      return null;
+    }
+  } else {
+    const scp = /^(?:[^@/:]+@)?([^/:]+):(.+)$/.exec(url);
+    if (!scp) return null;
+    host = scp[1];
+    path = scp[2];
+    ssh = true;
   }
-  return [...repos];
+  const match = /^\/?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec(path);
+  if (!host || !match) return null;
+  return { host: host.toLowerCase(), repository: `${match[1]}/${match[2]}`.toLowerCase(), ssh };
+}
+
+/** `owner/repo` (lower-cased) of a github.com URL, or null. */
+function githubRepoOfUrl(url) {
+  const split = splitRemoteUrl(url);
+  return split && GITHUB_HOSTS.includes(split.host) ? split.repository : null;
+}
+
+/**
+ * The real host behind an SSH host alias (`Host work` / `HostName github.com`
+ * in ~/.ssh/config), read with `ssh -G` as go-gh's translator does. Falls
+ * back to the alias itself.
+ */
+function sshHostName(alias) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(alias)) return alias;
+  const resolved = run('ssh', ['-G', alias]);
+  if (!resolved.ok || resolved.code !== 0) return alias;
+  const line = /^hostname\s+(\S+)\s*$/im.exec(resolved.stdout);
+  return line ? line[1].toLowerCase() : alias;
+}
+
+/**
+ * The repository a remote URL names: `owner/repo` on github.com, or
+ * `host/owner/repo` on any other host (which gh may know as an enterprise
+ * host). SSH host aliases are resolved first.
+ */
+function remoteRepository(url) {
+  const split = splitRemoteUrl(url);
+  if (!split) return null;
+  // go-gh translates every SSH remote, github.com included (`Host github.com`
+  // can point elsewhere).
+  const host = split.ssh ? sshHostName(split.host) : split.host;
+  return GITHUB_HOSTS.includes(host) ? split.repository : `${host}/${split.repository}`;
+}
+
+/** go-gh's remote ranking: upstream, then github, then origin, then the rest. */
+function remoteRank(name) {
+  return { upstream: 3, github: 2, origin: 1 }[name.toLowerCase()] || 0;
+}
+
+/**
+ * The repository `gh stack` acts on, worked out the way gh-stack 0.3.0 does
+ * it (go-gh `repository.Current()`): `GH_REPO` when set; otherwise the
+ * github.com remotes ranked upstream, github, origin, then the rest, where a
+ * remote marked by `gh repo set-default` (`remote.<name>.gh-resolved`) wins.
+ *
+ * Fails closed whenever that could name more than one repository: two
+ * top-ranked remotes for different repositories (go-gh's sort is not
+ * stable), or a set-default mark that disagrees with the ranking (older
+ * go-gh releases ignore the mark). Remotes on other hosts still take part
+ * in the ranking, since gh may know that host; when one wins, it refuses,
+ * because only github.com is understood.
+ * @returns {{ ok: true, repository: string, source: string } | { ok: false, reason: string }}
+ */
+function stackRepository() {
+  const override = (process.env.GH_REPO || '').trim();
+  if (override) {
+    // go-gh reads a URL like a remote (a `.git` suffix is dropped) and
+    // `[HOST/]OWNER/REPO` literally, so `o/r.git` names repository `r.git`.
+    let repository = null;
+    if (override.includes('://')) {
+      repository = githubRepoOfUrl(override);
+    } else {
+      const match = /^(?:([^/\s]+)\/)?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(override);
+      // A hostless override uses GH_HOST, as gh does.
+      const host = match ? (match[1] || (process.env.GH_HOST || '').trim() || 'github.com') : '';
+      if (match && host.toLowerCase() === 'github.com') {
+        repository = `${match[2]}/${match[3]}`.toLowerCase();
+      }
+    }
+    if (repository === null) {
+      return { ok: false, reason: `GH_REPO is "${override}", which is not a github.com repository this runtime can read` };
+    }
+    return { ok: true, repository, source: 'GH_REPO' };
+  }
+  // `git remote -v` prints each remote's effective fetch URL, with any
+  // `url.<base>.insteadOf` rewrite applied, as go-gh reads it.
+  const listed = run('git', ['remote', '-v']);
+  if (!listed.ok || listed.code !== 0) {
+    return { ok: false, reason: 'no git remote of this clone could be read' };
+  }
+  // go-gh reads a remote's identity from its fetch URL and falls back to
+  // its push URL when the fetch URL names no repository (a local mirror).
+  const urls = new Map();
+  for (const line of listed.stdout.split('\n')) {
+    // A partial clone adds a filter after the kind: `(fetch) [blob:none]`.
+    const match = /^(\S+)\s+(\S+)\s+\((fetch|push)\)(?:\s+\[[^\]]*\])?\s*$/.exec(line.trim());
+    if (!match) continue;
+    if (!urls.has(match[1])) urls.set(match[1], {});
+    const entry = urls.get(match[1]);
+    // First fetch URL, last push URL: go-gh overwrites the push URL per row.
+    if (match[3] === 'push' || entry.fetch === undefined) entry[match[3]] = match[2];
+  }
+  const remotes = new Map();
+  for (const [name, entry] of urls) {
+    const fetched = entry.fetch === undefined ? null : remoteRepository(entry.fetch);
+    const repository = fetched !== null || entry.push === undefined ? fetched : remoteRepository(entry.push);
+    remotes.set(name, { name, repository, resolved: null });
+  }
+  // Exit 1 means no remote is marked; anything else is unreadable.
+  const marks = run('git', ['config', '--get-regexp', '^remote\\..*\\.gh-resolved$']);
+  if (!marks.ok || (marks.code !== 0 && marks.code !== 1)) {
+    return { ok: false, reason: 'the gh repo set-default marks of this clone could not be read' };
+  }
+  for (const line of marks.code === 0 ? marks.stdout.split('\n') : []) {
+    const match = /^remote\.(.+)\.gh-resolved\s+(\S+)/.exec(line.trim());
+    if (match && remotes.has(match[1])) remotes.get(match[1]).resolved = match[2];
+  }
+  const candidates = [...remotes.values()].filter((remote) => remote.repository !== null);
+  if (candidates.length === 0) {
+    return { ok: false, reason: 'no git remote of this clone names a repository' };
+  }
+  const top = Math.max(...candidates.map((remote) => remoteRank(remote.name)));
+  const ranked = new Set(candidates.filter((remote) => remoteRank(remote.name) === top).map((remote) => remote.repository));
+  const marked = new Set();
+  for (const remote of candidates) {
+    if (remote.resolved === null) continue;
+    if (remote.resolved === 'base') {
+      marked.add(remote.repository);
+    } else {
+      const named = /^(?:github\.com\/)?([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)$/i.exec(remote.resolved);
+      marked.add(named ? named[1].toLowerCase() : `unreadable:${remote.resolved}`);
+    }
+  }
+  const choices = new Set([...ranked, ...marked]);
+  if (choices.size !== 1) {
+    return {
+      ok: false,
+      reason: `the remotes of this clone could point gh stack at more than one repository (${[...choices].join(', ')}); set GH_REPO to the one you mean`,
+    };
+  }
+  const [repository] = [...choices];
+  if (repository.split('/').length !== 2) {
+    // gh may know that host (an enterprise server, or GH_HOST); this runtime
+    // only understands github.com, so it never guesses past it.
+    return {
+      ok: false,
+      reason: `gh stack would act on ${repository}, which is not on github.com; set GH_REPO to the github.com repository you mean`,
+    };
+  }
+  return { ok: true, repository, source: marked.size > 0 ? 'gh repo set-default' : 'git remotes' };
 }
 
 function validateEnum(value, allowed, label) {
@@ -374,19 +532,12 @@ const RECOVERY_ACTIONS = Object.freeze({
  *   execResult: { ok: boolean, code: number|null, stdout: string, stderr: string },
  *   mayHaveMutated: boolean,
  *   syncAbortCheck?: boolean,
- *   statusOverride?: string,
  * }} input
  */
-function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck = false, statusOverride }) {
-  const stdout = bound(execResult.stdout);
-  const stderr = bound(execResult.stderr);
+function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck = false }) {
   let status;
   if (!execResult.ok) {
     status = 'SPAWN_FAILURE';
-  } else if (statusOverride) {
-    // The command is not `gh stack`, so gh-stack's exit codes and progress
-    // text say nothing about it; the caller read the outcome itself.
-    status = statusOverride;
   } else if (/rerun with --accept-base-change/.test(`${execResult.stdout}\n${execResult.stderr}`)) {
     // gh-stack 0.3.0 leaves the stack un-rebased when GitHub retargeted its
     // base and the old base never merged. Whatever the exit code, the stack
@@ -413,6 +564,40 @@ function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck
   } else {
     status = EXIT_STATUS[execResult.code] || 'UNKNOWN_ERROR';
   }
+  return buildResult({ op, bin, args, execResult, status, recoveryAction: RECOVERY_ACTIONS[status] || null, mayHaveMutated });
+}
+
+/**
+ * Shape a `gh api` call (merge-single). gh-stack's exit codes and progress
+ * text say nothing about it, so the caller decides `status` from what the
+ * API answered, and may give a recovery text that fits that call better
+ * than the generic one for the status.
+ * @param {{
+ *   op: string,
+ *   args: string[],
+ *   execResult: { ok: boolean, code: number|null, stdout: string, stderr: string },
+ *   mayHaveMutated: boolean,
+ *   status: string,
+ *   recoveryAction?: string,
+ * }} input
+ */
+function shapeApiResult({ op, args, execResult, mayHaveMutated, status, recoveryAction }) {
+  const finalStatus = execResult.ok ? status : 'SPAWN_FAILURE';
+  return buildResult({
+    op,
+    bin: 'gh',
+    args,
+    execResult,
+    status: finalStatus,
+    recoveryAction: (execResult.ok && recoveryAction) || RECOVERY_ACTIONS[finalStatus] || null,
+    mayHaveMutated,
+  });
+}
+
+/** The result object every executed command returns, output redacted and bounded. */
+function buildResult({ op, bin, args, execResult, status, recoveryAction, mayHaveMutated }) {
+  const stdout = bound(execResult.stdout);
+  const stderr = bound(execResult.stderr);
   // Arguments are redacted too, not just subprocess output. A validated
   // argument can still CARRY credential material — a commit message that
   // quotes a token (`add --message "...ghp_..."`), or a remote/URL value —
@@ -432,7 +617,7 @@ function shapeResult({ op, bin, args, execResult, mayHaveMutated, syncAbortCheck
     stderr: stderr.text,
     stderrTruncated: stderr.truncated,
     stderrTotalChars: stderr.totalChars,
-    recoveryAction: RECOVERY_ACTIONS[status] || null,
+    recoveryAction,
     mayHaveMutated,
   };
 }
@@ -483,10 +668,19 @@ function confirmationRequiredResult(op, rawDetail) {
 // Operations
 // ---------------------------------------------------------------------------
 
-/** Read-only. Always `--json`, never bare `view`. */
-function view() {
-  const execResult = run('gh', ['stack', 'view', '--json']);
-  return shapeResult({ op: 'view', bin: 'gh', args: ['stack', 'view', '--json'], execResult, mayHaveMutated: false });
+/**
+ * Read-only. Always `--json`, never bare `view`. With `repository`, the
+ * child runs with `GH_REPO=github.com/<repository>`, so a merge preview
+ * reads the stack from the repository the confirmed merge is pinned to.
+ */
+function view({ repository } = {}) {
+  if (repository !== undefined && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+    return refusalResult('view', `repository must be OWNER/REPO, got "${repository}"`);
+  }
+  const args = ['stack', 'view', '--json'];
+  const execResult =
+    repository === undefined ? run('gh', args) : run('gh', args, { GH_REPO: `github.com/${repository.toLowerCase()}` });
+  return shapeResult({ op: 'view', bin: 'gh', args, execResult, mayHaveMutated: false });
 }
 
 /**
@@ -687,8 +881,13 @@ const PR_URL_RE = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\
  * before confirming. gh-stack 0.3.0 accepts only a stack number or a pull
  * request number here (a URL exits 5), so a pull-request URL is reduced to
  * its number before it reaches argv.
+ *
+ * A number means nothing without its repository, so `stackRepository()`
+ * works out where gh-stack would merge it. The confirmation request names
+ * that repository and reports it as `repository`; a URL must name the same
+ * one, and a `repository` the caller passes back must still match it.
  */
-function merge({ target, mergeMethod, confirm }) {
+function merge({ target, mergeMethod, repository, confirm }) {
   if (typeof target !== 'string' || target.length === 0) {
     return refusalResult('merge', 'target must be an explicit PR number, PR URL, or stack number');
   }
@@ -701,41 +900,46 @@ function merge({ target, mergeMethod, confirm }) {
   // merge to the current branch's PR context instead of refusing.
   const urlMatch = PR_URL_RE.exec(target);
   const number = urlMatch ? urlMatch[3] : target;
-  if (urlMatch) {
-    // The number alone would merge pull request N of THIS repository, so a
-    // URL that names another repository must never be reduced to it.
-    const wanted = `${urlMatch[1]}/${urlMatch[2]}`.toLowerCase();
-    const repos = githubReposOfRemotes();
-    if (!repos.includes(wanted)) {
-      return refusalResult(
-        'merge',
-        repos.length === 0
-          ? `target "${target}" is a pull request URL, but no github.com remote of this clone could be read to confirm it is the same repository; pass the pull request number instead`
-          : `target "${target}" is a pull request in ${wanted}, which is not a remote of this clone (${repos.join(', ')})`
-      );
-    }
-    // gh-stack picks its repository the way gh does, so `GH_REPO`
-    // ([HOST/]OWNER/REPO) overrides the clone's remotes. The number must not
-    // land in a repository other than the one the URL names.
-    const override = (process.env.GH_REPO || '').trim().toLowerCase();
-    if (override && override !== wanted && override !== `github.com/${wanted}`) {
-      return refusalResult(
-        'merge',
-        `target "${target}" is a pull request in ${wanted}, but GH_REPO points gh at "${override}"; unset GH_REPO or pass the pull request number`
-      );
-    }
-  }
   if (!/^[1-9][0-9]*$/.test(number)) {
     return refusalResult(
       'merge',
       `target "${target}" is neither a positive integer (PR/stack number) nor a github.com pull request URL`
     );
   }
-  if (confirm !== true) {
-    return confirmationRequiredResult(
+  if (repository !== undefined && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+    return refusalResult('merge', `repository must be OWNER/REPO, got "${repository}"`);
+  }
+  // A number lands in whichever repository gh-stack resolves, so that
+  // repository is worked out first, named in the confirmation, and must
+  // match a URL's repository and the one the caller confirmed.
+  const resolved = stackRepository();
+  if (!resolved.ok) {
+    return refusalResult('merge', `could not tell which repository gh stack would merge in: ${resolved.reason}`);
+  }
+  const where = resolved.repository;
+  if (urlMatch) {
+    const wanted = `${urlMatch[1]}/${urlMatch[2]}`.toLowerCase();
+    if (wanted !== where) {
+      return refusalResult(
+        'merge',
+        `target "${target}" is a pull request in ${wanted}, but gh stack would merge #${number} in ${where} (from ${resolved.source}); its number would land a different pull request`
+      );
+    }
+  }
+  if (repository !== undefined && repository.toLowerCase() !== where) {
+    return refusalResult(
       'merge',
-      `merge target "${number}"${urlMatch ? ` in ${urlMatch[1]}/${urlMatch[2]}` : ''} lands that pull request and every unmerged pull request below it in the stack, and cannot be undone by this runtime`
+      `the merge was confirmed for ${repository.toLowerCase()}, but gh stack would merge in ${where} (from ${resolved.source}) now; nothing was merged`
     );
+  }
+  if (confirm !== true) {
+    return {
+      ...confirmationRequiredResult(
+        'merge',
+        `merge target "${number}" in ${where} (from ${resolved.source}) lands that pull request and every unmerged pull request below it in the stack, and cannot be undone by this runtime; re-run with repository ${where} and confirm`
+      ),
+      repository: where,
+    };
   }
   const args = ['stack', 'merge', number, '--yes'];
   if (mergeMethod !== undefined) {
@@ -743,8 +947,10 @@ function merge({ target, mergeMethod, confirm }) {
     if (!methodCheck.ok) return refusalResult('merge', methodCheck.reason);
     args.push('--merge-method', methodCheck.value);
   }
-  const execResult = run('gh', args);
-  return shapeResult({ op: 'merge', bin: 'gh', args, execResult, mayHaveMutated: true });
+  // Pin the child to the repository that was checked and confirmed, so a
+  // remote changed in between cannot move the merge somewhere else.
+  const execResult = run('gh', args, { GH_REPO: `github.com/${where}` });
+  return { ...shapeResult({ op: 'merge', bin: 'gh', args, execResult, mayHaveMutated: true }), repository: where };
 }
 
 /**
@@ -752,7 +958,7 @@ function merge({ target, mergeMethod, confirm }) {
  * whether it is an ordinary one that may be landed on its own.
  * @param {string} op
  * @param {string} target a validated pull request number
- * @returns {{ result: object } | { pullRequest: { number: number, repository: string, baseRef: string, headRef: string, headSha: string } }}
+ * @returns {{ result: object } | { pullRequest: { number: number, repository: string, baseRef: string, headRef: string, headRepository: string, headSha: string } }}
  *   `result` is the finished refusal or lookup failure.
  */
 function readOrdinaryPullRequest(op, target) {
@@ -760,14 +966,7 @@ function readOrdinaryPullRequest(op, target) {
   const lookup = run('gh', lookupArgs);
   if (!lookup.ok || lookup.code !== 0) {
     return {
-      result: shapeResult({
-        op,
-        bin: 'gh',
-        args: lookupArgs,
-        execResult: lookup,
-        mayHaveMutated: false,
-        statusOverride: 'API_FAILURE',
-      }),
+      result: shapeApiResult({ op, args: lookupArgs, execResult: lookup, mayHaveMutated: false, status: 'API_FAILURE' }),
     };
   }
   let pr;
@@ -785,6 +984,10 @@ function readOrdinaryPullRequest(op, target) {
     repository: text(repo.full_name),
     baseRef: text(base.ref),
     headRef: text(head.ref),
+    // Where the head branch lives: the same repository, a fork, or '' when
+    // the fork was deleted. A head branch name says nothing about ownership
+    // unless it lives in this repository.
+    headRepository: text((head.repo || {}).full_name),
     headSha: text(head.sha),
   };
   const defaultBranch = text(repo.default_branch);
@@ -907,6 +1110,10 @@ function mergeSingle({ target, mergeMethod, previewToken, confirm }) {
         repository: redact(pullRequest.repository),
         baseRef: redact(pullRequest.baseRef),
         headRef: redact(pullRequest.headRef),
+        headRepository: redact(pullRequest.headRepository),
+        headInRepository:
+          pullRequest.headRepository !== '' &&
+          pullRequest.headRepository.toLowerCase() === pullRequest.repository.toLowerCase(),
       },
       previewToken: currentToken,
     };
@@ -936,16 +1143,21 @@ function mergeSingle({ target, mergeMethod, previewToken, confirm }) {
       merged = false;
     }
   }
-  let statusOverride = 'API_FAILURE';
-  if (execResult.code === 0) statusOverride = merged ? 'SUCCESS' : 'ERROR';
-  const result = shapeResult({ op, bin: 'gh', args, execResult, mayHaveMutated: true, statusOverride });
-  if (result.status === 'API_FAILURE' || result.status === 'ERROR') {
+  let status = 'API_FAILURE';
+  if (execResult.code === 0) status = merged ? 'SUCCESS' : 'ERROR';
+  return shapeApiResult({
+    op,
+    args,
+    execResult,
+    mayHaveMutated: true,
+    status,
     // The generic API_FAILURE text says to retry. A refused merge is not
     // transient: the pull request has to change first.
-    result.recoveryAction =
-      'GitHub did not merge the pull request; its reason is in stdout (for example a required check, or a head that moved). Check on GitHub whether it merged before doing anything else, and do not retry unchanged.';
-  }
-  return result;
+    recoveryAction:
+      status === 'SUCCESS'
+        ? undefined
+        : 'GitHub did not merge the pull request; its reason is in stdout (for example a required check, or a head that moved). Check on GitHub whether it merged before doing anything else, and do not retry unchanged.',
+  });
 }
 
 /**
@@ -1055,6 +1267,7 @@ function main(argv) {
     mode: typeof args.mode === 'string' ? args.mode : undefined,
     mergeMethod: typeof args['merge-method'] === 'string' ? args['merge-method'] : undefined,
     previewToken: typeof args['preview-token'] === 'string' ? args['preview-token'] : undefined,
+    repository: typeof args.repository === 'string' ? args.repository : undefined,
     open: args.open === true,
     prune: args.prune === true,
     local: args.local === true,
@@ -1079,6 +1292,7 @@ module.exports = {
   validateRepoRelativePath,
   validateRemoteName,
   resolveRemote,
+  stackRepository,
   validateEnum,
   OPERATIONS,
   view,

@@ -137,9 +137,12 @@ the reference.
 - `stack-operation-registry.js` — maps the nine neutral stack operations to one
   Graphite and one GitHub implementation or `null`; `/flow:work` and
   `worktree-restack.sh` derive from it in prose, so change all together
-- `stack-tooling-probe.js` — provider CLI readiness; `commands/setup/all.md`
-  still inlines its own `gt` / `gh` checks, so a readiness change must update it
-  too
+- `stack-tooling-probe.js` — provider CLI readiness. GitHub is ready only with
+  an authenticated `gh`, the official `github/gh-stack` at 0.3.0 or newer (a
+  prerelease of 0.3.0 is older) and git 2.36+; an unversioned gh-stack or an
+  unreadable git is `unknown`. `commands/setup/all.md` still inlines its own
+  `gt` / `gh` / git checks (`tests/setup-all-stack-tooling.bats`), so a
+  readiness change must update both
 - `remote-agent-provider-state.js` — active `remote-agent` provider for
   `/linear:delegate` and `/setup:all` Step 2.5
 - `run-github-stack-runtime.js` — entry to github-workflow's runtime;
@@ -248,7 +251,7 @@ marketplace/plugins/contracts/examples/solutions targets), not inside
 `compound-staging`, `compound-stop-hook`, `context-observer`,
 `credential-status`, `handoff`, `jev-category-eval`, `jev-prefilter`,
 `plan-commands`, `plan-status-parity`, `plan-gate-tier`, `plugin-identity`,
-`stack-provider-root`,
+`setup-all-stack-tooling`, `stack-provider-root`,
 `pre-compact-hook`, `quote-ground`, `repo-profile`, `setup-all-ruvector-probe`,
 `statusline-template`, `validate-fs`) plus `skills/git-worktree/tests/`
 (`worktree-manager.bats`, `worktree-restack.bats` with stub `gt` / `gh` / `git`

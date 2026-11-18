@@ -16,6 +16,10 @@ if [ -n "${FAKE_GH_REPORT_NO_ATOMIC:-}" ]; then
     echo "no-atomic: absent" >&2
   fi
 fi
+# FAKE_GH_REPORT_GH_REPO=1: say on stderr which GH_REPO reached this process.
+if [ -n "${FAKE_GH_REPORT_GH_REPO:-}" ]; then
+  echo "gh-repo: ${GH_REPO:-unset}" >&2
+fi
 # `gh api` calls (merge-single makes a GET, then a PUT). FAKE_GH_LOG=<file>
 # records each call's arguments on one line. FAKE_GH_GET_STDOUT / _EXIT answer
 # the read and FAKE_GH_PUT_STDOUT / _EXIT the merge; unset, the generic

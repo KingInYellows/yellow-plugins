@@ -70,7 +70,7 @@ ambiguous state is reported, never silently resolved.
 | `/github-stack:sync` | Syncs the local stack with trunk and pushes the rebased branches; pruning merged branches requires confirmation. |
 | `/github-stack:nav` | Checks out a stack target (branch, PR number, PR URL, or stack number); prompts if none given. |
 | `/github-stack:cleanup` | Removes local stack tracking; by default also remote-unstacks every PR via the GitHub API (`--local` skips that). Never deletes local branches. Always behind confirmation. |
-| `/github-stack:merge` | Merges a PR and every unmerged PR below it via `gh stack merge` (never `gh pr merge`), always behind confirmation. |
+| `/github-stack:merge` | Merges a PR and every unmerged PR below it via `gh stack merge` (never `gh pr merge`), always behind confirmation. The preview names the repository gh-stack resolves (`GH_REPO`, `gh repo set-default`, or the remotes ranked upstream, github, origin), and the merge is refused if that changes or is ambiguous. |
 | `/github-stack:merge-single` | Merges one ordinary PR with an explicit merge method, pinned to the head commit you confirmed. Refuses a PR that belongs to a stack. |
 
 Each is a thin wrapper over a same-named skill, matching the

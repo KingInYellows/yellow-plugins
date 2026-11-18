@@ -27,6 +27,31 @@ if [ "$1" = "remote" ] && [ -z "${2:-}" ]; then
   fi
   exit 0
 fi
+if [ "$1" = "remote" ] && [ "${2:-}" = "-v" ]; then
+  # FAKE_GIT_REMOTE_URLS: "name=url" pairs separated by spaces.
+  [ -n "${FAKE_GIT_REMOTE_LIST_EXIT:-}" ] && exit "$FAKE_GIT_REMOTE_LIST_EXIT"
+  # FAKE_GIT_REMOTE_V: the whole `git remote -v` output, verbatim.
+  if [ -n "${FAKE_GIT_REMOTE_V:-}" ]; then printf '%b' "$FAKE_GIT_REMOTE_V"; exit 0; fi
+  # FAKE_GIT_REMOTE_PUSH_URLS: "name=url" pairs overriding a push URL.
+  for pair in ${FAKE_GIT_REMOTE_URLS:-}; do
+    name="${pair%%=*}"
+    push="${pair#*=}"
+    for over in ${FAKE_GIT_REMOTE_PUSH_URLS:-}; do
+      [ "${over%%=*}" = "$name" ] && push="${over#*=}"
+    done
+    printf '%s\t%s (fetch)\n%s\t%s (push)\n' "$name" "${pair#*=}" "$name" "$push"
+  done
+  exit 0
+fi
+if [ "$1" = "config" ] && [ "$2" = "--get-regexp" ] && [ "$3" = '^remote\..*\.gh-resolved$' ]; then
+  # FAKE_GIT_GH_RESOLVED: "name=value" pairs (`gh repo set-default` marks).
+  [ -n "${FAKE_GIT_GH_RESOLVED_EXIT:-}" ] && exit "$FAKE_GIT_GH_RESOLVED_EXIT"
+  [ -n "${FAKE_GIT_GH_RESOLVED:-}" ] || exit 1
+  for pair in $FAKE_GIT_GH_RESOLVED; do
+    printf 'remote.%s.gh-resolved %s\n' "${pair%%=*}" "${pair#*=}"
+  done
+  exit 0
+fi
 if [ "$1" = "config" ] && [ "$2" = "remote.pushDefault" ]; then
   if [ -n "${FAKE_GIT_PUSH_DEFAULT:-}" ]; then
     printf '%s\n' "$FAKE_GIT_PUSH_DEFAULT"
