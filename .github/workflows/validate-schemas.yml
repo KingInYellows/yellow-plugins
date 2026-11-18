@@ -1601,12 +1601,28 @@ jobs:
   # YELLOW-REVIEW SHELL TESTS (bats) — required, split out of
   # plugin-shell-tests so that job stays inside its 15-minute cap.
   # ============================================================================
+  # One job ran 25-30 minutes on main against a 30-minute cap (CLAUDE-354),
+  # so the suite runs in parallel shards. Three files take ~80% of the time
+  # (main run 44166050560: resolve-paths 8.6 min, run-verify-command 7.8,
+  # commit-resolve-fixes 4.0, review-ledger 1.9, all others 2.5 together).
+  # YR_SHARD_GROUPS lists the dedicated groups, one per shard, in order; the
+  # last shard runs every other .bats file, so a new test file is never
+  # skipped. Keep one more matrix entry than there are groups: the step
+  # fails when the counts disagree. ci-status needs this job id, and a
+  # matrix job's result there is failure when any shard fails. Rebalance
+  # from the per-test durations that `--timing` prints.
   yellow-review-shell-tests:
-    name: Plugin Shell Tests (yellow-review)
+    name: Plugin Shell Tests (yellow-review ${{ matrix.shard }}/${{ strategy.job-total }})
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-26.04 # CLAUDE-348: always uutils coreutils, the stricter runner
-    timeout-minutes: 30
+    timeout-minutes: 15
     needs: [validate-schemas]
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      YR_SHARD_GROUPS: 'resolve-paths.bats;run-verify-command.bats;commit-resolve-fixes.bats review-ledger.bats'
 
     steps:
       - name: Checkout repository
@@ -1637,7 +1653,36 @@ jobs:
         # before/after line counts. The two CLAUDE-49 ctags cases fail
         # when CI is set and universal-ctags is missing, so this job is
         # where they run.
-        run: bats plugins/yellow-review/tests/
+        env:
+          JOB_INDEX: ${{ strategy.job-index }}
+          JOB_TOTAL: ${{ strategy.job-total }}
+        run: |
+          set -euo pipefail
+          dir=plugins/yellow-review/tests
+          IFS=';' read -r -a groups <<< "$YR_SHARD_GROUPS"
+          if [ "$JOB_TOTAL" -ne $(( ${#groups[@]} + 1 )) ]; then
+            echo "::error::matrix has $JOB_TOTAL shards but YR_SHARD_GROUPS has ${#groups[@]} groups; keep one extra shard for the remaining files"
+            exit 1
+          fi
+          files=()
+          if [ "$JOB_INDEX" -lt "${#groups[@]}" ]; then
+            for f in ${groups[$JOB_INDEX]}; do
+              [ -f "$dir/$f" ] || { echo "::error::YR_SHARD_GROUPS names $f, which is not in $dir"; exit 1; }
+              files+=("$dir/$f")
+            done
+          else
+            dedicated=" ${YR_SHARD_GROUPS//;/ } "
+            for path in "$dir"/*.bats; do
+              case "$dedicated" in
+                *" ${path##*/} "*) ;;
+                *) files+=("$path") ;;
+              esac
+            done
+          fi
+          [ "${#files[@]}" -gt 0 ] || { echo "::error::shard $((JOB_INDEX + 1)) has no files"; exit 1; }
+          printf 'shard %s/%s runs:\n' "$((JOB_INDEX + 1))" "$JOB_TOTAL"
+          printf '  %s\n' "${files[@]}"
+          bats --timing "${files[@]}"
 
   # ============================================================================
   # YELLOW-RUVECTOR SHELL TESTS (bats) — advisory, like the loop above

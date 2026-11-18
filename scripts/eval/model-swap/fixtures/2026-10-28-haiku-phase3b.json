@@ -1,6 +1,6 @@
 {
  "$comment": "CLAUDE-194 Phase 3 leftovers eval, run 2026-10-28. Every agent runs as an isolated `prompt` agent: each run gets its own tree at prompt_commit with the case's `files` written (and committed for `commit` cases), and passes on its reply plus the files it leaves. Before `run`: put the real semgrep (pip install semgrep) and agent-browser (npm i -g agent-browser) on PATH and serve fixtures/2026-10-28-phase3b/app with `python3 -m http.server 8765`. bin/semgrep rewrites `--config auto` to p/default (semgrep 1.182 refuses auto with --metrics off); bin/codex replays a canned Codex result per case for the codex-reviewer contract check.",
- "prompt_commit": "b07eb1e",
+ "prompt_commit": "b07eb1ecf6d77f932110d6905ee7f1b8b5bba6fc",
  "configs": {
   "to_haiku": [
    {

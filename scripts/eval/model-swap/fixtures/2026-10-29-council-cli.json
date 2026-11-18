@@ -1,6 +1,6 @@
 {
   "$comment": "CLAUDE-200 gemini-reviewer / opencode-reviewer effort eval, 2026-10-29. Both wrappers run as isolated prompt agents against a council pack (the spawn prompt council.md sends), with bin/agy and bin/opencode first on PATH: they replay a canned CLI reply picked by the src/council_case_<x>.py file in the pack's diff and log every call to the run tree's eval-cli.log. A case passes on the agent's key=value return plus that log (one CLI call with the documented flags, the pack written verbatim with its INGEST_TOKEN last, the OpenCode session deleted once). The 2026-10-29-council-cli-real.json spec runs the same agents against the real CLIs on a machine that has them.",
-  "prompt_commit": "0b24dbc",
+  "prompt_commit": "0b24dbc9fb146448ae548e2973908230dc2cb85c",
   "configs": {
     "council": [
       {
