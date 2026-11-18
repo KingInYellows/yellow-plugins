@@ -142,7 +142,7 @@
               "count": 1,
               "match": ["^#+\\s.*Acceptance Criteria", "%b", "escape"],
               "not": [
-                "^[ \\t]*```(?:bash|sh|shell|zsh)\\b[^\\n]*\\n(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?[^\\n]*printf\\s+(['\\\"])(?:(?!\\1)(?!%s)[^\\n])*%b(?:(?!\\1)(?!%s)[^\\n])*\\1[^\\n;|&]*\\$\\{?(?:1|\\*|@|msg|message|text|line|err\\w*|output)\\b)(?:(?![ \\t]*```)(?![^\\n]*(?:wrong|\\bbad\\b|unsafe|vulnerab|don'?t|do not|must not|omit|fires|anti-?pattern|reinterpret|incorrect))[^\\n]*\\n)*?[ \\t]*```"
+                "^[ \\t]*```(?:bash|sh|shell|zsh)\\b[^\\n]*\\n(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?[^\\n]*printf\\s+(['\\\"])(?:(?!\\1)(?!%s)[^\\n])*%b(?:(?!\\1)(?!%s)[^\\n])*\\1[^\\n;|&]*\\$\\{?(?:\\*|@|(?:1|msg|message|text|line|err\\w*|output)\\b))(?:(?![ \\t]*```)(?![^\\n]*(?:wrong|\\bbad\\b|unsafe|vulnerab|don'?t|do not|must not|omit|fires|anti-?pattern|reinterpret|incorrect))[^\\n]*\\n)*?[ \\t]*```"
               ]
             }
           ]
