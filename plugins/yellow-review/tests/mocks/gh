@@ -32,6 +32,8 @@
 #                                        ref gets an all-low policy),
 #                                        MOCK_GH_MR_POLICY_FAIL=404|1
 #   */pulls/<n>/files                    MOCK_GH_MR_FILES replaces the fixture
+#   */issues/<n>/events                  MOCK_GH_MR_EVENTS (default []),
+#                                        MOCK_GH_MR_EVENTS_FAIL=1
 #   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES;
 #                                        MOCK_GH_PROTECTION_MAIN and
 #                                        MOCK_GH_RULES_MAIN override them for
@@ -153,6 +155,15 @@ case "$ALL_ARGS" in
     fi
     _mra_default='{"data":{"repository":null}}'
     printf '%s\n' "${MOCK_GH_MRA_BODY:-$_mra_default}"
+    exit 0
+    ;;
+  *"/issues/"*"/events"*)
+    # check-merge-ready's REST issue events (label additions).
+    if [ "${MOCK_GH_MR_EVENTS_FAIL:-0}" = 1 ]; then
+      printf 'gh: Server Error (HTTP 500)\n' >&2
+      exit 1
+    fi
+    printf '%s\n' "${MOCK_GH_MR_EVENTS:-[]}"
     exit 0
     ;;
   *"/contents/.github/review-risk.json"*)

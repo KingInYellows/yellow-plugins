@@ -263,17 +263,17 @@ first (it unstacks the pull requests on GitHub and keeps the branches), then
 
 ### yellow-plugins
 
-| Item                          | Where                                                                                                                                                                                 | Action                                                                                   |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Graphite provider plugin      | `plugins/gt-workflow/`                                                                                                                                                                | Keep through the transition. Decide after cutover whether to keep it for other users.    |
-| Convention file               | `.graphite.yml`                                                                                                                                                                       | Read only by gt-workflow. Remove with the plugin, not before.                            |
-| Merge-readiness label         | `graphite-queue` in `plugins/yellow-review/skills/pr-review-workflow/scripts/check-merge-ready`, `commands/review/merge-ready.md`, its README, CLAUDE.md and bats test                | Needs a provider-neutral replacement before the label stops meaning anything. Follow-up. |
-| Review workflow bot allowance | `.github/workflows/claude-code-review.yml` (`allowed_bots: 'cursor,graphite-app'`)                                                                                                    | Drop `graphite-app` after the app is removed.                                            |
-| Merge-queue draft handling    | comment in `.github/workflows/review-gate.yml`; draft pull request #1816 skips `gtmq_*` branches                                                                                      | Harmless. Remove once no `gtmq_*` branch can appear.                                     |
-| Contributor docs              | `CONTRIBUTING.md` (queue note, `gt submit` example), `README.md` ("Graphite's merge queue" and semgrep's Graphite CLI note), `plugins/yellow-linear/README.md` "Graphite Merge Queue" | Reword at cutover.                                                                       |
-| Setup dashboard               | `plugins/yellow-core/commands/setup/all.md` Graphite rows                                                                                                                             | Keep while gt-workflow ships.                                                            |
-| Codex smoke test              | `scripts/smoke-codex-graphite-auth.js`                                                                                                                                                | Keep while gt-workflow is Codex-enabled.                                                 |
-| Other plugins                 | yellow-review, yellow-debt, yellow-devin, yellow-semgrep, yellow-linear                                                                                                               | Already provider-neutral through the router; they mention Graphite only as one branch.   |
+| Item                          | Where                                                                                                                                                                                 | Action                                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Graphite provider plugin      | `plugins/gt-workflow/`                                                                                                                                                                | Keep through the transition. Decide after cutover whether to keep it for other users.  |
+| Convention file               | `.graphite.yml`                                                                                                                                                                       | Read only by gt-workflow. Remove with the plugin, not before.                          |
+| Merge-readiness label         | `graphite-queue` in `plugins/yellow-review/skills/pr-review-workflow/scripts/check-merge-ready`, `commands/review/merge-ready.md`, its README, CLAUDE.md and bats test                | Done (CLAUDE-345): replaced by the hand-added `merge-approved` label.                  |
+| Review workflow bot allowance | `.github/workflows/claude-code-review.yml` (`allowed_bots: 'cursor,graphite-app'`)                                                                                                    | Drop `graphite-app` after the app is removed.                                          |
+| Merge-queue draft handling    | comment in `.github/workflows/review-gate.yml`; draft pull request #1816 skips `gtmq_*` branches                                                                                      | Harmless. Remove once no `gtmq_*` branch can appear.                                   |
+| Contributor docs              | `CONTRIBUTING.md` (queue note, `gt submit` example), `README.md` ("Graphite's merge queue" and semgrep's Graphite CLI note), `plugins/yellow-linear/README.md` "Graphite Merge Queue" | Done (CLAUDE-345).                                                                     |
+| Setup dashboard               | `plugins/yellow-core/commands/setup/all.md` Graphite rows                                                                                                                             | Keep while gt-workflow ships.                                                          |
+| Codex smoke test              | `scripts/smoke-codex-graphite-auth.js`                                                                                                                                                | Keep while gt-workflow is Codex-enabled.                                               |
+| Other plugins                 | yellow-review, yellow-debt, yellow-devin, yellow-semgrep, yellow-linear                                                                                                               | Already provider-neutral through the router; they mention Graphite only as one branch. |
 
 Outside the tree, for this repository:
 
@@ -319,7 +319,8 @@ Expiry of a plan is not the same as non-renewal being configured.
       `READY_GITHUB`.
 - [ ] No open Graphite stacks in any repository in the inventory, and nothing in
       a Graphite merge queue.
-- [ ] `graphite-queue` label logic in yellow-review replaced or retired.
+- [x] `graphite-queue` label logic in yellow-review replaced or retired
+      (CLAUDE-345: `merge-approved`).
 - [ ] Cloud environments no longer need `gt` or a Graphite token.
 - [ ] Owner steps, in this order and only after everything above: remove
       Graphite's bypass allowance on `main`, uninstall the Graphite GitHub App,

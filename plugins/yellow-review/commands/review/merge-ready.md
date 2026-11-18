@@ -1,7 +1,7 @@
 ---
 name: review:merge-ready
 # prettier-ignore
-description: 'Read-only merge gate for one PR: unresolved review threads (outdated included), CHANGES_REQUESTED reviewers, conversation-resolution enforcement, CI, pending P0-P2 ledger findings and the risk-tier human approval. Use before adding graphite-queue or merging; it never writes to GitHub and adds no ledger records.'
+description: 'Read-only merge gate for one PR: unresolved review threads (outdated included), CHANGES_REQUESTED reviewers, conversation-resolution enforcement, CI, pending P0-P2 ledger findings and the risk-tier human approval. Use before merging; it never writes to GitHub and adds no ledger records.'
 argument-hint: '[PR# | URL | branch]'
 allowed-tools:
   - Bash
@@ -10,9 +10,9 @@ allowed-tools:
 # Check Whether a PR Is Merge-Ready
 
 This command reads and reports; it never comments, resolves, labels, pushes or
-merges. Its verdict is the check behind "add `graphite-queue` once CI is green
-and the review policy is met": a PR is `ready` only when nothing blocks and
-nothing went unread.
+merges. Its verdict is the check behind "merge once CI is green and the review
+policy is met": a PR is `ready` only when nothing blocks and nothing went
+unread.
 
 ## Step 1: Resolve the PR
 
@@ -70,10 +70,9 @@ Print one row per check, then the contract line. Mark each row `ok`, `blocks` or
   Resolution:  conversation resolution <enforced | not enforced | unknown>
   CI:          <ci.state>; failing: <names>; pending: <names>
   Ledger:      <mergeBlocking> pending P0-P2 findings[; <skipped> unreadable records] | none | other repo | unavailable
-  Queue:       graphite-queue <present | absent>
   Approval:    <tier> tier (<mode>); needs <required> human; approved by <login> via <review | label> on head | missing: <tokens>
 
-MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens or none> queued=<true|false|unknown>
+MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens or none>
 ```
 
 - Say `(list truncated)` after the CI names when `ci.truncated` is true; the
@@ -94,30 +93,35 @@ MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens
   reads `off`, no lookups), `advisory` (default: list `missing`, the verdict
   ignores it) or `enforce` (`approval_required`, `approval_stale` and
   `cross_lineage_missing` block; `tier_unknown`, `reviews_unknown`,
-  `head_time_unknown` and `fresh_review_unknown` make the verdict `unknown`).
-  Low needs no human; medium and high need approval of the head SHA by a login
-  in `review_approval_humans` (default: the repository owner): an approving
-  review on that commit, or that login adding the `graphite-queue` label after
-  the head arrived (GitHub will not let the owner approve their own PR, so the
-  owner approves by queueing). `humanApproval.via` says which. A bot's or
-  unlisted account's approval or label never counts (`approval_required`); a
-  listed human's from before the head is `approval_stale`; a label whose timing
-  cannot be checked is `head_time_unknown`. High also needs a review on the head
-  by an account GitHub reports as a `Bot` whose login is in
-  `review_cross_lineage_bots`; `freshReview` is always unknown until the ledger
-  records the head of each review run, so under `enforce` a high PR with no
-  other blocker is `unknown` until then (Phase 3), and the default `advisory`
-  only lists it.
+  `head_time_unknown`, `label_events_unknown` and `fresh_review_unknown` make
+  the verdict `unknown`). Low needs no human; medium and high need approval of
+  the head SHA by a login in `review_approval_humans` (default: the repository
+  owner): an approving review on that commit, or that login adding the
+  `merge-approved` label by hand after the head arrived (GitHub will not let the
+  owner approve their own PR, so the owner approves with the label).
+  `humanApproval.via` says which. Only the latest addition of the label counts,
+  and one made through a GitHub App (an agent's GitHub tools acting as the
+  owner) never does; a personal token used as the owner looks like a hand-added
+  label. A bot's or unlisted account's approval or label never counts
+  (`approval_required`); a listed human's from before the head is
+  `approval_stale`; a label whose timing cannot be checked is
+  `head_time_unknown`, and unreadable label events are `label_events_unknown`.
+  High also needs a review on the head by an account GitHub reports as a `Bot`
+  whose login is in `review_cross_lineage_bots`; `freshReview` is always unknown
+  until the ledger records the head of each review run, so under `enforce` a
+  high PR with no other blocker is `unknown` until then (Phase 3), and the
+  default `advisory` only lists it.
 - For `blocked`, end with the next step for each blocker: `/review:resolve` for
   threads, the reviewer for changes requested, the failing check names for CI, a
-  rebase for conflicts, the user adding `graphite-queue` again (or approving the
-  head commit) for `approval_required` or `approval_stale`, a review of the head
-  by a `review_cross_lineage_bots` account (Codex by default) for
+  rebase for conflicts, the user adding `merge-approved` by hand for
+  `approval_required` or `approval_stale` (when the label is already on the PR,
+  stale or added through an app, removing it and adding it again), a review of
+  the head by a `review_cross_lineage_bots` account (Codex by default) for
   `cross_lineage_missing`.
 - For `unknown`, say what could not be read and suggest re-running; an unknown
   is never reported as ready. `merge_state` means GitHub reports the merge as
   `BLOCKED` for a reason none of the rows show, often a required check that
   never ran on the head (point at the branch protection's required checks), or
   `BEHIND`, a base branch that must be merged in first (suggest a restack).
-- For `ready` with `queued=false`, say the PR meets the queue rule. Do not add
-  the label: this command is read-only.
+- For `ready`, say the PR meets the merge rule. Never add `merge-approved`: this
+  command is read-only, and only the user adds that label.

@@ -147,10 +147,11 @@ automatically.
 To re-authenticate or revoke access: run `/mcp` in Claude Code, select the
 server, and choose "Clear authentication".
 
-With Graphite's merge queue, Linear moves an issue to Done only through
-commit magic words, which needs a one-time GitHub push webhook from Linear's
-GitHub integration. The plugin never sees that webhook's secret; the setup
-steps are in `plugins/yellow-linear/README.md` "Graphite Merge Queue".
+When a merge queue lands a PR by closing it (Graphite's queue does), Linear
+moves an issue to Done only through commit magic words, which needs a one-time
+GitHub push webhook from Linear's GitHub integration. The plugin never sees
+that webhook's secret; the setup steps are in `plugins/yellow-linear/README.md`
+"Graphite Merge Queue".
 
 These plugins require browser access and **will not work in headless SSH
 sessions**.
@@ -208,8 +209,8 @@ API token:
 export SEMGREP_APP_TOKEN="sgp_your_token_here"
 ```
 
-The plugin also expects the `semgrep` CLI, `curl`, `jq`, and Graphite CLI
-(`gt`). Run `/semgrep:setup` to validate credentials, detect your deployment
+The plugin also expects the `semgrep` CLI, `curl`, `jq`, and the enabled
+stacked-PR provider's CLI (`gh` with `gh-stack`, or Graphite's `gt`). Run `/semgrep:setup` to validate credentials, detect your deployment
 slug, and verify MCP tools.
 
 ### Jev shadow pre-filter (yellow-core, optional)

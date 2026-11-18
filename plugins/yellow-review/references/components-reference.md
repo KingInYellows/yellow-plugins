@@ -85,10 +85,10 @@ flags, exit codes, trust-boundary rules and library behavior.
   `check-merge-ready`: unresolved threads (outdated included),
   `CHANGES_REQUESTED` reviewers, a missing required review, CI rollup, draft,
   conflicts and pending P0-P2 ledger findings block; conversation-resolution
-  enforcement and the `graphite-queue` label are reported. Ends with a
-  `MergeReady:` contract line; an unread source is `unknown`, never `ready`.
-  Writes nothing to GitHub and adds no ledger records; the ledger is read only
-  from a checkout of the same repository whose PR has ledger files
+  enforcement is reported. Ends with a `MergeReady:` contract line; an unread
+  source is `unknown`, never `ready`. Writes nothing to GitHub and adds no
+  ledger records; the ledger is read only from a checkout of the same repository
+  whose PR has ledger files
 
 ### Agents (18)
 
@@ -198,12 +198,13 @@ flags, exit codes, trust-boundary rules and library behavior.
   into `classify-risk --policy-file <tmp> --stdin --numstat` (so the size rule
   applies), and reports an `approval` object: tier, required humans (0 or 1;
   null when the tier is unknown), a listed human's approval of the head SHA (an
-  approving review on it, or adding `graphite-queue` after the head arrived: the
-  latest of its committer date, its first check suite on the PR's head branch
-  and any force push to it; no such suite means `head_time_unknown`; a head that
-  moved by the final re-read leaves the approval unknown), the high-tier
-  cross-lineage review on the head, and `missing` tokens, which block only under
-  `enforce`
+  approving review on it, or adding the `merge-approved` label by hand, not
+  through a GitHub App, as the latest addition of that label, after the head
+  arrived: the latest of its committer date, its first check suite on the PR's
+  head branch and any force push to it; no such suite means `head_time_unknown`;
+  a head that moved by the final re-read leaves the approval unknown), the
+  high-tier cross-lineage review on the head, and `missing` tokens, which block
+  only under `enforce`
 - `pr-base-remote <pr-url>` — prints the configured remote whose fetch URL names
   the PR's base repository (`origin` tried first, host, owner and repo compared
   case-insensitively), else `https://<host>/<owner>/<repo>.git`. The risk-tier
@@ -796,9 +797,8 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   did not apply: after a sweep, or when the session-start notice reports pending
   findings. Distinct from `/review:resolve`, which only handles GitHub review
   threads and never reads the ledger.
-- **`/review:merge-ready`** — The last check before adding `graphite-queue` or
-  merging. Read-only and fast to re-run; it says what to run next for each
-  blocker.
+- **`/review:merge-ready`** — The last check before merging. Read-only and fast
+  to re-run; it says what to run next for each blocker.
 - **`/flow:review`** (yellow-core) — Session-level review against a plan file.
   Evaluates plan adherence, cross-PR coherence, and scope drift. Complementary
   to `/review:pr` (per-PR code quality) — use both for full coverage.
