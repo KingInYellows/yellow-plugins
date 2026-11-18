@@ -30,6 +30,8 @@ fi
 if [ "$1" = "remote" ] && [ "${2:-}" = "-v" ]; then
   # FAKE_GIT_REMOTE_URLS: "name=url" pairs separated by spaces.
   [ -n "${FAKE_GIT_REMOTE_LIST_EXIT:-}" ] && exit "$FAKE_GIT_REMOTE_LIST_EXIT"
+  # FAKE_GIT_REMOTE_V: the whole `git remote -v` output, verbatim.
+  if [ -n "${FAKE_GIT_REMOTE_V:-}" ]; then printf '%b' "$FAKE_GIT_REMOTE_V"; exit 0; fi
   # FAKE_GIT_REMOTE_PUSH_URLS: "name=url" pairs overriding a push URL.
   for pair in ${FAKE_GIT_REMOTE_URLS:-}; do
     name="${pair%%=*}"

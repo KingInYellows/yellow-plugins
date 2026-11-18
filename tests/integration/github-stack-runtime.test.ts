@@ -57,6 +57,7 @@ const ENV_KEYS = [
   'FAKE_GIT_REMOTE_LIST_EXIT',
   'FAKE_SSH_HOSTNAMES',
   'FAKE_GIT_REMOTE_PUSH_URLS',
+  'FAKE_GIT_REMOTE_V',
   'FAKE_GIT_REVPARSE_EXIT',
   'FAKE_GH_REPORT_NO_ATOMIC',
   'GH_STACK_NO_ATOMIC',
@@ -499,6 +500,11 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     process.env.FAKE_GIT_REMOTE_PUSH_URLS = 'upstream=https://github.com/other/r.git';
     expect(merge({ target: '42' }).repository).toBe('other/r');
     expect(merge({ target: 'https://github.com/o/r/pull/42', confirm: true }).status).toBe('INVALID_ARGS');
+    // With several push URLs, gh uses the last one.
+    process.env.FAKE_GIT_REMOTE_V =
+      'upstream\t/srv/mirror/r.git (fetch)\nupstream\thttps://github.com/first/r.git (push)\nupstream\thttps://github.com/last/r.git (push)\n';
+    expect(merge({ target: '42' }).repository).toBe('last/r');
+    delete process.env.FAKE_GIT_REMOTE_V;
     // A fetch URL that names a repository wins over the push URL.
     process.env.FAKE_GIT_REMOTE_PUSH_URLS = 'origin=https://github.com/other/r.git';
     process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git';

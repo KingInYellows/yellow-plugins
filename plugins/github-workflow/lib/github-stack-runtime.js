@@ -436,7 +436,8 @@ function stackRepository() {
     if (!match) continue;
     if (!urls.has(match[1])) urls.set(match[1], {});
     const entry = urls.get(match[1]);
-    if (entry[match[3]] === undefined) entry[match[3]] = match[2];
+    // First fetch URL, last push URL: go-gh overwrites the push URL per row.
+    if (match[3] === 'push' || entry.fetch === undefined) entry[match[3]] = match[2];
   }
   const remotes = new Map();
   for (const [name, entry] of urls) {
