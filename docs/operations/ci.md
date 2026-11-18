@@ -69,7 +69,7 @@ job-level `if:`). On a fork pull request every job here is skipped, and
 - `security-audit`
 - `build`
 - `plugin-shell-tests` (needs `validate-schemas`; required by `ci-status`)
-- `yellow-review-shell-tests` (needs `validate-schemas`; required by `ci-status`; installs `universal-ctags`)
+- `yellow-review-shell-tests` (needs `validate-schemas`; required by `ci-status`; installs `universal-ctags`; a four-shard matrix, and `ci-status` sees one combined result)
 - `shell-compat-tests` (needs `validate-schemas`; required by `ci-status`)
 - `goal-engine-compat` (needs `build`; required by `ci-status`)
 - `codex-install-verification` (advisory; not in `ci-status` `needs`)

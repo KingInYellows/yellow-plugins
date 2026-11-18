@@ -363,7 +363,8 @@ Blocking jobs are exactly the `needs:` list of the `ci-status` aggregator in
 `plugin-shell-tests`, only the yellow-core, yellow-council, and yellow-codex
 bats suites are required; other plugins' suites run `continue-on-error`.
 The yellow-review suite is its own required job, `yellow-review-shell-tests`,
-which installs `universal-ctags`. The yellow-debt suite is also required, as
+which installs `universal-ctags` and runs as four parallel matrix shards
+(`YR_SHARD_GROUPS` names the dedicated files; the last shard runs the rest). The yellow-debt suite is also required, as
 a step in `shell-compat-tests` (it needs kislyuk `yq`); the advisory loop
 skips yellow-review, yellow-debt, and the suites already run as required steps.
 `report-metrics` (not in `ci-status`, never blocks merge) is meant to check the
