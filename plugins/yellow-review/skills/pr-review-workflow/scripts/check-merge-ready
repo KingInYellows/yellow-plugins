@@ -63,8 +63,10 @@
 # the label; humanApproval.via is review or label). Only the latest addition
 # of the label counts, and only when the issue events API reports a listed
 # User as its actor with performed_via_github_app null: an addition made
-# through a GitHub App, such as an agent's tools acting as the owner, never
-# approves. An approval or label from before the head only is
+# through a GitHub App (an agent's GitHub tools acting as the owner) never
+# approves. A personal token used as the owner, gh included, carries no app
+# and is indistinguishable from the owner, so agents must never hold one for
+# this label. An approval or label from before the head only is
 # approval_stale; a label with no readable head time is head_time_unknown;
 # label events that could not be read are label_events_unknown.
 # high needs the same plus a review on the head SHA
@@ -240,7 +242,7 @@ BLOCKERS_RC=0
     >"$WORK/blockers" 2>"$WORK/blockers.err" &
 BLOCKERS_PID=$!
 
-# --- PR state, labels and the head commit's checks (GraphQL) ---
+# --- PR state and the head commit's checks (GraphQL) ---
 # shellcheck disable=SC2016
 QUERY='
 query MergeReadyState($owner: String!, $name: String!, $number: Int!) {
@@ -251,7 +253,6 @@ query MergeReadyState($owner: String!, $name: String!, $number: Int!) {
       mergeable
       mergeStateStatus
       headRefOid
-      labels(first: 100) { nodes { name } }
       commits(last: 1) {
         nodes {
           commit {

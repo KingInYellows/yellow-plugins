@@ -792,3 +792,12 @@ $MOCK_GH_MR_EVENTS"
   [ "$status" -eq 0 ]
   [ "$(jq -r .approval.humanApproval.via <<<"$output")" = review ]
 }
+
+@test "CLAUDE-345: a labeled event without a readable time leaves the label events unknown" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  MOCK_GH_MR_EVENTS=$(jq -c 'map(del(.created_at))' <<<"$MOCK_GH_MR_EVENTS")
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["label_events_unknown"]' ]
+}
