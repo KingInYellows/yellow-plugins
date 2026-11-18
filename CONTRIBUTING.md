@@ -332,7 +332,7 @@ counts as one, so every `pull_request` run on the PR — including the required
 `CI Status Summary` — waits at "action_required" until a maintainer clicks
 **Approve and run workflows** (or runs
 `gh api -X POST repos/<owner>/<repo>/actions/runs/<id>/approve`). The PR stays
-blocked, and the Graphite merge queue cannot land it, until then.
+blocked, and cannot be merged, until then.
 
 To remove that step, add a `RELEASE_PR_TOKEN` repo secret: a fine-grained PAT
 owned by a **member of the KingInYellows organization with write access to this
@@ -564,7 +564,8 @@ The `knowledge-compounder` agent reads your PR body and commit subjects
 (via `gh pr view`), drafts both the solution doc and the one-line MEMORY.md
 index entry, runs Related Docs Finder against the existing corpus to detect
 updates to existing topics, and gates on AskUserQuestion before writing.
-Amend the resulting files into the same PR with `gt amend`.
+Commit the resulting files to the same PR through the enabled stacked-PR
+provider.
 
 ### When a doc is required
 

@@ -12,7 +12,7 @@ SRC="${PLUGIN_DIR}/skills/pr-review-workflow/scripts/check-merge-ready"
 setup() {
   export PATH="${BATS_TEST_DIRNAME}/mocks:${PATH}"
   unset MOCK_GH_MR_BODY MOCK_GH_MR_FAIL MOCK_GH_MRA_BODY MOCK_GH_MRA_FAIL \
-    MOCK_GH_MR_POLICY MOCK_GH_MR_POLICY_FAIL MOCK_GH_MR_FILES
+    MOCK_GH_MR_POLICY MOCK_GH_MR_POLICY_FAIL MOCK_GH_MR_FILES MOCK_GH_MR_EVENTS_FAIL
   ROOT="${BATS_TEST_TMPDIR}/plugin"
   mkdir -p "$ROOT/skills/pr-review-workflow/scripts" "$ROOT/lib"
   cp "$SRC" "$ROOT/skills/pr-review-workflow/scripts/check-merge-ready"
@@ -38,7 +38,7 @@ printf '%s\n' "${MR_LEDGER:-{\}}"
 STUB
   chmod +x "$ROOT"/skills/pr-review-workflow/scripts/* "$ROOT/lib/review-ledger.sh"
   unset MR_THREADS MR_THREADS_RC MR_BLOCKERS MR_LEDGER MR_LEDGER_FAIL
-  export MOCK_GH_MR_BODY MOCK_GH_MRA_BODY MOCK_GH_MR_FILES MOCK_GH_MR_POLICY MOCK_GH_MR_DEFAULT_OID
+  export MOCK_GH_MR_BODY MOCK_GH_MRA_BODY MOCK_GH_MR_FILES MOCK_GH_MR_POLICY MOCK_GH_MR_DEFAULT_OID MOCK_GH_MR_EVENTS
   MOCK_GH_MR_BODY=$(state_body)
   # Approval evidence: a docs-only PR (low) with no reviews, and the risk
   # policy served only for the default branch's tip.
@@ -65,11 +65,14 @@ rv() {
 }
 
 # with_files <path>...: the PR's file list (ADDED lines each, default 1), and an approval response whose
-# changedFiles matches it (reviews from REVIEWS, default none).
+# changedFiles matches it (reviews from REVIEWS, default none). LABELS entries
+# with an event field are REST label events; the rest (force pushes) go to
+# the GraphQL timeline.
 with_files() {
   MOCK_GH_MR_FILES=$(printf '%s\n' "$@" | jq -R . \
     | jq -sc --argjson a "${ADDED:-1}" 'map({filename: ., additions: $a, deletions: 0})')
-  MOCK_GH_MRA_BODY=$(approval_body "${REVIEWS:-[]}" "$#")
+  MOCK_GH_MR_EVENTS=$(jq -c 'map(select(has("event")))' <<<"${LABELS:-[]}")
+  MOCK_GH_MRA_BODY=$(LABELS=$(jq -c 'map(select(has("event") | not))' <<<"${LABELS:-[]}") approval_body "${REVIEWS:-[]}" "$#")
 }
 
 # approval_body <reviews-json> <changedFiles> [head]: the head commit was
@@ -83,14 +86,16 @@ approval_body() {
       pullRequest:{headRefOid:$h, changedFiles:$n, reviews:{pageInfo:{hasPreviousPage:false}, nodes:$r},
         headRefName:"feature",
         commits:{nodes:[{commit:{oid:$h, committedDate:$ca, checkSuites:{nodes:[{createdAt:$sa, branch:{name:"feature"}}]}}}]},
-        labels:{nodes:[{name:"graphite-queue"}]},
+        labels:{nodes:[{name:"merge-approved"}]},
         timelineItems:{pageInfo:{hasPreviousPage:false}, nodes:$l}}}}}'
 }
 
-# lb <login> <User|Bot> <createdAt> [label]: one LabeledEvent node.
+# lb <login> <User|Bot> <createdAt> [label] [app-slug]: one REST labeled
+# event; an app slug sets performed_via_github_app.
 lb() {
-  jq -nc --arg l "$1" --arg t "$2" --arg c "$3" --arg n "${4:-graphite-queue}" \
-    '{createdAt:$c, label:{name:$n}, actor:{__typename:$t, login:$l}}'
+  jq -nc --arg l "$1" --arg t "$2" --arg c "$3" --arg n "${4:-merge-approved}" --arg app "${5:-}" \
+    '{event:"labeled", created_at:$c, label:{name:$n}, actor:{type:$t, login:$l},
+      performed_via_github_app:(if $app == "" then null else {slug:$app} end)}'
 }
 
 # config <frontmatter lines>: an untracked yellow-plugins.local.md.
@@ -247,11 +252,11 @@ state_body() {
   [ "$(jq -c .unknowns <<<"$output")" = '["merge_state"]' ]
 }
 
-@test "the graphite-queue label is reported as queued" {
+@test "CLAUDE-345: the report no longer carries a graphite-queue field" {
   MOCK_GH_MR_BODY=$(state_body 'labels={"nodes":[{"name":"bug"},{"name":"graphite-queue"}]}')
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 0 ]
-  [ "$(jq -r .queued <<<"$output")" = true ]
+  [ "$(jq -r 'has("queued")' <<<"$output")" = false ]
 }
 
 @test "a failed state lookup leaves PR state and CI unknown" {
@@ -403,7 +408,7 @@ state_body() {
   [ "$(jq -r .approval.humanApproval.login <<<"$output")" = alice ]
 }
 
-@test "CLAUDE-234: the owner adding graphite-queue after the head arrived approves" {
+@test "CLAUDE-345: the owner adding merge-approved by hand after the head arrived approves" {
   config 'review_approval_gate: enforce'
   LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
   run --separate-stderr "$SCRIPT" test/repo 7
@@ -449,7 +454,7 @@ state_body() {
 
 @test "CLAUDE-234: other labels, bots and unlisted accounts never approve by label" {
   config 'review_approval_gate: enforce'
-  LABELS="[$(lb Test User 2026-11-02T10:05:00Z other),$(lb Test Bot 2026-11-02T10:05:00Z),$(lb 'test[bot]' User 2026-11-02T10:05:00Z),$(lb mallory User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z other),$(lb Test User 2026-11-02T10:05:00Z graphite-queue),$(lb Test Bot 2026-11-02T10:05:00Z),$(lb 'test[bot]' User 2026-11-02T10:05:00Z),$(lb mallory User 2026-11-02T10:05:00Z)]" with_files src/a.js
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 1 ]
   [ "$(jq -c .blockers <<<"$output")" = '["approval_required"]' ]
@@ -739,4 +744,51 @@ state_body() {
   [ "$(jq -r .approval.mode <<<"$output")" = advisory ]
   [[ "$stderr" == *"review_approval_gate is invalid"* ]]
   [[ "$stderr" == *"review_approval_humans has an invalid login"* ]]
+}
+
+@test "CLAUDE-345: a merge-approved label added through a GitHub App never approves" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z merge-approved claude)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_required"]' ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+}
+
+@test "CLAUDE-345: an app re-adding the label after the owner's hand-added one revokes it" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z),$(lb Test User 2026-11-02T10:20:00Z merge-approved claude)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+}
+
+@test "CLAUDE-345: label events spread over several pages are all read" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  MOCK_GH_MR_EVENTS="[{\"event\":\"subscribed\",\"created_at\":\"2026-11-02T09:00:00Z\"}]
+$MOCK_GH_MR_EVENTS"
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.humanApproval.via <<<"$output")" = label ]
+}
+
+@test "CLAUDE-345: unreadable label events are unknown, not a missing approval" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  MOCK_GH_MR_EVENTS_FAIL=1 run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["label_events_unknown"]' ]
+  [ "$(jq -c .unknowns <<<"$output")" = '["approval"]' ]
+  MOCK_GH_MR_EVENTS='{"message":"oops"}' run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["label_events_unknown"]' ]
+}
+
+@test "CLAUDE-345: a review approval on the head needs no label events" {
+  config 'review_approval_gate: enforce'
+  REVIEWS="[$(rv APPROVED Test User "$HEAD_SHA")]" with_files src/a.js
+  MOCK_GH_MR_EVENTS_FAIL=1 run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.humanApproval.via <<<"$output")" = review ]
 }

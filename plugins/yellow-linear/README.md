@@ -70,11 +70,13 @@ and save only the redacted copy, fenced as reference-only.
 
 ## Graphite Merge Queue
 
-With Graphite's merge queue (Parallel CI), a landed PR shows as `CLOSED`, not
-`MERGED`, on GitHub, so Linear's "PR merged" automation never moves the issue to
-Done. The squash commit still lands on the default branch with the PR number
-appended, and its message is the PR title plus description. Two things make
-Linear follow it:
+This applies to PRs landed through Graphite's merge queue: stacks still on
+Graphite, and older PRs. A PR merged directly or through the GitHub-native stack
+merge shows as `MERGED`, and Linear's own automation handles it. With Graphite's
+merge queue (Parallel CI), a landed PR shows as `CLOSED`, not `MERGED`, on
+GitHub, so Linear's "PR merged" automation never moves the issue to Done. The
+squash commit still lands on the default branch with the PR number appended, and
+its message is the PR title plus description. Two things make Linear follow it:
 
 1. **Closing words in the commit body.** `smart-submit` and `/flow:work` end the
    commit body with `Part of <ISSUE-ID>`, or `Closes <ISSUE-ID>` on the commit
