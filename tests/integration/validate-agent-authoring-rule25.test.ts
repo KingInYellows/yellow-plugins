@@ -569,4 +569,49 @@ describe('validate-agent-authoring RULE 25 (disable-model-invocation)', () => {
     expect(status).toBe(0);
     expect(stdout).not.toContain('RULE 25');
   });
+
+  it.each([
+    [
+      'a user-triggered dispatch',
+      'When the user asks, invoke `/alpha:run` via the Skill tool.',
+    ],
+    [
+      'a dispatch after an earlier mention',
+      'This workflow uses /alpha:run.\n\nInvoke `/alpha:run` via the Skill tool.',
+    ],
+  ])('fails on %s', (_label, body) => {
+    writeAgent(
+      dir,
+      'alpha/commands/alpha/run.md',
+      command('alpha:run', DISABLED)
+    );
+    notice(dir, 'alpha', '/alpha:run');
+    writeAgent(
+      dir,
+      'beta/commands/beta/chain.md',
+      command('beta:chain', '', body)
+    );
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 25 — tells the model to run "alpha:run"');
+  });
+
+  it('accepts a Skill-tool line that tells the user to type the command', () => {
+    writeAgent(
+      dir,
+      'alpha/commands/alpha/run.md',
+      command('alpha:run', DISABLED)
+    );
+    notice(dir, 'alpha', '/alpha:run');
+    writeAgent(
+      dir,
+      'beta/commands/beta/chain.md',
+      command(
+        'beta:chain',
+        '',
+        'The Skill tool refuses `/alpha:run`, so tell the user to type it.'
+      )
+    );
+    expect(runValidator(dir).status).toBe(0);
+  });
 });

@@ -1883,9 +1883,13 @@ function slashFormRe(id) {
   return new RegExp(`(?<![\\w./:-])/${escaped}(?![\\w:-])`);
 }
 
-// A line that speaks about the user ("tell the user to type /x") is a hint to
-// the user, not an instruction to the model.
+// A line that speaks about the user ("the user may need /x") is a hint to the
+// user, not an instruction to the model, so it gets no advisory. Only a line
+// that tells the user to type the entry point is exempt from the Skill-tool
+// error: "when the user asks, invoke /x via the Skill tool" still dispatches.
 const USER_CUE_RE = /\b(?:users?|type|types|typed|typing)\b/i;
+const TYPE_CUE_RE =
+  /\b(?:(?:tell|ask)s? the user to (?:type|run|enter)|(?:user|you) (?:must|should|can|needs? to) type|typed?-only)\b/i;
 
 function validateModelInvocationFlag(files, errors, warnings) {
   const { commandFiles, skillFiles, agentFiles, markdownFiles } = files;
@@ -2082,12 +2086,13 @@ function validateModelInvocationFlag(files, errors, warnings) {
     for (const [id, targetPath] of disabled) {
       const slash = slashFormRe(id);
       const ticked = `\`${id}\``;
+      let warned = false;
       for (const line of lines) {
-        if (USER_CUE_RE.test(line)) continue;
         const named = slash.test(line);
         if (
           SKILL_TOOL_MENTION_RE.test(line) &&
-          (named || line.includes(ticked))
+          (named || line.includes(ticked)) &&
+          !TYPE_CUE_RE.test(line)
         ) {
           errors.push(
             `${relative(filePath)}: RULE 25 — tells the model to run "${id}" ` +
@@ -2097,14 +2102,14 @@ function validateModelInvocationFlag(files, errors, warnings) {
           );
           break;
         }
-        if (named) {
+        if (named && !warned && !USER_CUE_RE.test(line)) {
+          warned = true;
           warnings.push(
             `[RULE 25 advisory] ${relative(filePath)}: names \`/${id}\`, which ` +
               `sets \`${MODEL_INVOCATION_KEY}: true\`, in a line that does not ` +
               `mention the user. If it tells the model to run it, say that the ` +
               `user must type it instead.`
           );
-          break;
         }
       }
     }
