@@ -1,5 +1,5 @@
 ---
-'yellow-review': minor
+'yellow-review': major
 'yellow-core': patch
 'yellow-linear': patch
 ---
