@@ -104,6 +104,9 @@
                 "^#+\\s.*Acceptance Criteria",
                 "\\\"?continue\\\"?\\s*:\\s*true",
                 "set -e|set -euo|set -uo|json_exit|-e\\b[^\\n]{0,60}exit"
+              ],
+              "not": [
+                "^[ \\t]*```(?:bash|sh|shell|zsh)\\b[^\\n]*\\n(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?[ \\t]*set[ \\t]+-[a-z]*e[a-z]*\\b)(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?[^\\n]*\\\"?continue\\\"?\\s*:\\s*true)(?:(?![ \\t]*```)(?![^\\n]*(?:wrong|\\bbad\\b|unsafe|vulnerab|inject|avoid|never|don'?t|do not|must not|omit|instead|fires|anti-?pattern|reinterpret|incorrect|\\bbug))[^\\n]*\\n)*?[ \\t]*```"
               ]
             }
           ]
@@ -137,7 +140,10 @@
               "glob": "plans/*.md",
               "changed": "added",
               "count": 1,
-              "match": ["^#+\\s.*Acceptance Criteria", "%b", "escape"]
+              "match": ["^#+\\s.*Acceptance Criteria", "%b", "escape"],
+              "not": [
+                "^[ \\t]*```(?:bash|sh|shell|zsh)\\b[^\\n]*\\n(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?[^\\n]*printf\\s+(['\\\"])(?:(?!\\1)(?!%s)[^\\n])*%b(?:(?!\\1)(?!%s)[^\\n])*\\1[^\\n;|&]*\\$\\{?(?:1|\\*|@|msg|message|text|line|err\\w*|output)\\b)(?:(?![ \\t]*```)(?![^\\n]*(?:wrong|\\bbad\\b|unsafe|vulnerab|inject|avoid|never|don'?t|do not|must not|omit|instead|fires|anti-?pattern|reinterpret|incorrect|\\bbug))[^\\n]*\\n)*?[ \\t]*```"
+              ]
             }
           ]
         },
@@ -235,6 +241,9 @@
               "match": [
                 "^#+\\s.*Acceptance Criteria",
                 "trap[^\\n]{0,160}(fire|exit|same (Bash )?call|consum|separate|own call)|(fire|exit|same (Bash )?call|consum|separate|own call)[^\\n]{0,160}trap"
+              ],
+              "not": [
+                "^[ \\t]*```(?:bash|sh|shell|zsh)\\b[^\\n]*\\n(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?[^\\n]*mktemp[ \\t]+-d[^\\n]*\\n(?:(?![ \\t]*```)[^\\n]*\\n)*?[ \\t]*trap\\b[^\\n]*\\bEXIT\\b)(?:(?![ \\t]*```)(?![^\\n]*(?:wrong|\\bbad\\b|unsafe|vulnerab|inject|avoid|never|don'?t|do not|must not|omit|instead|fires|anti-?pattern|reinterpret|incorrect|\\bbug))[^\\n]*\\n)*?[ \\t]*```"
               ]
             }
           ]
@@ -296,7 +305,13 @@
       "incident": "docs/solutions/code-quality/hook-set-e-and-json-exit-pattern.md",
       "text": "Add a SessionStart hook script to yellow-ci that checks the gh CLI is installed and signed in and reports the result.",
       "selfcheck": {
-        "doc": "docs/solutions/code-quality/hook-set-e-and-json-exit-pattern.md"
+        "doc": "docs/solutions/code-quality/hook-set-e-and-json-exit-pattern.md",
+        "lookalikes": [
+          {
+            "append": "\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nif ! gh auth status >/dev/null 2>&1; then\n  printf '{\"continue\": true, \"systemMessage\": \"gh is not signed in\"}\\n'\n  exit 0\nfi\nprintf '{\"continue\": true}\\n'\n```\n",
+            "why": "a hook that keeps set -e and prints continue JSON"
+          }
+        ]
       }
     },
     {
@@ -320,7 +335,13 @@
       "incident": "docs/solutions/security-issues/printf-percent-b-terminal-escape-injection.md",
       "text": "Add colored error, warning and success output helpers to the yellow-devin install script, used to print messages from the CLI's stderr.",
       "selfcheck": {
-        "doc": "docs/solutions/security-issues/printf-percent-b-terminal-escape-injection.md"
+        "doc": "docs/solutions/security-issues/printf-percent-b-terminal-escape-injection.md",
+        "lookalikes": [
+          {
+            "append": "\n```bash\nerror() {\n  printf '%bError: %b%b\\n' \"$RED\" \"$1\" \"$NC\" >&2\n}\n```\n",
+            "why": "a helper that passes the message through %b"
+          }
+        ]
       }
     },
     {
@@ -384,7 +405,13 @@
       "incident": "docs/solutions/code-quality/trap-cleanup-across-tool-call-boundaries.md",
       "text": "In the /debt:audit command, create a temp dir with mktemp -d and register its cleanup trap in one Bash call, then stage the report there with the Write tool in a later step.",
       "selfcheck": {
-        "doc": "docs/solutions/code-quality/trap-cleanup-across-tool-call-boundaries.md"
+        "doc": "docs/solutions/code-quality/trap-cleanup-across-tool-call-boundaries.md",
+        "lookalikes": [
+          {
+            "append": "\n```bash\nSTAGE_DIR=\"$(mktemp -d)\"\ntrap 'rm -rf -- \"$STAGE_DIR\"' EXIT\nprintf '%s\\n' \"$STAGE_DIR\"\n```\n",
+            "why": "an EXIT trap set in the mktemp call"
+          }
+        ]
       }
     }
   ]

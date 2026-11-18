@@ -1,6 +1,6 @@
 {
   "$comment": "CLAUDE-200 real-CLI confirmation run: same wrappers, with bin-real/ first on PATH, whose agy and opencode log each call to eval-cli.log and then exec the real CLI. Needs agy (signed in) and opencode (with the default openrouter/deepseek/deepseek-v4-pro model or COUNCIL_OPENCODE_MODEL set) on PATH. Spends the CLIs' own quota as well as Claude usage.",
-  "prompt_commit": "0b24dbc",
+  "prompt_commit": "0b24dbc9fb146448ae548e2973908230dc2cb85c",
   "configs": {
     "council": [
       {

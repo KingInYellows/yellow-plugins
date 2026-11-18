@@ -25,6 +25,14 @@ spec entry, model, effort). `run` skips a row only when its output has the same
 fingerprint, so a stopped run resumes and a changed spec reruns; `grade` treats
 an output with another fingerprint as missing.
 
+`prepare`, `run`, `grade` and `check` hold `<work-dir>/.eval.lock`, so a second
+process on the same work directory stops instead of racing on a row's output or
+tree. `prepare` removes the old `matrix.tsv` first and writes the new one last,
+so an interrupted `prepare` leaves no matrix and `run` and `grade` stop until it
+finishes. `prepare` also records a hash of the checkout files `run` reads live
+(agent files, overlays, plugin and fixture directories, `run-one.sh`); when the
+checkout changes between the two, `run` stops and asks for a fresh `prepare`.
+
 ## How it grades
 
 - **Replay.** A merged PR is checked out at its merge commit with defects
@@ -69,8 +77,11 @@ those `SKILL.md` bodies appended, which is what `skills:` frontmatter does.
 An agent with a `plugins` key is the exception: it runs its `file` as a slash
 command with those plugins loaded by `--plugin-dir`, no system prompt, and Write
 and Edit allowed only under the run's tree (`--permission-mode acceptEdits`).
-Unless `EVAL_ALLOW_BASH=1`, that run gets no Bash tool and its plugins' hooks
-are off, since the command text and hooks come from the checkout under test.
+Unless `EVAL_ALLOW_BASH=1`, every corpus row (an agent with `plugins` or
+`overlay`) gets no Bash tool (`--disallowedTools Bash`) and no hooks, since the
+agent, command and hook text come from the checkout under test: a PR that adds
+Bash to a corpus agent's `tools:` still gets none. Agents outside the corpus
+keep their tools.
 
 Runs set `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1`, since nobody watches
 the subagent progress lines. When settings block the requested model, Claude
@@ -124,14 +135,25 @@ agents:
   check either way), and `count: 0` then asserts a file was left alone;
 - a case's `incident` and `selfcheck` (both required by `check`):
   `{"fix": <sha>, "paths": [...]}`, `{"doc": <repo file>}` or
-  `{"protects": [...]}`.
+  `{"protects": [...]}`, plus:
+  - `reply` (required when the case's grader reads the reply): a recorded reply
+    that must pass the reply regexes, and `reply_fails`, replies that must fail
+    them;
+  - `lookalikes`: edits to the passing tree that only look like the fix
+    (`{"path", "old", "new"}` or `{"append"}`; `path` defaults to the selfcheck
+    plan), each of which must fail the file checks.
+
+`prompt_commit`, `tree` and `selfcheck.fix` must be 40-character commit ids;
+replay and scan `commit` values must be hex ids.
 
 `eval.py check <work-dir> <spec>...` spends nothing: it validates the specs,
 fetches missing commits by id, compiles every regex and runs each `selfcheck`
 through the real grader (the case must fail on the incident tree and pass with
 the fix's files, pass with the doc written as the run's only new plan, or pass
-untouched and fail once a protected file is edited or removed). Write and Edit,
-like Read, Grep and Glob, are approved only under the run's tree.
+untouched and fail once a protected file is edited or removed), proves the
+recorded `reply` against the reply regexes, and checks that every `lookalikes`
+edit fails. Write and Edit, like Read, Grep and Glob, are approved only under
+the run's tree.
 
 ## Results
 
