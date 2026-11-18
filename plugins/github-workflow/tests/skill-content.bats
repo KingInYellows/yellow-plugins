@@ -112,6 +112,6 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
   [ "$output" -eq 1 ]
   run grep -F 'repos/{owner}/{repo}/pulls' "$MERGE_SKILL"
   [ "$status" -eq 1 ]
-  run grep -F 'discard it and run Step 2 again' "$MERGE_SKILL"
+  run grep -F 'view --repository "<repository>"' "$MERGE_SKILL"
   [ "$status" -eq 0 ]
 }

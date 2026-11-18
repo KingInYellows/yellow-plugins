@@ -668,10 +668,19 @@ function confirmationRequiredResult(op, rawDetail) {
 // Operations
 // ---------------------------------------------------------------------------
 
-/** Read-only. Always `--json`, never bare `view`. */
-function view() {
-  const execResult = run('gh', ['stack', 'view', '--json']);
-  return shapeResult({ op: 'view', bin: 'gh', args: ['stack', 'view', '--json'], execResult, mayHaveMutated: false });
+/**
+ * Read-only. Always `--json`, never bare `view`. With `repository`, the
+ * child runs with `GH_REPO=github.com/<repository>`, so a merge preview
+ * reads the stack from the repository the confirmed merge is pinned to.
+ */
+function view({ repository } = {}) {
+  if (repository !== undefined && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+    return refusalResult('view', `repository must be OWNER/REPO, got "${repository}"`);
+  }
+  const args = ['stack', 'view', '--json'];
+  const execResult =
+    repository === undefined ? run('gh', args) : run('gh', args, { GH_REPO: `github.com/${repository.toLowerCase()}` });
+  return shapeResult({ op: 'view', bin: 'gh', args, execResult, mayHaveMutated: false });
 }
 
 /**

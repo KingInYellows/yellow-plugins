@@ -504,6 +504,15 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     expect(result.stderr).toContain('gh-repo: github.com/o/r');
   });
 
+  it('pins view to a named repository and refuses a malformed one', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GH_REPORT_GH_REPO = '1';
+    const pinned = view({ repository: 'O/R' });
+    expect(pinned.status).toBe('SUCCESS');
+    expect(pinned.stderr).toContain('gh-repo: github.com/o/r');
+    expect(view({ repository: 'github.com/o/r' }).status).toBe('INVALID_ARGS');
+  });
+
   it('reads a remote that fetches from a local mirror by its push URL, as gh does', () => {
     process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git upstream=/srv/mirror/r.git';
     process.env.FAKE_GIT_REMOTE_PUSH_URLS = 'upstream=https://github.com/other/r.git';

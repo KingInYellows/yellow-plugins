@@ -122,19 +122,24 @@ show it in the preview. On `INVALID_ARGS`, report `refusalReason` and stop:
 the repository is ambiguous, or a URL names another repository than the one
 the number would land in.
 
-Check that the set belongs to that repository and read each pull request's
-draft state there (`view` does not report it). `<repository>` must match
+Read the stack again from that repository. `<repository>` must match
 `^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" view --repository "<repository>"
+```
+
+If its status is not `SUCCESS`, or its set (each number with its branch)
+differs from the one above, stop: the preview came from another
+repository. Then read each pull request's draft state there (`view` does
+not report it):
 
 ```bash
 gh api --hostname github.com "repos/<repository>/pulls/<number>" --jq '[.draft, .head.ref] | @tsv'
 ```
 
-If a call fails, stop: the draft state is unknown. If a `head.ref` is not
-the branch `view` listed for that number, or a `pr.url` in `view`'s JSON is
-not `https://github.com/<repository>/pull/<number>`, the set came from
-another repository: discard it and run Step 2 again from `view`. A first
-column of `true` is a draft.
+If a call fails, or a `head.ref` is not the branch `view` listed, stop. A
+first column of `true` is a draft.
 
 GitHub evaluates required checks and approvals for every pull request in
 the set against the stack's base branch and refuses the whole merge if one
