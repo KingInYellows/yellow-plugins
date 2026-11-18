@@ -351,7 +351,15 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
 
   it('accepts ssh and credential-bearing remote URL forms for the same repository', () => {
     process.env.FAKE_GH_EXIT = '0';
-    for (const url of ['git@github.com:o/r.git', 'ssh://git@github.com/o/r', 'https://x-access-token:abc@github.com/o/r']) {
+    for (const url of [
+      'git@github.com:o/r.git',
+      'github.com:o/r',
+      'ssh://git@github.com/o/r',
+      'ssh://git@github.com:22/o/r.git',
+      'ssh://git@ssh.github.com:443/o/r.git',
+      'https://x-access-token:abc@github.com/o/r',
+      'https://github.com:443/O/r.git/',
+    ]) {
       process.env.FAKE_GIT_REMOTE_URLS = `origin=${url}`;
       expect(merge({ target: 'https://github.com/o/r/pull/42', confirm: true }).status).toBe('SUCCESS');
     }
@@ -445,6 +453,13 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     delete process.env.FAKE_GIT_REMOTE_LIST_EXIT;
     process.env.FAKE_GIT_GH_RESOLVED_EXIT = '3';
     expect(merge({ target: '42', confirm: true }).status).toBe('INVALID_ARGS');
+  });
+
+  it('does not read a look-alike host or a deeper path as a github.com repository', () => {
+    for (const url of ['https://github.com.evil.example/o/r', 'git@notgithub.com:o/r.git', 'https://github.com/o/r/extra', 'file:///github.com/o/r']) {
+      process.env.FAKE_GIT_REMOTE_URLS = `origin=${url}`;
+      expect(merge({ target: '42', confirm: true }).status).toBe('INVALID_ARGS');
+    }
   });
 
   it('refuses any target when no github.com remote can be read', () => {

@@ -318,9 +318,33 @@ function resolveRemote(explicitRemote) {
   };
 }
 
-/** `owner/repo` (lower-cased) of a github.com remote URL, or null. */
+/** Hosts that are github.com itself (go-gh treats ssh.github.com as github.com). */
+const GITHUB_HOSTS = Object.freeze(['github.com', 'www.github.com', 'ssh.github.com']);
+
+/**
+ * `owner/repo` (lower-cased) of a github.com remote URL, or null. Takes
+ * scheme URLs with any user or port (`https://x@github.com/o/r`,
+ * `ssh://git@github.com:22/o/r.git`) and scp-style `[user@]host:o/r`.
+ */
 function githubRepoOfUrl(url) {
-  const match = /^(?:https:\/\/(?:[^@/]*@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec(url);
+  let host;
+  let path;
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(url)) {
+    try {
+      const parsed = new URL(url);
+      host = parsed.hostname;
+      path = parsed.pathname;
+    } catch {
+      return null;
+    }
+  } else {
+    const scp = /^(?:[^@/:]+@)?([^/:]+):(.+)$/.exec(url);
+    if (!scp) return null;
+    host = scp[1];
+    path = scp[2];
+  }
+  if (!GITHUB_HOSTS.includes(host.toLowerCase())) return null;
+  const match = /^\/?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec(path);
   return match ? `${match[1]}/${match[2]}`.toLowerCase() : null;
 }
 
