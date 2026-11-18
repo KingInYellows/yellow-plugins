@@ -279,6 +279,16 @@ class CheckTest(TempRepo):
         self.assertIn("pass on lookalikes[0]", self.check(loose))
         self.assertIn("matches 0 times", self.check(self.spec(lookalikes=[dict(la, old="nope")])))
 
+    def test_lookalike_append_bad_path_and_restore(self):
+        la = {"path": "lib/kill.ts", "append": "if (child.exitCode !== null) return;\n", "why": "x"}
+        self.assertEqual(self.check(self.spec(lookalikes=[la])), "")
+        self.assertIn("is not a file in the tree",
+                      self.check(self.spec(lookalikes=[dict(la, path="lib/missing.ts")])))
+        twice = {"path": "lib/kill.ts", "old": "exitCode", "new": "x"}
+        spec = self.spec(lookalikes=[dict(la, append="exitCode\n"), twice])
+        # Each look-alike starts from the restored file: `old` matches once, not twice.
+        self.assertNotIn("matches 2 times", self.check(spec))
+
     def test_reply_fixtures_prove_the_reply_regexes(self):
         self.assertIn("no recorded `reply`", self.check(self.spec(reply=None)))
         self.assertIn("fail on the recorded `reply`",

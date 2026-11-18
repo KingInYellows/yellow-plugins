@@ -65,9 +65,10 @@ A plan that names the lesson can still prescribe the bug. `p07`, `p10` and `p18`
 have a `not` regex for a shell code block that does exactly that (a hook with
 `set -e` that prints `{"continue": true}`, a `printf` whose `%b` format takes
 the message, an `EXIT` trap in the `mktemp -d` block) with no warning word
-(`wrong`, `avoid`, `fires` and so on) anywhere in the block, so quoting the
-incident's own anti-pattern still passes. Their `selfcheck.lookalikes` append
-such a block to the incident doc and require the case to fail.
+(`wrong`, `fires`, `reinterpret` and so on, but not routine words like `never`
+or `inject`) anywhere in the block, so quoting the incident's own anti-pattern
+still passes. Their `selfcheck.lookalikes` append such a block to the incident
+doc and require the case to fail.
 
 Runs load `yellow-core` from the checkout with `--plugin-dir` (agent `plugins`
 key) and invoke `/yellow-core:flow:plan` as a slash command, so the command, its

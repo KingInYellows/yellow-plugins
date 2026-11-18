@@ -424,7 +424,8 @@ def check_spec(spec):
     if spec["prompts"]:
         shas.append(spec.get("prompt_commit"))
     bad += [x for x in shas if not re.fullmatch(r"[0-9a-f]{40}", str(x))]
-    bad += [x["commit"] for x in [*spec["replays"], *spec["scans"]]
+    bad += [x["commit"] for x in [*spec["replays"], *spec["scans"],
+                                  *(c["source"] for c in spec["prompts"] if "source" in c)]
             if not re.fullmatch(r"[0-9a-f]{7,40}", str(x.get("commit")))]
     if bad:
         sys.exit("prepare: unsafe spec values (names must match %s; files must be "
@@ -808,6 +809,7 @@ def reject(out, rid, why):
 
 def grade(work):
     lock_work(work)
+    read_matrix(work)  # stops cleanly after an interrupted prepare
     with open(os.path.join(work, "spec.json"), encoding="utf-8") as handle:
         spec = json.load(handle)
     spec.setdefault("replays", [])
@@ -1049,6 +1051,9 @@ def check(spec_paths, work):
                         if edited or removed:
                             problems.append("%s %s: file checks still pass with %s %s"
                                             % (name, cid, path, "edited" if edited else "removed"))
+                    if sc.get("lookalikes"):
+                        problems.append("%s %s: `lookalikes` need a `fix` or `doc` selfcheck"
+                                        % (name, cid))
                     continue
                 if "fix" in sc:
                     if any(files_pass(e, wt, content_only=True) for e in expects[cid]):
