@@ -1,6 +1,7 @@
 ---
 name: ci:runner-health
-description: "Check self-hosted runner health via SSH. Use when user asks \"runner status\", \"is runner healthy\", \"check runner\", or wants to verify infrastructure before diagnosing CI failures."
+# prettier-ignore
+description: "Check self-hosted runner health via SSH. Use when user asks \"runner status\", \"is runner healthy\", \"check runner\", or wants to verify infrastructure before diagnosing CI failures. Disk cleanup is typed-only: tell the user to run /ci:runner-cleanup."
 argument-hint: '[runner-name]'
 allowed-tools:
   - Bash
@@ -17,8 +18,8 @@ health, with deep diagnostics folded in.
 ## Host binding (Claude Code)
 
 On Claude Code, the runner SSH config file is `.claude/yellow-ci.local.md`
-(repo-local). Read runner details (`name`, `host`, `user`, `ssh_key`) from it; if
-it is missing, point the user at the setup workflow to create it.
+(repo-local). Read runner details (`name`, `host`, `user`, `ssh_key`) from it;
+if it is missing, point the user at the setup workflow to create it.
 
 ## Usage
 

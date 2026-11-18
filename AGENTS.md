@@ -350,14 +350,20 @@ rule id in parentheses is what the failure message cites.
   including when the user asks in plain language. The key does not stop
   Claude from reading the file or calling a CLI it wraps, so it is not a
   safety gate. Before setting it, check that no other command, skill, agent
-  or hook needs the entry point, and that something the model still reads
-  tells it to ask the user to type it. RULE 25 errors when a flagged entry
+  or hook needs the entry point. RULE 25 errors when a flagged entry
   point is a `skill:` target, an agent `skills:` preload, in the
   `/setup:all` list or in the stack-operation registry, when a skill also
-  sets `user-invocable: false`, or when the value is not a boolean. It warns
-  when a file under a plugin's `hooks/` or the root `CLAUDE.md` names the
-  slash form. It does not check prose dispatches in command, skill or agent
-  bodies.
+  sets `user-invocable: false`, when the value is not a boolean, when no
+  description of an unflagged command or skill in the same plugin names its
+  slash form, or when a command, skill or agent body names it on a line with
+  the Skill tool. It warns when a file under a plugin's `hooks/`, the root
+  `CLAUDE.md`, or a body line that does not mention the user names the slash
+  form. The typed-only notice is required because, probed on 2.1.327, Claude
+  ran the CLI a hidden command wraps (skipping its confirmation) in 3 of 3
+  runs without it, and told the user to type the command in 3 of 3 with it:
+  add a line such as `Typed-only: /plugin:cmd.` to a sibling description.
+  Flagging an entry point removes a description, so it goes through the
+  triggering suite (CLAUDE-315), not the eval corpus.
 - Every `description:` is single-line — no `>`, `|`, or wrapped strings.
   RULE 15d warns on skills, agents and commands. Prettier produces the wrapped
   form when it rewraps a long description, so put `# prettier-ignore` on the

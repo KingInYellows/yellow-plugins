@@ -1,7 +1,8 @@
 /**
  * Integration test for RULE 25 in scripts/validate-agent-authoring.js. An
  * entry point with `disable-model-invocation: true` is refused by the Skill
- * tool, so nothing may dispatch it by name.
+ * tool, so nothing may dispatch it by name, and a model-visible description
+ * in its plugin must name its typed form.
  */
 
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -22,6 +23,18 @@ function skill(name: string, extra = ''): string {
   return `---\nname: ${name}\ndescription: Fixture skill. Use when testing RULE 25.\n${extra}---\n\n## What It Does\n\nX.\n\n## When to Use\n\nX.\n\n## Usage\n\nX.\n`;
 }
 
+// A model-visible sibling whose description names the typed-only forms.
+function notice(dir: string, plugin: string, ...typed: string[]): void {
+  writeAgent(
+    dir,
+    `${plugin}/commands/${plugin}/status.md`,
+    command(`${plugin}:status`).replace(
+      'Use when testing RULE 25.',
+      `Use when testing RULE 25. Typed-only - ${typed.join(', ')}.`
+    )
+  );
+}
+
 function agent(skills: string): string {
   return `---\nname: demo-agent\ndescription: Fixture agent. Use when testing RULE 25.\nmodel: inherit\ntools:\n  - Read\nskills:\n  - ${skills}\n---\n\nBody.\n`;
 }
@@ -40,12 +53,12 @@ describe('validate-agent-authoring RULE 25 (disable-model-invocation)', () => {
   });
 
   it('passes when nothing dispatches the flagged command', () => {
+    notice(dir, 'alpha', '/alpha:run');
     writeAgent(
       dir,
       'alpha/commands/alpha/run.md',
       command('alpha:run', DISABLED)
     );
-    writeAgent(dir, 'alpha/commands/alpha/other.md', command('alpha:other'));
     const { status, stdout } = runValidator(dir);
     expect(status).toBe(0);
     expect(stdout).not.toContain('RULE 25');
@@ -70,6 +83,7 @@ describe('validate-agent-authoring RULE 25 (disable-model-invocation)', () => {
   });
 
   it('ignores a dispatch shown inside a code fence', () => {
+    notice(dir, 'alpha', '/alpha:run');
     writeAgent(
       dir,
       'alpha/commands/alpha/run.md',
@@ -106,6 +120,7 @@ describe('validate-agent-authoring RULE 25 (disable-model-invocation)', () => {
   );
 
   it('does not match a bare skill name from another plugin', () => {
+    notice(dir, 'alpha', '/alpha:helper');
     writeAgent(
       dir,
       'alpha/skills/helper/SKILL.md',
@@ -209,6 +224,7 @@ describe('validate-agent-authoring RULE 25 (disable-model-invocation)', () => {
     ['a hook script', 'plugins/alpha/hooks/scripts/session-start.sh'],
     ['the root CLAUDE.md', 'CLAUDE.md'],
   ])('warns when %s names a flagged command', (_label, relPath) => {
+    notice(dir, 'alpha', '/alpha:run');
     writeAgent(
       dir,
       'alpha/commands/alpha/run.md',
@@ -394,6 +410,7 @@ describe('validate-agent-authoring RULE 25 (disable-model-invocation)', () => {
       'Run /alpha:run to continue.\n',
     ],
   ])('does not warn on %s', (_label, relPath, text) => {
+    notice(dir, 'alpha', '/alpha:run');
     writeAgent(
       dir,
       'alpha/commands/alpha/run.md',
@@ -406,6 +423,7 @@ describe('validate-agent-authoring RULE 25 (disable-model-invocation)', () => {
   });
 
   it('does not warn on the bare name of a flagged skill', () => {
+    notice(dir, 'alpha', '/alpha:helper');
     writeAgent(
       dir,
       'alpha/skills/helper/SKILL.md',
@@ -417,6 +435,7 @@ describe('validate-agent-authoring RULE 25 (disable-model-invocation)', () => {
   });
 
   it('does not warn on a longer command name that starts the same way', () => {
+    notice(dir, 'alpha', '/alpha:run');
     writeAgent(
       dir,
       'alpha/commands/alpha/run.md',
@@ -424,6 +443,130 @@ describe('validate-agent-authoring RULE 25 (disable-model-invocation)', () => {
     );
     writeAgent(root, 'CLAUDE.md', 'Run /alpha:run-all to continue.\n');
     const { stdout } = runValidator(dir);
+    expect(stdout).not.toContain('RULE 25');
+  });
+
+  it('fails when no description in the plugin names a flagged command', () => {
+    writeAgent(
+      dir,
+      'alpha/commands/alpha/run.md',
+      command('alpha:run', DISABLED)
+    );
+    writeAgent(dir, 'alpha/commands/alpha/other.md', command('alpha:other'));
+    notice(dir, 'beta', '/alpha:run');
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain(
+      'alpha/commands/alpha/run.md: RULE 25 — sets `disable-model-invocation: true`, but no description in plugins/alpha names `/alpha:run`'
+    );
+  });
+
+  it('does not count the flagged entry point naming itself', () => {
+    writeAgent(
+      dir,
+      'alpha/commands/alpha/run.md',
+      command('alpha:run', DISABLED).replace(
+        'Use when testing RULE 25.',
+        'Typed-only - /alpha:run.'
+      )
+    );
+    const { stderr } = runValidator(dir);
+    expect(stderr).toContain('no description in plugins/alpha names');
+  });
+
+  it('accepts the notice in a skill description of the same plugin', () => {
+    writeAgent(
+      dir,
+      'alpha/commands/alpha/run.md',
+      command('alpha:run', DISABLED)
+    );
+    writeAgent(
+      dir,
+      'alpha/skills/guide/SKILL.md',
+      skill('guide').replace(
+        'Use when testing RULE 25.',
+        'Use when testing RULE 25. Typed-only - /alpha:run.'
+      )
+    );
+    const { status, stdout } = runValidator(dir);
+    expect(status).toBe(0);
+    expect(stdout).not.toContain('RULE 25');
+  });
+
+  it.each([
+    ['the slash form', 'Invoke `/alpha:run` via the Skill tool next.'],
+    ['the backticked name', 'Run `alpha:run` via Skill tool next.'],
+  ])(
+    'fails when a body tells the model to run a flagged command with the Skill tool (%s)',
+    (_label, line) => {
+      writeAgent(
+        dir,
+        'alpha/commands/alpha/run.md',
+        command('alpha:run', DISABLED)
+      );
+      notice(dir, 'alpha', '/alpha:run');
+      writeAgent(
+        dir,
+        'beta/agents/demo-agent.md',
+        `---\nname: demo-agent\ndescription: Fixture agent. Use when testing RULE 25.\nmodel: inherit\ntools:\n  - Read\n  - Skill\n---\n\n${line}\n`
+      );
+      const { status, stderr } = runValidator(dir);
+      expect(status).toBe(1);
+      expect(stderr).toContain(
+        'beta/agents/demo-agent.md: RULE 25 — tells the model to run "alpha:run" with the Skill tool'
+      );
+    }
+  );
+
+  it('warns when a body names a flagged command without mentioning the user', () => {
+    writeAgent(
+      dir,
+      'alpha/commands/alpha/run.md',
+      command('alpha:run', DISABLED)
+    );
+    notice(dir, 'alpha', '/alpha:run');
+    writeAgent(
+      dir,
+      'beta/skills/flow/references/steps.md',
+      'Then run /alpha:run to finish.\n'
+    );
+    const { status, stdout } = runValidator(dir);
+    expect(status).toBe(0);
+    expect(stdout).toContain('[RULE 25 advisory]');
+    expect(stdout).toContain(
+      'plugins/beta/skills/flow/references/steps.md: names `/alpha:run`'
+    );
+  });
+
+  it.each([
+    ['a line addressed to the user', 'Tell the user to type /alpha:run.\n'],
+    ['a code fence', '```text\nRun /alpha:run via the Skill tool.\n```\n'],
+  ])('does not report prose in %s', (_label, body) => {
+    writeAgent(
+      dir,
+      'alpha/commands/alpha/run.md',
+      command('alpha:run', DISABLED)
+    );
+    notice(dir, 'alpha', '/alpha:run');
+    writeAgent(
+      dir,
+      'beta/commands/beta/chain.md',
+      command('beta:chain', '', body)
+    );
+    const { status, stdout } = runValidator(dir);
+    expect(status).toBe(0);
+    expect(stdout).not.toContain('RULE 25');
+  });
+
+  it('does not report the flagged command naming itself in its body', () => {
+    writeAgent(
+      dir,
+      'alpha/commands/alpha/run.md',
+      command('alpha:run', DISABLED, 'Run /alpha:run via the Skill tool.')
+    );
+    notice(dir, 'alpha', '/alpha:run');
+    const { status, stdout } = runValidator(dir);
+    expect(status).toBe(0);
     expect(stdout).not.toContain('RULE 25');
   });
 });

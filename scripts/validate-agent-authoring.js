@@ -91,8 +91,14 @@ const REVIEW_AGENT_ALLOWLIST = new Map([
   // plans/yellow-council-godmodeskill-integration.md (2026-05-04). Both also
   // carry Write to materialize their own fenced-output file (unlike
   // codex-reviewer, which does not).
-  ['yellow-council/agents/review/gemini-reviewer.md', new Set(['Bash', 'Write'])],
-  ['yellow-council/agents/review/opencode-reviewer.md', new Set(['Bash', 'Write'])],
+  [
+    'yellow-council/agents/review/gemini-reviewer.md',
+    new Set(['Bash', 'Write']),
+  ],
+  [
+    'yellow-council/agents/review/opencode-reviewer.md',
+    new Set(['Bash', 'Write']),
+  ],
   // claude-reviewer is the council's in-process slot and does NOT share the
   // CLI-wrapper rationale above: it has no Bash at all and invokes no binary.
   // Write is granted for exactly one file — the fenced-output path the
@@ -262,14 +268,16 @@ const DURABLE_BAR_FILES = [
 // ERROR when an entry point with the key is dispatched by name (a `skill:`
 // value, an agent `skills:` preload, the /setup:all delegated list or the
 // stack-operation registry), when a skill sets it with
-// `user-invocable: false` (nothing could reach it), or when the value is not
-// a boolean (RULE 23 counts anything but boolean true). ADVISORY when a file
-// under a plugin's hooks/ directory, or the root CLAUDE.md, names the entry
-// point's slash form (a skill's qualified form only), because the model reads
-// those and could not act on them. Only these structured forms are checked:
-// prose in a command, skill or agent body that tells the model to run a
-// flagged entry point is not caught, and the key does not stop Claude from
-// reading the file or calling a CLI it wraps.
+// `user-invocable: false` (nothing could reach it), when the value is not
+// a boolean (RULE 23 counts anything but boolean true), when no description
+// of an unflagged command or skill in the same plugin names its slash form
+// (the typed-only notice; see the probe note in validateModelInvocationFlag),
+// or when a line of a command, skill or agent body names it next to the
+// Skill tool. ADVISORY when a file under a plugin's hooks/ directory, the
+// root CLAUDE.md, or a body line that does not mention the user names the
+// slash form (a skill's qualified form only), because the model reads those
+// and could not act on them. The key does not stop Claude from reading the
+// file or calling a CLI it wraps; the notice is what steers it to the user.
 //
 // RULE 15 (a–d) — authoring lint, ALL warning-tier: 15a–c on SKILL.md, 15d
 // (single-line description) on SKILL.md, agents and commands. AGENTS.md and
@@ -673,7 +681,9 @@ function validateAgentFile(filePath, ctx) {
 
   const hasAllowedTools = /^allowed-tools:/m.test(frontmatter);
   if (hasAllowedTools) {
-    errors.push(`${relative(filePath)}: use "tools:" instead of "allowed-tools:"`);
+    errors.push(
+      `${relative(filePath)}: use "tools:" instead of "allowed-tools:"`
+    );
   }
 
   if (!hasAllowedTools) {
@@ -721,7 +731,10 @@ function validateAgentFile(filePath, ctx) {
       const allowedExceptionTools = hasDocumentedException
         ? REVIEW_AGENT_ALLOWLIST.get(pluginsRelPath)
         : undefined;
-      if (!hasDocumentedException && REVIEW_AGENT_ALLOWLIST.has(pluginsRelPath)) {
+      if (
+        !hasDocumentedException &&
+        REVIEW_AGENT_ALLOWLIST.has(pluginsRelPath)
+      ) {
         errors.push(
           `${relative(filePath)}: listed in REVIEW_AGENT_ALLOWLIST but has no ` +
             `"## Tool Surface — Documented Exception" section — the allowlist ` +
@@ -729,13 +742,13 @@ function validateAgentFile(filePath, ctx) {
             `the section or remove the allowlist entry.`
         );
       }
-      const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) =>
-        t.toLowerCase()
-      );
+      const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) => t.toLowerCase());
       const toolsLower = tools.map((t) => t.toLowerCase());
       const violations = REVIEW_AGENT_DENIED_TOOLS.filter((deniedTool, i) => {
         if (!toolsLower.includes(deniedLower[i])) return false;
-        return !(allowedExceptionTools && allowedExceptionTools.has(deniedTool));
+        return !(
+          allowedExceptionTools && allowedExceptionTools.has(deniedTool)
+        );
       });
       if (violations.length > 0) {
         errors.push(
@@ -764,10 +777,9 @@ function validateAgentFile(filePath, ctx) {
       // regressing silently.
       const memoryScope = parseScalar(frontmatter, 'memory');
       if (memoryScope && VALID_MEMORY_SCOPES.has(memoryScope)) {
-        const disallowedLower = parseList(
-          frontmatter,
-          'disallowedTools'
-        ).map((t) => t.toLowerCase());
+        const disallowedLower = parseList(frontmatter, 'disallowedTools').map(
+          (t) => t.toLowerCase()
+        );
         const missingDenies = REVIEW_AGENT_REQUIRED_DISALLOWED_TOOLS.filter(
           (t) => !disallowedLower.includes(t.toLowerCase())
         );
@@ -948,17 +960,13 @@ function validateStagingPromoterFrontmatter(agentFiles, errors) {
   // run non-interactively under bypassPermissions; both must hard-deny
   // AskUserQuestion at the frontmatter level (prose-only enforcement is
   // insufficient — see docs/solutions/code-quality/subagent-frontmatter-field-catalog.md).
-  const checkedAgents = [
-    'staging-promoter.md',
-    'staging-reviewer.md',
-  ];
+  const checkedAgents = ['staging-promoter.md', 'staging-reviewer.md'];
 
   for (const basename of checkedAgents) {
-    const agentPath = agentFiles.find(
-      (f) =>
-        f.endsWith(
-          `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}${basename}`
-        )
+    const agentPath = agentFiles.find((f) =>
+      f.endsWith(
+        `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}${basename}`
+      )
     );
     if (!agentPath) {
       // Agent not yet present (e.g., stack item #2 not merged).
@@ -996,11 +1004,10 @@ function validateStagingPromoterFrontmatter(agentFiles, errors) {
 // common drift: someone editing the agent to also append to other
 // MEMORY.md sections (CORE_RULES, USER_PREFERENCES, KNOWN_PROJECTS).
 function validateMemoryWriteSectionGate(agentFiles, errors) {
-  const promoter = agentFiles.find(
-    (f) =>
-      f.endsWith(
-        `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}staging-promoter.md`
-      )
+  const promoter = agentFiles.find((f) =>
+    f.endsWith(
+      `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}staging-promoter.md`
+    )
   );
   if (!promoter) {
     return;
@@ -1098,8 +1105,7 @@ function validateMemoryProtocolSentinel(markdownFiles, errors) {
   // run every declared file must exist — a deleted/renamed canonical or
   // replica must not silently disable its own check.
   const fixtureRun = Boolean(process.env.VALIDATE_PLUGINS_DIR);
-  const strict =
-    !fixtureRun || process.env.VALIDATE_SENTINEL_STRICT === '1';
+  const strict = !fixtureRun || process.env.VALIDATE_SENTINEL_STRICT === '1';
 
   for (const filePath of declaredPaths) {
     if (!fs.existsSync(filePath)) {
@@ -1177,8 +1183,7 @@ function validateDurableBar(markdownFiles, errors) {
   // opts in by carrying the start marker.
   const optedIn = declaredPaths.some(
     (p) =>
-      fs.existsSync(p) &&
-      fs.readFileSync(p, 'utf8').includes(DURABLE_BAR_START)
+      fs.existsSync(p) && fs.readFileSync(p, 'utf8').includes(DURABLE_BAR_START)
   );
   const checkDeclared = strict || optedIn;
   const copies = [];
@@ -1315,7 +1320,13 @@ function validateSkillWrapperDrift(commandFiles, errors) {
     }
 
     for (const skillName of skillNames) {
-      const skillFile = path.join(PLUGINS_DIR, pluginName, 'skills', skillName, 'SKILL.md');
+      const skillFile = path.join(
+        PLUGINS_DIR,
+        pluginName,
+        'skills',
+        skillName,
+        'SKILL.md'
+      );
       if (!fs.existsSync(skillFile)) {
         errors.push(
           `${relative(filePath)}: RULE 17 — references skill "${skillName}" ` +
@@ -1325,6 +1336,45 @@ function validateSkillWrapperDrift(commandFiles, errors) {
       }
     }
   }
+}
+
+// RULES 18, 24 and 25 name an entry point the same way. A command is its
+// `name:`, else its path under commands/ (`commands/ci/setup.md` is
+// `ci:setup`). A skill is `<plugin>:<name:>`, else `<plugin>:<directory>`.
+// `declared` is false when the name came from the path: RULE 18 indexes only
+// declared skill names. `primary` is false for the generated codex/ and
+// cursor/ skill copies, which repeat every skill name.
+function entryPointId(filePath, kind) {
+  const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
+  const plugin = parts[0];
+  const raw = parseScalar(
+    extractFrontmatter(fs.readFileSync(filePath, 'utf8')),
+    'name'
+  );
+  const declared = typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+  if (kind === 'command') {
+    const name =
+      declared ||
+      parts
+        .slice(parts.indexOf('commands') + 1)
+        .join(':')
+        .replace(/\.md$/, '');
+    return {
+      plugin,
+      name,
+      id: name,
+      declared: Boolean(declared),
+      primary: true,
+    };
+  }
+  const name = declared || parts[parts.length - 2];
+  return {
+    plugin,
+    name,
+    id: `${plugin}:${name}`,
+    declared: Boolean(declared),
+    primary: parts.length === 4 && parts[1] === 'skills',
+  };
 }
 
 // RULE 18 — namespaced `skill:` dispatch targets must resolve to a real
@@ -1437,21 +1487,12 @@ function buildDispatchTargetIndex(commandFiles, skillFiles) {
   const index = new Map();
 
   for (const filePath of commandFiles) {
-    const content = fs.readFileSync(filePath, 'utf8');
-    // extractFrontmatter returns the raw block STRING, not a parsed object —
-    // parseScalar is the accessor the rest of this file pairs it with.
-    const frontmatter = extractFrontmatter(content);
-    if (!frontmatter) continue;
-    const name = parseScalar(frontmatter, 'name');
-    if (typeof name === 'string' && name.trim()) {
-      index.set(name.trim(), filePath);
-    }
+    index.set(entryPointId(filePath, 'command').id, filePath);
   }
 
   for (const filePath of skillFiles) {
-    // plugins/<plugin>/**/skills/<skill>/SKILL.md — take the plugin from the
-    // first path segment, so nested layouts (e.g. codex/skills/<name>/)
-    // resolve the same way.
+    // Every layout counts, so nested copies (e.g. codex/skills/<name>/)
+    // resolve the same way; the first file found keeps the id.
     //
     // The skill half comes from the frontmatter `name:`, NOT the directory.
     // `name:` is the runtime identifier; the directory is only where the file
@@ -1460,37 +1501,30 @@ function buildDispatchTargetIndex(commandFiles, skillFiles) {
     // stale directory-qualified value would pass this rule and then fail to
     // resolve in a live session — precisely the class RULE 18 exists to catch.
     // A SKILL.md with no parseable `name:` is SKIPPED rather than indexed
-    // under its directory: synthesizing a target from the directory registers
-    // an id the runtime may never expose, so a dispatch to it would pass this
-    // rule and fail in a live session. `validateSkillDispatchResolution`
-    // reports the missing `name:` as a hard error instead — RULE 15's
-    // sub-rules are all warning-tier and none of them checks `name:`, so
-    // nothing else catches it.
-    const relSegments = path.relative(PLUGINS_DIR, filePath).split(path.sep);
-    const pluginName = relSegments[0];
-    const skillDir = relSegments[relSegments.length - 2];
-    if (!pluginName || !skillDir) continue;
-    const skillFm = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
-    const declaredName = skillFm ? parseScalar(skillFm, 'name') : null;
-    const skillName = (declaredName || '').trim();
-    if (!skillName) continue;
-    const qualified = `${pluginName}:${skillName}`;
-    if (!index.has(qualified)) index.set(qualified, filePath);
+    // under its directory, and `validateSkillDispatchResolution` reports the
+    // missing `name:` as a hard error instead — RULE 15's sub-rules are all
+    // warning-tier and none of them checks `name:`, so nothing else catches it.
+    const entry = entryPointId(filePath, 'skill');
+    if (!entry.declared) continue;
+    if (!index.has(entry.id)) index.set(entry.id, filePath);
   }
 
   return index;
 }
 
-function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles, errors) {
+function validateSkillDispatchResolution(
+  markdownFiles,
+  commandFiles,
+  skillFiles,
+  errors
+) {
   // `name:` is the runtime identifier a `skill: "<plugin>:<name>"` dispatch
   // resolves against. Without it there is no target to validate, and the
   // directory is not a safe stand-in (see buildDispatchTargetIndex). Hard
   // error rather than advisory: every RULE 15 sub-rule is warning-tier, so an
   // advisory here would let a nameless skill reach a release unnoticed.
   for (const filePath of skillFiles) {
-    const skillFm = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
-    const declaredName = skillFm ? parseScalar(skillFm, 'name') : null;
-    if (!(declaredName || '').trim()) {
+    if (!entryPointId(filePath, 'skill').declared) {
       errors.push(
         `[RULE 18] ${relative(filePath)}: SKILL.md has no \`name:\` in its ` +
           `frontmatter. \`name:\` is the runtime identifier a ` +
@@ -1535,7 +1569,8 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
       .relative(PLUGINS_DIR, filePath)
       .split(path.sep)
       .join('/');
-    const allowedPlaceholders = SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST.get(pluginsRelPath);
+    const allowedPlaceholders =
+      SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST.get(pluginsRelPath);
 
     for (const target of seen) {
       if (dispatchTargets.has(target)) continue;
@@ -1560,9 +1595,13 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
   // do not carry these two real files) unless a test opts back in, matching
   // RULE 16's VALIDATE_SENTINEL_STRICT precedent.
   const fixtureRun = Boolean(process.env.VALIDATE_PLUGINS_DIR);
-  const strict = !fixtureRun || process.env.VALIDATE_PLACEHOLDER_ALLOWLIST_STRICT === '1';
+  const strict =
+    !fixtureRun || process.env.VALIDATE_PLACEHOLDER_ALLOWLIST_STRICT === '1';
   if (strict) {
-    for (const [relPath, placeholders] of SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST) {
+    for (const [
+      relPath,
+      placeholders,
+    ] of SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST) {
       const absPath = path.join(PLUGINS_DIR, ...relPath.split('/'));
       if (!fs.existsSync(absPath)) {
         errors.push(
@@ -1792,32 +1831,13 @@ function validateCommandDescriptions(commandFiles, errors, warnings) {
 function validateCommandSkillNameCollisions(commandFiles, skillFiles, errors) {
   const commandNames = new Map();
   for (const filePath of commandFiles) {
-    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
-    // A command with no `name:` is named after its path under commands/
-    // (`commands/ci/setup.md` is `ci:setup`).
-    const name =
-      parseScalar(
-        extractFrontmatter(fs.readFileSync(filePath, 'utf8')),
-        'name'
-      ) ||
-      parts
-        .slice(parts.indexOf('commands') + 1)
-        .join(':')
-        .replace(/\.md$/, '');
-    commandNames.set(`${parts[0]}\0${name}`, filePath);
+    const { plugin, name } = entryPointId(filePath, 'command');
+    commandNames.set(`${plugin}\0${name}`, filePath);
   }
   for (const filePath of skillFiles) {
-    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
-    // skills/<name>/SKILL.md only: the generated codex/ and cursor/ copies
-    // repeat every skill name.
-    if (parts.length !== 4 || parts[1] !== 'skills') continue;
-    // A skill with no `name:` is named after its directory.
-    const name =
-      parseScalar(
-        extractFrontmatter(fs.readFileSync(filePath, 'utf8')),
-        'name'
-      ) || parts[2];
-    const commandPath = commandNames.get(`${parts[0]}\0${name}`);
+    const { plugin, name, primary } = entryPointId(filePath, 'skill');
+    if (!primary) continue;
+    const commandPath = commandNames.get(`${plugin}\0${name}`);
     if (commandPath) {
       errors.push(
         `${relative(filePath)}: RULE 24 — skill name "${name}" is also the ` +
@@ -1836,15 +1856,14 @@ function pluginOf(filePath) {
   return path.relative(PLUGINS_DIR, filePath).split(path.sep)[0];
 }
 
-// Every entry point that sets the key to true: a command by its `name:`, a
-// skill by `<plugin>:<name>`.
+// Every entry point that sets the key to true, keyed by entryPointId's id.
 function collectModelInvocationDisabled(commandFiles, skillFiles, errors) {
   const disabled = new Map();
-  const read = (filePath) => {
+  const isDisabled = (filePath) => {
     const data = parseFrontmatter(
       extractFrontmatter(fs.readFileSync(filePath, 'utf8'))
     );
-    if (!data || !(MODEL_INVOCATION_KEY in data)) return null;
+    if (!data || !(MODEL_INVOCATION_KEY in data)) return false;
     const value = data[MODEL_INVOCATION_KEY];
     if (typeof value !== 'boolean') {
       errors.push(
@@ -1852,31 +1871,19 @@ function collectModelInvocationDisabled(commandFiles, skillFiles, errors) {
           `the boolean true or false, not ${JSON.stringify(value)}. Only a ` +
           `boolean true hides the description and leaves the RULE 23 budget.`
       );
-      return null;
+      return false;
     }
-    return value ? data : null;
+    return value;
   };
   for (const filePath of commandFiles) {
-    const data = read(filePath);
-    if (!data) continue;
-    // A command with no `name:` is named after its path under commands/, as
-    // in RULE 24.
-    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
-    const name =
-      typeof data.name === 'string' && data.name.trim()
-        ? data.name.trim()
-        : parts
-            .slice(parts.indexOf('commands') + 1)
-            .join(':')
-            .replace(/\.md$/, '');
-    disabled.set(name, filePath);
+    if (isDisabled(filePath)) {
+      disabled.set(entryPointId(filePath, 'command').id, filePath);
+    }
   }
   for (const filePath of skillFiles) {
-    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
-    // skills/<name>/SKILL.md only: codex/ and cursor/ copies keep no such key.
-    if (parts.length !== 4 || parts[1] !== 'skills') continue;
-    const data = read(filePath);
-    if (!data) continue;
+    const entry = entryPointId(filePath, 'skill');
+    // codex/ and cursor/ copies keep no such key.
+    if (!entry.primary || !isDisabled(filePath)) continue;
     if (!isUserInvocableSkill(fs.readFileSync(filePath, 'utf8'))) {
       errors.push(
         `${relative(filePath)}: RULE 25 — sets \`${MODEL_INVOCATION_KEY}: true\` ` +
@@ -1884,11 +1891,20 @@ function collectModelInvocationDisabled(commandFiles, skillFiles, errors) {
           `can reach it. Remove one of them.`
       );
     }
-    const name = typeof data.name === 'string' ? data.name.trim() : parts[2];
-    disabled.set(`${parts[0]}:${name}`, filePath);
+    disabled.set(entry.id, filePath);
   }
   return disabled;
 }
+
+// `/<id>` as a whole token: not part of a path or a longer name.
+function slashFormRe(id) {
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![\\w./:-])/${escaped}(?![\\w:-])`);
+}
+
+// A line that speaks about the user ("tell the user to type /x") is a hint to
+// the user, not an instruction to the model.
+const USER_CUE_RE = /\b(?:users?|type|types|typed|typing)\b/i;
 
 function validateModelInvocationFlag(files, errors, warnings) {
   const { commandFiles, skillFiles, agentFiles, markdownFiles } = files;
@@ -1924,7 +1940,12 @@ function validateModelInvocationFlag(files, errors, warnings) {
       const value = match[1] !== undefined ? match[1] : match[2];
       if (seen.has(value)) continue;
       seen.add(value);
-      report(relative(filePath), 'dispatches `skill:`', value, pluginOf(filePath));
+      report(
+        relative(filePath),
+        'dispatches `skill:`',
+        value,
+        pluginOf(filePath)
+      );
     }
   }
 
@@ -1932,7 +1953,12 @@ function validateModelInvocationFlag(files, errors, warnings) {
     const frontmatter = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
     if (!frontmatter) continue;
     for (const skill of parseList(frontmatter, 'skills')) {
-      report(relative(filePath), 'preloads the skill', skill, pluginOf(filePath));
+      report(
+        relative(filePath),
+        'preloads the skill',
+        skill,
+        pluginOf(filePath)
+      );
     }
   }
 
@@ -1970,7 +1996,12 @@ function validateModelInvocationFlag(files, errors, warnings) {
     const visit = (node) => {
       if (!node || typeof node !== 'object') return;
       if (node.type === 'command' && node.plugin && node.ref) {
-        report(relative(registryPath), 'routes an operation to', node.ref, node.plugin);
+        report(
+          relative(registryPath),
+          'routes an operation to',
+          node.ref,
+          node.plugin
+        );
         return;
       }
       for (const child of Object.values(node)) visit(child);
@@ -2018,13 +2049,97 @@ function validateModelInvocationFlag(files, errors, warnings) {
       continue;
     }
     for (const name of disabled.keys()) {
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      if (new RegExp(`(?<![\\w./:-])/${escaped}(?![\\w:-])`).test(text)) {
+      if (slashFormRe(name).test(text)) {
         warnings.push(
           `[RULE 25 advisory] ${relative(filePath)}: names \`/${name}\`, which ` +
             `sets \`${MODEL_INVOCATION_KEY}: true\`. The model reads this file ` +
             `and cannot run that entry point; say that the user must type it.`
         );
+      }
+    }
+  }
+
+  // Typed-only notice. A flagged entry point leaves the listing, so Claude
+  // no longer knows it exists. Probed on 2.1.327 with a scratch plugin whose
+  // flagged cancel command wraps a CLI and asks first: asked in plain
+  // language to cancel, Claude ran the CLI directly in 3 of 3 runs, skipping
+  // the confirmation. With one line in a sibling description naming the
+  // typed form, it told the user to type the command in 3 of 3 runs and ran
+  // nothing. So a model-visible description in the same plugin must name it.
+  const visible = new Map();
+  const disabledPaths = new Set(disabled.values());
+  const addVisible = (filePath, plugin) => {
+    if (disabledPaths.has(filePath)) return;
+    const data = parseFrontmatter(
+      extractFrontmatter(fs.readFileSync(filePath, 'utf8'))
+    );
+    if (!data) return;
+    const text = ['description', 'when_to_use']
+      .map((key) => (typeof data[key] === 'string' ? data[key] : ''))
+      .join('\n');
+    visible.set(plugin, `${visible.get(plugin) || ''}\n${text}`);
+  };
+  for (const filePath of commandFiles) addVisible(filePath, pluginOf(filePath));
+  for (const filePath of skillFiles) {
+    const entry = entryPointId(filePath, 'skill');
+    if (entry.primary) addVisible(filePath, entry.plugin);
+  }
+  for (const [id, filePath] of disabled) {
+    const plugin = pluginOf(filePath);
+    if (slashFormRe(id).test(visible.get(plugin) || '')) continue;
+    errors.push(
+      `${relative(filePath)}: RULE 25 — sets \`${MODEL_INVOCATION_KEY}: true\`, ` +
+        `but no description in plugins/${plugin} names \`/${id}\`. Claude ` +
+        `cannot see this entry point and may call the CLI it wraps instead, ` +
+        `skipping its checks. Add a line such as "Typed-only: /${id}" to the ` +
+        `description of a command or skill in ${plugin} that keeps the key off.`
+    );
+  }
+
+  // Prose dispatches. Command, skill and agent bodies (and skill references)
+  // are read by the model. A line naming a flagged entry point next to the
+  // Skill tool is a dispatch that fails; any other line naming its slash
+  // form may tell the model to run it. Lines about the user are hints.
+  const proseFiles = markdownFiles.filter((filePath) =>
+    ['commands', 'agents', 'skills'].some((dir) =>
+      path.relative(PLUGINS_DIR, filePath).split(path.sep).includes(dir)
+    )
+  );
+  for (const filePath of proseFiles) {
+    if (disabledPaths.has(filePath)) continue;
+    const content = fs.readFileSync(filePath, 'utf8');
+    const fmBlock = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+    const body = fmBlock ? content.slice(fmBlock[0].length) : content;
+    const lines = stripFencedContent(body, { stripFrontmatter: false }).split(
+      '\n'
+    );
+    for (const [id, targetPath] of disabled) {
+      const slash = slashFormRe(id);
+      const ticked = `\`${id}\``;
+      for (const line of lines) {
+        if (USER_CUE_RE.test(line)) continue;
+        const named = slash.test(line);
+        if (
+          SKILL_TOOL_MENTION_RE.test(line) &&
+          (named || line.includes(ticked))
+        ) {
+          errors.push(
+            `${relative(filePath)}: RULE 25 — tells the model to run "${id}" ` +
+              `with the Skill tool, but ${relative(targetPath)} sets ` +
+              `\`${MODEL_INVOCATION_KEY}: true\`, so the Skill tool refuses it. ` +
+              `Tell the user to type \`/${id}\` instead, or remove the key.`
+          );
+          break;
+        }
+        if (named) {
+          warnings.push(
+            `[RULE 25 advisory] ${relative(filePath)}: names \`/${id}\`, which ` +
+              `sets \`${MODEL_INVOCATION_KEY}: true\`, in a line that does not ` +
+              `mention the user. If it tells the model to run it, say that the ` +
+              `user must type it instead.`
+          );
+          break;
+        }
       }
     }
   }
@@ -2340,7 +2455,12 @@ function main() {
   });
   validateCommandFiles(commandFiles, errors);
   validateSkillWrapperDrift(commandFiles, errors);
-  validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles, errors);
+  validateSkillDispatchResolution(
+    markdownFiles,
+    commandFiles,
+    skillFiles,
+    errors
+  );
   validateSkillToolGrant(commandFiles, errors, { toolsKey: 'allowed-tools' });
   validateSkillToolGrant(agentFiles, errors, { toolsKey: 'tools' });
   validateSkillFiles(skillFiles, { errors, warnings });
