@@ -108,7 +108,7 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
 }
 
 @test "github-stack-merge: the previewed set is checked against the resolved repository" {
-  run grep -c -F 'gh api "repos/<repository>/pulls/<number>"' "$MERGE_SKILL"
+  run grep -c -F 'gh api --hostname github.com "repos/<repository>/pulls/<number>"' "$MERGE_SKILL"
   [ "$output" -eq 1 ]
   run grep -F 'repos/{owner}/{repo}/pulls' "$MERGE_SKILL"
   [ "$status" -eq 1 ]

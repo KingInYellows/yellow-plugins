@@ -127,7 +127,7 @@ draft state there (`view` does not report it). `<repository>` must match
 `^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`:
 
 ```bash
-gh api "repos/<repository>/pulls/<number>" --jq '[.draft, .head.ref] | @tsv'
+gh api --hostname github.com "repos/<repository>/pulls/<number>" --jq '[.draft, .head.ref] | @tsv'
 ```
 
 If a call fails, stop: the draft state is unknown. If a `head.ref` is not
