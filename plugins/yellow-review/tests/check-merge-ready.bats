@@ -801,3 +801,15 @@ $MOCK_GH_MR_EVENTS"
   [ "$status" -eq 3 ]
   [ "$(jq -c .approval.missing <<<"$output")" = '["label_events_unknown"]' ]
 }
+
+@test "CLAUDE-345: a removal after the owner's addition revokes it even while the label still reads present" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z),$(lb Test User 2026-11-02T10:20:00Z | jq -c '.event = "unlabeled"')]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z),$(lb Test User 2026-11-02T10:20:00Z | jq -c '.event = "unlabeled"'),$(lb Test User 2026-11-02T10:30:00Z)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.humanApproval.at <<<"$output")" = 2026-11-02T10:30:00Z ]
+}

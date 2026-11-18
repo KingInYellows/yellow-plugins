@@ -385,9 +385,9 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
                 >"$WORK/events.raw" 2>"$WORK/events.err" || E_RC=$?
             if [ "$E_RC" -ne 0 ] || ! jq -s -c --arg label "$APPROVAL_LABEL" '
                   if all(.[]; type == "array") then add // [] else error("not a list") end
-                  | [.[] | select(type == "object" and .event == "labeled" and .label.name == $label)
+                  | [.[] | select(type == "object" and (.event == "labeled" or .event == "unlabeled") and .label.name == $label)
                      | if (.created_at | type) == "string" then . else error("no time") end
-                     | {createdAt: .created_at, label: {name: .label.name},
+                     | {kind: .event, createdAt: .created_at, label: {name: .label.name},
                         actor: {__typename: (.actor.type // null), login: (.actor.login // null)},
                         viaApp: (.performed_via_github_app != null)}]' \
                 "$WORK/events.raw" >"$WORK/events" 2>/dev/null; then
@@ -493,12 +493,14 @@ jq -n -c \
       | group_by(.author.login | ascii_downcase) | map(last | select(.state == "APPROVED")) as $appr
     | ([$appr[] | select(.commit.oid == $head)] | last) as $onhead
     | $lab[0].headTime as $ht
-    | [($lab[0].events // [])[] | select($lab[0].present != false and .label.name == $label and .actor.__typename == "User"
+    | [($lab[0].events // [])[] | select($lab[0].present != false and .kind == "labeled" and .label.name == $label and .actor.__typename == "User"
           and .viaApp == false
           and ((.actor.login // "") | test("\\[bot\\]\\z") | not)
           and ((.actor.login // "") | ascii_downcase | IN($humans[])))] as $lbl
-    # Only the latest addition of the label can approve: an earlier listed
-    # human addition does not survive a removal and re-addition by anyone.
+    # Only the latest change to the label can approve, and only when it is a
+    # qualifying addition: a removal read after the state query revokes it,
+    # and an earlier listed human addition does not survive a removal and
+    # re-addition by anyone.
     | ([($lab[0].events // [])[] | select(.label.name == $label)] | sort_by(.t) | last) as $lastadd
     | (if $ht == null or $lastadd == null or $lab[0].present != true then null
        elif ($lbl | any(. == $lastadd)) and $lastadd.t >= $ht then $lastadd
