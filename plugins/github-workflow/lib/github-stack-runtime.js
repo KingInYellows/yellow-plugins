@@ -322,18 +322,20 @@ function resolveRemote(explicitRemote) {
 const GITHUB_HOSTS = Object.freeze(['github.com', 'www.github.com', 'ssh.github.com']);
 
 /**
- * `owner/repo` (lower-cased) of a github.com remote URL, or null. Takes
- * scheme URLs with any user or port (`https://x@github.com/o/r`,
+ * Host and `owner/repo` (lower-cased) of a remote URL, or null. Takes scheme
+ * URLs with any user or port (`https://x@github.com/o/r`,
  * `ssh://git@github.com:22/o/r.git`) and scp-style `[user@]host:o/r`.
  */
-function githubRepoOfUrl(url) {
+function splitRemoteUrl(url) {
   let host;
   let path;
+  let ssh;
   if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(url)) {
     try {
       const parsed = new URL(url);
       host = parsed.hostname;
       path = parsed.pathname;
+      ssh = /^(?:ssh|git\+ssh|ssh\+git):$/i.test(parsed.protocol);
     } catch {
       return null;
     }
@@ -342,10 +344,42 @@ function githubRepoOfUrl(url) {
     if (!scp) return null;
     host = scp[1];
     path = scp[2];
+    ssh = true;
   }
-  if (!GITHUB_HOSTS.includes(host.toLowerCase())) return null;
   const match = /^\/?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec(path);
-  return match ? `${match[1]}/${match[2]}`.toLowerCase() : null;
+  if (!host || !match) return null;
+  return { host: host.toLowerCase(), repository: `${match[1]}/${match[2]}`.toLowerCase(), ssh };
+}
+
+/** `owner/repo` (lower-cased) of a github.com URL, or null. */
+function githubRepoOfUrl(url) {
+  const split = splitRemoteUrl(url);
+  return split && GITHUB_HOSTS.includes(split.host) ? split.repository : null;
+}
+
+/**
+ * The real host behind an SSH host alias (`Host work` / `HostName github.com`
+ * in ~/.ssh/config), read with `ssh -G` as go-gh's translator does. Falls
+ * back to the alias itself.
+ */
+function sshHostName(alias) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(alias)) return alias;
+  const resolved = run('ssh', ['-G', alias]);
+  if (!resolved.ok || resolved.code !== 0) return alias;
+  const line = /^hostname\s+(\S+)\s*$/im.exec(resolved.stdout);
+  return line ? line[1].toLowerCase() : alias;
+}
+
+/**
+ * The repository a remote URL names: `owner/repo` on github.com, or
+ * `host/owner/repo` on any other host (which gh may know as an enterprise
+ * host). SSH host aliases are resolved first.
+ */
+function remoteRepository(url) {
+  const split = splitRemoteUrl(url);
+  if (!split) return null;
+  const host = split.ssh && !GITHUB_HOSTS.includes(split.host) ? sshHostName(split.host) : split.host;
+  return GITHUB_HOSTS.includes(host) ? split.repository : `${host}/${split.repository}`;
 }
 
 /** go-gh's remote ranking: upstream, then github, then origin, then the rest. */
@@ -362,7 +396,9 @@ function remoteRank(name) {
  * Fails closed whenever that could name more than one repository: two
  * top-ranked remotes for different repositories (go-gh's sort is not
  * stable), or a set-default mark that disagrees with the ranking (older
- * go-gh releases ignore the mark). Only github.com is understood.
+ * go-gh releases ignore the mark). Remotes on other hosts still take part
+ * in the ranking, since gh may know that host; when one wins, it refuses,
+ * because only github.com is understood.
  * @returns {{ ok: true, repository: string, source: string } | { ok: false, reason: string }}
  */
 function stackRepository() {
@@ -396,7 +432,7 @@ function stackRepository() {
   for (const line of listed.stdout.split('\n')) {
     const match = /^(\S+)\s+(\S+)\s+\(fetch\)\s*$/.exec(line.trim());
     if (!match || remotes.has(match[1])) continue;
-    remotes.set(match[1], { name: match[1], repository: githubRepoOfUrl(match[2]), resolved: null });
+    remotes.set(match[1], { name: match[1], repository: remoteRepository(match[2]), resolved: null });
   }
   // Exit 1 means no remote is marked; anything else is unreadable.
   const marks = run('git', ['config', '--get-regexp', '^remote\\..*\\.gh-resolved$']);
@@ -409,7 +445,7 @@ function stackRepository() {
   }
   const candidates = [...remotes.values()].filter((remote) => remote.repository !== null);
   if (candidates.length === 0) {
-    return { ok: false, reason: 'no git remote of this clone points to github.com' };
+    return { ok: false, reason: 'no git remote of this clone names a repository' };
   }
   const top = Math.max(...candidates.map((remote) => remoteRank(remote.name)));
   const ranked = new Set(candidates.filter((remote) => remoteRank(remote.name) === top).map((remote) => remote.repository));
@@ -430,7 +466,16 @@ function stackRepository() {
       reason: `the remotes of this clone could point gh stack at more than one repository (${[...choices].join(', ')}); set GH_REPO to the one you mean`,
     };
   }
-  return { ok: true, repository: [...choices][0], source: marked.size > 0 ? 'gh repo set-default' : 'git remotes' };
+  const [repository] = [...choices];
+  if (repository.split('/').length !== 2) {
+    // gh may know that host (an enterprise server, or GH_HOST); this runtime
+    // only understands github.com, so it never guesses past it.
+    return {
+      ok: false,
+      reason: `gh stack would act on ${repository}, which is not on github.com; set GH_REPO to the github.com repository you mean`,
+    };
+  }
+  return { ok: true, repository, source: marked.size > 0 ? 'gh repo set-default' : 'git remotes' };
 }
 
 function validateEnum(value, allowed, label) {

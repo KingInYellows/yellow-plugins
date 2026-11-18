@@ -55,6 +55,7 @@ const ENV_KEYS = [
   'FAKE_GIT_GH_RESOLVED',
   'FAKE_GIT_GH_RESOLVED_EXIT',
   'FAKE_GIT_REMOTE_LIST_EXIT',
+  'FAKE_SSH_HOSTNAMES',
   'FAKE_GIT_REVPARSE_EXIT',
   'FAKE_GH_REPORT_NO_ATOMIC',
   'GH_STACK_NO_ATOMIC',
@@ -479,6 +480,27 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
       process.env.FAKE_GIT_REMOTE_URLS = `origin=${url}`;
       expect(merge({ target: '42', confirm: true }).status).toBe('INVALID_ARGS');
     }
+  });
+
+  it('refuses when a remote on another host outranks the github.com one — gh may know that host', () => {
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git upstream=https://ghe.example.com/e/r.git';
+    const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.refusalReason).toContain('ghe.example.com/e/r');
+    expect(merge({ target: '42' }).status).toBe('INVALID_ARGS');
+    // A lower-ranked remote on another host does not get in the way.
+    process.env.FAKE_GIT_REMOTE_URLS = 'upstream=https://github.com/o/r.git origin=https://gitlab.example.com/me/r.git';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+  });
+
+  it('resolves an SSH host alias before reading the remote, as gh does', () => {
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=git@work-github:o/r.git';
+    process.env.FAKE_SSH_HOSTNAMES = 'work-github=github.com';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=ssh://git@work-github/o/r.git';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+    process.env.FAKE_SSH_HOSTNAMES = 'work-github=ghe.example.com';
+    expect(merge({ target: '42' }).status).toBe('INVALID_ARGS');
   });
 
   it('refuses any target when no github.com remote can be read', () => {

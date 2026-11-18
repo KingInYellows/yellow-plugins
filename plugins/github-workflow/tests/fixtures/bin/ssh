@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Fake `ssh` for github-stack-runtime.js tests: only `ssh -G <alias>`.
+#   FAKE_SSH_HOSTNAMES  space-separated "alias=hostname" pairs (~/.ssh/config)
+[ "$1" = "-G" ] || { echo "unrecognized fake ssh invocation: $*" >&2; exit 5; }
+host="$2"
+for pair in ${FAKE_SSH_HOSTNAMES:-}; do
+  [ "${pair%%=*}" = "$2" ] && host="${pair#*=}"
+done
+printf 'user git\nhostname %s\nport 22\n' "$host"
