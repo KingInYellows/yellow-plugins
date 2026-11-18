@@ -23,6 +23,7 @@ const {
   TESTED_GH_STACK_VERSION,
   parseExtensionIdentity,
   parseExtensionVersion,
+  isOlderExtensionVersion,
   parseVersion,
   probeGraphite,
   probeGithub,
@@ -154,6 +155,21 @@ describe('parseExtensionVersion / parseVersion', () => {
     expect(parseExtensionVersion('gh stack\tboneskull/gh-stack\tv1.0.0\n')).toBeNull();
   });
 
+  it('keeps a prerelease or build suffix on the official row', () => {
+    expect(parseExtensionVersion('gh stack\tgithub/gh-stack\tv0.4.0-rc1\n')).toBe('0.4.0-rc1');
+    expect(parseExtensionVersion('gh stack\tgithub/gh-stack\tv0.3.1+build.7\n')).toBe('0.3.1+build.7');
+    expect(parseExtensionVersion('gh stack\tgithub/gh-stack\tv0.3.0rc1\n')).toBeNull();
+  });
+
+  it('orders a prerelease before its own release, and ignores build metadata', () => {
+    expect(isOlderExtensionVersion('0.3.0-rc1', '0.3.0')).toBe(true);
+    expect(isOlderExtensionVersion('0.4.0-rc1', '0.3.0')).toBe(false);
+    expect(isOlderExtensionVersion('0.2.9', '0.3.0')).toBe(true);
+    expect(isOlderExtensionVersion('0.3.0', '0.3.0')).toBe(false);
+    expect(isOlderExtensionVersion('0.3.0+build.7', '0.3.0')).toBe(false);
+    expect(isOlderExtensionVersion('0.3.0+build-7', '0.3.0')).toBe(false);
+  });
+
   it('parses git and gh version lines', () => {
     expect(parseVersion('git version 2.43.0')).toEqual([2, 43, 0]);
     expect(parseVersion('git version 2.55.0.windows.3')).toEqual([2, 55, 0]);
@@ -176,6 +192,16 @@ describe('probeGithub — a verified extension must also be a tested version', (
     process.env.FAKE_GH_AUTH_EXIT = '0';
     process.env.FAKE_GH_EXT_OUTPUT = `gh stack\\t${OFFICIAL_EXTENSION}\\tv0.4.1\\n`;
     expect(probeGithub().readiness).toBe(READINESS.READY);
+  });
+
+  it('ready on a prerelease of a newer version, not-ready on a prerelease of the tested one', () => {
+    process.env.FAKE_GH_AUTH_EXIT = '0';
+    process.env.FAKE_GH_EXT_OUTPUT = `gh stack\\t${OFFICIAL_EXTENSION}\\tv0.4.0-rc1\\n`;
+    const newer = probeGithub();
+    expect(newer.readiness).toBe(READINESS.READY);
+    expect(newer.checks.extensionVersion).toBe('0.4.0-rc1');
+    process.env.FAKE_GH_EXT_OUTPUT = `gh stack\\t${OFFICIAL_EXTENSION}\\tv${TESTED_GH_STACK_VERSION}-rc1\\n`;
+    expect(probeGithub().readiness).toBe(READINESS.NOT_READY);
   });
 
   it('unknown, not ready, when the official row carries no version (locally linked build)', () => {

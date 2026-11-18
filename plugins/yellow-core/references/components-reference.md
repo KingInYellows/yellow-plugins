@@ -279,11 +279,17 @@ than sourced:
   Dependency-free; verified by
   `tests/integration/stack-operation-registry.test.ts`
 - `stack-tooling-probe.js` — the shared owner of provider CLI readiness (`gt` on
-  PATH; `gh auth status` plus a verified `github/gh-stack` extension).
-  `/stack:status`, `stack-provider-router`, and github-workflow's
+  PATH; `gh auth status` plus a verified `github/gh-stack` extension). GitHub
+  readiness also needs gh-stack at or above `TESTED_GH_STACK_VERSION` (0.3.0; a
+  prerelease such as `0.3.0-rc1` counts as older) and git at or above
+  `MIN_GIT_VERSION` (2.36). An older gh-stack or git is `not-ready`; a gh-stack
+  row with no version, or a git version that cannot be read, is `unknown`, never
+  ready. `/stack:status`, `stack-provider-router`, and github-workflow's
   `github-stack-status` / `github-stack-setup` call it. Exception:
-  `commands/setup/all.md`'s dashboard still inlines its own `gt` / `gh` checks,
-  so a readiness change must update it too
+  `commands/setup/all.md`'s dashboard still inlines its own `gt` / `gh` checks
+  (`gh_stack_ext`, `gh_stack_git`, tested by
+  `tests/setup-all-stack-tooling.bats`), so a readiness change must update it
+  too
 - `remote-agent-provider-state.js` — classifies which `remote-agent` provider
   (yellow-cursor, yellow-devin, or yellow-jules) is active for
   `/linear:delegate` and `/setup:all` Step 2.5; a smaller sibling of

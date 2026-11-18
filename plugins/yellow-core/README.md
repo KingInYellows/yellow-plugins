@@ -19,6 +19,7 @@ skills from Claude command wrappers. See
 
 - Git
 - Graphite CLI (`gt`) recommended for branch management
+- For the GitHub stacked-PR provider: an authenticated `gh`, the official `github/gh-stack` extension at 0.3.0 or newer, and git 2.36 or newer. `/stack:status` and `/setup:all` report an older gh-stack or git as not ready, and a gh-stack with no version or a git whose version cannot be read as unknown.
 - github-workflow plugin (optional): under `READY_GITHUB`, stack operations run its `lib/github-stack-runtime.js` through this plugin's `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the active installed version (the newest cached one when that is unknown). Without it they report `RUNTIME_NOT_FOUND` and tell you to install it or run `/stack:select`.
 
 ## Commands

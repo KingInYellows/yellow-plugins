@@ -36,9 +36,13 @@ if [ "$1" = "config" ] && [ "$2" = "remote.pushDefault" ]; then
 fi
 if [ "$1" = "config" ] && [ "$2" = "--get-regexp" ]; then
   # FAKE_GIT_REMOTE_URLS: "name=url" pairs separated by spaces.
-  [ -n "${FAKE_GIT_REMOTE_URLS:-}" ] || exit 1
-  for pair in $FAKE_GIT_REMOTE_URLS; do
+  # FAKE_GIT_GH_RESOLVED: "name=value" pairs (`gh repo set-default` marks).
+  [ -n "${FAKE_GIT_REMOTE_URLS:-}${FAKE_GIT_GH_RESOLVED:-}" ] || exit 1
+  for pair in ${FAKE_GIT_REMOTE_URLS:-}; do
     printf 'remote.%s.url %s\n' "${pair%%=*}" "${pair#*=}"
+  done
+  for pair in ${FAKE_GIT_GH_RESOLVED:-}; do
+    printf 'remote.%s.gh-resolved %s\n' "${pair%%=*}" "${pair#*=}"
   done
   exit 0
 fi

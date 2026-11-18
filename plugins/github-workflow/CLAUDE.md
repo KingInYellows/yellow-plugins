@@ -148,6 +148,12 @@ older extension is reported not ready. Facts the adapter depends on:
 - `add` takes no `--remote`; `init` adopts existing branches given bottom
   to top; `merge` takes a stack or PR number only (the adapter reduces a
   PR URL); `sync` pushes and links existing PRs but never opens one.
+- gh-stack picks its repository with go-gh `repository.Current()`:
+  `GH_REPO`, else the remote marked by `gh repo set-default`, else the
+  github.com remotes ranked upstream, github, origin. The adapter's
+  `stackRepository()` copies that for `merge`, refuses when it could name
+  two repositories, and the merge skill passes the previewed repository
+  back (`--repository`).
 - `rebase` and `sync` leave the stack un-rebased when GitHub retargeted its
   base and the old base did not merge. The adapter reports that as
   `BASE_CHANGE_UNCONFIRMED`, never `SUCCESS`, and `--accept-base-change`

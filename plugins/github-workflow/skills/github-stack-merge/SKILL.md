@@ -117,6 +117,19 @@ Stop before asking when any of these holds, and say which:
   older head of any branch in the set;
 - the branches are also tracked by Graphite.
 
+Ask the adapter which repository the number lands in. Without
+`--confirm` it merges nothing:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge --target "<target>"
+```
+
+On `REQUIRES_CONFIRMATION`, its `repository` field is the repository
+gh-stack resolves (from `GH_REPO`, `gh repo set-default` or the remotes);
+show it in the preview. On `INVALID_ARGS`, report `refusalReason` and stop:
+the repository is ambiguous, or a URL names another repository than the one
+the number would land in.
+
 GitHub evaluates required checks and approvals for every pull request in
 the set against the stack's base branch and refuses the whole merge if one
 is not mergeable. This skill does not bypass that: `gh stack merge` has no
@@ -125,21 +138,25 @@ admin override.
 ### Step 3: Confirm
 
 Use `AskUserQuestion`: "Merge these pull requests via gh stack?" showing
-the full set from Step 2 and the merge method, with options "Merge" /
+the repository, the full set from Step 2 and the merge method, with options "Merge" /
 "Cancel". Never proceed
 without an explicit yes — this lands code. On "Cancel", stop — nothing
 has run.
 
 ### Step 4: Merge
 
+Pass back the `repository` from Step 2. It must match
+`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`; if it does not, stop. The adapter
+refuses when gh-stack would now merge in a different repository.
+
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge --target "<target>" --confirm
+node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge --target "<target>" --repository "<repository>" --confirm
 ```
 
 or, with a merge method:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge --target "<target>" --merge-method <method> --confirm
+node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge --target "<target>" --repository "<repository>" --merge-method <method> --confirm
 ```
 
 If it fails, report `status` and `recoveryAction` exactly. Do not retry

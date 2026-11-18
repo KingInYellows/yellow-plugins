@@ -90,3 +90,15 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
   run grep -E '^node .*<(baseRef|headRef|repository|headSha)>' "$MERGE_SINGLE_SKILL"
   [ "$status" -eq 1 ]
 }
+
+@test "github-stack-merge-single: a fork's head branch is never matched against Graphite branches" {
+  run grep -F 'pullRequest.headInRepository` is `false`' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+}
+
+@test "github-stack-merge: the confirmed merge passes back the previewed repository" {
+  run grep -c -F 'merge --target "<target>" --repository "<repository>"' "$MERGE_SKILL"
+  [ "$output" -eq 2 ]
+  run grep -E '^node .*merge --target "<target>" (--merge-method <method> )?--confirm' "$MERGE_SKILL"
+  [ "$status" -eq 1 ]
+}

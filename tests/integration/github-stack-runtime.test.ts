@@ -51,6 +51,7 @@ const ENV_KEYS = [
   'FAKE_GIT_NOT_ANCESTOR',
   'FAKE_GIT_ANCESTRY_EXIT',
   'FAKE_GIT_REMOTE_URLS',
+  'FAKE_GIT_GH_RESOLVED',
   'FAKE_GIT_REVPARSE_EXIT',
   'FAKE_GH_REPORT_NO_ATOMIC',
   'GH_STACK_NO_ATOMIC',
@@ -316,20 +317,27 @@ describe('submit — --auto always present, --open only when explicit (draft by 
 });
 
 describe('merge — explicit target and confirm required; never gh pr merge', () => {
+  beforeEach(() => {
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git';
+  });
+
   it('refuses without an explicit target', () => {
     expect(merge({ confirm: true }).status).toBe('INVALID_ARGS');
   });
 
-  it('requires confirm: true and runs nothing without it', () => {
+  it('requires confirm: true and runs nothing without it, naming the repository it would merge in', () => {
     const result = merge({ target: '42' });
     expect(result.status).toBe('REQUIRES_CONFIRMATION');
     expect(result.command).toBeNull();
+    expect(result.repository).toBe('o/r');
+    expect(result.safeSummary).toContain('in o/r');
   });
 
   it('builds gh stack merge <target> --yes once confirmed', () => {
     process.env.FAKE_GH_EXIT = '0';
     const result = merge({ target: '42', confirm: true });
     expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'merge', '42', '--yes'] });
+    expect(result.repository).toBe('o/r');
   });
 
   it('reduces a github.com pull request URL to its number — gh stack merge exits 5 on a URL', () => {
@@ -348,7 +356,6 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
   });
 
   it('refuses a pull request URL from another repository — its number would merge a different PR here', () => {
-    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git';
     for (const confirm of [true, false]) {
       const result = merge({ target: 'https://github.com/other/project/pull/42', confirm });
       expect(result.status).toBe('INVALID_ARGS');
@@ -358,18 +365,17 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
   });
 
   it('refuses a pull request URL when GH_REPO points gh at another repository', () => {
-    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git';
     process.env.GH_REPO = 'x/y';
     const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
     expect(result.status).toBe('INVALID_ARGS');
     expect(result.command).toBeNull();
+    expect(result.refusalReason).toContain('x/y');
     expect(result.refusalReason).toContain('GH_REPO');
   });
 
   it('accepts a pull request URL when GH_REPO names the same repository, and names it when asking', () => {
-    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git';
     process.env.FAKE_GH_EXIT = '0';
-    for (const override of ['o/r', 'github.com/O/R']) {
+    for (const override of ['o/r', 'github.com/O/R', 'https://github.com/o/r']) {
       process.env.GH_REPO = override;
       const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
       expect(result.command?.args).toEqual(['stack', 'merge', '42', '--yes']);
@@ -377,10 +383,67 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     expect(merge({ target: 'https://github.com/o/r/pull/42' }).safeSummary).toContain('in o/r');
   });
 
-  it('refuses a pull request URL when no github.com remote can be read', () => {
-    const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
+  it('a numeric target lands where GH_REPO points, and says so before confirming', () => {
+    process.env.GH_REPO = 'x/y';
+    const result = merge({ target: '42' });
+    expect(result.status).toBe('REQUIRES_CONFIRMATION');
+    expect(result.repository).toBe('x/y');
+    expect(result.safeSummary).toContain('in x/y (from GH_REPO)');
+  });
+
+  it('refuses a GH_REPO on another host — the runtime cannot tell which pull request that is', () => {
+    process.env.GH_REPO = 'ghe.example.com/o/r';
+    const result = merge({ target: '42', confirm: true });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.refusalReason).toContain('GH_REPO');
+  });
+
+  it('with a fork and its upstream, a URL must name the repository gh resolves (upstream ranks first)', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/me/r.git upstream=https://github.com/o/r.git';
+    const fork = merge({ target: 'https://github.com/me/r/pull/42', confirm: true });
+    expect(fork.status).toBe('INVALID_ARGS');
+    expect(fork.refusalReason).toContain('o/r');
+    expect(merge({ target: 'https://github.com/o/r/pull/42', confirm: true }).status).toBe('SUCCESS');
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+  });
+
+  it('follows a gh repo set-default mark that agrees with the ranking, refuses one that does not', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/me/r.git upstream=https://github.com/o/r.git';
+    process.env.FAKE_GIT_GH_RESOLVED = 'upstream=base';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+    process.env.FAKE_GIT_GH_RESOLVED = 'origin=base';
+    const disputed = merge({ target: '42', confirm: true });
+    expect(disputed.status).toBe('INVALID_ARGS');
+    expect(disputed.refusalReason).toContain('more than one repository');
+    process.env.FAKE_GIT_GH_RESOLVED = 'upstream=o/r';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+  });
+
+  it('refuses when two equally ranked remotes name different repositories', () => {
+    process.env.FAKE_GIT_REMOTE_URLS = 'a=https://github.com/o/r.git b=https://github.com/me/r.git';
+    const result = merge({ target: '42', confirm: true });
     expect(result.status).toBe('INVALID_ARGS');
     expect(result.command).toBeNull();
+  });
+
+  it('refuses when the confirmed repository is not the one gh stack would merge in now', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    const moved = merge({ target: '42', repository: 'x/y', confirm: true });
+    expect(moved.status).toBe('INVALID_ARGS');
+    expect(moved.command).toBeNull();
+    expect(merge({ target: '42', repository: 'O/R', confirm: true }).status).toBe('SUCCESS');
+    expect(merge({ target: '42', repository: 'o/r --squash', confirm: true }).status).toBe('INVALID_ARGS');
+  });
+
+  it('refuses any target when no github.com remote can be read', () => {
+    delete process.env.FAKE_GIT_REMOTE_URLS;
+    for (const target of ['42', 'https://github.com/o/r/pull/42']) {
+      const result = merge({ target, confirm: true });
+      expect(result.status).toBe('INVALID_ARGS');
+      expect(result.command).toBeNull();
+    }
   });
 
   it('refuses a github.com URL that is not a pull request', () => {
@@ -437,7 +500,7 @@ describe('merge-single — one ordinary pull request, never a stacked one', () =
       draft: false,
       merged: false,
       mergeable_state: 'clean',
-      head: { sha: HEAD, ref: 'feat/x' },
+      head: { sha: HEAD, ref: 'feat/x', repo: { full_name: 'O/r' } },
       base: { ref: 'main', repo: { full_name: 'o/r', default_branch: 'main' } },
       ...overrides,
     });
@@ -493,10 +556,29 @@ describe('merge-single — one ordinary pull request, never a stacked one', () =
     const result = mergeSingle({ target: '42', mergeMethod: 'squash' });
     expect(result.status).toBe('REQUIRES_CONFIRMATION');
     expect(result.mayHaveMutated).toBe(false);
-    expect(result.pullRequest).toEqual({ number: 42, repository: 'o/r', baseRef: 'main', headRef: 'feat/x', headSha: HEAD });
+    expect(result.pullRequest).toEqual({
+      number: 42,
+      repository: 'o/r',
+      baseRef: 'main',
+      headRef: 'feat/x',
+      headRepository: 'O/r',
+      headInRepository: true,
+      headSha: HEAD,
+    });
     expect(result.safeSummary).toContain(HEAD);
     expect(result.previewToken).toBe(token());
     expect(calls()).toEqual(['api repos/{owner}/{repo}/pulls/42']);
+  });
+
+  it('reports a head branch that lives in a fork, or in a deleted fork, as outside the repository', () => {
+    process.env.FAKE_GH_GET_STDOUT = pullRequest({ head: { sha: HEAD, ref: 'feat/x', repo: { full_name: 'me/r' } } });
+    const fork = mergeSingle({ target: '42', mergeMethod: 'squash' }).pullRequest;
+    expect(fork.headRepository).toBe('me/r');
+    expect(fork.headInRepository).toBe(false);
+    process.env.FAKE_GH_GET_STDOUT = pullRequest({ head: { sha: HEAD, ref: 'feat/x', repo: null } });
+    const deleted = mergeSingle({ target: '42', mergeMethod: 'squash' }).pullRequest;
+    expect(deleted.headRepository).toBe('');
+    expect(deleted.headInRepository).toBe(false);
   });
 
   it('refuses a pull request that GitHub reports as part of a stack, confirmed or not', () => {

@@ -94,7 +94,8 @@ function isOlder(a, b) {
 
 /**
  * Read the installed `github/gh-stack` version out of `gh extension list`
- * output: the `vX.Y.Z` column on the official extension's row.
+ * output: the `vX.Y.Z` column on the official extension's row, with any
+ * prerelease or build suffix kept (`v0.4.0-rc1` -> `"0.4.0-rc1"`).
  *
  * @param {string} listOutput
  * @returns {string|null} e.g. `"0.3.0"`, or null when the row has no version
@@ -105,11 +106,25 @@ function parseExtensionVersion(listOutput) {
     const columns = line.trim().split(/\s+/);
     if (!columns.includes(OFFICIAL_EXTENSION)) continue;
     for (const column of columns) {
-      if (/^v?\d+\.\d+\.\d+$/.test(column)) return column.replace(/^v/, '');
+      if (/^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(column)) return column.replace(/^v/, '');
     }
     return null;
   }
   return null;
+}
+
+/**
+ * True when gh-stack `version` (as parseExtensionVersion returns it) is
+ * older than `minimum`. A prerelease (`0.3.0-rc1`) is older than its own
+ * release, as in semver; build metadata (`+abc`) does not count.
+ * @param {string} version
+ * @param {string} minimum
+ */
+function isOlderExtensionVersion(version, minimum) {
+  const triple = parseVersion(version);
+  const floor = parseVersion(minimum);
+  if (isOlder(triple, floor)) return true;
+  return !isOlder(floor, triple) && /^[^+]*-/.test(version);
 }
 
 /**
@@ -268,7 +283,7 @@ function probeGithub() {
     extensionIdentity === 'verified' ? parseExtensionVersion(extensionList.stdout) : null;
   const extensionTriple = parseVersion(extensionVersion);
   const extensionOutdated =
-    extensionTriple !== null && isOlder(extensionTriple, parseVersion(TESTED_GH_STACK_VERSION));
+    extensionTriple !== null && isOlderExtensionVersion(extensionVersion, TESTED_GH_STACK_VERSION);
 
   // gh-stack needs Git 2.36+. A git that cannot be run or read is left
   // unjudged (null): reported as unknown below, never as too old or ready.
@@ -432,6 +447,7 @@ module.exports = {
   MIN_GIT_VERSION,
   parseVersion,
   parseExtensionVersion,
+  isOlderExtensionVersion,
   run,
   parseExtensionIdentity,
   probeGraphite,

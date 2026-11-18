@@ -475,6 +475,7 @@ else
 fi
 
 printf '\n=== Stacked-PR Provider Tooling ===\n'
+# setup-all-stack-tooling:start
 # Owner-scoped, not name-scoped: `gh extension search stack` returns three
 # third-party extensions that also expose a `gh stack` command, and only
 # github/gh-stack is first-party. Matching the bare name would report a
@@ -492,7 +493,8 @@ if [ -n "$_gh" ]; then
       _ext_ver=$(printf '%s\n' "$_ext_list" | awk '{ own = 0; for (i = 1; i <= NF; i++) if ($i == "github/gh-stack") own = 1; if (own) for (i = 1; i <= NF; i++) if ($i ~ /^v?[0-9]+\.[0-9]+\.[0-9]+/) { sub(/^v/, "", $i); print $i; exit } }')
       if [ -z "$_ext_ver" ]; then
         printf 'gh_stack_ext: UNAVAILABLE (github/gh-stack version not reported)\n'
-      elif printf '%s\n' "$_ext_ver" | awk -F. '{ exit !(($1 + 0) * 1000000 + ($2 + 0) * 1000 + ($3 + 0) < 3000) }'; then
+      # A prerelease of the minimum (0.3.0-rc1) is older than 0.3.0 itself.
+      elif printf '%s\n' "$_ext_ver" | awk -F. '{ v = ($1 + 0) * 1000000 + ($2 + 0) * 1000 + ($3 + 0); exit !(v < 3000 || (v == 3000 && $3 ~ /-/)) }'; then
         printf 'gh_stack_ext: OUTDATED (github/gh-stack %s, needs 0.3.0+)\n' "$_ext_ver"
       else
         printf 'gh_stack_ext: OK (github/gh-stack %s)\n' "$_ext_ver"
@@ -508,6 +510,18 @@ if [ -n "$_gh" ]; then
 else
   printf 'gh_stack_ext: SKIPPED (gh not found)\n'
 fi
+# gh-stack needs Git 2.36+ (MIN_GIT_VERSION in lib/stack-tooling-probe.js;
+# change both together). A git that cannot be run or read is UNAVAILABLE,
+# never OK.
+_stack_git=$(git --version 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+/) { split($i, p, "."); printf "%d.%d.%d", p[1], p[2], p[3]; exit } }')
+if [ -z "$_stack_git" ]; then
+  printf 'gh_stack_git: UNAVAILABLE (git --version could not be run or read)\n'
+elif printf '%s\n' "$_stack_git" | awk -F. '{ exit !(($1 + 0) * 1000000 + ($2 + 0) * 1000 + ($3 + 0) < 2036000) }'; then
+  printf 'gh_stack_git: OUTDATED (git %s, gh-stack needs 2.36+)\n' "$_stack_git"
+else
+  printf 'gh_stack_git: OK (git %s)\n' "$_stack_git"
+fi
+# setup-all-stack-tooling:end
 
 printf '\n=== Remote-Agent Provider Tooling ===\n'
 # setup-all-remote-agent-tooling:start
@@ -732,7 +746,12 @@ classified like any other plugin, but its setup is only ever offered when it is
 the **enabled** provider — a user running Graphite must never be asked to
 configure GitHub stacks as well.
 
-- READY: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` OK
+- READY: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` OK AND `gh_stack_git` OK
+- PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` OK AND `gh_stack_git` is
+  `OUTDATED` — gh-stack needs Git 2.36+; detail: "upgrade git to 2.36 or newer
+  (show the version from that row)"
+- UNKNOWN: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` OK AND `gh_stack_git` is
+  `UNAVAILABLE` — git's version was never read; do NOT report READY
 - PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` is `OUTDATED` — the
   official extension is older than the tested version; detail: "upgrade with
   `gh extension upgrade stack`, in every clone's environment at once"
