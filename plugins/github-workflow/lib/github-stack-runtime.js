@@ -350,18 +350,26 @@ function stackRepository() {
     }
     return { ok: true, repository: `${match[2]}/${match[3]}`.toLowerCase(), source: 'GH_REPO' };
   }
-  const config = run('git', ['config', '--get-regexp', '^remote\\..*\\.(url|gh-resolved)$']);
-  if (!config.ok || config.code !== 0) {
+  // `git remote -v` prints each remote's effective fetch URL, with any
+  // `url.<base>.insteadOf` rewrite applied, as go-gh reads it.
+  const listed = run('git', ['remote', '-v']);
+  if (!listed.ok || listed.code !== 0) {
     return { ok: false, reason: 'no git remote of this clone could be read' };
   }
   const remotes = new Map();
-  for (const line of config.stdout.split('\n')) {
-    const match = /^remote\.(.+)\.(url|gh-resolved)\s+(\S+)/.exec(line.trim());
-    if (!match) continue;
-    const entry = remotes.get(match[1]) || { name: match[1], repository: null, resolved: null };
-    if (match[2] === 'url') entry.repository = entry.repository || githubRepoOfUrl(match[3]);
-    else entry.resolved = match[3];
-    remotes.set(match[1], entry);
+  for (const line of listed.stdout.split('\n')) {
+    const match = /^(\S+)\s+(\S+)\s+\(fetch\)\s*$/.exec(line.trim());
+    if (!match || remotes.has(match[1])) continue;
+    remotes.set(match[1], { name: match[1], repository: githubRepoOfUrl(match[2]), resolved: null });
+  }
+  // Exit 1 means no remote is marked; anything else is unreadable.
+  const marks = run('git', ['config', '--get-regexp', '^remote\\..*\\.gh-resolved$']);
+  if (!marks.ok || (marks.code !== 0 && marks.code !== 1)) {
+    return { ok: false, reason: 'the gh repo set-default marks of this clone could not be read' };
+  }
+  for (const line of marks.code === 0 ? marks.stdout.split('\n') : []) {
+    const match = /^remote\.(.+)\.gh-resolved\s+(\S+)/.exec(line.trim());
+    if (match && remotes.has(match[1])) remotes.get(match[1]).resolved = match[2];
   }
   const candidates = [...remotes.values()].filter((remote) => remote.repository !== null);
   if (candidates.length === 0) {

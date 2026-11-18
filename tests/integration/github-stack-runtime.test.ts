@@ -52,6 +52,8 @@ const ENV_KEYS = [
   'FAKE_GIT_ANCESTRY_EXIT',
   'FAKE_GIT_REMOTE_URLS',
   'FAKE_GIT_GH_RESOLVED',
+  'FAKE_GIT_GH_RESOLVED_EXIT',
+  'FAKE_GIT_REMOTE_LIST_EXIT',
   'FAKE_GIT_REVPARSE_EXIT',
   'FAKE_GH_REPORT_NO_ATOMIC',
   'GH_STACK_NO_ATOMIC',
@@ -435,6 +437,14 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     expect(moved.command).toBeNull();
     expect(merge({ target: '42', repository: 'O/R', confirm: true }).status).toBe('SUCCESS');
     expect(merge({ target: '42', repository: 'o/r --squash', confirm: true }).status).toBe('INVALID_ARGS');
+  });
+
+  it('fails closed when the remotes or the set-default marks cannot be read', () => {
+    process.env.FAKE_GIT_REMOTE_LIST_EXIT = '128';
+    expect(merge({ target: '42', confirm: true }).status).toBe('INVALID_ARGS');
+    delete process.env.FAKE_GIT_REMOTE_LIST_EXIT;
+    process.env.FAKE_GIT_GH_RESOLVED_EXIT = '3';
+    expect(merge({ target: '42', confirm: true }).status).toBe('INVALID_ARGS');
   });
 
   it('refuses any target when no github.com remote can be read', () => {
