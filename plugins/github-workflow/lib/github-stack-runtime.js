@@ -375,7 +375,9 @@ function stackRepository() {
       repository = githubRepoOfUrl(override);
     } else {
       const match = /^(?:([^/\s]+)\/)?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(override);
-      if (match && (match[1] === undefined || match[1].toLowerCase() === 'github.com')) {
+      // A hostless override uses GH_HOST, as gh does.
+      const host = match ? (match[1] || (process.env.GH_HOST || '').trim() || 'github.com') : '';
+      if (match && host.toLowerCase() === 'github.com') {
         repository = `${match[2]}/${match[3]}`.toLowerCase();
       }
     }

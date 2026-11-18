@@ -41,6 +41,7 @@ const FIXTURE_BIN = join(__dirname, '..', '..', 'plugins', 'github-workflow', 't
 const LIB = join(__dirname, '..', '..', 'plugins', 'github-workflow', 'lib', 'github-stack-runtime.js');
 
 const ENV_KEYS = [
+  'GH_HOST',
   'FAKE_GH_EXIT',
   'FAKE_GH_STDOUT',
   'FAKE_GH_STDERR',
@@ -414,6 +415,16 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     const result = merge({ target: '42', confirm: true });
     expect(result.status).toBe('INVALID_ARGS');
     expect(result.refusalReason).toContain('GH_REPO');
+  });
+
+  it('reads a hostless GH_REPO on GH_HOST, as gh does', () => {
+    process.env.GH_REPO = 'o/r';
+    process.env.GH_HOST = 'ghe.example.com';
+    const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
+    expect(result.status).toBe('INVALID_ARGS');
+    expect(result.refusalReason).toContain('GH_REPO');
+    process.env.GH_HOST = 'github.com';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
   });
 
   it('with a fork and its upstream, a URL must name the repository gh resolves (upstream ranks first)', () => {

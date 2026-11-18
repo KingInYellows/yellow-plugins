@@ -91,8 +91,12 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
   [ "$status" -eq 1 ]
 }
 
-@test "github-stack-merge-single: a fork's head branch is never matched against Graphite branches" {
+@test "github-stack-merge-single: a fork's head branch is never matched against Graphite branches, but ownership is still asked" {
   run grep -F 'pullRequest.headInRepository` is `false`' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+  run grep -F 'go straight to the question below' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+  run grep -F 'Is this pull request part of a Graphite stack?' "$MERGE_SINGLE_SKILL"
   [ "$status" -eq 0 ]
 }
 
