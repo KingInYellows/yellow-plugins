@@ -30,8 +30,14 @@ fi
 if [ "$1" = "remote" ] && [ "${2:-}" = "-v" ]; then
   # FAKE_GIT_REMOTE_URLS: "name=url" pairs separated by spaces.
   [ -n "${FAKE_GIT_REMOTE_LIST_EXIT:-}" ] && exit "$FAKE_GIT_REMOTE_LIST_EXIT"
+  # FAKE_GIT_REMOTE_PUSH_URLS: "name=url" pairs overriding a push URL.
   for pair in ${FAKE_GIT_REMOTE_URLS:-}; do
-    printf '%s\t%s (fetch)\n%s\t%s (push)\n' "${pair%%=*}" "${pair#*=}" "${pair%%=*}" "${pair#*=}"
+    name="${pair%%=*}"
+    push="${pair#*=}"
+    for over in ${FAKE_GIT_REMOTE_PUSH_URLS:-}; do
+      [ "${over%%=*}" = "$name" ] && push="${over#*=}"
+    done
+    printf '%s\t%s (fetch)\n%s\t%s (push)\n' "$name" "${pair#*=}" "$name" "$push"
   done
   exit 0
 fi

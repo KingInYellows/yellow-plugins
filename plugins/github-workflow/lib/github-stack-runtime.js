@@ -428,11 +428,21 @@ function stackRepository() {
   if (!listed.ok || listed.code !== 0) {
     return { ok: false, reason: 'no git remote of this clone could be read' };
   }
-  const remotes = new Map();
+  // go-gh reads a remote's identity from its fetch URL and falls back to
+  // its push URL when the fetch URL names no repository (a local mirror).
+  const urls = new Map();
   for (const line of listed.stdout.split('\n')) {
-    const match = /^(\S+)\s+(\S+)\s+\(fetch\)\s*$/.exec(line.trim());
-    if (!match || remotes.has(match[1])) continue;
-    remotes.set(match[1], { name: match[1], repository: remoteRepository(match[2]), resolved: null });
+    const match = /^(\S+)\s+(\S+)\s+\((fetch|push)\)\s*$/.exec(line.trim());
+    if (!match) continue;
+    if (!urls.has(match[1])) urls.set(match[1], {});
+    const entry = urls.get(match[1]);
+    if (entry[match[3]] === undefined) entry[match[3]] = match[2];
+  }
+  const remotes = new Map();
+  for (const [name, entry] of urls) {
+    const fetched = entry.fetch === undefined ? null : remoteRepository(entry.fetch);
+    const repository = fetched !== null || entry.push === undefined ? fetched : remoteRepository(entry.push);
+    remotes.set(name, { name, repository, resolved: null });
   }
   // Exit 1 means no remote is marked; anything else is unreadable.
   const marks = run('git', ['config', '--get-regexp', '^remote\\..*\\.gh-resolved$']);

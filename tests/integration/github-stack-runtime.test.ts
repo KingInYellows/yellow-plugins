@@ -56,6 +56,7 @@ const ENV_KEYS = [
   'FAKE_GIT_GH_RESOLVED_EXIT',
   'FAKE_GIT_REMOTE_LIST_EXIT',
   'FAKE_SSH_HOSTNAMES',
+  'FAKE_GIT_REMOTE_PUSH_URLS',
   'FAKE_GIT_REVPARSE_EXIT',
   'FAKE_GH_REPORT_NO_ATOMIC',
   'GH_STACK_NO_ATOMIC',
@@ -490,6 +491,17 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     expect(merge({ target: '42' }).status).toBe('INVALID_ARGS');
     // A lower-ranked remote on another host does not get in the way.
     process.env.FAKE_GIT_REMOTE_URLS = 'upstream=https://github.com/o/r.git origin=https://gitlab.example.com/me/r.git';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+  });
+
+  it('reads a remote that fetches from a local mirror by its push URL, as gh does', () => {
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git upstream=/srv/mirror/r.git';
+    process.env.FAKE_GIT_REMOTE_PUSH_URLS = 'upstream=https://github.com/other/r.git';
+    expect(merge({ target: '42' }).repository).toBe('other/r');
+    expect(merge({ target: 'https://github.com/o/r/pull/42', confirm: true }).status).toBe('INVALID_ARGS');
+    // A fetch URL that names a repository wins over the push URL.
+    process.env.FAKE_GIT_REMOTE_PUSH_URLS = 'origin=https://github.com/other/r.git';
+    process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git';
     expect(merge({ target: '42' }).repository).toBe('o/r');
   });
 
