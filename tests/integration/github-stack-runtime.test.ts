@@ -504,6 +504,10 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     process.env.FAKE_GIT_REMOTE_V =
       'upstream\t/srv/mirror/r.git (fetch)\nupstream\thttps://github.com/first/r.git (push)\nupstream\thttps://github.com/last/r.git (push)\n';
     expect(merge({ target: '42' }).repository).toBe('last/r');
+    // A partial clone's fetch row carries its filter.
+    process.env.FAKE_GIT_REMOTE_V =
+      'origin\thttps://github.com/o/r.git (fetch) [blob:none]\norigin\thttps://github.com/other/r.git (push)\n';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
     delete process.env.FAKE_GIT_REMOTE_V;
     // A fetch URL that names a repository wins over the push URL.
     process.env.FAKE_GIT_REMOTE_PUSH_URLS = 'origin=https://github.com/other/r.git';

@@ -432,7 +432,8 @@ function stackRepository() {
   // its push URL when the fetch URL names no repository (a local mirror).
   const urls = new Map();
   for (const line of listed.stdout.split('\n')) {
-    const match = /^(\S+)\s+(\S+)\s+\((fetch|push)\)\s*$/.exec(line.trim());
+    // A partial clone adds a filter after the kind: `(fetch) [blob:none]`.
+    const match = /^(\S+)\s+(\S+)\s+\((fetch|push)\)(?:\s+\[[^\]]*\])?\s*$/.exec(line.trim());
     if (!match) continue;
     if (!urls.has(match[1])) urls.set(match[1], {});
     const entry = urls.get(match[1]);
