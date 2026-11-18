@@ -817,6 +817,26 @@ plan a PR names in its body or commits under `plans/`
   reliability, performance, contract and testing findings, and any finding that
   cites a defect, keep their severity.
 
+### Merge Approval Label (yellow-review)
+
+`check-merge-ready` (`/review:merge-ready`) counts the `merge-approved` label as
+the owner's approval of a medium or high tier PR, because GitHub refuses an
+approving review from the PR's own author. It reads the label's history from the
+REST issue events, the only API that reports `performed_via_github_app`. The
+latest change to the label must be an addition by a login in
+`review_approval_humans` whose account type is `User`, with
+`performed_via_github_app` null, at or after the time the head arrived.
+
+- **What it tells apart.** An addition through a GitHub App, such as an agent's
+  GitHub tools acting as the owner, never approves.
+- **What it cannot tell apart.** A personal access token or a `gh` login acting
+  as the owner carries no app, so its addition looks hand-made. Keep any
+  credential that can label PRs as an approving login out of agent sessions;
+  agents must never add `merge-approved`.
+- **Revocation.** A later removal of the label, a removal and re-addition by
+  anyone else, or a new commit on the head makes the approval stale. Unreadable
+  events leave the approval unknown (`label_events_unknown`), never approved.
+
 ### Persona Selection Shadow Log (yellow-review)
 
 Off by default. When `yellow-plugins.local.md` sets `reviewer_selection: shadow`
