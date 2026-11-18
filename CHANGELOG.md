@@ -13,6 +13,33 @@ and this project adheres to
 
 ---
 
+## [2.1.37] - 2026-11-18
+
+### Changed
+
+- **yellow-ci 1.5.11, yellow-goal 0.4.2** — The typed-only commands are named in
+  a description Claude still sees. `/ci:runner-cleanup` and `/goal:run-real` set
+  `disable-model-invocation: true`, which hides their own descriptions, so the
+  `/ci:runner-health` description now says disk cleanup is typed-only and the
+  `/goal:run-stub` description says a real, paid run is typed-only. Asked in
+  plain language, Claude tells the user to type them instead of working around
+  them (CLAUDE-341, #1858).
+
+### Fixed
+
+- **yellow-core 2.17.1, yellow-morph 1.3.4, yellow-ruvector 2.0.7, yellow-review
+  3.18.3** — Directory locks stay exclusive on Ubuntu 26.04, whose uutils
+  `mkdir` can tell several racing callers they created the same directory. The
+  compound-staging drain and Stop capture locks, the morph and ruvector install
+  locks, the ruvector model lock and its reclaim markers are now claimed by an
+  exclusive create of an `.owner` or `pid` file and released by renaming them
+  aside. The `/setup:all` ruvector probe caps its writes at 2 MiB and still
+  probes when `TMPDIR` is unusable, and yellow-review's ignored-file guard no
+  longer makes `run-verify-command` refuse while a ruvector co-edit lock exists
+  (CLAUDE-348, #1844).
+
+---
+
 ## [2.1.36] - 2026-11-17
 
 ### Added

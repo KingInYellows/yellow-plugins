@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.5.11
+
+### Patch Changes
+
+- [#1858](https://github.com/KingInYellows/yellow-plugins/pull/1858)
+  [`afc20b7`](https://github.com/KingInYellows/yellow-plugins/commit/afc20b7b85092e62c76aa49eb6387b6a26d073aa)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Name the
+  typed-only commands in a description Claude still sees (CLAUDE-341).
+  `/ci:runner-cleanup` and `/goal:run-real` set
+  `disable-model-invocation: true`, so their own descriptions are hidden. Asked
+  in plain language, Claude now tells the user to type them instead of working
+  around them.
+  - yellow-ci: the `/ci:runner-health` description says disk cleanup is
+    typed-only.
+  - yellow-goal: the `/goal:run-stub` description says a real, paid run is
+    typed-only.
+
 ## 1.5.10
 
 ### Patch Changes
