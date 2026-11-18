@@ -154,7 +154,8 @@ older extension is reported not ready. Facts the adapter depends on:
   aliases resolved (`ssh -G`). The adapter's `stackRepository()` copies
   that for `merge`, refuses when it could name two repositories or when a
   remote on another host wins, and the merge skill passes the previewed
-  repository back (`--repository`).
+  repository back (`--repository`). The confirmed `gh stack merge` runs
+  with `GH_REPO=github.com/<that repository>`, so it cannot act elsewhere.
 - `rebase` and `sync` leave the stack un-rebased when GitHub retargeted its
   base and the old base did not merge. The adapter reports that as
   `BASE_CHANGE_UNCONFIRMED`, never `SUCCESS`, and `--accept-base-change`

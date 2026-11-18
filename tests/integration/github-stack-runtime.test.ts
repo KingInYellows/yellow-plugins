@@ -60,6 +60,7 @@ const ENV_KEYS = [
   'FAKE_GIT_REMOTE_V',
   'FAKE_GIT_REVPARSE_EXIT',
   'FAKE_GH_REPORT_NO_ATOMIC',
+  'FAKE_GH_REPORT_GH_REPO',
   'GH_STACK_NO_ATOMIC',
   'GH_REPO',
   'FAKE_GH_LOG',
@@ -493,6 +494,14 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     // A lower-ranked remote on another host does not get in the way.
     process.env.FAKE_GIT_REMOTE_URLS = 'upstream=https://github.com/o/r.git origin=https://gitlab.example.com/me/r.git';
     expect(merge({ target: '42' }).repository).toBe('o/r');
+  });
+
+  it('pins the confirmed merge to the checked repository', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GH_REPORT_GH_REPO = '1';
+    const result = merge({ target: '42', repository: 'o/r', confirm: true });
+    expect(result.status).toBe('SUCCESS');
+    expect(result.stderr).toContain('gh-repo: github.com/o/r');
   });
 
   it('reads a remote that fetches from a local mirror by its push URL, as gh does', () => {

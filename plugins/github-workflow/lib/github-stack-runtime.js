@@ -134,16 +134,16 @@ const MERGEABLE_STATES = Object.freeze(['clean', 'has_hooks', 'unstable']);
  * would turn off the all-or-nothing push this runtime promises. It is
  * dropped here rather than overridden per command.
  */
-function childEnv() {
-  const env = { ...process.env };
+function childEnv(extra) {
+  const env = { ...process.env, ...extra };
   delete env.GH_STACK_NO_ATOMIC;
   return env;
 }
 
-function run(bin, args) {
+function run(bin, args, extraEnv) {
   const result = spawnSync(bin, args, {
     encoding: 'utf8',
-    env: childEnv(),
+    env: childEnv(extraEnv),
     timeout: spawnTimeoutMs,
     shell: false,
     windowsHide: true,
@@ -378,7 +378,9 @@ function sshHostName(alias) {
 function remoteRepository(url) {
   const split = splitRemoteUrl(url);
   if (!split) return null;
-  const host = split.ssh && !GITHUB_HOSTS.includes(split.host) ? sshHostName(split.host) : split.host;
+  // go-gh translates every SSH remote, github.com included (`Host github.com`
+  // can point elsewhere).
+  const host = split.ssh ? sshHostName(split.host) : split.host;
   return GITHUB_HOSTS.includes(host) ? split.repository : `${host}/${split.repository}`;
 }
 
@@ -936,7 +938,9 @@ function merge({ target, mergeMethod, repository, confirm }) {
     if (!methodCheck.ok) return refusalResult('merge', methodCheck.reason);
     args.push('--merge-method', methodCheck.value);
   }
-  const execResult = run('gh', args);
+  // Pin the child to the repository that was checked and confirmed, so a
+  // remote changed in between cannot move the merge somewhere else.
+  const execResult = run('gh', args, { GH_REPO: `github.com/${where}` });
   return { ...shapeResult({ op: 'merge', bin: 'gh', args, execResult, mayHaveMutated: true }), repository: where };
 }
 

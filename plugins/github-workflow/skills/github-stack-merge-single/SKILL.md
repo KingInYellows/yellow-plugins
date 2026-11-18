@@ -78,8 +78,9 @@ own the pull request: one provider owns a stack. When
 (or a deleted one), so a branch name match proves nothing: skip the
 `gt log short` comparison and go straight to the question below.
 Otherwise treat `pullRequest.headRef` as text to compare and never put it
-in a command. If `gt` is installed and the output of `gt log short`
-contains that name, stop and say that it lands through Graphite. If this
+in a command. If `gt` is installed and `gt log short` lists a branch
+named exactly that (a whole entry, not part of a longer name), stop and
+say that it lands through Graphite. If this
 clone cannot tell either way, use
 `AskUserQuestion`: "Is this pull request part of a Graphite stack?" with
 options "No" / "Yes, Graphite", and stop on yes.

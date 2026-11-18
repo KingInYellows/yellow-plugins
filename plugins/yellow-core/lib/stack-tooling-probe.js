@@ -106,7 +106,7 @@ function parseExtensionVersion(listOutput) {
     const columns = line.trim().split(/\s+/);
     if (!columns.includes(OFFICIAL_EXTENSION)) continue;
     for (const column of columns) {
-      if (/^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(column)) return column.replace(/^v/, '');
+      if (/^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(column)) return column.replace(/^v/, '');
     }
     return null;
   }

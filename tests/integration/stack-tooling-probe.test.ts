@@ -157,6 +157,8 @@ describe('parseExtensionVersion / parseVersion', () => {
 
   it('keeps a prerelease or build suffix on the official row', () => {
     expect(parseExtensionVersion('gh stack\tgithub/gh-stack\tv0.4.0-rc1\n')).toBe('0.4.0-rc1');
+    expect(parseExtensionVersion('gh stack\tgithub/gh-stack\tv0.4.0-rc1+build.7\n')).toBe('0.4.0-rc1+build.7');
+    expect(isOlderExtensionVersion('0.3.0+build-1', '0.3.0')).toBe(false);
     expect(parseExtensionVersion('gh stack\tgithub/gh-stack\tv0.3.1+build.7\n')).toBe('0.3.1+build.7');
     expect(parseExtensionVersion('gh stack\tgithub/gh-stack\tv0.3.0rc1\n')).toBeNull();
   });

@@ -54,6 +54,11 @@ ext() { export FAKE_EXT_LIST="gh stack\tgithub/gh-stack\t$1\n"; }
   [[ "$output" == *"gh_stack_ext: OK (github/gh-stack 0.4.0-rc1)"* ]]
 }
 
+@test "build metadata never makes a release a prerelease" {
+  ext v0.3.0+build-1; probe
+  [[ "$output" == *"gh_stack_ext: OK (github/gh-stack 0.3.0+build-1)"* ]]
+}
+
 @test "an official row with no version is UNAVAILABLE" {
   export FAKE_EXT_LIST='gh stack\tgithub/gh-stack\t\n'; probe
   [[ "$output" == *"gh_stack_ext: UNAVAILABLE (github/gh-stack version not reported)"* ]]

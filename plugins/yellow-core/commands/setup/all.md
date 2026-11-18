@@ -493,8 +493,9 @@ if [ -n "$_gh" ]; then
       _ext_ver=$(printf '%s\n' "$_ext_list" | awk '{ own = 0; for (i = 1; i <= NF; i++) if ($i == "github/gh-stack") own = 1; if (own) for (i = 1; i <= NF; i++) if ($i ~ /^v?[0-9]+\.[0-9]+\.[0-9]+/) { sub(/^v/, "", $i); print $i; exit } }')
       if [ -z "$_ext_ver" ]; then
         printf 'gh_stack_ext: UNAVAILABLE (github/gh-stack version not reported)\n'
-      # A prerelease of the minimum (0.3.0-rc1) is older than 0.3.0 itself.
-      elif printf '%s\n' "$_ext_ver" | awk -F. '{ v = ($1 + 0) * 1000000 + ($2 + 0) * 1000 + ($3 + 0); exit !(v < 3000 || (v == 3000 && $3 ~ /-/)) }'; then
+      # A prerelease of the minimum (0.3.0-rc1) is older than 0.3.0 itself;
+      # build metadata (+...) is dropped first and never counts.
+      elif printf '%s\n' "${_ext_ver%%+*}" | awk -F. '{ v = ($1 + 0) * 1000000 + ($2 + 0) * 1000 + ($3 + 0); exit !(v < 3000 || (v == 3000 && $3 ~ /-/)) }'; then
         printf 'gh_stack_ext: OUTDATED (github/gh-stack %s, needs 0.3.0+)\n' "$_ext_ver"
       else
         printf 'gh_stack_ext: OK (github/gh-stack %s)\n' "$_ext_ver"
