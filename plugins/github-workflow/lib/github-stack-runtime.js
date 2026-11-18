@@ -368,11 +368,21 @@ function remoteRank(name) {
 function stackRepository() {
   const override = (process.env.GH_REPO || '').trim();
   if (override) {
-    const match = /^(?:(?:https:\/\/)?([^/\s]+)\/)?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec(override);
-    if (!match || (match[1] !== undefined && match[1].toLowerCase() !== 'github.com')) {
+    // go-gh reads a URL like a remote (a `.git` suffix is dropped) and
+    // `[HOST/]OWNER/REPO` literally, so `o/r.git` names repository `r.git`.
+    let repository = null;
+    if (override.includes('://')) {
+      repository = githubRepoOfUrl(override);
+    } else {
+      const match = /^(?:([^/\s]+)\/)?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(override);
+      if (match && (match[1] === undefined || match[1].toLowerCase() === 'github.com')) {
+        repository = `${match[2]}/${match[3]}`.toLowerCase();
+      }
+    }
+    if (repository === null) {
       return { ok: false, reason: `GH_REPO is "${override}", which is not a github.com repository this runtime can read` };
     }
-    return { ok: true, repository: `${match[2]}/${match[3]}`.toLowerCase(), source: 'GH_REPO' };
+    return { ok: true, repository, source: 'GH_REPO' };
   }
   // `git remote -v` prints each remote's effective fetch URL, with any
   // `url.<base>.insteadOf` rewrite applied, as go-gh reads it.

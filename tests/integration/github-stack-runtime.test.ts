@@ -401,6 +401,14 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     expect(result.safeSummary).toContain('in x/y (from GH_REPO)');
   });
 
+  it('reads GH_REPO OWNER/REPO literally, as gh does, and only drops .git from a URL', () => {
+    process.env.GH_REPO = 'o/r.git';
+    expect(merge({ target: '42' }).repository).toBe('o/r.git');
+    expect(merge({ target: 'https://github.com/o/r/pull/42', confirm: true }).status).toBe('INVALID_ARGS');
+    process.env.GH_REPO = 'https://github.com/o/r.git';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+  });
+
   it('refuses a GH_REPO on another host — the runtime cannot tell which pull request that is', () => {
     process.env.GH_REPO = 'ghe.example.com/o/r';
     const result = merge({ target: '42', confirm: true });
