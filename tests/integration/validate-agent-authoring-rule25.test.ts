@@ -614,4 +614,27 @@ describe('validate-agent-authoring RULE 25 (disable-model-invocation)', () => {
     );
     expect(runValidator(dir).status).toBe(0);
   });
+
+  it('checks a flagged command that dispatches another flagged command', () => {
+    writeAgent(
+      dir,
+      'alpha/commands/alpha/run.md',
+      command(
+        'alpha:run',
+        DISABLED,
+        'Invoke `/alpha:cancel` via the Skill tool.'
+      )
+    );
+    writeAgent(
+      dir,
+      'alpha/commands/alpha/cancel.md',
+      command('alpha:cancel', DISABLED)
+    );
+    notice(dir, 'alpha', '/alpha:run', '/alpha:cancel');
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain(
+      'alpha/commands/alpha/run.md: RULE 25 — tells the model to run "alpha:cancel"'
+    );
+  });
 });

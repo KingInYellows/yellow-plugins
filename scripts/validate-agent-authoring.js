@@ -2076,7 +2076,6 @@ function validateModelInvocationFlag(files, errors, warnings) {
     )
   );
   for (const filePath of proseFiles) {
-    if (disabledPaths.has(filePath)) continue;
     const content = fs.readFileSync(filePath, 'utf8');
     const fmBlock = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
     const body = fmBlock ? content.slice(fmBlock[0].length) : content;
@@ -2084,6 +2083,9 @@ function validateModelInvocationFlag(files, errors, warnings) {
       '\n'
     );
     for (const [id, targetPath] of disabled) {
+      // A flagged entry point may name itself; a typed one still loads its
+      // body, so its dispatches to other flagged entry points are checked.
+      if (targetPath === filePath) continue;
       const slash = slashFormRe(id);
       const ticked = `\`${id}\``;
       let warned = false;
