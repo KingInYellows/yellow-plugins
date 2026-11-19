@@ -150,8 +150,13 @@ const scenarios = {
   },
 };
 
-function injected(ev, stdout) {
+function injected(ev, stdout, status, stderr) {
   const r = { ctx: 0, sys: 0, raw: stdout.length };
+  // Exit 2 blocks the call; Claude reads its stderr.
+  if (status === 2) {
+    r.ctx = Buffer.byteLength(stderr || '');
+    return r;
+  }
   const t = stdout.trim();
   if (!t) return r;
   let j;
@@ -225,7 +230,7 @@ for (const [plugin, j] of Object.entries(catalog)) {
         if (i >= 2) times.push(ms);
         last = r;
       }
-      const inj = injected(h.ev, last.stdout || '');
+      const inj = injected(h.ev, last.stdout || '', last.status, last.stderr);
       rows.push({
         plugin,
         script: path
