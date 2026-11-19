@@ -123,7 +123,6 @@ const edit = (ev, file = 'README.md', sid = base.session_id) =>
     },
     tool_response: { success: true },
   });
-const BENCH_START_MS = Date.now();
 const RUN_ID = `${process.pid}-${Date.now()}`;
 const pairEdit = (i) =>
   edit(
@@ -168,15 +167,15 @@ const waitCiRefresh = (env) => {
 const primeCiCache = (env, plugin) => {
   waitCiRefresh(env);
   if (plugin !== 'yellow-ci') return true;
-  // Only a cache written during this bench run counts, and only while it is
-  // still fresh (under the hook's 10 min TTL): a leftover from an earlier run
-  // or another project must not mark a failed refresh as primed.
+  // Only a fresh cache (under the hook's 10 min TTL) counts: an expired one
+  // must not mark a failed refresh as primed. A fresh one from a bench run a
+  // few minutes earlier is a real hit, so it counts too.
   const now = Date.now();
   try {
     return fs.readdirSync(env.CLAUDE_PLUGIN_DATA).some((n) => {
       if (!n.startsWith('last-check-')) return false;
       const { mtimeMs } = fs.statSync(path.join(env.CLAUDE_PLUGIN_DATA, n));
-      return mtimeMs >= BENCH_START_MS && now - mtimeMs < 600000;
+      return now - mtimeMs < 600000;
     });
   } catch {
     return false;
