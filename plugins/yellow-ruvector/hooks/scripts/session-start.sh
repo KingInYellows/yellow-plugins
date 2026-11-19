@@ -126,7 +126,7 @@ finish() {
 # A semantic recall loads the ONNX model (1.2-2.1s warm), which would set the
 # floor for every session start (SessionStart budget: p95 500ms). The hook
 # instead injects the recall a background job saved at the previous session
-# start (.ruvector/recall-cache.json) and starts a new one for the next
+# start (in the plugin data dir, see recall_paths) and starts a new one for the next
 # session. The query is fixed, so the saved results are one session old at
 # most; a project's first session after the upgrade gets none.
 RECALL_QUERY="recent mistakes, fixes, and useful patterns for this project"
@@ -145,18 +145,38 @@ case "$RECALL_REFRESH_SECS" in ''|*[!0-9]*) RECALL_REFRESH_SECS=30 ;; esac
 # The physical store dir as coedit validates it (a worktree's symlinked
 # .ruvector must resolve to the main checkout's store).
 STORE_DIR=$(coedit_store_dir "$PROJECT_DIR") || STORE_DIR=""
-RECALL_CACHE="${STORE_DIR:+${STORE_DIR}/recall-cache.json}"
+
+# The cache and its refresh stamp live in the plugin data dir (validated as
+# the MCP launcher does), keyed by the store's physical path: never in the
+# worktree, where yellow-review's resolve guard counts every new ignored file
+# and a checkout could ship one.
+RECALL_DIR="" RECALL_CACHE="" RECALL_STAMP=""
+recall_paths() {
+  local key
+  [ -n "$STORE_DIR" ] || return 1
+  # shellcheck source=../../lib/install-ruvector.sh
+  . "${RUVECTOR_PLUGIN_ROOT}/lib/install-ruvector.sh" 2>/dev/null || return 1
+  : "${CLAUDE_PLUGIN_ROOT:=$RUVECTOR_PLUGIN_ROOT}"
+  export CLAUDE_PLUGIN_ROOT
+  yellow_ruvector_validate_paths --data-only >/dev/null 2>&1 || return 1
+  key=$(printf '%s' "$STORE_DIR" | cksum | tr -c '0-9\n' '-') || return 1
+  RECALL_DIR="${RUVECTOR_DATA}/recall"
+  RECALL_CACHE="${RECALL_DIR}/${key}.json"
+  RECALL_STAMP="${RECALL_DIR}/${key}.refresh"
+}
+recall_paths || RECALL_CACHE=""
 
 learnings=""
-# The cache is project data (anything ever stored, or a file a checkout
-# shipped): a regular file under 64 KB only, never a symlink. One bounded jq
-# keeps results at or over the minimum score, renders each as one bullet
-# (control characters and runs of three or more dashes removed, so no memory
-# can forge the closing fence), and stops at RECALL_MAX_BYTES.
-if [ -n "$RECALL_CACHE" ] && [ -f "$RECALL_CACHE" ] && [ ! -L "$RECALL_CACHE" ] \
+# Recalled memories are untrusted text (anything ever stored): a regular file
+# under 64 KB only, never a symlink. One bounded jq takes exactly one JSON
+# document, keeps results at or over the minimum score, renders each as one
+# bullet (control characters and runs of three or more dashes removed, so no
+# memory can forge the closing fence), and stops at RECALL_MAX_BYTES.
+if [ -n "$RECALL_CACHE" ] && [ ! -L "$RECALL_DIR" ] && [ -f "$RECALL_CACHE" ] && [ ! -L "$RECALL_CACHE" ] \
    && [ "$(wc -c < "$RECALL_CACHE" 2>/dev/null | tr -d ' ')" -le 65536 ]; then
-  recalled=$(run_budgeted 0.2 jq -r --argjson min "$RECALL_MIN_SCORE" --argjson max "$RECALL_MAX_BYTES" '
-    [ (.results // [])[]?
+  recalled=$(run_budgeted 0.2 jq -rs --argjson min "$RECALL_MIN_SCORE" --argjson max "$RECALL_MAX_BYTES" '
+    (if length == 1 and (.[0] | type) == "object" then .[0] else {} end)
+    | [ (.results // [])[]?
       | select(type == "object" and (.score | type) == "number" and .score >= $min
                and (.content | type) == "string")
       | "- "
@@ -186,9 +206,9 @@ fi
 # A refresh started in the last RECALL_REFRESH_GAP seconds (another session,
 # a quick restart) is not repeated: each one is a ~1s model load, and
 # back-to-back starts would pile them up. The stamp's mtime marks the start.
+# Both live under RECALL_DIR (see recall_paths).
 RECALL_REFRESH_GAP="${RUVECTOR_RECALL_REFRESH_GAP:-60}"
 case "$RECALL_REFRESH_GAP" in ''|*[!0-9]*) RECALL_REFRESH_GAP=60 ;; esac
-RECALL_STAMP="${STORE_DIR:+${STORE_DIR}/.recall-refresh}"
 refresh_due() {
   # Anything but a regular file there (a checkout's symlink) is unlinked,
   # never followed, so the atomic stamp write below can replace it.
@@ -198,7 +218,8 @@ refresh_due() {
   [ -f "$RECALL_STAMP" ] || return 0
   coedit_older_than "$(coedit_mtime "$RECALL_STAMP")" "$RECALL_REFRESH_GAP"
 }
-if [ -n "$RECALL_CACHE" ] && refresh_due && ruvector_resolve_bin \
+if [ -n "$RECALL_CACHE" ] && [ ! -L "$RECALL_DIR" ] && mkdir -p "$RECALL_DIR" 2>/dev/null \
+   && refresh_due && ruvector_resolve_bin \
    && { [ -n "${RUVECTOR_BIN:-}" ] || ruvector_hash_selected || yellow_ruvector_model_cached; } \
    && date +%s | coedit_write_atomic "$RECALL_STAMP"; then
   # Detached: the hook prints its JSON without waiting. `hooks recall` does

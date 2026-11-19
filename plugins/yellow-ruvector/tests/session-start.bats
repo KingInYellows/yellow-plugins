@@ -13,12 +13,19 @@ setup() {
   mkdir -p "$RUVECTOR_DIR"
   HOOK_SCRIPT="$BATS_TEST_DIRNAME/../hooks/scripts/session-start.sh"
   MOCK_BIN="$(mktemp -d)"
+  # The recall cache lives in the plugin data dir, keyed by the store's
+  # physical path (session-start.sh recall_paths).
+  CLAUDE_PLUGIN_DATA="$(cd "$(mktemp -d)" && pwd -P)"
+  export CLAUDE_PLUGIN_DATA
+  _key=$(printf '%s' "$(cd "$RUVECTOR_DIR" && pwd -P)" | cksum | tr -c '0-9\n' '-')
+  RECALL_CACHE="$CLAUDE_PLUGIN_DATA/recall/${_key}.json"
+  RECALL_STAMP="$CLAUDE_PLUGIN_DATA/recall/${_key}.refresh"
 }
 
 teardown() {
   # Retry once: external tooling (checkpoint watchers) can race rm -rf by
   # writing into fresh .git dirs; a raced cleanup must not fail the test.
-  rm -rf "$PROJECT_ROOT" "$MOCK_BIN" 2>/dev/null || { sleep 0.3; rm -rf "$PROJECT_ROOT" "$MOCK_BIN" 2>/dev/null || true; }
+  rm -rf "$PROJECT_ROOT" "$MOCK_BIN" "$CLAUDE_PLUGIN_DATA" 2>/dev/null || { sleep 0.3; rm -rf "$PROJECT_ROOT" "$MOCK_BIN" "$CLAUDE_PLUGIN_DATA" 2>/dev/null || true; }
 }
 
 make_ruvector_stub() {
@@ -54,9 +61,9 @@ wait_for() {
 # run_hook_warm <stdin> — one session start that saves the recall, then the
 # next one, which injects it (run's $output is the second).
 run_hook_warm() {
-  rm -f "$RUVECTOR_DIR/recall-cache.json" "$RUVECTOR_DIR/.recall-refresh"
+  rm -f "$RECALL_CACHE" "$RECALL_STAMP"
   run_hook "$1" >/dev/null
-  wait_for "$RUVECTOR_DIR/recall-cache.json"
+  wait_for "$RECALL_CACHE"
   run_hook "$1"
 }
 
@@ -155,9 +162,9 @@ exit 0'
   [ "$status" -eq 0 ]
   echo "$output" | jq -e 'has("hookSpecificOutput") | not' > /dev/null
   [ "$elapsed_ms" -lt 1500 ]
-  [ ! -e "$RUVECTOR_DIR/recall-cache.json" ]
-  for _ in $(seq 1 50); do [ -s "$RUVECTOR_DIR/recall-cache.json" ] && break; sleep 0.1; done
-  [ -s "$RUVECTOR_DIR/recall-cache.json" ]
+  [ ! -e "$RECALL_CACHE" ]
+  for _ in $(seq 1 50); do [ -s "$RECALL_CACHE" ] && break; sleep 0.1; done
+  [ -s "$RECALL_CACHE" ]
 }
 
 @test "results under the minimum score are dropped; none passing injects nothing" {
@@ -175,9 +182,9 @@ exit 0'
 
 @test "RUVECTOR_RECALL_MIN_SCORE moves the floor; a malformed value falls back to 0.3" {
   make_recall_stub mid 0.25
-  rm -f "$RUVECTOR_DIR/recall-cache.json"
+  rm -f "$RECALL_CACHE"
   run_hook '{"cwd":""}' >/dev/null
-  wait_for "$RUVECTOR_DIR/recall-cache.json"
+  wait_for "$RECALL_CACHE"
   run env RUVECTOR_RECALL_MIN_SCORE=0.2 bash -c 'printf "{}" | PATH="$1:$PATH" RUVECTOR_BIN="$1/ruvector" CLAUDE_PROJECT_DIR="$2" bash "$3"' _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
   echo "$output" | jq -e '.hookSpecificOutput.additionalContext | contains("mid")' > /dev/null
   run env 'RUVECTOR_RECALL_MIN_SCORE=0}' bash -c 'printf "{}" | PATH="$1:$PATH" RUVECTOR_BIN="$1/ruvector" CLAUDE_PROJECT_DIR="$2" bash "$3"' _ "$MOCK_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
@@ -187,14 +194,14 @@ exit 0'
 @test "recall output that is not a recall object never replaces the cache" {
   make_recall_stub kept 0.5
   run run_hook_warm '{"cwd":""}'
-  before=$(cat "$RUVECTOR_DIR/recall-cache.json")
+  before=$(cat "$RECALL_CACHE")
   make_ruvector_stub 'case "$2" in recall) echo "not json";; esac
 exit 0'
-  rm -f "$RUVECTOR_DIR/.recall-refresh"
+  rm -f "$RECALL_STAMP"
   run_hook '{"cwd":""}' >/dev/null
-  wait_for "$RUVECTOR_DIR/.recall-refresh"
+  wait_for "$RECALL_STAMP"
   sleep 1
-  [ "$(cat "$RUVECTOR_DIR/recall-cache.json")" = "$before" ]
+  [ "$(cat "$RECALL_CACHE")" = "$before" ]
 }
 
 @test "a refresh started under a minute ago is not repeated" {
@@ -206,24 +213,40 @@ exit 0'
   sleep 0.5
   [ "$(grep -c '^hooks recall ' "$CALLS")" -eq 1 ]
   # An old stamp (or a symlink planted there) does not hold it back.
-  touch -t 202001010000 "$RUVECTOR_DIR/.recall-refresh"
+  touch -t 202001010000 "$RECALL_STAMP"
   run_hook '{"cwd":""}' >/dev/null
-  rm -f "$RUVECTOR_DIR/.recall-refresh"
-  ln -s /nonexistent "$RUVECTOR_DIR/.recall-refresh"
+  rm -f "$RECALL_STAMP"
+  ln -s /nonexistent "$RECALL_STAMP"
   run_hook '{"cwd":""}' >/dev/null
   for _ in $(seq 1 30); do [ "$(grep -c '^hooks recall ' "$CALLS")" -ge 3 ] && break; sleep 0.1; done
   [ "$(grep -c '^hooks recall ' "$CALLS")" -eq 3 ]
-  [ -f "$RUVECTOR_DIR/.recall-refresh" ] && [ ! -L "$RUVECTOR_DIR/.recall-refresh" ]
+  [ -f "$RECALL_STAMP" ] && [ ! -L "$RECALL_STAMP" ]
+}
+
+@test "a cache holding several JSON documents is not read (no per-document cap)" {
+  make_ruvector_stub 'exit 0'
+  mkdir -p "$CLAUDE_PLUGIN_DATA/recall"
+  { recall_json one 0.9 | jq -c .; recall_json two 0.9 | jq -c .; } > "$RECALL_CACHE"
+  run run_hook '{"cwd":""}'
+  echo "$output" | jq -e 'has("hookSpecificOutput") | not' > /dev/null
+}
+
+@test "the recall never writes into the worktree's .ruvector" {
+  make_recall_stub kept 0.5
+  run run_hook_warm '{"cwd":""}'
+  echo "$output" | jq -e '.hookSpecificOutput.additionalContext | contains("kept")' > /dev/null
+  [ -z "$(ls -A "$RUVECTOR_DIR")" ]
 }
 
 @test "a symlinked or oversized recall cache is never read" {
   make_ruvector_stub 'exit 0'
+  mkdir -p "$CLAUDE_PLUGIN_DATA/recall"
   recall_json via-symlink 0.9 | jq -c . > "$BATS_TEST_TMPDIR/elsewhere.json"
-  ln -s "$BATS_TEST_TMPDIR/elsewhere.json" "$RUVECTOR_DIR/recall-cache.json"
+  ln -s "$BATS_TEST_TMPDIR/elsewhere.json" "$RECALL_CACHE"
   run run_hook '{"cwd":""}'
   echo "$output" | jq -e 'has("hookSpecificOutput") | not' > /dev/null
-  rm -f "$RUVECTOR_DIR/recall-cache.json"
-  { recall_json big 0.9 | jq -c .; head -c 70000 /dev/zero | tr '\0' ' '; } > "$RUVECTOR_DIR/recall-cache.json"
+  rm -f "$RECALL_CACHE"
+  { recall_json big 0.9 | jq -c .; head -c 70000 /dev/zero | tr '\0' ' '; } > "$RECALL_CACHE"
   run run_hook '{"cwd":""}'
   echo "$output" | jq -e 'has("hookSpecificOutput") | not' > /dev/null
 }
@@ -318,7 +341,7 @@ exit 0"
   pid=$(cat "$PIDF")
   for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
   ! kill -0 "$pid" 2>/dev/null
-  [ ! -e "$RUVECTOR_DIR/recall-cache.json" ]
+  [ ! -e "$RECALL_CACHE" ]
 }
 
 @test "worktree store-heal links .ruvector from the main checkout" {

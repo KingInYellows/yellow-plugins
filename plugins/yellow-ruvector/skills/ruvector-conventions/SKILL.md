@@ -1,9 +1,6 @@
 ---
 name: ruvector-conventions
-description:
-  'ruvector workflow patterns and conventions reference. Use when commands or
-  agents need ruvector context, MCP tool naming, current tool schemas, or error
-  handling patterns.'
+description: "ruvector workflow patterns and conventions reference. Use when commands or agents need ruvector context, MCP tool naming, current tool schemas, or error handling patterns."
 user-invocable: false
 ---
 
@@ -52,16 +49,16 @@ Accepted parameters:
 
 Preferred `type` values in this plugin:
 
-| Type       | Use for                                   | Example Content                                                                                          |
-| ---------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `context`  | Mistakes and their fixes                  | "Used wrong API endpoint. Root cause: stale client assumptions. Action: use /v2/users and update tests." |
-| `decision` | Successful patterns and conventions       | "Batch inserts with transaction wrapping to avoid partial writes."                                       |
-| `project`  | Session summaries and repo-wide takeaways | "Implemented auth flow, added 3 tests, and verified Graphite submit path."                               |
-| `code`     | Code-specific implementation notes        | "Token refresh logic lives in src/auth/refresh.ts and is reused by mobile sync."                         |
-| `general`  | Fallback when none fit                    | "General context about the current repository or workflow."                                              |
+| Type | Use for | Example Content |
+| --- | --- | --- |
+| `context` | Mistakes and their fixes | "Used wrong API endpoint. Root cause: stale client assumptions. Action: use /v2/users and update tests." |
+| `decision` | Successful patterns and conventions | "Batch inserts with transaction wrapping to avoid partial writes." |
+| `project` | Session summaries and repo-wide takeaways | "Implemented auth flow, added 3 tests, and verified Graphite submit path." |
+| `code` | Code-specific implementation notes | "Token refresh logic lives in src/auth/refresh.ts and is reused by mobile sync." |
+| `general` | Fallback when none fit | "General context about the current repository or workflow." |
 
-Do not document or call invented `namespace` or `metadata` parameters unless the
-upstream ruvector MCP schema actually adds them.
+Do not document or call invented `namespace` or `metadata` parameters unless
+the upstream ruvector MCP schema actually adds them.
 
 ### `hooks_recall`
 
@@ -115,25 +112,24 @@ Result items include fields such as `content`, `type`, `score`, and `created`.
 ## Hook Architecture
 
 Only `session-start.sh` calls ruvector's CLI (`hooks recall`), through the
-plugin-managed install (`hooks/scripts/lib/resolve.sh`; never a global binary)
-from the git toplevel. The edit hooks are jq-only and make no CLI call. There is
-no manual queue management inside the plugin:
+plugin-managed install (`hooks/scripts/lib/resolve.sh`; never a global
+binary) from the git toplevel. The edit hooks are jq-only and make no CLI
+call. There is no manual queue management inside the plugin:
 
 - `prewarm.sh` (SessionStart) → installs the pinned ruvector into the plugin
   data dir and downloads the ONNX model in the background
-- `session-start.sh` → injects `.ruvector/recall-cache.json` (the previous
-  session's `ruvector hooks recall --top-k 5 "query"`, results scoring ≥ 0.3,
+- `session-start.sh` → injects the previous session's `ruvector hooks recall
+  --top-k 5 "query"` (cached in the plugin data dir; results scoring ≥ 0.3,
   plain bullets, ≤ 1,500 bytes) and refreshes it in a detached job. Recall is
-  `hookSpecificOutput.additionalContext` for `SessionStart`. The
-  embedder-provenance warning stays on `systemMessage`. There is no per-prompt
-  recall
+  `hookSpecificOutput.additionalContext` for `SessionStart`. The embedder-provenance warning stays on `systemMessage`.
+  There is no per-prompt recall
 - `pre-tool-use.sh` (PreToolUse on Edit/Write/MultiEdit) → up to 3 co-edit
   partners (count ≥ 3, existing files, once per file per session for the
-  session's 200 most recently suggested files; an older one can repeat) as
-  fenced `hookSpecificOutput.additionalContext`; jq only
-- `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit) → co-edit recording
-  in `.ruvector/coedit.json` with jq (`hooks/scripts/lib/coedit.sh`); no
-  ruvector CLI call
+  session's 200 most recently suggested files; an older one can repeat) as fenced
+  `hookSpecificOutput.additionalContext`; jq only
+- `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit) → co-edit
+  recording in `.ruvector/coedit.json` with jq (`hooks/scripts/lib/coedit.sh`);
+  no ruvector CLI call
 
 No hook writes `.ruvector/intelligence.json`: memories come only from MCP
 `hooks_remember` (agents and commands). The removed `hooks post-edit` /
@@ -159,9 +155,9 @@ All `$ARGUMENTS` values are user input and must be validated:
 - **Learning content:** Max 2000 characters. Strip HTML tags. Minimum 20 words
   after sanitization.
 - **File paths:** Validate via `cd+pwd -P` (POSIX) with a `realpath` fallback,
-  plus a prefix containment check against the canonicalized project root. Reject
-  `..`, absolute paths, `~`, embedded newlines/CRs, and symlinks whose target
-  escapes the root. Canonical implementation lives in
+  plus a prefix containment check against the canonicalized project root.
+  Reject `..`, absolute paths, `~`, embedded newlines/CRs, and symlinks whose
+  target escapes the root. Canonical implementation lives in
   `yellow-core/lib/validate-fs.sh`; `hooks/scripts/lib/validate.sh` sources it
   via the `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/` cross-plugin pattern.
 - **General rule:** Never interpolate `$ARGUMENTS` into shell commands without
@@ -217,13 +213,13 @@ All commands and agents must work when ruvector is unavailable:
 
 ## Error Handling Catalog
 
-| Error                                                                                                                 | Action                                                                                                                                       |
-| --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| MCP server not running                                                                                                | Report and suggest: "Run `/ruvector:setup` to initialize"                                                                                    |
-| Empty database                                                                                                        | Suggest: "Run `/ruvector:index` to index your codebase"                                                                                      |
-| Corrupt queue (malformed JSONL)                                                                                       | Skip malformed lines with `jq -c '.' 2>/dev/null`, log warning                                                                               |
-| Disk full                                                                                                             | Clear error message, suggest freeing space or running `/ruvector:status`                                                                     |
-| Timeout (search > 5s)                                                                                                 | Report timeout, suggest smaller scope or re-indexing                                                                                         |
-| Permission denied on `.ruvector/`                                                                                     | Check file permissions, suggest `chmod -R u+rw .ruvector/`                                                                                   |
-| MCP tool not found via ToolSearch                                                                                     | Verify plugin is installed and MCP server is configured                                                                                      |
+| Error | Action |
+| --- | --- |
+| MCP server not running | Report and suggest: "Run `/ruvector:setup` to initialize" |
+| Empty database | Suggest: "Run `/ruvector:index` to index your codebase" |
+| Corrupt queue (malformed JSONL) | Skip malformed lines with `jq -c '.' 2>/dev/null`, log warning |
+| Disk full | Clear error message, suggest freeing space or running `/ruvector:status` |
+| Timeout (search > 5s) | Report timeout, suggest smaller scope or re-indexing |
+| Permission denied on `.ruvector/` | Check file permissions, suggest `chmod -R u+rw .ruvector/` |
+| MCP tool not found via ToolSearch | Verify plugin is installed and MCP server is configured |
 | Provenance refusal on `hooks_remember` (ADR-210 "does not match the active embedder", or `ERR_LEGACY_STORE_READONLY`) | Store-wide, not per-entry: do not retry; report "memory writes refused — run `/ruvector:status`" and continue (reembed + restart is the fix) |
