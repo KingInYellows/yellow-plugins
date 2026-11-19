@@ -101,9 +101,9 @@ jobs:
           fi
           # The Bash guard hook (CLAUDE-356) the review step's settings run
           # before every Bash call. Without it the agent could expand a token
-          # into a comment, so a missing guard skips the review instead of
-          # running it unguarded. It only fails before the guard first reaches
-          # the default branch.
+          # into a comment, so when the guard cannot be fetched (not yet on the
+          # default branch, or an API error) the job skips the review with a
+          # warning instead of running it unguarded.
           mkdir -p "$HOME/.claude/hooks"
           url="repos/$REPO/contents/.github/claude-code-review/bash-guard.sh?ref=$DEFAULT_BRANCH"
           if ! gh_api -H 'Accept: application/vnd.github.raw+json' "$url" \
@@ -111,6 +111,34 @@ jobs:
             echo "::warning::no Bash guard on $DEFAULT_BRANCH; skipping the review"
             echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+          # The guard only lets the agent touch this PR and post the marker for
+          # this head, so a prompt-injected run cannot mark a future head as
+          # reviewed or act on another repository.
+          printf '%s %s %s\n' "$REPO" "$PR_NUMBER" "$HEAD_SHA" \
+            > "$HOME/.claude/hooks/claude-code-review-target"
+          # A symlink committed in the PR could point the Read tool at
+          # .git/config or /proc. Read deny rules check symlink targets, but
+          # refuse links that leave the checkout or enter .git anyway.
+          if ! python3 -I - <<'PY'
+          import os, sys
+          root = os.path.realpath(".")
+          git = os.path.join(root, ".git")
+          bad = []
+          for d, dirs, files in os.walk(root):
+              dirs[:] = [x for x in dirs if os.path.join(d, x) != git]
+              for name in dirs + files:
+                  p = os.path.join(d, name)
+                  if os.path.islink(p):
+                      t = os.path.realpath(p)
+                      if os.path.commonpath([root, t]) != root or os.path.commonpath([git, t]) == git:
+                          bad.append(os.path.relpath(p, root))
+          for b in bad:
+              print(f"::error::symlink leaves the checkout: {b}")
+          sys.exit(1 if bad else 0)
+          PY
+          then
+            exit 1
           fi
           export MARKER="<!-- claude-code-review head=$HEAD_SHA -->"
           found=$(gh_api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \

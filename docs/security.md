@@ -417,13 +417,17 @@ vendored code-review command (CLAUDE-248). Its boundary:
   (`.github/claude-code-review/bash-guard.sh`) allows only `gh pr diff` and
   `gh pr view` with a short list of flags (no `--jq` or `--template`, whose jq
   `env` reads the process environment) and a `gh pr comment` whose body is the
-  fixed summary; it blocks every other Bash call, including in subagents. The
-  gate skips the review when the hook is missing. For the file tools,
-  `--disallowedTools` denies `Read` on `.git` and `/proc`, and the command no
-  longer grants bare `Read`, so the Read tool needs an approval outside the
-  checkout that a CI run cannot give. The rest of the checkout is the PR's own
-  content, so pasting it into an inline comment leaks nothing new. The app token
-  is revoked when the job ends.
+  fixed summary; it blocks every other Bash call, including in subagents. The PR
+  must be this PR (number or URL) and the summary's marker must name this head,
+  both read from a file the gate writes, so an injected run cannot touch other
+  repositories or mark a future head as reviewed. The gate skips the review when
+  the hook cannot be fetched, and fails when the PR adds a symlink that leaves
+  the checkout or points into `.git`. For the file tools, `--disallowedTools`
+  denies `Read` on `.git` and `/proc`, and the command no longer grants bare
+  `Read`, so the Read tool needs an approval outside the checkout that a CI run
+  cannot give. The rest of the checkout is the PR's own content, so pasting it
+  into an inline comment leaks nothing new. The app token is revoked when the
+  job ends.
 - **Skip marker**: the gate skips a run only when a `claude[bot]` comment that
   starts with `## Code review` ends with
   `<!-- claude-code-review head=<sha> -->` for the current head. A forged or

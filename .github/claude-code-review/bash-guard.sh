@@ -9,7 +9,9 @@
 # body. So this hook allows only these command shapes and blocks the rest:
 #   gh pr diff <pr> [--name-only] [--patch] [--color=never]
 #   gh pr view <pr> [--json <fields>] [--comments]
-#   gh pr comment <pr> --body '<the fixed review summary>'
+#   gh pr comment <pr> --body|-b '<the fixed review summary>' (or "...")
+# <pr> is this PR's number or URL and the summary's marker names this head,
+# both read from the file the gate step writes.
 # Exit 2 blocks the call and shows the reason to the agent.
 set -u
 
@@ -21,11 +23,16 @@ deny() {
 cmd=$(jq -r '.tool_input.command // empty') || deny 'unreadable hook input'
 [ -n "$cmd" ] || deny 'empty command'
 
+target="$HOME/.claude/hooks/claude-code-review-target"
+read -r repo pr head < "$target" 2>/dev/null || deny 'no review target file'
+[[ $repo =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ && $pr =~ ^[0-9]+$ && $head =~ ^[0-9a-f]{40}$ ]] ||
+  deny 'malformed review target file'
+
 # Flags are listed one by one: gh's --jq and --template read the process
 # environment (jq's env), so a generic "plain argument" rule would leak it.
-# The PR is a number or a github.com PR URL, never something that starts
-# with "-" and so could be read as a flag such as -q.
-ref='([0-9]+|https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+)'
+# <pr> is only this PR's number or URL, so it can never be a flag such as -q
+# or another repository.
+ref="(${pr}|https://github\\.com/${repo//./\\.}/pull/${pr})"
 diff="^gh pr diff ${ref}( --name-only| --patch| --color=never)*\$"
 view="^gh pr view ${ref}( --json [A-Za-z,]+| --comments)*\$"
 if [[ $cmd =~ $diff || $cmd =~ $view ]]; then
@@ -33,10 +40,10 @@ if [[ $cmd =~ $diff || $cmd =~ $view ]]; then
 fi
 
 nl=$'\n'
-summary="## Code review${nl}${nl}(No issues found\\. Checked for bugs and CLAUDE\\.md compliance\\.|Found [0-9]+ issue\\(s\\); see the inline comments\\.)${nl}${nl}<!-- claude-code-review head=[0-9a-f]{40} -->${nl}?"
+summary="## Code review${nl}${nl}(No issues found\\. Checked for bugs and CLAUDE\\.md compliance\\.|Found [0-9]+ issue\\(s\\); see the inline comments\\.)${nl}${nl}<!-- claude-code-review head=${head} -->${nl}?"
 comment="^gh pr comment ${ref} (--body|-b) ('${summary}'|\"${summary}\")\$"
 if [[ $cmd =~ $comment ]]; then
   exit 0
 fi
 
-deny "only 'gh pr diff <pr>' (--name-only, --patch), 'gh pr view <pr>' (--json <fields>, --comments) and 'gh pr comment <pr> --body' with the exact summary format in single quotes may run"
+deny "only 'gh pr diff <pr>' (--name-only, --patch, --color=never), 'gh pr view <pr>' (--json <fields>, --comments) and 'gh pr comment <pr> --body' with the exact summary for this head may run, where <pr> is this PR's number or URL"
