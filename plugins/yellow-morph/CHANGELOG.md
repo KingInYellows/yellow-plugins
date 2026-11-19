@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.5
+
+### Patch Changes
+
+- [#1889](https://github.com/KingInYellows/yellow-plugins/pull/1889)
+  [`3a81b27`](https://github.com/KingInYellows/yellow-plugins/commit/3a81b275b6663b87e3c044f5233db4b02026f644)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Pass proxy, CA
+  and npm config variables through the sanitized `npm ci` environment so the
+  morphmcp install works behind a TLS-intercepting proxy (cloud sessions).
+  Secrets are still dropped.
+
 ## 1.3.4
 
 ### Patch Changes
