@@ -400,12 +400,34 @@ vendored code-review command (CLAUDE-248). Its boundary:
 - **Agent tools**: `--allowedTools` pre-approves the inline-comment MCP tool and
   `gh pr comment`, `gh pr diff` and `gh pr view`. It does not restrict the tool
   set (the workflow passes no `--tools`), and the command's frontmatter also
-  grants `Agent`, `Read`, `gh issue view`, `gh issue list`, `gh search` and
-  `gh pr list`, all read-only. Neither grants `gh api`, and project settings
-  cannot add permissions because they do not load. The gate step, which runs no
-  model, writes `claude[bot]`'s earlier inline comments to
-  `.claude-code-review/prior-inline-comments.jsonl`, and the command treats
-  their bodies as reference data.
+  grants `Agent`. Neither grants `gh api`, and project settings cannot add
+  permissions because they do not load. The gate step, which runs no model,
+  writes `claude[bot]`'s earlier inline comments to
+  `.claude-code-review/prior-inline-comments.jsonl`, wraps each body in
+  reference delimiters (breaking up every `---` inside it), and the command
+  treats them as reference data. Outdated comments are kept and flagged so a
+  push that only moves an unfixed line does not repost it.
+- **Tokens on the runner**: checkout runs with `persist-credentials: false`, but
+  the action's agent mode then writes its own GitHub App token into the origin
+  URL in `.git/config`, and the CLI's environment holds that token and
+  `CLAUDE_CODE_OAUTH_TOKEN` (CLAUDE-356). Claude Code runs read-only commands
+  such as `cat` and `echo` without a prompt, and a `gh pr comment` allow rule
+  still lets `"$VAR"` or `"$(cat file)"` expand in the body, so deny rules alone
+  cannot close this. A `PreToolUse` hook installed from the default branch
+  (`.github/claude-code-review/bash-guard.sh`) allows only `gh pr diff` and
+  `gh pr view` with a short list of flags (no `--jq` or `--template`, whose jq
+  `env` reads the process environment) and a `gh pr comment` whose body is the
+  fixed summary; it blocks every other Bash call, including in subagents. The PR
+  must be this PR (number or URL) and the summary's marker must name this head,
+  both read from a file the gate writes, so an injected run cannot touch other
+  repositories or mark a future head as reviewed. The gate skips the review when
+  the hook cannot be fetched, and fails when the PR adds a symlink that leaves
+  the checkout or points into `.git`. For the file tools, `--disallowedTools`
+  denies `Read` on `.git` and `/proc`, and the command no longer grants bare
+  `Read`, so the Read tool needs an approval outside the checkout that a CI run
+  cannot give. The rest of the checkout is the PR's own content, so pasting it
+  into an inline comment leaks nothing new. The app token is revoked when the
+  job ends.
 - **Skip marker**: the gate skips a run only when a `claude[bot]` comment that
   starts with `## Code review` ends with
   `<!-- claude-code-review head=<sha> -->` for the current head. A forged or
