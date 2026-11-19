@@ -222,6 +222,9 @@ function ghAuthOk(env) {
     stdio: 'ignore',
     timeout: GH_AUTH_TIMEOUT_MS,
     killSignal: 'SIGKILL',
+    // The refresh runs detached with no console; without this, each gh call
+    // would open a console window on Windows.
+    windowsHide: true,
   });
   return !res.error && res.status === 0;
 }
@@ -235,7 +238,13 @@ function ghRunList(env) {
       '-q', '[.[] | select(.conclusion == "failure")]',
     ],
     // SIGKILL (see ghAuthOk) so a non-terminating `gh` cannot outlive it.
-    { env, encoding: 'utf8', timeout: GH_RUN_LIST_TIMEOUT_MS, killSignal: 'SIGKILL' }
+    {
+      env,
+      encoding: 'utf8',
+      timeout: GH_RUN_LIST_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
+      windowsHide: true,
+    }
   );
   if (res.error || res.status !== 0) {
     return { failed: true, stdout: '' };

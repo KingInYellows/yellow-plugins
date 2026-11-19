@@ -351,6 +351,11 @@ age_file() {
   grep -q 'Unexpected GitHub API response format' "$dir/refresh-$key.log"
   # A malformed reply is not cached as zero failures.
   [ ! -e "$dir/last-check-$key" ]
+  # ...and it leaves an existing cache as it was.
+  printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$dir/last-check-$key"
+  node "$SCRIPTS_DIR/lib/refresh-cache.js"
+  [ "$(cat "$dir/last-check-$key")" = "$HOOK_SCENARIO_CACHED_TEXT" ]
+  rm -f "$dir/last-check-$key"
 
   # Rate-limited (gh exits 1): nothing cached, so the next start refreshes again.
   export MOCK_GH_RUNLIST=ratelimit
