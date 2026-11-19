@@ -35,11 +35,21 @@ else
   printf 'gh_stack:   NOT FOUND (or gh extension list failed)\n'
 fi
 printf '=== Stacked-PR provider (enabled plugins) ===\n'
-claude plugin list --json 2>/dev/null | node -e '
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
+claude plugin list --json 2>/dev/null | PROJECT_PATH="$repo_root" node -e '
+  const fs = require("fs");
   let rows;
-  try { rows = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch { rows = null; }
+  try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = null; }
   if (!Array.isArray(rows)) { console.log("provider:   UNKNOWN (claude plugin list failed)"); process.exit(0); }
-  const on = (id) => rows.some((r) => r && r.id === id && r.enabled === true);
+  const projectPath = process.env.PROJECT_PATH || "";
+  const sameDir = (a, b) => {
+    try { return fs.realpathSync(a) === fs.realpathSync(b); } catch { return false; }
+  };
+  // project/local rows count only for this repository; user/managed are global.
+  const applies = (r) =>
+    (r.scope !== "project" && r.scope !== "local") ||
+    (projectPath.length > 0 && typeof r.projectPath === "string" && sameDir(r.projectPath, projectPath));
+  const on = (id) => rows.some((r) => r && r.id === id && r.enabled === true && applies(r));
   const found = [];
   if (on("gt-workflow@yellow-plugins")) found.push("graphite");
   if (on("github-workflow@yellow-plugins")) found.push("github");
