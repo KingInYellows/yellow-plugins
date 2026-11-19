@@ -27,6 +27,7 @@
 // and opts.measure(i) returns false for runs that take another code path.
 'use strict';
 const { spawnSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -167,16 +168,19 @@ const waitCiRefresh = (env) => {
 const primeCiCache = (env, plugin) => {
   waitCiRefresh(env);
   if (plugin !== 'yellow-ci') return true;
-  // Only a fresh cache (under the hook's 10 min TTL) counts: an expired one
-  // must not mark a failed refresh as primed. A fresh one from a bench run a
-  // few minutes earlier is a real hit, so it counts too.
-  const now = Date.now();
+  // The hook keys its cache on md5(process.cwd()), i.e. PROJ with symlinks
+  // resolved. Only that file counts, and only while it is fresh (under the
+  // hook's 10 min TTL): another project's cache or an expired one must not
+  // mark a failed refresh as primed.
+  const key = crypto
+    .createHash('md5')
+    .update(fs.realpathSync(PROJ))
+    .digest('hex');
   try {
-    return fs.readdirSync(env.CLAUDE_PLUGIN_DATA).some((n) => {
-      if (!n.startsWith('last-check-')) return false;
-      const { mtimeMs } = fs.statSync(path.join(env.CLAUDE_PLUGIN_DATA, n));
-      return now - mtimeMs < 600000;
-    });
+    const { mtimeMs } = fs.statSync(
+      path.join(env.CLAUDE_PLUGIN_DATA, `last-check-${key}`)
+    );
+    return Date.now() - mtimeMs < 600000;
   } catch {
     return false;
   }
