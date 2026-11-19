@@ -23,7 +23,9 @@ cmd=$(jq -r '.tool_input.command // empty') || deny 'unreadable hook input'
 
 # Flags are listed one by one: gh's --jq and --template read the process
 # environment (jq's env), so a generic "plain argument" rule would leak it.
-ref='[A-Za-z0-9_./:#-]+'
+# The PR is a number or a github.com PR URL, never something that starts
+# with "-" and so could be read as a flag such as -q.
+ref='([0-9]+|https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+)'
 diff="^gh pr diff ${ref}( --name-only| --patch| --color=never)*\$"
 view="^gh pr view ${ref}( --json [A-Za-z,]+| --comments)*\$"
 if [[ $cmd =~ $diff || $cmd =~ $view ]]; then
@@ -32,7 +34,7 @@ fi
 
 nl=$'\n'
 summary="## Code review${nl}${nl}(No issues found\\. Checked for bugs and CLAUDE\\.md compliance\\.|Found [0-9]+ issue\\(s\\); see the inline comments\\.)${nl}${nl}<!-- claude-code-review head=[0-9a-f]{40} -->${nl}?"
-comment="^gh pr comment [A-Za-z0-9_./:#-]+ (--body|-b) ('${summary}'|\"${summary}\")\$"
+comment="^gh pr comment ${ref} (--body|-b) ('${summary}'|\"${summary}\")\$"
 if [[ $cmd =~ $comment ]]; then
   exit 0
 fi
