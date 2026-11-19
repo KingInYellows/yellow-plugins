@@ -835,7 +835,9 @@ latest change to the label must be an addition by a login in
   agents must never add `merge-approved`.
 - **Revocation.** A later removal of the label, a removal and re-addition by
   anyone else, or a new commit on the head makes the approval stale. Unreadable
-  events leave the approval unknown (`label_events_unknown`), never approved.
+  events, including one change to the label whose time does not parse (it could
+  be a hidden removal), leave the approval unknown (`label_events_unknown`),
+  never approved.
 
 ### Persona Selection Shadow Log (yellow-review)
 

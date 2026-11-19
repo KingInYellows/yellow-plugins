@@ -21,7 +21,8 @@
 #                "tier":"low|medium|high|unknown"|null,
 #                "policy":"default_branch|none|invalid"|null,
 #                "required":0|1|null,
-#                "humanApproval":{"login":"...","commit":"<sha>"}|null,
+#                "humanApproval":{"login":"...","commit":"<sha>",
+#                                 "via":"review|label","at":"<time>"}|null,
 #                "extras":{"crossLineage":bool|null,"freshReview":null},
 #                "missing":[tokens]}}
 # blockers holds fixed tokens: not_open, draft, conflicts, unresolved_threads,
@@ -68,7 +69,9 @@
 # and is indistinguishable from the owner, so agents must never hold one for
 # this label. An approval or label from before the head only is
 # approval_stale; a label with no readable head time is head_time_unknown;
-# label events that could not be read are label_events_unknown.
+# label events that could not be read, or any change to the label whose time
+# does not parse, are label_events_unknown (a dropped event could hide a
+# removal), unless the label is not on the PR, which is a definite miss.
 # high needs the same plus a review on the head SHA
 # by a listed cross-lineage bot. freshReview is always null: the review
 # ledger records a head SHA per finding, not per run, and a clean run writes
@@ -420,9 +423,14 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
                             else [$c.committedDate, $suite] + $forced | map(utc)
                                  | if any(. == null) then null else max end end),
                  events: (if ($ev[0] | type) == "array"
-                          then [$ev[0][] | .t = (.createdAt | utc) | select(.t != null)]
+                          then [$ev[0][] | .t = (.createdAt | utc)]
+                               | if any(.[]; .t == null) then null else . end
                           else null end)}' "$WORK/approval.raw" >"$WORK/labels" 2>/dev/null \
               || printf '{"headTime":null,"events":null}' >"$WORK/labels"
+            if jq -e 'type == "array"' "$WORK/events" >/dev/null 2>&1 \
+                && ! jq -e '.events | type == "array"' "$WORK/labels" >/dev/null 2>&1; then
+                note "label event times could not be read; label approval unknown"
+            fi
         fi
     fi
     if [ -n "$A_HEAD" ]; then
@@ -520,7 +528,7 @@ jq -n -c \
          elif $tier == "low" then []
          else (if $onhead != null or $lblhead != null then []
                elif $r == null or $rt then ["reviews_unknown"]
-               elif $lab[0].events == null then ["label_events_unknown"]
+               elif $lab[0].events == null and $lab[0].present != false then ["label_events_unknown"]
                elif ($lbl | length) > 0 and $ht == null then ["head_time_unknown"]
                elif ($appr | length) > 0 or ($lbl | length) > 0 then ["approval_stale"]
                else ["approval_required"] end)

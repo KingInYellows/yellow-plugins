@@ -813,3 +813,44 @@ $MOCK_GH_MR_EVENTS"
   [ "$status" -eq 0 ]
   [ "$(jq -r .approval.humanApproval.at <<<"$output")" = 2026-11-02T10:30:00Z ]
 }
+
+@test "CLAUDE-360: a removal with an unparseable time leaves the label events unknown, not approved" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z),$(lb Test User 'not a time' | jq -c '.event = "unlabeled"')]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["label_events_unknown"]' ]
+  [[ "$stderr" == *"label event times could not be read"* ]]
+}
+
+@test "CLAUDE-360: unreadable label events with the label off the PR are a definite approval_required" {
+  config 'review_approval_gate: enforce'
+  with_files src/a.js
+  MOCK_GH_MRA_BODY=$(jq -c '.data.repository.pullRequest.labels.nodes = []' <<<"$MOCK_GH_MRA_BODY")
+  MOCK_GH_MR_EVENTS_FAIL=1 run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .blockers <<<"$output")" = '["approval_required"]' ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["approval_required"]' ]
+}
+
+@test "CLAUDE-360: a labeled and unlabeled pair in the same second keeps the API's order" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z),$(lb Test User 2026-11-02T10:05:00Z | jq -c '.event = "unlabeled"')]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z | jq -c '.event = "unlabeled"'),$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.humanApproval.via <<<"$output")" = label ]
+}
+
+@test "CLAUDE-360: a label added in the same instant the head arrived approves" {
+  config 'review_approval_gate: enforce'
+  HEAD_AT=2026-11-02T10:00:00Z SUITE_AT=2026-11-02T10:05:00Z \
+    LABELS="[$(lb Test User 2026-11-02T10:05:00Z)]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .approval.humanApproval.at <<<"$output")" = 2026-11-02T10:05:00Z ]
+}

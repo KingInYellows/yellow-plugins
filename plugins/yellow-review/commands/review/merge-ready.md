@@ -105,12 +105,14 @@ MergeReady: <verdict> blockers=<comma-separated tokens or none> unknowns=<tokens
   label. A bot's or unlisted account's approval or label never counts
   (`approval_required`); a listed human's from before the head is
   `approval_stale`; a label whose timing cannot be checked is
-  `head_time_unknown`, and unreadable label events are `label_events_unknown`.
-  High also needs a review on the head by an account GitHub reports as a `Bot`
-  whose login is in `review_cross_lineage_bots`; `freshReview` is always unknown
-  until the ledger records the head of each review run, so under `enforce` a
-  high PR with no other blocker is `unknown` until then (Phase 3), and the
-  default `advisory` only lists it.
+  `head_time_unknown`, and unreadable label events, or one change to the label
+  whose time does not parse, are `label_events_unknown` (with the label off the
+  PR the miss is definite instead). High also needs a review on the head by an
+  account GitHub reports as a `Bot` whose login is in
+  `review_cross_lineage_bots`; `freshReview` is always unknown until the ledger
+  records the head of each review run, so under `enforce` a high PR with no
+  other blocker is `unknown` until then (Phase 3), and the default `advisory`
+  only lists it.
 - For `blocked`, end with the next step for each blocker: `/review:resolve` for
   threads, the reviewer for changes requested, the failing check names for CI, a
   rebase for conflicts, the user adding `merge-approved` by hand for
