@@ -40,7 +40,8 @@ if [[ $cmd =~ $diff || $cmd =~ $view ]]; then
 fi
 
 nl=$'\n'
-summary="## Code review${nl}${nl}(No issues found\\. Checked for bugs and CLAUDE\\.md compliance\\.|Found [0-9]+ issue\\(s\\); see the inline comments\\.)${nl}${nl}<!-- claude-code-review head=${head} -->${nl}?"
+# The optional line counts files the review could not see (CLAUDE-371).
+summary="## Code review${nl}${nl}(No issues found\\. Checked for bugs and CLAUDE\\.md compliance\\.|Found [0-9]+ issue\\(s\\); see the inline comments\\.)(${nl}${nl}[0-9]+ changed file\\(s\\) were not reviewed: binary, or too large for GitHub to send\\.)?${nl}${nl}<!-- claude-code-review head=${head} -->${nl}?"
 comment="^gh pr comment ${ref} (--body|-b) ('${summary}'|\"${summary}\")\$"
 if [[ $cmd =~ $comment ]]; then
   exit 0

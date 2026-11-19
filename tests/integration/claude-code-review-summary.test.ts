@@ -4,7 +4,8 @@
  * Bash guard's allow regex in bash-guard.sh, and the skip-marker check in
  * claude-code-review.yml. An edit to one alone would silently block the
  * summary (the guard denies it) or re-review every push (the marker check
- * never matches). This test builds the comment exactly as code-review.md
+ * never matches). The optional not-reviewed line (CLAUDE-371) is held to
+ * the same rule. This test builds the comment exactly as code-review.md
  * describes it, runs the real guard on it, and checks the workflow looks for
  * the same heading and marker.
  */
@@ -63,9 +64,14 @@ const foundLine = DOC.match(
   /replace the middle line with `(Found <n> issue\(s\);[^`]*)`/
 );
 
-function summary(middle: string): string {
+const notReviewedLine = DOC.match(
+  /add the line `(<n> changed file\(s\) were not reviewed:[^`]*)` after the middle line/
+);
+
+function summary(middle: string, extra?: string): string {
   const [heading, , , , marker] = example![1].split('\n');
-  return [heading, '', middle, '', marker.replace('<sha>', SHA)].join('\n');
+  const body = extra ? [middle, '', extra] : [middle];
+  return [heading, '', ...body, '', marker.replace('<sha>', SHA)].join('\n');
 }
 
 describe('Claude Code Review summary wording', () => {
@@ -83,6 +89,27 @@ describe('Claude Code Review summary wording', () => {
   it('the guard allows the issues-found summary exactly as documented', () => {
     const middle = foundLine![1].replace('<n>', '3');
     expect(guard(`gh pr comment ${URL} --body '${summary(middle)}'`)).toBe(0);
+  });
+
+  it('the guard allows the not-reviewed line after either middle line', () => {
+    expect(notReviewedLine).not.toBeNull();
+    const extra = notReviewedLine![1].replace('<n>', '2');
+    const none = example![1].split('\n')[2];
+    const found = foundLine![1].replace('<n>', '1');
+    for (const middle of [none, found]) {
+      expect(
+        guard(`gh pr comment ${URL} --body '${summary(middle, extra)}'`)
+      ).toBe(0);
+    }
+    // Only a number may stand for <n>, and the line goes after the middle one.
+    expect(
+      guard(
+        `gh pr comment ${URL} --body '${summary(none, notReviewedLine![1])}'`
+      )
+    ).toBe(2);
+    expect(guard(`gh pr comment ${URL} --body '${summary(extra, none)}'`)).toBe(
+      2
+    );
   });
 
   it('the guard still blocks other wording, another head and a $ in the body', () => {

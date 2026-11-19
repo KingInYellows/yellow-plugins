@@ -160,6 +160,8 @@ No issues found. Checked for bugs and CLAUDE.md compliance.
 
   When issues were found, replace the middle line with `Found <n> issue(s); see the inline comments.` and include the issues that step 9 skipped as already raised in the count.
 
+  Read `.claude-code-review/not-reviewed-count`: the workflow wrote the number of changed files this review could not see (binary, or no patch from GitHub). When it is above 0, add the line `<n> changed file(s) were not reviewed: binary, or too large for GitHub to send.` after the middle line, with a blank line before it, so the summary does not read as a full review.
+
   Post it as one command. Put the whole body inside single quotes (`'...'`),
   with real line breaks, no `$`, no heredoc and nothing after the closing quote:
   `gh pr comment https://github.com/<owner>/<repo>/pull/<number> --body '## Code review`,

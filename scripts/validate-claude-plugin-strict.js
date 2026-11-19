@@ -30,13 +30,15 @@ const KNOWN_FILE = path.join(__dirname, 'claude-plugin-validate-known.json');
 /** Every error and warning in one `--json` report, with repo-relative files. */
 function collectFindings(report, root = ROOT) {
   const out = [];
+  const rel = (file) =>
+    path
+      .relative(root, file || '')
+      .split(path.sep)
+      .join('/');
   const sections = [report.manifest, ...(report.contents || [])];
   for (const sec of sections) {
     if (!sec) continue;
-    const file = path
-      .relative(root, sec.file || '')
-      .split(path.sep)
-      .join('/');
+    const file = rel(sec.file);
     for (const level of ['errors', 'warnings']) {
       for (const f of sec[level] || []) {
         out.push({
@@ -48,6 +50,44 @@ function collectFindings(report, root = ROOT) {
       }
     }
   }
+  // An error reported anywhere else (a top-level "error", or an "errors"
+  // list under another key) is an error too. Without this, a failure outside
+  // manifest/contents would pass, since every plugin's known CLAUDE.md
+  // warning already explains a nonzero exit (CLAUDE-373).
+  const target = rel(report.target);
+  const stray = (node, where) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach((n, i) => stray(n, `${where}[${i}]`));
+      return;
+    }
+    for (const [key, val] of Object.entries(node)) {
+      const at = where ? `${where}.${key}` : key;
+      if (!where && (key === 'manifest' || key === 'contents')) continue;
+      if (key === 'error' && val) {
+        out.push({
+          level: 'error',
+          file: target,
+          path: at,
+          message: typeof val === 'string' ? val : JSON.stringify(val),
+        });
+      } else if (key === 'errors' && Array.isArray(val)) {
+        for (const f of val) {
+          out.push({
+            level: 'error',
+            file: rel(node.file || report.target),
+            path: at,
+            message:
+              (f && (f.message || (typeof f === 'string' ? f : ''))) ||
+              JSON.stringify(f),
+          });
+        }
+      } else {
+        stray(val, at);
+      }
+    }
+  };
+  stray(report, '');
   return out;
 }
 
@@ -89,12 +129,12 @@ function targets(root = ROOT) {
   return list;
 }
 
-function runValidator(bin, target) {
+function runValidator(bin, target, root = ROOT) {
   const r = spawnSync(
     bin,
     ['plugin', 'validate', '--strict', '--json', target],
     {
-      cwd: ROOT,
+      cwd: root,
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
     }
@@ -111,7 +151,13 @@ function runValidator(bin, target) {
   return { status: r.status, report };
 }
 
-function main(argv) {
+/**
+ * Returns the exit code. `opts` lets tests point it at another tree and
+ * known list.
+ */
+function main(argv, opts = {}) {
+  const root = opts.root || ROOT;
+  const knownFile = opts.knownFile || KNOWN_FILE;
   let bin = 'claude';
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--claude' && argv[i + 1]) {
@@ -124,18 +170,19 @@ function main(argv) {
       return 2;
     }
   }
-  const known = JSON.parse(fs.readFileSync(KNOWN_FILE, 'utf8')).known;
+  const known = JSON.parse(fs.readFileSync(knownFile, 'utf8')).known;
   const version = spawnSync(bin, ['--version'], { encoding: 'utf8' });
   console.log(`Using ${bin} ${(version.stdout || '').trim()}`);
 
   const all = [];
   let failed = false;
-  for (const t of targets()) {
-    const { status, report } = runValidator(bin, t);
-    const findings = collectFindings(report);
+  for (const t of targets(root)) {
+    const { status, report } = runValidator(bin, t, root);
+    const findings = collectFindings(report, root);
     all.push(...findings);
     // --strict exits 1 on warnings we accept, so only a failure with nothing
-    // to explain it is an error on its own.
+    // to explain it is an error on its own. Errors outside manifest/contents
+    // are findings too (collectFindings), so they fail below as unknown.
     if (status !== 0 && findings.length === 0) {
       console.error(
         `::error::${t}: validator exited ${status} with no error or warning listed`
@@ -152,7 +199,7 @@ function main(argv) {
   }
   for (const id of stale) {
     console.log(
-      `::warning::known difference "${id}" no longer occurs; remove it from ${path.relative(ROOT, KNOWN_FILE)}`
+      `::warning::known difference "${id}" no longer occurs; remove it from ${path.relative(root, knownFile)}`
     );
   }
   console.log(
@@ -170,4 +217,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { collectFindings, classify, targets };
+module.exports = { collectFindings, classify, targets, main };
