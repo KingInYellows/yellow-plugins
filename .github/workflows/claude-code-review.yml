@@ -220,6 +220,14 @@ jobs:
                 >> .claude-code-review/pr.diff
             fi
           fi
+          # Check the head again: a push between the first check and the
+          # requests above would give a file list and diff for another commit.
+          live_head=$(gh_api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')
+          if [ "$live_head" != "$HEAD_SHA" ]; then
+            echo "::notice::PR head moved to $live_head while preparing the review; skipping this run"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Every earlier claude[bot] inline comment, outdated ones included
           # and flagged, so a push that only moves a still-unfixed line
           # (reformat, rename, restack) does not repost the same issue
