@@ -86,15 +86,22 @@ the provider model:
   `merge` operation (Preview → Confirm → Merge → Report), always behind
   an `AskUserQuestion` confirmation; never calls `gh pr merge`. The preview
   lists the target and every unmerged PR below it, because GitHub lands
-  that whole set (or queues it when the base uses a merge queue).
+  that whole set (or queues it when the base uses a merge queue). The
+  adapter reads that set from the Stacks REST API the way gh-stack does,
+  not from the local stack file, and a confirmed merge needs the previewed
+  `repository` and `previewToken` back.
 - `github-stack-merge-single` — merge one ordinary pull request via the
   runtime adapter's `merge-single` operation (Preview → Confirm → Merge →
   Report). The adapter refuses a pull request GitHub reports as part of a
   stack, a draft, a closed one, or one not based on the default branch,
   needs an explicit merge method, and merges only the head commit and base
-  branch the preview reported (REST merge call with `sha`). The skill stops
-  on a pull request Graphite owns. No admin override, auto-merge or branch
-  deletion.
+  branch the preview reported (REST merge call with `sha`). A pull request
+  is stacked if its own answer has a `stack` object or the Stacks API lists
+  it. A non-default base passes only when the user names it (`--base`, a
+  release or hotfix branch) and no open pull request has it as its head.
+  The preview lists open pull requests based on its head branch
+  (`dependents`). The skill stops on a pull request Graphite owns. No admin
+  override, auto-merge or branch deletion.
 
 ### MCP servers (0) · Hooks (2)
 
@@ -156,8 +163,16 @@ older extension is reported not ready. Facts the adapter depends on:
   remote on another host wins, and the merge skill passes the previewed
   repository back (`--repository`). The confirmed `gh stack merge` runs
   with `GH_REPO=github.com/<that repository>`, so it cannot act elsewhere.
-  `view --repository <owner/repo>` reads the stack under the same pin; the
-  merge skill re-reads its preview set that way before confirming.
+  `view --repository <owner/repo>` reads the stack under the same pin. A
+  hostless `GH_REPO` gets gh's default host as go-gh `auth.DefaultHost()`
+  works it out (`GH_HOST`, else the only host in `hosts.yml`), and is
+  refused when that is not github.com.
+- `gh stack merge <n>` reads `n` as a stack number first
+  (`GET repos/<repo>/stacks/<n>`), then as a pull request
+  (`GET repos/<repo>/stacks?pull_request=<n>`), and picks the landing set
+  from that remote stack (`mergeCandidates` in `cmd/merge.go`): merged pull
+  requests at the bottom are skipped and the first draft or closed one
+  blocks everything above it. The adapter's merge preview copies that.
 - `rebase` and `sync` leave the stack un-rebased when GitHub retargeted its
   base and the old base did not merge. The adapter reports that as
   `BASE_CHANGE_UNCONFIRMED`, never `SUCCESS`, and `--accept-base-change`
@@ -173,6 +188,16 @@ What was verified against the real extension in a local fixture, and what
 still needs a live GitHub repository, is recorded in
 `docs/stacked-prs-native-migration.md`. Bump the tested version only after
 re-running that fixture list.
+
+## Where the provider gate lives
+
+The `github-stack-*` skills do not run `/stack:status` before mutating.
+The gate stays with the provider-neutral callers (`/stack:*` and
+yellow-core's `stack-operation-registry.js`), which classify readiness
+first. A skill is reachable only while this plugin is enabled, and exactly
+one `stacked-pr` provider is enabled at a time. The skills keep their own
+checks for what the gate cannot see: Graphite tracking a branch, and
+gh-stack readiness reported by the adapter.
 
 ## Dependency on yellow-core
 
