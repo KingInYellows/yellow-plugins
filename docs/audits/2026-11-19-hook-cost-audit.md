@@ -60,18 +60,23 @@ the last run.
 1. Stderr from the exit-2 deny, which Claude reads. Only on a blocked push.
 2. github-workflow adds a 121-byte `systemMessage` when a `git commit -m`
    message is not a conventional commit.
-3. 60 runs, after an untimed seed of three sessions. "Pairs recorded" alternates
-   README.md with a partner, so every run writes a co-edit pair to
-   `.ruvector/coedit.json`. "3 known partners" starts a new session each run, so
-   the once-per-file suggestion is injected every time. Two consecutive
-   invocations gave the same 318 bytes.
+3. 60 runs, after an untimed seed of three sessions. "Same file" edits README.md
+   repeatedly in one session, so no pair is recorded. "Pairs recorded"
+   alternates README.md with a partner, so every timed run writes a co-edit pair
+   to `.ruvector/coedit.json`; the first edit of each new session id records no
+   pair, so the bench runs it but does not time it. "3 known partners" starts a
+   new session each run, so the once-per-file suggestion is injected every time.
+   Two consecutive invocations gave the same 318 bytes.
 4. Cloud `gh auth status` fails here (the `GH_TOKEN` is a proxy placeholder), so
    a shim reported success after making the real call. Without it the hook
    spends 275 ms and shows nothing. The cache TTL is 60 s, so most session
    starts are misses.
 5. Six pending entries and a stub `claude`, so the timing covers lock and
-   dispatch only. The real drain runs disowned on Haiku with a 3.00 USD
-   API-equivalent cap (not a bill); it adds no foreground latency.
+   dispatch only. Reproduce with `BENCH_STUB_CLAUDE=1`, which puts a no-op
+   `claude` written under `BENCH_HOME` on the hooks' `PATH`, after seeding six
+   `*.jsonl` files in the scratch project's `compound-staging/pending/`. The
+   real drain runs disowned on Haiku with a 3.00 USD API-equivalent cap (not a
+   bill); it adds no foreground latency.
 6. A second session starting while a background `npm ci` holds the install lock.
    In cloud sessions the install always fails, so this repeats.
 7. With findings it adds at most about 400 bytes: counts plus up to 10 PR
@@ -123,7 +128,11 @@ records wall-clock time with `process.hrtime`. It needs:
   drain. The script refuses to run while `claude` is on `PATH`.
 
 It reports a `failed_runs` count per row (spawn errors, timeouts and exits other
-than 0 or 2) and prints `FAILED` beside any row that has one.
+than 0 or 2) and prints `FAILED` beside any row that has one. Untimed seed runs
+that fail are counted in `seed_failed` and printed as `SEED FAILED`, since a
+broken seed measures an unseeded store. yellow-ci also runs a "startup, cache
+miss" scenario that deletes its result cache before every run; back-to-back
+"startup" runs are cache hits.
 
 For the loaded scenarios, seed the state first: install yellow-ruvector and
 yellow-morph by running their prewarm hooks once, create `.ruvector/` in the
