@@ -137,6 +137,18 @@ jobs:
           # there must not reach the review agent.
           rm -rf .claude-code-review
           mkdir .claude-code-review
+          # The file list and diff below come from the PR as it is now, so
+          # they match this checkout only while HEAD_SHA is still the PR head.
+          # A re-run of an older run would scan the wrong paths: skip it, the
+          # newer head has its own run.
+          pr_info=$(gh_api "repos/$REPO/pulls/$PR_NUMBER" \
+            --jq '"\(.head.sha) \(.changed_files)"')
+          read -r live_head changed_count <<< "$pr_info"
+          if [ "$live_head" != "$HEAD_SHA" ]; then
+            echo "::notice::PR head is now $live_head, not $HEAD_SHA; skipping this older run"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Paths this PR adds or changes, one JSON string per line so a
           # filename holding a newline stays one entry (the files API lists up
           # to 3000).
@@ -201,6 +213,10 @@ jobs:
                 + "status: \(.status)\n"
                 + (if .patch then .patch + "\n" else "(no patch from GitHub: binary or too large; not reviewed)\n" end)' \
               > .claude-code-review/pr.diff
+            if [ "$changed_count" -gt 3000 ]; then
+              echo "($((changed_count - 3000)) more changed files: GitHub lists only 3000; not reviewed)" \
+                >> .claude-code-review/pr.diff
+            fi
           fi
           # Every earlier claude[bot] inline comment, outdated ones included
           # and flagged, so a push that only moves a still-unfixed line
