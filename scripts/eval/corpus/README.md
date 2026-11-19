@@ -43,13 +43,13 @@ the fixed file that only look like a fix, and `check` requires each to fail:
 `r06` defines the redaction helpers but never applies them to the `classify_run`
 result, `r12` keeps the faulty exit guard with extra parentheses, split over
 lines, limited to POSIX or group kill (the wrong polarity), inside the
-group-kill branch, in `stop()`, or with the group kill through a negated pid
-variable, and `r15` keeps `git diff` or `git log` double-quoted or on one line.
+group-kill branch, in `stop()`, after a group-kill branch that returns only
+conditionally, or with the group kill through a negated pid variable, and `r15` keeps `git diff` or `git log` double-quoted or on one line.
 Graders are proven against other valid fixes too: `selfcheck.alternates` are
 edits of the fixed file into a different correct fix, and `check` requires each
 to pass. `r12` moves the exit guard into the non-group `else` branch or an
 `if (!groupKill) { ... }` block that handles Windows first, puts it after a
-group-kill branch that returns, or limits it with
+group-kill branch that ends in an unconditional `return`, or limits it with
 `process.platform === 'win32'` instead of `groupKill`. The `r12` grader fails
 any exit guard in `process.ts` outside those non-group forms, so it does not
 depend on how the group kill is spelled. It uses an atomic group `(?>...)`, so the
