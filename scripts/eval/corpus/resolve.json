@@ -167,7 +167,7 @@
               "count": 1,
               "match": ["[\\s\\S]"],
               "not": [
-                "\\bif\\s*\\((?:(?!groupKill)[^;{}])*?(?:child\\.exitCode\\s*!==?\\s*null|null\\s*!==?\\s*child\\.exitCode)(?:(?!groupKill)[^;{}])*\\)\\s*\\{?\\s*return\\b"
+                "\\bif\\s*\\((?:(?!!\\s*groupKill\\b|process\\.platform\\s*===?\\s*['\\\"]win32['\\\"]|['\\\"]win32['\\\"]\\s*===?\\s*process\\.platform)[^;{}])*?(?:child\\.exitCode\\s*!==?\\s*null|null\\s*!==?\\s*child\\.exitCode)(?:(?!!\\s*groupKill\\b|process\\.platform\\s*===?\\s*['\\\"]win32['\\\"]|['\\\"]win32['\\\"]\\s*===?\\s*process\\.platform)[^;{}])*\\)\\s*\\{?\\s*return\\b(?=(?:(?!\\};)[\\s\\S])*?process\\.kill\\(\\s*-)"
               ]
             }
           ]
@@ -453,6 +453,32 @@
             "old": "      if (child.pid === undefined || closed) return;\n      if (!groupKill && child.exitCode !== null) return;\n",
             "new": "      if (\n        child.pid === undefined ||\n        child.exitCode != null\n      ) {\n        return;\n      }\n",
             "why": "the faulty guard split over lines, with != null"
+          },
+          {
+            "path": "plugins/yellow-agy/src/process.ts",
+            "old": "      if (child.pid === undefined || closed) return;\n      if (!groupKill && child.exitCode !== null) return;\n",
+            "new": "      if (child.pid === undefined || closed) return;\n      if (process.platform !== 'win32' && child.exitCode !== null) return;\n",
+            "why": "the faulty guard limited to POSIX, the wrong polarity"
+          },
+          {
+            "path": "plugins/yellow-agy/src/process.ts",
+            "old": "      if (child.pid === undefined || closed) return;\n      if (!groupKill && child.exitCode !== null) return;\n",
+            "new": "      if (child.pid === undefined || closed) return;\n      if (groupKill && child.exitCode !== null) return;\n",
+            "why": "the faulty guard limited to group kill, the wrong polarity"
+          }
+        ],
+        "alternates": [
+          {
+            "path": "plugins/yellow-agy/src/process.ts",
+            "old": "      if (!groupKill && child.exitCode !== null) return;\n      try {\n        if (groupKill) process.kill(-child.pid, sig);\n        else child.kill(sig);\n",
+            "new": "      try {\n        if (groupKill) process.kill(-child.pid, sig);\n        else {\n          if (child.exitCode !== null) return;\n          child.kill(sig);\n        }\n",
+            "why": "the exit guard moved into the non-group else branch"
+          },
+          {
+            "path": "plugins/yellow-agy/src/process.ts",
+            "old": "      if (!groupKill && child.exitCode !== null) return;\n",
+            "new": "      if (process.platform === 'win32' && child.exitCode !== null) return;\n",
+            "why": "the exit guard limited to Windows by platform instead of groupKill"
           }
         ]
       }

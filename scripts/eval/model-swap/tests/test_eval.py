@@ -157,6 +157,17 @@ class CheckSpecTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             harness.check_spec(self.spec(selfcheck={"fix": "a" * 40, "paths": ["a"],
                                                     "lookalikes": [{"path": "../a", "append": "x"}]}))
+        with self.assertRaises(SystemExit):
+            harness.check_spec(self.spec(selfcheck={"fix": "a" * 40, "paths": ["a"],
+                                                    "alternates": [{"path": "../a", "append": "x"}]}))
+
+    def test_an_entry_without_a_commit_is_unsafe_not_a_crash(self):
+        for spec in (dict(self.spec(), replays=[{"id": "r", "plants": []}]),
+                     dict(self.spec(), scans=[{"id": "s", "files": []}]),
+                     self.spec(source={"path": "a.md"})):
+            with self.assertRaises(SystemExit) as err:
+                harness.check_spec(spec)
+            self.assertIn("unsafe spec values", str(err.exception))
 
     def test_tree_must_be_a_full_sha(self):
         with self.assertRaises(SystemExit):
@@ -297,6 +308,20 @@ class CheckTest(TempRepo):
                       self.check(self.spec(reply_fails=["THREAD T1 | disposition=fixed, again"])))
         self.assertEqual(self.check(self.spec(reply_fails=["THREAD T2 | disposition=fixed"])), "")
 
+    def test_an_alternate_fix_the_grader_rejects_is_reported(self):
+        alt = {"path": "lib/kill.ts", "old": "!groupKill && ", "new": "!groupKill &&\n  ",
+               "why": "split"}
+        self.assertEqual(self.check(self.spec(alternates=[alt])), "")
+        bad = dict(alt, new="process.platform === 'win32' && ", why="platform guard")
+        self.assertIn("fail on alternates[0] (platform guard)", self.check(self.spec(alternates=[bad])))
+        self.assertIn("alternates[0] `old` matches 0 times",
+                      self.check(self.spec(alternates=[dict(alt, old="nope")])))
+        with open(os.path.join(self.repo, "lib/kill.ts"), encoding="utf-8") as handle:
+            before = handle.read()
+        self.check(self.spec(alternates=[bad]))
+        with open(os.path.join(self.repo, "lib/kill.ts"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), before)
+
 
 class PrepareRunTest(TempRepo):
     def setUp(self):
@@ -369,6 +394,102 @@ class PrepareRunTest(TempRepo):
         _, err = holder.communicate(timeout=60)
         self.assertNotEqual(holder.returncode, 0)
         self.assertIn("in use by another eval.py process", err)
+
+    def lock_held_elsewhere(self):
+        probe = subprocess.run([sys.executable, "-c",
+                                "import sys; sys.path.insert(0, %r); import eval as h; "
+                                "h.lock_work(%r)" % (os.path.dirname(harness.__file__), self.work)],
+                               capture_output=True, text=True, timeout=60)
+        return probe.returncode != 0 and "in use by another eval.py process" in probe.stderr
+
+    def release(self):
+        for handle in harness.LOCKS:
+            handle.close()
+        harness.LOCKS.clear()
+
+    def test_grade_and_check_take_the_lock(self):
+        self.prepare()
+        harness.lock_work(self.work)
+        holder = harness.LOCKS[:]
+        harness.LOCKS.clear()
+        for cmd in (["grade", self.work], ["check", self.work, self.spec_path]):
+            res = subprocess.run([sys.executable, harness.__file__, *cmd], capture_output=True,
+                                 text=True, timeout=60)
+            self.assertNotEqual(res.returncode, 0)
+            self.assertIn("in use by another eval.py process", res.stderr)
+        harness.LOCKS.extend(holder)
+
+    def stub_runner(self, body):
+        here = os.path.join(self.tmp.name, "here")
+        os.makedirs(here, exist_ok=True)
+        stub = os.path.join(here, "run-one.sh")
+        with open(stub, "w", encoding="utf-8") as handle:
+            handle.write("#!/usr/bin/env bash\n" + body)
+        os.chmod(stub, 0o755)
+        saved = harness.HERE
+        harness.HERE = here
+        self.addCleanup(setattr, harness, "HERE", saved)
+
+    def test_run_marks_corpus_rows_untrusted(self):
+        log = os.path.join(self.tmp.name, "env.log")
+        self.stub_runner('printf "%%s %%s\\n" "$2" "$EVAL_UNTRUSTED" >>%s\n' % json.dumps(log))
+        self.prepare()
+        harness.run(self.work, 1, False)
+        self.release()
+        with open(log, encoding="utf-8") as handle:
+            self.assertEqual(handle.read().split()[1], "1")
+        os.remove(log)
+        # An agent with neither `overlay` nor `plugins` runs trusted.
+        self.prepare(agent={"overlay": []})
+        spec_path = os.path.join(self.work, "spec.json")
+        with open(spec_path, encoding="utf-8") as handle:
+            spec = json.load(handle)
+        del spec["agents"]["r"]["overlay"]
+        spec.pop("eval_inputs", None)
+        with open(spec_path, "w", encoding="utf-8") as handle:
+            json.dump(spec, handle)
+        harness.run(self.work, 1, False)
+        self.release()
+        with open(log, encoding="utf-8") as handle:
+            self.assertEqual(handle.read().split()[1], "0")
+
+    def test_the_lock_outlives_a_killed_run_while_its_child_lives(self):
+        pidfile = os.path.join(self.tmp.name, "child.pid")
+        # The stub leaves a child behind, as claude would be after eval.py dies.
+        self.stub_runner("sleep 30 &\necho $! >%s\n" % json.dumps(pidfile))
+        self.prepare()
+        harness.run(self.work, 1, False)
+        with open(pidfile, encoding="utf-8") as handle:
+            child = int(handle.read())
+        self.addCleanup(lambda: subprocess.run(["kill", str(child)], capture_output=True))
+        self.release()  # eval.py's own handle is gone, as after a forced exit
+        self.assertTrue(self.lock_held_elsewhere())
+        os.kill(child, 15)
+        for _ in range(100):
+            if not self.lock_held_elsewhere():
+                break
+        else:
+            self.fail("lock still held after the child exited")
+
+
+class WriteAtomicTest(unittest.TestCase):
+    def test_replaces_the_file_whole_and_leaves_no_temp(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "matrix.tsv")
+            harness.write_atomic(path, "old\n")
+            harness.write_atomic(path, "new\n")
+            with open(path, encoding="utf-8") as handle:
+                self.assertEqual(handle.read(), "new\n")
+            self.assertEqual(os.listdir(d), ["matrix.tsv"])
+
+    def test_a_failed_write_keeps_the_old_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "matrix.tsv")
+            harness.write_atomic(path, "old\n")
+            with self.assertRaises(TypeError):
+                harness.write_atomic(path, None)
+            with open(path, encoding="utf-8") as handle:
+                self.assertEqual(handle.read(), "old\n")
 
 
 class RunOneGuardTest(unittest.TestCase):

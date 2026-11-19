@@ -41,8 +41,12 @@ reviewed file.
 Graders are also proven against non-fixes. `selfcheck.lookalikes` are edits to
 the fixed file that only look like a fix, and `check` requires each to fail:
 `r06` defines the redaction helpers but never applies them to the `classify_run`
-result, `r12` keeps the faulty exit guard with extra parentheses or split over
-lines, and `r15` keeps `git diff` or `git log` double-quoted or on one line.
+result, `r12` keeps the faulty exit guard with extra parentheses, split over
+lines, or limited to POSIX or group kill (the wrong polarity), and `r15` keeps `git diff` or `git log` double-quoted or on one line.
+Graders are proven against other valid fixes too: `selfcheck.alternates` are
+edits of the fixed file into a different correct fix, and `check` requires each
+to pass. `r12` moves the exit guard into the non-group `else` branch, or limits
+it with `process.platform === 'win32'` instead of `groupKill`.
 Every case also records the resolver's real `THREAD` line from the 2026-11-17
 pass as `selfcheck.reply` (for `r08`, `r13` and `r15`, which reported `unclear`
 there, that real line is in `reply_fails` and `reply` is the same line reporting
@@ -65,10 +69,12 @@ A plan that names the lesson can still prescribe the bug. `p07`, `p10` and `p18`
 have a `not` regex for a shell code block that does exactly that (a hook with
 `set -e` that prints `{"continue": true}`, a `printf` whose `%b` format takes
 the message, an `EXIT` trap in the `mktemp -d` block) with no warning word
-(`wrong`, `fires`, `reinterpret` and so on, but not routine words like `never`
+(`wrong`, `reinterpret` and so on, but not routine words like `never`
 or `inject`) anywhere in the block, so quoting the incident's own anti-pattern
 still passes. Their `selfcheck.lookalikes` append such a block to the incident
-doc and require the case to fail.
+doc and require the case to fail. `p18` flags the block whatever the order of
+`mktemp -d` and the trap, on one line or two; only "fires when this call ..."
+counts as a warning, so a comment such as "cleanup fires on exit" does not.
 
 Runs load `yellow-core` from the checkout with `--plugin-dir` (agent `plugins`
 key) and invoke `/yellow-core:flow:plan` as a slash command, so the command, its

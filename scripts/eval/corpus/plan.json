@@ -243,7 +243,7 @@
                 "trap[^\\n]{0,160}(fire|exit|same (Bash )?call|consum|separate|own call)|(fire|exit|same (Bash )?call|consum|separate|own call)[^\\n]{0,160}trap"
               ],
               "not": [
-                "^[ \\t]*```(?:bash|sh|shell|zsh)\\b[^\\n]*\\n(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?[^\\n]*mktemp[ \\t]+-d[^\\n]*\\n(?:(?![ \\t]*```)[^\\n]*\\n)*?[ \\t]*trap\\b[^\\n]*\\bEXIT\\b)(?:(?![ \\t]*```)(?![^\\n]*(?:wrong|\\bbad\\b|unsafe|vulnerab|don'?t|do not|must not|omit|fires|anti-?pattern|reinterpret|incorrect))[^\\n]*\\n)*?[ \\t]*```"
+                "^[ \\t]*```(?:bash|sh|shell|zsh)\\b[^\\n]*\\n(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?(?![ \\t]*```)[^\\n]*mktemp[ \\t]+-d)(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?(?![ \\t]*```)(?:[ \\t]*|[^\\n]*[;&|][ \\t]*)trap\\b[^\\n]*\\bEXIT\\b)(?:(?![ \\t]*```)(?![^\\n]*(?:wrong|\\bbad\\b|unsafe|vulnerab|don'?t|do not|must not|omit|fires (?:when|as soon as) (?:this|the|that) (?:\\w+ )?call|anti-?pattern|reinterpret|incorrect))[^\\n]*\\n)*?[ \\t]*```"
               ]
             }
           ]
@@ -410,6 +410,18 @@
           {
             "append": "\n```bash\nSTAGE_DIR=\"$(mktemp -d)\"\ntrap 'rm -rf -- \"$STAGE_DIR\"' EXIT\nprintf '%s\\n' \"$STAGE_DIR\"\n```\n",
             "why": "an EXIT trap set in the mktemp call"
+          },
+          {
+            "append": "\n```bash\nd=\"$(mktemp -d)\"; trap 'rm -rf -- \"$d\"' EXIT\nprintf '%s\\n' \"$d\"\n```\n",
+            "why": "mktemp and the EXIT trap on one line"
+          },
+          {
+            "append": "\n```bash\ntrap 'rm -rf -- \"$STAGE_DIR\"' EXIT\nSTAGE_DIR=\"$(mktemp -d)\"\nprintf '%s\\n' \"$STAGE_DIR\"\n```\n",
+            "why": "the EXIT trap set before mktemp"
+          },
+          {
+            "append": "\n```bash\nSTAGE_DIR=\"$(mktemp -d)\"\ntrap 'rm -rf -- \"$STAGE_DIR\"' EXIT   # cleanup fires on exit\nprintf '%s\\n' \"$STAGE_DIR\"\n```\n",
+            "why": "a reassuring comment that says the trap fires"
           }
         ]
       }
