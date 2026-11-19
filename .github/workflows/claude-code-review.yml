@@ -137,24 +137,41 @@ jobs:
           # there must not reach the review agent.
           rm -rf .claude-code-review
           mkdir .claude-code-review
-          # Paths this PR adds or changes (the files API lists up to 3000).
+          # Paths this PR adds or changes, one JSON string per line so a
+          # filename holding a newline stays one entry (the files API lists up
+          # to 3000).
           gh_api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" \
-            --jq '.[] | select(.status != "removed") | .filename' \
+            --jq '.[] | select(.status != "removed") | .filename | @json' \
             > .claude-code-review/changed-files.txt
           # A symlink committed in the PR could point the Read tool at
           # .git/config or /proc. Read deny rules check symlink targets, but
           # refuse links that leave the checkout or enter .git anyway. Only
           # the paths this PR changes, and the directories above them, are
           # checked: one such link already on the default branch would
-          # otherwise fail every PR's review (CLAUDE-365). It runs after the
-          # marker check, so a reviewed head skips it too.
+          # otherwise fail every PR's review (CLAUDE-365). At the files API's
+          # 3000-path cap the list may be cut short, so the whole tree is
+          # scanned instead. A listed path that is absolute or has an empty,
+          # "." or ".." part fails the job. It runs after the marker check, so
+          # a reviewed head skips it too.
           if ! python3 -I - .claude-code-review/changed-files.txt <<'PY'
           import os, sys
           root = os.path.realpath(".")
           git = os.path.join(root, ".git")
+          import json
           bad = set()
           with open(sys.argv[1], encoding="utf-8") as fh:
-              paths = [line.rstrip("\n") for line in fh if line.strip()]
+              paths = [json.loads(line) for line in fh if line.strip()]
+          for rel in paths:
+              parts = rel.split("/")
+              if not rel or rel.startswith("/") or "\0" in rel or any(x in ("", ".", "..") for x in parts):
+                  print(f"::error::unsafe path in the PR file list: {rel!r}")
+                  sys.exit(1)
+          if len(paths) >= 3000:
+              paths = []
+              for d, dirs, files in os.walk(root):
+                  dirs[:] = [x for x in dirs if os.path.join(d, x) != git]
+                  for name in dirs + files:
+                      paths.append(os.path.relpath(os.path.join(d, name), root).replace(os.sep, "/"))
           for rel in paths:
               parts = rel.split("/")
               for i in range(1, len(parts) + 1):
