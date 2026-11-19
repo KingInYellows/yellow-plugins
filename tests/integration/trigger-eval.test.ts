@@ -72,7 +72,7 @@ describe('componentInfo', () => {
     expect(new RegExp(info.inputMatch).test('{"skill":"debug"}')).toBe(false);
   });
 
-  it('rejects a set aimed at a component the model cannot invoke', () => {
+  it('accepts an internal user-invocable: false skill as a target', () => {
     const set = {
       id: 'yellow-core:brainstorming',
       plugin: 'yellow-core',
@@ -81,9 +81,9 @@ describe('componentInfo', () => {
         queries: [],
       },
     };
-    expect(trigger.checkSet(ROOT, set).join('\n')).toMatch(
-      /user-invocable: false/
-    );
+    const errors = trigger.checkSet(ROOT, set).join('\n');
+    expect(errors).not.toMatch(/user-invocable/);
+    expect(errors).not.toMatch(/cannot trigger/);
   });
 });
 

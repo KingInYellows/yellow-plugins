@@ -30,8 +30,9 @@ temporary root with copies of the plugins a set needs and one generated
 }
 ```
 
-- `source` is the command file or `SKILL.md`. The target must be
-  model-invocable.
+- `source` is the command file or `SKILL.md`. The target must be model-invocable
+  (no `disable-model-invocation: true`); internal `user-invocable: false` skills
+  qualify.
 - At least 8 should-trigger and 8 should-not-trigger queries, each side split
   roughly 60/40 between `train` and `heldout`.
 - Near misses name a sibling's job (`/review:resolve` vs `/review:pr`), not

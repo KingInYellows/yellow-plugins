@@ -167,14 +167,8 @@ function checkSet(repoRoot, set) {
         `${set.id}: target sets disable-model-invocation; it cannot trigger`
       );
     }
-    if (
-      info.kind === 'skill' &&
-      info.frontmatter['user-invocable'] === 'false'
-    ) {
-      errors.push(
-        `${set.id}: target is user-invocable: false; it is not listed to the model`
-      );
-    }
+    // user-invocable: false only hides a skill from the / menu; the model can
+    // still invoke it, so internal skills stay eligible.
   }
   const qs = Array.isArray(data.queries) ? data.queries : [];
   const seen = new Set();
