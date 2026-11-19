@@ -41,6 +41,7 @@
     "validate:setup-all": "node scripts/validate-setup-all.js",
     "validate:doc-counts": "node scripts/validate-doc-counts.js",
     "validate:council-roster": "node scripts/validate-council-roster.js",
+    "validate:claude-strict": "node scripts/validate-claude-plugin-strict.js",
     "validate:compact-return": "node scripts/validate-compact-return-schema.js",
     "check:pins": "node scripts/check-upstream-pins.js",
     "smoke:install": "bash scripts/smoke-plugin-install.sh",

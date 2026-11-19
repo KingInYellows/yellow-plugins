@@ -424,6 +424,35 @@ jobs:
 
 ```
 
+### Claude Code strict validation
+
+CI also runs Claude Code's own validator on the marketplace and every plugin
+(`claude-plugin-validate` job in `validate-schemas.yml`, required by
+`ci-status`; CLAUDE-323):
+
+```bash
+pnpm validate:claude-strict   # node scripts/validate-claude-plugin-strict.js
+```
+
+The script runs `claude plugin validate --strict --json` on `.` and on each
+`plugins/<name>`, and fails on any error or warning not listed in
+`scripts/claude-plugin-validate-known.json`. CI installs a pinned CLI
+(`CLAUDE_CODE_CLI_VERSION` in the job); locally it uses `claude` from `PATH`,
+so a newer CLI may report findings CI does not see yet. Bump the pin on
+purpose and update the known list in the same PR.
+
+The two validators disagree in both directions:
+
+| Difference | Direction | How we handle it |
+|---|---|---|
+| `CLAUDE.md` at a plugin root "is not loaded as project context" | Claude Code warns; our validators require the file | Known (`plugin-root-claude-md`). The file is contributor documentation for this repo; the plugin's skills carry runtime context. |
+| `userConfig.<key>.pattern`, `plugin.changelog`, npm-style `repository` | Claude Code rejects; our schema allowed them | Now caught here before merge. See CONTRIBUTING.md "Local vs Remote Validator Divergence". |
+| Authoring rules (RULE 1-25), version sync, `setup:all` coverage, generated-manifest drift | Ours only | Still enforced by `pnpm validate:schemas`; Claude Code does not check them. |
+| README install line, plugin icon (`--profile directory` checks) | Claude Code advice only | Not run: we do not submit to the plugin directory. |
+
+A known entry that no longer matches anything prints a warning; delete it
+then.
+
 ### Pre-Commit Hook
 
 ```bash

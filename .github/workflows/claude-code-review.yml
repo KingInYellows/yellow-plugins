@@ -23,6 +23,9 @@ jobs:
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
     runs-on: ubuntu-latest
+    # Spend cap, with --max-budget-usd below (CLAUDE-323): a stuck run stops
+    # here instead of holding the subscription token for the 6-hour default.
+    timeout-minutes: 30
     permissions:
       contents: read
       # write: --comment below posts the review as a PR comment and inline
@@ -69,7 +72,8 @@ jobs:
             fi
           done
           # gh api with three tries, so one transient API error does not fail
-          # the job. A 404 is not retried.
+          # the job. A 404, or a 406 for a diff too large to return, is not
+          # retried.
           gh_api() {
             local try out="$RUNNER_TEMP/gh-api.out" err="$RUNNER_TEMP/gh-api.err"
             for try in 1 2 3; do
@@ -77,7 +81,7 @@ jobs:
                 cat "$out"
                 return 0
               fi
-              if grep -q 'HTTP 404' "$err"; then
+              if grep -qE 'HTTP 40[46]' "$err"; then
                 break
               fi
               if [ "$try" -lt 3 ]; then sleep $((try * 5)); fi
@@ -117,29 +121,6 @@ jobs:
           # reviewed or act on another repository.
           printf '%s %s %s\n' "$REPO" "$PR_NUMBER" "$HEAD_SHA" \
             > "$HOME/.claude/hooks/claude-code-review-target"
-          # A symlink committed in the PR could point the Read tool at
-          # .git/config or /proc. Read deny rules check symlink targets, but
-          # refuse links that leave the checkout or enter .git anyway.
-          if ! python3 -I - <<'PY'
-          import os, sys
-          root = os.path.realpath(".")
-          git = os.path.join(root, ".git")
-          bad = []
-          for d, dirs, files in os.walk(root):
-              dirs[:] = [x for x in dirs if os.path.join(d, x) != git]
-              for name in dirs + files:
-                  p = os.path.join(d, name)
-                  if os.path.islink(p):
-                      t = os.path.realpath(p)
-                      if os.path.commonpath([root, t]) != root or os.path.commonpath([git, t]) == git:
-                          bad.append(os.path.relpath(p, root))
-          for b in bad:
-              print(f"::error::symlink leaves the checkout: {b}")
-          sys.exit(1 if bad else 0)
-          PY
-          then
-            exit 1
-          fi
           export MARKER="<!-- claude-code-review head=$HEAD_SHA -->"
           found=$(gh_api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
             --jq '.[]
@@ -156,6 +137,54 @@ jobs:
           # there must not reach the review agent.
           rm -rf .claude-code-review
           mkdir .claude-code-review
+          # Paths this PR adds or changes (the files API lists up to 3000).
+          gh_api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" \
+            --jq '.[] | select(.status != "removed") | .filename' \
+            > .claude-code-review/changed-files.txt
+          # A symlink committed in the PR could point the Read tool at
+          # .git/config or /proc. Read deny rules check symlink targets, but
+          # refuse links that leave the checkout or enter .git anyway. Only
+          # the paths this PR changes, and the directories above them, are
+          # checked: one such link already on the default branch would
+          # otherwise fail every PR's review (CLAUDE-365). It runs after the
+          # marker check, so a reviewed head skips it too.
+          if ! python3 -I - .claude-code-review/changed-files.txt <<'PY'
+          import os, sys
+          root = os.path.realpath(".")
+          git = os.path.join(root, ".git")
+          bad = set()
+          with open(sys.argv[1], encoding="utf-8") as fh:
+              paths = [line.rstrip("\n") for line in fh if line.strip()]
+          for rel in paths:
+              parts = rel.split("/")
+              for i in range(1, len(parts) + 1):
+                  p = os.path.join(root, *parts[:i])
+                  if os.path.islink(p):
+                      t = os.path.realpath(p)
+                      if os.path.commonpath([root, t]) != root or os.path.commonpath([git, t]) == git:
+                          bad.add("/".join(parts[:i]))
+          for b in sorted(bad):
+              print(f"::error::symlink leaves the checkout: {b}")
+          sys.exit(1 if bad else 0)
+          PY
+          then
+            exit 1
+          fi
+          # The whole diff as a file the agent reads in pages (CLAUDE-365).
+          # gh pr diff output is cut off in the tool result on a large PR, and
+          # the Bash guard allows no pipe or redirect to page it. When GitHub
+          # refuses the diff as too large, build it from each file's patch;
+          # files whose patch GitHub leaves out are named so the agent can say
+          # they were not reviewed.
+          if ! gh_api -H 'Accept: application/vnd.github.diff' \
+              "repos/$REPO/pulls/$PR_NUMBER" > .claude-code-review/pr.diff; then
+            echo "::notice::the full diff is too large for one request; building it per file"
+            gh_api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" \
+              --jq '.[] | "diff --git a/\(.previous_filename // .filename) b/\(.filename)\n"
+                + "status: \(.status)\n"
+                + (if .patch then .patch + "\n" else "(no patch from GitHub: binary or too large; not reviewed)\n" end)' \
+              > .claude-code-review/pr.diff
+          fi
           # Every earlier claude[bot] inline comment, outdated ones included
           # and flagged, so a push that only moves a still-unfixed line
           # (reformat, rename, restack) does not repost the same issue
@@ -236,8 +265,13 @@ jobs:
           # Read tool already needs approval outside the checkout, which a CI
           # run cannot give, since the command no longer grants bare Read.
           # Read deny rules also cover Grep and Glob; Bash is the hook's job.
+          # --max-budget-usd: cap on the run's API-equivalent cost, subagents
+          # included (CLAUDE-323). A normal review costs about $1; a run that
+          # hits the cap stops before posting the summary, so the next push
+          # reviews that PR again.
           claude_args: >-
             --model claude-sonnet-5-5
+            --max-budget-usd 5
             --setting-sources user
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
             --disallowedTools "Bash(gh pr comment -F*),Bash(gh pr comment --body-file*),Bash(gh pr comment * -F*),Bash(gh pr comment * --body-file*),Read(./.git),Read(./.git/**),Read(//proc),Read(//proc/**)"
