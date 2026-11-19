@@ -99,10 +99,11 @@ takes n runs and a threshold, isolates each case under a temporary home, and its
 ## Baseline
 
 `baseline.json` holds the committed per-set and per-query results. Its `sets`
-map is keyed by set id. After a run of one set, replace only that key in
+map is keyed by set id. Refresh it only from a run without `--case` whose
+`summary.json` has `partial: false`, `failedRuns: 0` and an empty
+`unscoredCases`. After a run of one set, replace only that key in
 `baseline.json` with the same key from the run's `summary.json`. Copy a whole
-`summary.json` over the baseline only after a run of every set, and only when
-its `partial` is `false` and `failedRuns` is 0.
+`summary.json` over the baseline only after a run of every set.
 
 2026-11-19, Claude Code 2.1.328, Sonnet 5.5, 3 runs, 19.99 USD API-equivalent
 (not a bill), 304 s, no failed runs:
