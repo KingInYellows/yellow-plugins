@@ -167,7 +167,7 @@
               "count": 1,
               "match": ["[\\s\\S]"],
               "not": [
-                "\\bif\\s*\\((?:(?!!\\s*groupKill\\b|process\\.platform\\s*===?\\s*['\\\"]win32['\\\"]|['\\\"]win32['\\\"]\\s*===?\\s*process\\.platform)[^;{}])*?(?:child\\.exitCode\\s*!==?\\s*null|null\\s*!==?\\s*child\\.exitCode)(?:(?!!\\s*groupKill\\b|process\\.platform\\s*===?\\s*['\\\"]win32['\\\"]|['\\\"]win32['\\\"]\\s*===?\\s*process\\.platform)[^;{}])*\\)\\s*\\{?\\s*return\\b(?=(?:(?!\\};)[\\s\\S])*?process\\.kill\\(\\s*-)"
+                "\\A(?>\\bif\\s*\\(\\s*(?:!\\s*groupKill\\b|process\\.platform\\s*===?\\s*['\"]win32['\"]|['\"]win32['\"]\\s*===?\\s*process\\.platform)\\s*\\)\\s*\\{(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*\\}|\\bif\\s*\\(\\s*(?:groupKill\\b|process\\.platform\\s*!==?\\s*['\"]win32['\"]|['\"]win32['\"]\\s*!==?\\s*process\\.platform)\\s*\\)\\s*(?:\\{(?:(?:(?!exitCode)[^{}])|\\{(?:(?:(?!exitCode)[^{}])|\\{(?:(?!exitCode)[^{}])*\\})*\\})*\\}|(?:(?!exitCode)[^;{}])*;)\\s*else\\s*\\{(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*\\}|\\bif\\s*\\(\\s*(?:groupKill\\b|process\\.platform\\s*!==?\\s*['\"]win32['\"]|['\"]win32['\"]\\s*!==?\\s*process\\.platform)\\s*\\)\\s*(?=\\{(?:(?:[^{}]|\\{(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*\\})*?(?:;|\\{(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*\\}))?\\s*return\\b[^;{}]*;\\s*\\})\\{(?:(?:(?!exitCode)[^{}])|\\{(?:(?:(?!exitCode)[^{}])|\\{(?:(?!exitCode)[^{}])*\\})*\\})*\\}(?:[^{}]|\\{(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*\\})*(?=\\})|[\\s\\S])*?\\bif\\s*\\((?:(?!(?:!\\s*groupKill\\b|process\\.platform\\s*===?\\s*['\"]win32['\"]|['\"]win32['\"]\\s*===?\\s*process\\.platform))[^;{}])*?(?:child\\.exitCode\\s*!==?\\s*null|null\\s*!==?\\s*child\\.exitCode)(?:(?!(?:!\\s*groupKill\\b|process\\.platform\\s*===?\\s*['\"]win32['\"]|['\"]win32['\"]\\s*===?\\s*process\\.platform))[^;{}])*\\)\\s*\\{?\\s*return\\b"
               ]
             }
           ]
@@ -465,6 +465,30 @@
             "old": "      if (child.pid === undefined || closed) return;\n      if (!groupKill && child.exitCode !== null) return;\n",
             "new": "      if (child.pid === undefined || closed) return;\n      if (groupKill && child.exitCode !== null) return;\n",
             "why": "the faulty guard limited to group kill, the wrong polarity"
+          },
+          {
+            "path": "plugins/yellow-agy/src/process.ts",
+            "old": "    const stop = (): void => {\n",
+            "new": "    const stop = (): void => {\n      if (child.exitCode !== null) return;\n",
+            "why": "the faulty guard moved into stop()"
+          },
+          {
+            "path": "plugins/yellow-agy/src/process.ts",
+            "old": "      if (child.pid === undefined || closed) return;\n      if (!groupKill && child.exitCode !== null) return;\n      try {\n        if (groupKill) process.kill(-child.pid, sig);\n",
+            "new": "      if (child.pid === undefined || closed || child.exitCode !== null) return;\n      const pgid = -child.pid;\n      try {\n        if (groupKill) process.kill(pgid, sig);\n",
+            "why": "the faulty guard with the group kill through a negated pid variable"
+          },
+          {
+            "path": "plugins/yellow-agy/src/process.ts",
+            "old": "      if (!groupKill && child.exitCode !== null) return;\n      try {\n        if (groupKill) process.kill(-child.pid, sig);\n        else child.kill(sig);\n      } catch {\n        // already gone\n      }\n",
+            "new": "      if (groupKill) {\n        if (child.exitCode !== null) return;\n        try {\n          process.kill(-child.pid, sig);\n        } catch {\n          // already gone\n        }\n        return;\n      }\n      child.kill(sig);\n",
+            "why": "the faulty guard inside the group-kill branch"
+          },
+          {
+            "path": "plugins/yellow-agy/src/process.ts",
+            "old": "      if (child.pid === undefined || closed) return;\n      if (!groupKill && child.exitCode !== null) return;\n",
+            "new": "      if (child.pid === undefined || closed) return;\n      if (groupKill) {\n        if (closed) return;\n      }\n      if (child.exitCode !== null) return;\n",
+            "why": "the faulty guard after a group-kill branch that returns only conditionally"
           }
         ],
         "alternates": [
@@ -479,6 +503,18 @@
             "old": "      if (!groupKill && child.exitCode !== null) return;\n",
             "new": "      if (process.platform === 'win32' && child.exitCode !== null) return;\n",
             "why": "the exit guard limited to Windows by platform instead of groupKill"
+          },
+          {
+            "path": "plugins/yellow-agy/src/process.ts",
+            "old": "      if (!groupKill && child.exitCode !== null) return;\n      try {\n        if (groupKill) process.kill(-child.pid, sig);\n        else child.kill(sig);\n      } catch {\n        // already gone\n      }\n",
+            "new": "      if (!groupKill) {\n        if (child.exitCode !== null) return;\n        child.kill(sig);\n        return;\n      }\n      try {\n        process.kill(-child.pid, sig);\n      } catch {\n        // already gone\n      }\n",
+            "why": "Windows handled first, the exit guard nested in if (!groupKill) { ... }"
+          },
+          {
+            "path": "plugins/yellow-agy/src/process.ts",
+            "old": "      if (!groupKill && child.exitCode !== null) return;\n      try {\n        if (groupKill) process.kill(-child.pid, sig);\n        else child.kill(sig);\n      } catch {\n        // already gone\n      }\n",
+            "new": "      if (groupKill) {\n        try {\n          process.kill(-child.pid, sig);\n        } catch {\n          // already gone\n        }\n        return;\n      }\n      if (child.exitCode !== null) return;\n      child.kill(sig);\n",
+            "why": "the group kill handled first and returning, the exit guard after it"
           }
         ]
       }

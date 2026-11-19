@@ -322,6 +322,16 @@ class CheckTest(TempRepo):
         with open(os.path.join(self.repo, "lib/kill.ts"), encoding="utf-8") as handle:
             self.assertEqual(handle.read(), before)
 
+    def test_edits_on_a_protects_case_are_reported(self):
+        edit = {"path": "lib/kill.ts", "append": "x\n", "why": "x"}
+        for key in ("alternates", "lookalikes"):
+            spec = self.spec(**{key: [edit]})
+            sc = spec["prompts"][0]["selfcheck"]
+            del sc["fix"], sc["paths"]
+            sc["protects"] = ["lib/kill.ts"]
+            self.assertIn("`lookalikes` and `alternates` need a `fix` or `doc` selfcheck",
+                          self.check(spec))
+
 
 class PrepareRunTest(TempRepo):
     def setUp(self):

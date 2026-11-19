@@ -243,7 +243,7 @@
                 "trap[^\\n]{0,160}(fire|exit|same (Bash )?call|consum|separate|own call)|(fire|exit|same (Bash )?call|consum|separate|own call)[^\\n]{0,160}trap"
               ],
               "not": [
-                "^[ \\t]*```(?:bash|sh|shell|zsh)\\b[^\\n]*\\n(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?(?![ \\t]*```)[^\\n]*mktemp[ \\t]+-d)(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?(?![ \\t]*```)(?:[ \\t]*|[^\\n]*[;&|][ \\t]*)trap\\b[^\\n]*\\bEXIT\\b)(?:(?![ \\t]*```)(?![^\\n]*(?:wrong|\\bbad\\b|unsafe|vulnerab|don'?t|do not|must not|omit|fires (?:when|as soon as) (?:this|the|that) (?:\\w+ )?call|anti-?pattern|reinterpret|incorrect))[^\\n]*\\n)*?[ \\t]*```"
+                "^[ \\t]*```(?:bash|sh|shell|zsh)\\b[^\\n]*\\n(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?(?![ \\t]*```)[^\\n]*mktemp[ \\t]+-d)(?=(?:(?![ \\t]*```)[^\\n]*\\n)*?(?![ \\t]*```)(?:[^\\n]*(?:[;&|({]|\\b(?:then|do|else)\\b))?[ \\t]*trap\\b[^\\n]*\\bEXIT\\b)(?:(?![ \\t]*```)(?![^\\n]*(?:wrong|\\bbad\\b|unsafe|vulnerab|don'?t|do not|must not|omit|anti-?pattern|reinterpret|incorrect|\\bbug(?:gy)?\\b|too (?:early|soon)|prematur|before (?:the |a )?(?:later |next |separate |subsequent )?`?Write\\b|(?:fires|runs|triggers|executes|deletes|removes|cleans up)\\b[^\\n]{0,30}?\\b(?:when|as soon as|once|at the end of)\\s+(?:this|the|that|each|its)\\s+(?:\\w+\\s+){0,2}(?:call|shell|subshell)\\b|\\b(?:this|the|that) (?:\\w+ )?(?:call|shell) (?:ends|exits|returns|finishes)))[^\\n]*\\n)*?[ \\t]*```"
               ]
             }
           ]
@@ -422,6 +422,24 @@
           {
             "append": "\n```bash\nSTAGE_DIR=\"$(mktemp -d)\"\ntrap 'rm -rf -- \"$STAGE_DIR\"' EXIT   # cleanup fires on exit\nprintf '%s\\n' \"$STAGE_DIR\"\n```\n",
             "why": "a reassuring comment that says the trap fires"
+          },
+          {
+            "append": "\n```bash\nif STAGE_DIR=\"$(mktemp -d)\"; then trap 'rm -rf -- \"$STAGE_DIR\"' EXIT; fi\nprintf '%s\\n' \"$STAGE_DIR\"\n```\n",
+            "why": "the EXIT trap after then"
+          },
+          {
+            "append": "\n```bash\nSTAGE_DIR=\"$(mktemp -d)\"\n{ trap 'rm -rf -- \"$STAGE_DIR\"' EXIT; }\nprintf '%s\\n' \"$STAGE_DIR\"\n```\n",
+            "why": "the EXIT trap inside { }"
+          }
+        ],
+        "alternates": [
+          {
+            "append": "\n```bash\nSTAGE_DIR=\"$(mktemp -d)\"\ntrap 'rm -rf -- \"$STAGE_DIR\"' EXIT   # runs as soon as this Bash call ends, so the dir is gone before Write\nprintf '%s\\n' \"$STAGE_DIR\"\n```\n",
+            "why": "the anti-pattern quoted with a paraphrased warning"
+          },
+          {
+            "append": "\n```bash\nSTAGE_DIR=\"$(mktemp -d)\"\ntrap 'rm -rf -- \"$STAGE_DIR\"' EXIT   # BUG: cleanup is too early\nprintf '%s\\n' \"$STAGE_DIR\"\n```\n",
+            "why": "the anti-pattern quoted with a short bug note"
           }
         ]
       }
