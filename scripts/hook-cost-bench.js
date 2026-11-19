@@ -240,6 +240,14 @@ for (const [plugin, j] of Object.entries(catalog)) {
   // PostToolUse first, so the co-edit pairs it records exist for PreToolUse.
   const order = (ev) => (ev === 'PostToolUse' ? 0 : 1);
   const hooks = findHooks(j, []).sort((a, b) => order(a.ev) - order(b.ev));
+  // Seeds always go through the recording hook (PostToolUse Edit), so an
+  // ONLY filter that skips it still measures a seeded store.
+  const recorder = hooks.find(
+    (x) =>
+      x.type === 'command' &&
+      x.ev === 'PostToolUse' &&
+      x.matcher.includes('Edit')
+  );
   for (const h of hooks) {
     if (h.type !== 'command') continue;
     const key = h.matcher.includes('Bash')
@@ -259,13 +267,16 @@ for (const [plugin, j] of Object.entries(catalog)) {
         CLAUDE_PLUGIN_DATA: path.join(HOME, '.claude/plugins/data', plugin),
       };
       // Untimed state seeding (co-edit pairs) before the measured runs.
+      const seedCmd = recorder
+        ? recorder.command.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, root)
+        : cmd;
       for (const seedInput of seed) {
-        spawnSync('bash', ['-c', cmd], {
+        spawnSync('bash', ['-c', seedCmd], {
           input: seedInput,
           env,
           cwd: PROJ,
           encoding: 'utf8',
-          timeout: (h.timeout || 60) * 1000,
+          timeout: ((recorder || h).timeout || 60) * 1000,
         });
       }
       const times = [];

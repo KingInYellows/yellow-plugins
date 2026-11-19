@@ -126,8 +126,9 @@ It reports a `failed_runs` count per row (spawn errors, timeouts and exits other
 than 0 or 2) and prints `FAILED` beside any row that has one.
 
 For the loaded scenarios, seed the state first: install yellow-ruvector and
-yellow-morph by running their prewarm hooks once, store memories with
-`ruvector hooks remember --semantic`, and create
+yellow-morph by running their prewarm hooks once, create `.ruvector/` in the
+scratch project (the yellow-ruvector hooks skip a project without it), store
+memories with `ruvector hooks remember --semantic`, and create
 `todos/debt/000001-pending-high-<slug>.md` files. Numbers will differ on a local
 machine: the cloud container routes `gh` and npm through a TLS proxy, which
 inflates the network-bound rows (yellow-ci, installs).
