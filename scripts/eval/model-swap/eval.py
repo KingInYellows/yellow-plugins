@@ -403,8 +403,8 @@ def check_spec(spec):
              *(p for c in spec["prompts"] for p in c.get("selfcheck", {}).get("paths", [])),
              *(p for c in spec["prompts"] for p in c.get("selfcheck", {}).get("protects", [])),
              *(c["selfcheck"]["doc"] for c in spec["prompts"] if "doc" in c.get("selfcheck", {})),
-             *(la["path"] for c in spec["prompts"] for la in c.get("selfcheck", {}).get("lookalikes", [])
-               if "path" in la),
+             *(e["path"] for c in spec["prompts"] for k in ("lookalikes", "alternates")
+               for e in c.get("selfcheck", {}).get(k, []) if "path" in e),
              *(p["file"] for r in spec["replays"] for p in r["plants"]),
              *(f for s in spec["scans"] for f in s["files"]),
              *(p["file"] for s in spec["scans"] for p in s.get("plants", [])),
@@ -424,7 +424,7 @@ def check_spec(spec):
     if spec["prompts"]:
         shas.append(spec.get("prompt_commit"))
     bad += [x for x in shas if not re.fullmatch(r"[0-9a-f]{40}", str(x))]
-    bad += [x["commit"] for x in [*spec["replays"], *spec["scans"],
+    bad += [x.get("commit") for x in [*spec["replays"], *spec["scans"],
                                   *(c["source"] for c in spec["prompts"] if "source" in c)]
             if not re.fullmatch(r"[0-9a-f]{7,40}", str(x.get("commit")))]
     if bad:
@@ -628,9 +628,11 @@ def run(work, jobs, dry_run):
         # A command agent runs as a slash command with its plugins loaded.
         plugins = agents[row[6]].get("plugins", [])
         env["EVAL_PLUGIN_DIRS"] = ":".join(os.path.join(REPO, "plugins", n) for n in plugins)
+        # The child inherits the work-dir lock, so a forced exit of this
+        # process leaves the directory locked until run-one.sh and claude end.
         rc = subprocess.run([os.path.join(HERE, "run-one.sh"), out, rid, sys_prompt, wt,
                              model, effort, prompt, agent_tools(sys_prompt, bool(plugins))],
-                            env=env).returncode
+                            env=env, pass_fds=[h.fileno() for h in LOCKS]).returncode
         return rid, rc
 
     failed = 0
@@ -945,21 +947,27 @@ def reply_problems(label, sc, expects):
 def lookalike_problems(label, sc, expects, wt, plan_path):
     """Each `lookalikes` entry edits the passing tree (`path`, default the
     selfcheck plan; `old` -> `new` once, or `append`) into something that only
-    looks like the fix; the file checks must fail on it. The file is restored
-    after each one."""
+    looks like the fix; the file checks must fail on it. Each `alternates`
+    entry, the same shape, edits it into another valid fix; the file checks
+    must pass on it. The file is restored after each one."""
+    return (edit_problems(label, sc, "lookalikes", expects, wt, plan_path)
+            + edit_problems(label, sc, "alternates", expects, wt, plan_path))
+
+
+def edit_problems(label, sc, key, expects, wt, plan_path):
     problems = []
-    for i, la in enumerate(sc.get("lookalikes", [])):
+    for i, la in enumerate(sc.get(key, [])):
         rel = la.get("path", plan_path)
         target = os.path.join(wt, rel)
         if symlink_on_path(wt, rel) or not os.path.isfile(target):
-            problems.append("%s: lookalikes[%d] path %s is not a file in the tree" % (label, i, rel))
+            problems.append("%s: %s[%d] path %s is not a file in the tree" % (label, key, i, rel))
             continue
         with open(target, encoding="utf-8") as handle:
             original = handle.read()
         if "old" in la:
             if original.count(la["old"]) != 1:
-                problems.append("%s: lookalikes[%d] `old` matches %d times"
-                                % (label, i, original.count(la["old"])))
+                problems.append("%s: %s[%d] `old` matches %d times"
+                                % (label, key, i, original.count(la["old"])))
                 continue
             edited = original.replace(la["old"], la["new"])
         else:
@@ -967,8 +975,11 @@ def lookalike_problems(label, sc, expects, wt, plan_path):
         try:
             with open(target, "w", encoding="utf-8") as handle:
                 handle.write(edited)
-            if any(files_pass(e, wt) for e in expects):
+            if key == "lookalikes" and any(files_pass(e, wt) for e in expects):
                 problems.append("%s: file checks pass on lookalikes[%d] (%s)"
+                                % (label, i, la.get("why", "")))
+            if key == "alternates" and not all(files_pass(e, wt) for e in expects):
+                problems.append("%s: file checks fail on alternates[%d] (%s)"
                                 % (label, i, la.get("why", "")))
         finally:
             with open(target, "w", encoding="utf-8") as handle:
@@ -985,7 +996,8 @@ def check(spec_paths, work):
     `protects` (files an out-of-scope case must leave alone) must pass
     untouched and fail once one is edited or removed. Every case needs one.
     `lookalikes` (edits to the passing tree that only look like the fix) must
-    each fail the file checks. `reply` (a recorded reply) must pass the reply
+    each fail the file checks; `alternates` (edits into another valid fix) must
+    each pass them. `reply` (a recorded reply) must pass the reply
     regexes and each of `reply_fails` must fail them; a case whose grader reads
     the reply needs a `reply`."""
     lock_work(work)
@@ -1051,9 +1063,9 @@ def check(spec_paths, work):
                         if edited or removed:
                             problems.append("%s %s: file checks still pass with %s %s"
                                             % (name, cid, path, "edited" if edited else "removed"))
-                    if sc.get("lookalikes"):
-                        problems.append("%s %s: `lookalikes` need a `fix` or `doc` selfcheck"
-                                        % (name, cid))
+                    if sc.get("lookalikes") or sc.get("alternates"):
+                        problems.append("%s %s: `lookalikes` and `alternates` need a `fix` or "
+                                        "`doc` selfcheck" % (name, cid))
                     continue
                 if "fix" in sc:
                     if any(files_pass(e, wt, content_only=True) for e in expects[cid]):

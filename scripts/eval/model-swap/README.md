@@ -141,7 +141,9 @@ agents:
     them;
   - `lookalikes`: edits to the passing tree that only look like the fix
     (`{"path", "old", "new"}` or `{"append"}`; `path` defaults to the selfcheck
-    plan), each of which must fail the file checks.
+    plan), each of which must fail the file checks;
+  - `alternates`: edits of the same shape into another valid fix, each of
+    which must pass the file checks.
 
 `prompt_commit`, `tree` and `selfcheck.fix` must be 40-character commit ids;
 replay and scan `commit` values must be hex ids.
