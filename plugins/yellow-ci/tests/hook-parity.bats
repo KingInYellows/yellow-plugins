@@ -349,9 +349,10 @@ age_file() {
   for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
   [ ! -e "$dir/refresh-$key" ]
   grep -q 'Unexpected GitHub API response format' "$dir/refresh-$key.log"
+  # A malformed reply is not cached as zero failures.
+  [ ! -e "$dir/last-check-$key" ]
 
   # Rate-limited (gh exits 1): nothing cached, so the next start refreshes again.
-  rm -f "$dir/last-check-$key"
   export MOCK_GH_RUNLIST=ratelimit
   run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
   for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done

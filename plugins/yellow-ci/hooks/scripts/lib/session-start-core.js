@@ -639,8 +639,9 @@ function refreshCache({ cwd, env }) {
         // MAX_CACHE_FILE_BYTES.
         .map((b) => b.slice(0, MAX_WRITE_BRANCH_LEN));
     } else {
+      // Keep the previous cache: a malformed reply is not "zero failures".
       warn('[yellow-ci] Warning: Unexpected GitHub API response format');
-      failureCount = 0;
+      return done();
     }
   }
 

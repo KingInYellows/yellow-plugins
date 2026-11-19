@@ -143,9 +143,12 @@ const ss = S({ hook_event_name: 'SessionStart', source: 'startup' });
 // cache after this prep and turn the next run into a hit. Untimed.
 const sleepMs = (ms) =>
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+// The wait outlasts the worker's own gh timeouts (5 s auth + 15 s run list,
+// plus node startup). A marker that survives it means a refresh may still
+// write, so stop rather than time a run against a moving cache.
 const waitCiRefresh = (env) => {
   const marker = /^refresh-[0-9a-f]+$/;
-  for (let waited = 0; waited < 20000; waited += 50) {
+  for (let waited = 0; waited < 30000; waited += 50) {
     let names = [];
     try {
       names = fs.readdirSync(env.CLAUDE_PLUGIN_DATA);
@@ -155,6 +158,7 @@ const waitCiRefresh = (env) => {
     if (!names.some((n) => marker.test(n))) return;
     sleepMs(50);
   }
+  throw new Error('yellow-ci refresh still running after 30 s; aborting');
 };
 const clearCiCache = (env) => {
   waitCiRefresh(env);
