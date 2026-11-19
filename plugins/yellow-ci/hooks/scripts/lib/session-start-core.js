@@ -5,8 +5,15 @@
  *
  * Detects CI context and surfaces recent-failure + runner-routing context as a
  * SessionStart `systemMessage`. Dependency-free Node (no `jq` — uses
- * JSON.parse). Budget contract unchanged: routing cache read is cheap,
- * `gh run list` is bounded to a 2s timeout, results cached for 60s.
+ * JSON.parse).
+ *
+ * The foreground never touches the network (CLAUDE-369). It reads the
+ * routing cache and the last-check result cache only: a result younger than
+ * FRESH_TTL_SEC is shown as is; one younger than MAX_STALE_SEC is shown and
+ * refreshed; anything older (or no cache) shows the routing summary only and
+ * is refreshed. The refresh (`gh auth status` + `gh run list`) runs in a
+ * detached `refresh-cache.js` process (see scheduleRefresh / refreshCache),
+ * so the next session start sees the result.
  *
  * Returns `{ systemMessage: string, stderr: string[] }`. An empty
  * systemMessage means "emit {"continue": true} with no message". stderr lines
@@ -17,7 +24,7 @@
  * routing summary (or empty) — it never throws to the caller.
  */
 
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
@@ -66,8 +73,8 @@ function resolveCacheReadPath(env, filename) {
 //
 // O_NONBLOCK guards the same predictable path against a FIFO: opening a FIFO
 // for reading with a plain O_RDONLY blocks the whole process until some
-// writer shows up, and this hook has a ~3s host deadline (see
-// HOOK_BUDGET_MS) — a local process that `mkfifo`s either cache path with no
+// writer shows up, and this hook has a ~3s host deadline (the
+// manifest timeout) — a local process that `mkfifo`s either cache path with no
 // writer attached would stall SessionStart indefinitely. O_NONBLOCK makes a
 // read-only open of a FIFO return immediately instead, and the caller's
 // existing `st.isFile()` check (both call sites check it BEFORE reading —
@@ -181,21 +188,6 @@ function sanitizeBranchName(name) {
   return defangUntrustedText(name).slice(0, 120);
 }
 
-// The manifest gives this hook a 3s timeout. The two `gh` calls are
-// SEQUENTIAL, so fixed per-call timeouts must be budgeted against the whole
-// hook, not each other: a 1000ms auth call plus a 2000ms list call already
-// reaches 3000ms before Node startup and the stdin read are counted, so a slow
-// (but succeeding) auth followed by a stalled list would blow the budget and
-// the host would kill the hook mid-write.
-//
-// Instead, both calls draw from one shared deadline measured from process
-// start, and each gets whatever is left minus a reserve for teardown (writing
-// the cache and emitting JSON). If the budget is already exhausted, the call
-// is skipped rather than started.
-const HOOK_BUDGET_MS = 3000;
-const HOOK_RESERVE_MS = 400; // cache write + JSON emit + exit
-const HOOK_START_MS = Date.now();
-
 // `gh run list --limit N` below. Also the ceiling parseCachedFacts enforces
 // on a cached failureCount/branches: a same-uid cache writer must never be
 // able to claim more failures or candidate branches than a LIVE fetch could
@@ -203,31 +195,38 @@ const HOOK_START_MS = Date.now();
 // the only way to change the cache's ceiling too.
 const GH_RUN_LIST_LIMIT = 3;
 
-function remainingBudgetMs() {
-  return HOOK_BUDGET_MS - HOOK_RESERVE_MS - (Date.now() - HOOK_START_MS);
-}
+// Result-cache ages (CLAUDE-369). Under FRESH_TTL_SEC a hit is shown with no
+// refresh; up to MAX_STALE_SEC it is shown and refreshed in the background;
+// past that it is not shown at all, only refreshed.
+const FRESH_TTL_SEC = 600;
+const MAX_STALE_SEC = 3600;
+
+// The `gh` calls run only in the detached refresh process, never inside the
+// hook's 3s host budget, so they get generous fixed timeouts instead of a
+// shared deadline.
+const GH_AUTH_TIMEOUT_MS = 5000;
+const GH_RUN_LIST_TIMEOUT_MS = 15000;
+
+// A refresh marker younger than this means a refresh is already running (or
+// just ran) for this cwd, so no second one starts. An older marker is a
+// crashed refresh and is replaced.
+const REFRESH_MARKER_MAX_AGE_MS = 60 * 1000;
 
 function ghAuthOk(env) {
-  // Cap the auth probe at 1s, but never let it run past the shared deadline.
-  const budget = Math.min(1000, remainingBudgetMs());
-  if (budget <= 0) return false;
   // killSignal: default SIGTERM is catchable, so a `gh` that traps or ignores
-  // it would keep spawnSync blocked past `budget` (spawnSync waits for the
+  // it would keep spawnSync blocked past the timeout (spawnSync waits for the
   // child to actually exit, not just for the timeout to fire). SIGKILL cannot
-  // be caught or ignored, so the child is reaped within the hook's deadline.
+  // be caught or ignored.
   const res = spawnSync('gh', ['auth', 'status'], {
     env,
     stdio: 'ignore',
-    timeout: budget,
+    timeout: GH_AUTH_TIMEOUT_MS,
     killSignal: 'SIGKILL',
   });
   return !res.error && res.status === 0;
 }
 
 function ghRunList(env) {
-  // Whatever the auth probe left, capped at the original 2s.
-  const budget = Math.min(2000, remainingBudgetMs());
-  if (budget <= 0) return { failed: true, stdout: '' };
   const res = spawnSync(
     'gh',
     [
@@ -235,9 +234,8 @@ function ghRunList(env) {
       '--json', 'databaseId,headBranch,displayTitle,conclusion,updatedAt',
       '-q', '[.[] | select(.conclusion == "failure")]',
     ],
-    // SIGKILL (see ghAuthOk) so a non-terminating `gh` can't carry this call
-    // past the shared hook budget.
-    { env, encoding: 'utf8', timeout: budget, killSignal: 'SIGKILL' }
+    // SIGKILL (see ghAuthOk) so a non-terminating `gh` cannot outlive it.
+    { env, encoding: 'utf8', timeout: GH_RUN_LIST_TIMEOUT_MS, killSignal: 'SIGKILL' }
   );
   if (res.error || res.status !== 0) {
     return { failed: true, stdout: '' };
@@ -274,9 +272,11 @@ function cacheKeyFor(cwd) {
 // above already relies on, not something this cap re-derives.)
 const MAX_CACHE_FILE_BYTES = 8192;
 
-// Read the last-check result cache, refusing anything but a fresh,
-// sanely-sized regular file we own (see openNoFollow/ownedByUs above).
-// `{hit: false}` covers "no cache file", "stale", "a symlink" (rejected via
+// Read the last-check result cache, refusing anything but a sanely-sized
+// regular file we own (see openNoFollow/ownedByUs above) younger than
+// maxAgeSec. A hit also carries ageSec, so the caller can tell a fresh hit
+// from a stale-but-servable one.
+// `{hit: false}` covers "no cache file", "too old", "a symlink" (rejected via
 // O_NOFOLLOW/ELOOP), "owned by someone else", and "larger than any
 // legitimate cache could be" (see MAX_CACHE_FILE_BYTES) — the caller treats
 // all five identically to a plain cache miss and falls through to a live
@@ -303,9 +303,9 @@ function readFreshOwnedFile(file, maxAgeSec) {
     try {
       const buf = Buffer.alloc(MAX_CACHE_FILE_BYTES);
       const bytesRead = fs.readSync(opened.fd, buf, 0, MAX_CACHE_FILE_BYTES, 0);
-      return { hit: true, content: buf.subarray(0, bytesRead).toString('utf8') };
+      return { hit: true, ageSec, content: buf.subarray(0, bytesRead).toString('utf8') };
     } catch {
-      return { hit: true, content: null };
+      return { hit: true, ageSec, content: null };
     }
   } finally {
     try { fs.closeSync(opened.fd); } catch { /* best effort */ }
@@ -436,7 +436,74 @@ function parseCachedFacts(content) {
   return { failureCount: parsed.failureCount, branches: parsed.branches };
 }
 
+function hasWorkflows(cwd) {
+  try {
+    return fs.statSync(path.join(cwd, '.github', 'workflows')).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+// Start a detached refresh of this cwd's result cache and return at once.
+// The child gets its own process group (detached) and no stdio, so neither
+// the host nor a caller waiting on this hook's pipes waits for it. An
+// exclusive marker file (refresh-<key>) stops parallel session starts from
+// each launching a refresh; refresh-cache.js removes it when done.
+// YELLOW_CI_NO_BACKGROUND_REFRESH=1 turns the launch off (tests run
+// refresh-cache.js themselves).
+function scheduleRefresh(cwd, env, key) {
+  if (env.YELLOW_CI_NO_BACKGROUND_REFRESH === '1') return;
+  const dir = newCacheDir(env);
+  const marker = path.join(dir, `refresh-${key}`);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    return;
+  }
+  const claim = () => {
+    try {
+      fs.closeSync(fs.openSync(marker, 'wx'));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (!claim()) {
+    let st;
+    try {
+      // lstat: a planted symlink is judged (and removed) as itself.
+      st = fs.lstatSync(marker);
+    } catch {
+      return;
+    }
+    if (Date.now() - st.mtimeMs < REFRESH_MARKER_MAX_AGE_MS) return;
+    try {
+      fs.rmSync(marker, { force: true });
+    } catch {
+      return;
+    }
+    if (!claim()) return;
+  }
+  try {
+    const child = spawn(process.execPath, [path.join(__dirname, 'refresh-cache.js'), marker], {
+      cwd,
+      env,
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.on('error', () => {
+      try { fs.rmSync(marker, { force: true }); } catch { /* best effort */ }
+    });
+    child.unref();
+  } catch {
+    try { fs.rmSync(marker, { force: true }); } catch { /* best effort */ }
+  }
+}
+
 /**
+ * Foreground SessionStart: cache reads only, never the network.
+ *
  * @param {{cwd: string, env: NodeJS.ProcessEnv}} ctx
  * @returns {{systemMessage: string, stderr: string[]}}
  */
@@ -446,13 +513,7 @@ function runSessionStart({ cwd, env }) {
   const done = (systemMessage) => ({ systemMessage: systemMessage || '', stderr });
 
   // Early exit for non-CI projects.
-  try {
-    if (!fs.statSync(path.join(cwd, '.github', 'workflows')).isDirectory()) {
-      return done('');
-    }
-  } catch {
-    return done('');
-  }
+  if (!hasWorkflows(cwd)) return done('');
 
   // Routing context (read before gh checks so it surfaces even without gh).
   const routingSummary = readRoutingSummary(env);
@@ -460,20 +521,16 @@ function runSessionStart({ cwd, env }) {
   if (!commandExists('gh', env)) {
     return done(routingSummary);
   }
-  if (!ghAuthOk(env)) {
-    return done(routingSummary);
-  }
 
-  const cacheFileName = `last-check-${cacheKeyFor(cwd)}`;
+  const key = cacheKeyFor(cwd);
+  const cacheFileName = `last-check-${key}`;
   const newReadCacheFile = path.join(newCacheDir(env), cacheFileName);
   const readCacheFile = resolveCacheReadPath(env, cacheFileName);
 
-  // Cache freshness (60s TTL). A hit is read ONLY from the NEW location: that
-  // file is written exclusively by this Node runtime (see the write below).
-  // The legacy location can still hold raw pre-sanitize text written by the
-  // deleted bash hook for up to 60s after an upgrade, so a legacy-only hit is
-  // treated as a miss and falls through to a real fetch, which re-populates
-  // the new cache.
+  // A hit is read ONLY from the NEW location: that file is written
+  // exclusively by this runtime (refreshCache below). The legacy location can
+  // still hold raw pre-sanitize text written by the deleted bash hook, so a
+  // legacy-only hit is treated as a miss and refreshed.
   //
   // "Written exclusively by this runtime" does NOT mean "safe to trust
   // blindly": the filename is predictable (md5 of cwd) inside a
@@ -483,16 +540,14 @@ function runSessionStart({ cwd, env }) {
   // So the cache never stores a rendered message; it stores raw FACTS
   // (failureCount + candidate branch names — see parseCachedFacts) and
   // renderOutput() re-runs those facts through the identical sanitize/fence
-  // pipeline a live fetch uses, on EVERY read, regardless of who wrote the
-  // file. Hostile cache content can therefore only ever surface inside a
-  // reference-only fence, defanged, exactly like a hostile branch name from
-  // the GitHub API — it cannot bypass fencing no matter who planted it.
+  // pipeline on EVERY read, regardless of who wrote the file. Hostile cache
+  // content can therefore only ever surface inside a reference-only fence,
+  // defanged, exactly like a hostile branch name from the GitHub API.
   // readFreshOwnedFile's O_NOFOLLOW + ownership guard is kept as
   // defense-in-depth (it still stops arbitrary-file disclosure via symlink
-  // before any of this parsing runs), it just isn't the only thing standing
-  // between a same-uid attacker and systemMessage anymore.
+  // before any of this parsing runs).
   if (readCacheFile === newReadCacheFile) {
-    const cached = readFreshOwnedFile(readCacheFile, 60);
+    const cached = readFreshOwnedFile(readCacheFile, MAX_STALE_SEC);
     if (cached.hit) {
       if (cached.content === null) {
         warn(`[yellow-ci] Warning: Cannot read cache file ${readCacheFile}`);
@@ -500,27 +555,43 @@ function runSessionStart({ cwd, env }) {
       }
       const facts = parseCachedFacts(cached.content);
       if (facts) {
+        if (cached.ageSec >= FRESH_TTL_SEC) scheduleRefresh(cwd, env, key);
         return done(renderOutput(routingSummary, facts.failureCount, facts.branches));
       }
-      // Malformed or wrong-shape JSON: fall through to a live fetch below,
-      // which re-populates the cache with valid facts. Do NOT emit the raw
+      // Malformed or wrong-shape JSON: treat as a miss. Do NOT emit the raw
       // cache bytes and do NOT throw.
     }
-    // no cache file, stale, a rejected symlink, or owned by someone else —
-    // fall through to a real fetch, which re-populates the cache.
   }
 
-  // Cache miss: fetch recent failed runs.
+  // Miss (no cache, too old, legacy-only, rejected symlink, foreign owner or
+  // malformed): show the routing summary now and refresh for the next start.
+  scheduleRefresh(cwd, env, key);
+  return done(routingSummary);
+}
+
+/**
+ * Background refresh, run by refresh-cache.js in a detached process: checks
+ * `gh` auth, fetches recent failed runs and writes the result cache as FACTS.
+ * Writes nothing when `gh` is missing, unauthenticated or the call fails, so
+ * the next session start refreshes again.
+ *
+ * @param {{cwd: string, env: NodeJS.ProcessEnv}} ctx
+ * @returns {{stderr: string[]}}
+ */
+function refreshCache({ cwd, env }) {
+  const stderr = [];
+  const warn = (line) => stderr.push(line);
+  const done = () => ({ stderr });
+
+  if (!hasWorkflows(cwd)) return done();
+  if (!commandExists('gh', env)) return done();
+  if (!ghAuthOk(env)) return done();
+
   const { failed, stdout: failedJson } = ghRunList(env);
-  if (failed) {
-    return done(routingSummary);
-  }
+  if (failed) return done();
 
   // Parse into FACTS only — failureCount plus RAW candidate branch names.
-  // Sanitizing/fencing happens exactly once, in renderOutput below, never
-  // here, so what gets cached at the bottom of this function is the same
-  // pre-render shape whether it's used now (live) or read back later (cache
-  // hit).
+  // Sanitizing/fencing happens in renderOutput on every read, never here.
   let failureCount = 0;
   let rawBranches = [];
   const trimmed = failedJson.trim();
@@ -536,9 +607,9 @@ function runSessionStart({ cwd, env }) {
       rawBranches = parsed
         .map((r) => r && r.headBranch)
         .filter((b) => typeof b === 'string' && b.length > 0)
-        // Bound BEFORE this feeds either renderOutput or the cache write
-        // below (see MAX_WRITE_BRANCH_LEN) — a valid Unicode branch name
-        // must never be able to grow the cache past MAX_CACHE_FILE_BYTES.
+        // Bound BEFORE the cache write (see MAX_WRITE_BRANCH_LEN) — a valid
+        // Unicode branch name must never grow the cache past
+        // MAX_CACHE_FILE_BYTES.
         .map((b) => b.slice(0, MAX_WRITE_BRANCH_LEN));
     } else {
       warn('[yellow-ci] Warning: Unexpected GitHub API response format');
@@ -546,25 +617,19 @@ function runSessionStart({ cwd, env }) {
     }
   }
 
-  // Branch names are attacker-controllable (anyone who can open a PR picks
-  // one) and this string lands in the SessionStart systemMessage, so
-  // renderOutput sanitizes and fences them as reference-only data.
-  const output = renderOutput(routingSummary, failureCount, rawBranches);
-
-  // Write the result cache (best-effort) as FACTS, not the rendered message
-  // — see the cache-hit comment above and parseCachedFacts/renderOutput.
-  // Create the plugin-data write dir only now — it is needed only for
-  // writing, so a mkdir failure must NOT suppress the freshly-computed
-  // output (the failure info still surfaces).
   const writeCacheDir = newCacheDir(env);
   try {
     fs.mkdirSync(writeCacheDir, { recursive: true });
     const cacheContent = JSON.stringify({ failureCount, branches: rawBranches });
-    writeCacheAtomic(path.join(writeCacheDir, cacheFileName), cacheContent, warn);
+    writeCacheAtomic(
+      path.join(writeCacheDir, `last-check-${cacheKeyFor(cwd)}`),
+      cacheContent,
+      warn
+    );
   } catch {
     warn(`[yellow-ci] Warning: Cannot create cache directory ${writeCacheDir}`);
   }
-  return done(output);
+  return done();
 }
 
-module.exports = { runSessionStart };
+module.exports = { runSessionStart, refreshCache };

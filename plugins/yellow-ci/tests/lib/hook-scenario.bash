@@ -4,7 +4,8 @@
 # read NO meaningful stdin — they derive their output from the environment:
 # the presence of .github/workflows in the cwd, the routing-summary cache under
 # $HOME/.cache/yellow-ci/, whether `gh` is available/authenticated, a 60s
-# md5(PWD) result cache, and what `gh run list` returns. So a "fixture" is a
+# md5(PWD) result cache, and what `gh run list` returns (the last two only
+# through refresh-cache.js since CLAUDE-369). So a "fixture" is a
 # named environment scenario, not a stdin payload.
 #
 # `hook_scenario_setup <case> <sandbox>` configures HOME, PATH, MOCK_GH_* and a
@@ -76,6 +77,9 @@ hook_scenario_setup() {
   export XDG_DATA_HOME="$home/.local/share"
   unset CLAUDE_PLUGIN_DATA
   export MOCK_GH_AUTH=ok MOCK_GH_RUNLIST=empty
+  # Tests run refresh-cache.js themselves (CLAUDE-369); a background refresh
+  # would race them. Tests of the background launch unset this.
+  export YELLOW_CI_NO_BACKGROUND_REFRESH=1
   export PATH="$mocks:$PATH"
 
   # .github/workflows presence
