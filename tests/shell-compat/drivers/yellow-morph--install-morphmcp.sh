@@ -40,8 +40,8 @@ yellow_morph_release_install_lock
 # not held with an empty pid that a waiter would reclaim.
 ( ulimit -f 0 2>/dev/null; trap '' XFSZ; yellow_morph_acquire_install_lock 1 2>/dev/null; printf 'pid_write_fails=%s left=%s\n' "$?" "$([ -e "$CLAUDE_PLUGIN_DATA/.install.lock" ] && printf yes || printf no)" )
 # The npm ci environment keeps proxy, CA and npm config variables, drops
-# secrets, and ignores a NAME=value line that is only part of another
-# variable's multi-line value.
+# secrets and npm auth/token/password config, and ignores a NAME=value line
+# that is only part of another variable's multi-line value.
 mkdir -p "$TMPD/shim"
 printf '#!/bin/sh\nenv | LC_ALL=C sort\n' >| "$TMPD/shim/npm"
 chmod +x "$TMPD/shim/npm"
@@ -49,9 +49,13 @@ chmod +x "$TMPD/shim/npm"
 ( PATH="$TMPD/shim:$PATH" HTTPS_PROXY=http://proxy.test:3128 \
   NODE_EXTRA_CA_CERTS=/ca/bundle.crt npm_config_cafile=/ca/npm.crt \
   NPM_CONFIG_USERCONFIG=/cfg/npmrc NO_PROXY= MORPH_API_KEY=secret \
+  http_proxy=http://proxy.test:3129 no_proxy=localhost SSL_CERT_FILE=/ca/ssl.crt \
+  NPM_CONFIG__AUTH=secret npm_config__authToken=secret NPM_CONFIG_PASSWORD=secret \
   GITHUB_TOKEN=secret MULTI="$(printf 'a\nNPM_CONFIG_FAKE=leak')"
   export PATH HTTPS_PROXY NODE_EXTRA_CA_CERTS npm_config_cafile \
-    NPM_CONFIG_USERCONFIG NO_PROXY MORPH_API_KEY GITHUB_TOKEN MULTI
+    NPM_CONFIG_USERCONFIG NO_PROXY MORPH_API_KEY GITHUB_TOKEN MULTI \
+    http_proxy no_proxy SSL_CERT_FILE NPM_CONFIG__AUTH npm_config__authToken \
+    NPM_CONFIG_PASSWORD
   yellow_morph_do_install >| "$TMPD/npm-env"
   printf 'do_install=%s\n' "$?"
-  grep -E '^(HTTPS_PROXY|NODE_EXTRA_CA_CERTS|npm_config_cafile|NPM_CONFIG_USERCONFIG|NO_PROXY|MORPH_API_KEY|GITHUB_TOKEN|MULTI|NPM_CONFIG_FAKE)=' "$TMPD/npm-env" )
+  grep -E '^(HTTPS_PROXY|http_proxy|no_proxy|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|npm_config_cafile|npm_config__authToken|NPM_CONFIG_(USERCONFIG|_AUTH|PASSWORD|FAKE)|NO_PROXY|MORPH_API_KEY|GITHUB_TOKEN|MULTI)=' "$TMPD/npm-env" )

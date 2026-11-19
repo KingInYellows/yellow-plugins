@@ -194,7 +194,7 @@ assert_same_under_all_profiles() {
 @test "yellow-morph install-morphmcp.sh behaves the same in bash and zsh" {
   assert_same_under_all_profiles plugins/yellow-morph/lib/install-morphmcp.sh
   [[ "$LIB_OUTPUT" == *"validate_ok=0"* && "$LIB_OUTPUT" == *"lock=0 pid_file=yes"* && "$LIB_OUTPUT" == *"released=yes"* ]]
-  [[ "$LIB_OUTPUT" == *"do_install=0"* && "$LIB_OUTPUT" == *"HTTPS_PROXY=http://proxy.test:3128"* && "$LIB_OUTPUT" == *"NODE_EXTRA_CA_CERTS=/ca/bundle.crt"* && "$LIB_OUTPUT" == *"npm_config_cafile=/ca/npm.crt"* && "$LIB_OUTPUT" == *"NPM_CONFIG_USERCONFIG=/cfg/npmrc"* ]]
+  [[ "$LIB_OUTPUT" == *"do_install=0"* && "$LIB_OUTPUT" == *"HTTPS_PROXY=http://proxy.test:3128"* && "$LIB_OUTPUT" == *"NODE_EXTRA_CA_CERTS=/ca/bundle.crt"* && "$LIB_OUTPUT" == *"npm_config_cafile=/ca/npm.crt"* && "$LIB_OUTPUT" == *"NPM_CONFIG_USERCONFIG=/cfg/npmrc"* && "$LIB_OUTPUT" == *"http_proxy=http://proxy.test:3129"* && "$LIB_OUTPUT" == *"no_proxy=localhost"* && "$LIB_OUTPUT" == *"SSL_CERT_FILE=/ca/ssl.crt"* ]]
   [[ "$LIB_OUTPUT" != *"secret"* && "$LIB_OUTPUT" != *"NPM_CONFIG_FAKE"* && "$LIB_OUTPUT" != *"NO_PROXY="* ]]
 }
 

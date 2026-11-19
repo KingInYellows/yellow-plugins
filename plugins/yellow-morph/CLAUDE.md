@@ -121,9 +121,11 @@ do not apply.
 - `plugin.json` MCP env sets `DISABLED_TOOLS=github_codebase_search` and
   `WORKSPACE_MODE=true`; `npm ci` runs under `env -i` so postinstall scripts
   inherit no secrets. Only HOME, PATH, the proxy and CA variables, and
-  `NPM_CONFIG_*`/`npm_config_*` pass through; dropping the CA breaks the install
-  behind a TLS-intercepting proxy (cloud sessions).
-- No automated tests exist for the wrapper/lock logic.
+  `NPM_CONFIG_*`/`npm_config_*` (minus auth, token and password names) pass
+  through; dropping the CA breaks the install behind a TLS-intercepting proxy
+  (cloud sessions).
+- `tests/shell-compat/` drives the lock and the `npm ci` environment under bash
+  and zsh; the wrapper itself has no automated test.
 - **Shell libraries and zsh:** `lib/install-morphmcp.sh` is dual-shell
   (Tier 4) because `/morph:setup` sources it into the user's shell, often
   zsh; `tests/shell-compat/` runs its driver under bash and zsh. Keep it

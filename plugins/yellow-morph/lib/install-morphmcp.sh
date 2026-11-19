@@ -178,16 +178,17 @@ yellow_morph_release_install_lock() {
 }
 
 # Copy the manifest+lockfile from the plugin install into the data dir,
-# then run `npm ci` with a sanitized environment. env -i denies ANY
-# inherited secret (ANTHROPIC_API_KEY, GITHUB_TOKEN, etc.) to npm
+# then run `npm ci` with a sanitized environment. env -i keeps inherited
+# secrets (ANTHROPIC_API_KEY, GITHUB_TOKEN, etc.) away from npm
 # postinstall scripts — a tighter boundary than `unset MORPH_API_KEY`,
 # which only blocks the one variable.
 #
 # HOME and PATH are required for npm to function. The proxy and CA
-# variables, plus every NPM_CONFIG_* / npm_config_* (registry, proxy,
-# cafile, prefix), are passed through when present so npm still reaches the
+# variables, plus NPM_CONFIG_* / npm_config_* (registry, proxy, cafile,
+# prefix), are passed through when present so npm still reaches the
 # registry from behind a TLS-intercepting proxy such as a cloud session's.
-# Caller is responsible for holding the install lock.
+# npm config names that look like credentials (auth, token, password) are
+# dropped. Caller is responsible for holding the install lock.
 yellow_morph_do_install() {
   cp "${CLAUDE_PLUGIN_ROOT}/package.json" \
      "${CLAUDE_PLUGIN_DATA}/package.json"      || return 1
@@ -207,6 +208,10 @@ yellow_morph_do_install() {
   while IFS= read -r line; do
     name=${line%%=*}
     case "$name" in
+      NPM_CONFIG_*[Aa][Uu][Tt][Hh]*|npm_config_*[Aa][Uu][Tt][Hh]*|\
+      NPM_CONFIG_*[Tt][Oo][Kk][Ee][Nn]*|npm_config_*[Tt][Oo][Kk][Ee][Nn]*|\
+      NPM_CONFIG_*[Pp][Aa][Ss][Ss]*|npm_config_*[Pp][Aa][Ss][Ss]*)
+        continue ;;
       HTTPS_PROXY|HTTP_PROXY|NO_PROXY|https_proxy|http_proxy|no_proxy|\
       NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|NPM_CONFIG_*|npm_config_*)
         value=$(printenv "$name") || continue
