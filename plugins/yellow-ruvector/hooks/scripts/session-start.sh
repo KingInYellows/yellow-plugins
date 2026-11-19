@@ -174,6 +174,7 @@ learnings=""
 # memory can forge the closing fence), and stops at RECALL_MAX_BYTES.
 if [ -n "$RECALL_CACHE" ] && [ ! -L "$RECALL_DIR" ] && [ -f "$RECALL_CACHE" ] && [ ! -L "$RECALL_CACHE" ] \
    && [ "$(wc -c < "$RECALL_CACHE" 2>/dev/null | tr -d ' ')" -le 65536 ]; then
+  # shellcheck disable=SC2016  # $min/$max are jq variables, not shell
   recalled=$(run_budgeted 0.2 jq -rs --argjson min "$RECALL_MIN_SCORE" --argjson max "$RECALL_MAX_BYTES" '
     (if length == 1 and (.[0] | type) == "object" then .[0] else {} end)
     | [ (.results // [])[]?
