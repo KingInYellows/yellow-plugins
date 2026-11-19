@@ -157,7 +157,9 @@ than 0 or 2) and prints `FAILED` beside any row that has one. Untimed seed runs
 that fail are counted in `seed_failed` and printed as `SEED FAILED`, since a
 broken seed measures an unseeded store. yellow-ci also runs a "startup, cache
 miss" scenario that deletes its result cache before every run; back-to-back
-"startup" runs are cache hits.
+"startup" runs are cache hits. If no yellow-ci cache exists after the warm-up
+refresh (for example, `gh` is not signed in), its row counts `unprimed_runs` and
+prints `UNPRIMED`, because those timings are cache misses.
 
 For the loaded scenarios, seed the state first: install yellow-ruvector and
 yellow-morph by running their prewarm hooks once, create `.ruvector/` in the

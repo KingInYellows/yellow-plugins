@@ -160,6 +160,21 @@ const waitCiRefresh = (env) => {
   }
   throw new Error('yellow-ci refresh still running after 30 s; aborting');
 };
+// Cache-hit prep: wait for the warm-up's refresh, then report (false) when no
+// yellow-ci result cache exists, e.g. gh unauthenticated, so the row is
+// flagged instead of passing cache-miss timings off as hits. Only yellow-ci
+// writes last-check-* files; other plugins' rows are never flagged.
+const primeCiCache = (env, plugin) => {
+  waitCiRefresh(env);
+  if (plugin !== 'yellow-ci') return true;
+  try {
+    return fs
+      .readdirSync(env.CLAUDE_PLUGIN_DATA)
+      .some((n) => n.startsWith('last-check-'));
+  } catch {
+    return false;
+  }
+};
 const clearCiCache = (env) => {
   waitCiRefresh(env);
   const dirs = [
@@ -254,7 +269,7 @@ const scenarios = {
       // yellow-ci: the first warm-up run is a miss that starts a refresh;
       // waiting for it (untimed) makes every timed run a cache hit. A no-op
       // for plugins without refresh markers.
-      ['startup', ss, [], { prep: waitCiRefresh }],
+      ['startup', ss, [], { prep: primeCiCache }],
       [
         'startup, cache miss',
         ss,
@@ -376,8 +391,10 @@ for (const [plugin, j] of Object.entries(catalog)) {
       // The first two timed-path runs are warm-up; runs that opts.measure
       // rejects still execute (they build state) but are never timed.
       let eligible = 0;
+      // Timed runs whose prep reported an unusable state (see primeCiCache).
+      let unprimed = 0;
       for (let i = 0; times.length < N; i++) {
-        if (opts.prep) opts.prep(env);
+        const primed = opts.prep ? opts.prep(env, plugin) !== false : true;
         const t0 = process.hrtime.bigint();
         const r = spawnSync('bash', ['-c', cmd], {
           input: typeof input === 'function' ? input(i) : input,
@@ -391,7 +408,10 @@ for (const [plugin, j] of Object.entries(catalog)) {
         last = r;
         if (opts.measure && !opts.measure(i)) continue;
         if (eligible === 0) first = ms;
-        if (eligible >= 2) times.push(ms);
+        if (eligible >= 2) {
+          times.push(ms);
+          if (!primed) unprimed++;
+        }
         eligible++;
       }
       const inj = injected(h.ev, last.stdout || '', last.status, last.stderr);
@@ -419,11 +439,12 @@ for (const [plugin, j] of Object.entries(catalog)) {
         exit: last.status,
         failed_runs: failed,
         seed_failed: seedFailed,
+        unprimed_runs: unprimed,
         stdout: (last.stdout || '').slice(0, 300),
         stderr: (last.stderr || '').slice(0, 300),
       });
       process.stderr.write(
-        `${id}: p50 ${rows.at(-1).p50_ms} p95 ${rows.at(-1).p95_ms} ctx ${inj.ctx} sys ${inj.sys}${failed ? ` FAILED ${failed} run(s)` : ''}${seedFailed ? ` SEED FAILED ${seedFailed}/${seed.length}` : ''}\n`
+        `${id}: p50 ${rows.at(-1).p50_ms} p95 ${rows.at(-1).p95_ms} ctx ${inj.ctx} sys ${inj.sys}${failed ? ` FAILED ${failed} run(s)` : ''}${seedFailed ? ` SEED FAILED ${seedFailed}/${seed.length}` : ''}${unprimed ? ` UNPRIMED ${unprimed}/${N} (no cache: timings are misses)` : ''}\n`
       );
     }
   }
