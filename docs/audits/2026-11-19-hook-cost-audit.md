@@ -38,9 +38,9 @@ the last run.
 | gt-workflow      | PostToolUse  | Bash                       | check-commit-message       | 1 KB output              | 5 s     | 44       | 34     | 38     | 0         | 0               | pass                 |
 | gt-workflow      | PostToolUse  | Bash                       | check-commit-message       | `git commit`             | 5 s     | 39       | 34     | 48     | 0         | 0               | pass                 |
 | gt-workflow      | PostToolUse  | Bash                       | check-commit-message       | 60 KB output             | 5 s     | 33       | 34     | 42     | 0         | 0               | pass                 |
-| yellow-ruvector  | PreToolUse   | Edit\|Write\|MultiEdit     | pre-tool-use.sh            | Edit, 3 known partners ³ | 1 s     | 78       | 80     | 94     | 234       | 0               | pass                 |
+| yellow-ruvector  | PreToolUse   | Edit\|Write\|MultiEdit     | pre-tool-use.sh            | Edit, 3 known partners ³ | 1 s     | 69       | 74     | 83     | 318       | 0               | pass                 |
 | yellow-ruvector  | PostToolUse  | Edit\|Write\|MultiEdit     | post-tool-use.sh           | Edit, same file ³        | 1 s     | 72       | 74     | 84     | 0         | 0               | pass                 |
-| yellow-ruvector  | PostToolUse  | Edit\|Write\|MultiEdit     | post-tool-use.sh           | Edit, pairs recorded ³   | 1 s     | 269      | 117    | 133    | 0         | 0               | **over: CLAUDE-372** |
+| yellow-ruvector  | PostToolUse  | Edit\|Write\|MultiEdit     | post-tool-use.sh           | Edit, pairs recorded ³   | 1 s     | 58       | 100    | 121    | 0         | 0               | **over: CLAUDE-372** |
 | yellow-ci        | SessionStart | \*                         | entrypoint-claude.js       | cache miss ⁴             | 3 s     | 1,465    | 1,200  | 1,465  | 0         | 218             | **over: CLAUDE-369** |
 | yellow-ci        | SessionStart | \*                         | entrypoint-claude.js       | cache hit ⁴              | 3 s     | -        | 280    | 310    | 0         | 218             | pass                 |
 | yellow-core      | SessionStart | \*                         | session-start.sh           | no drain due             | 3 s     | 71       | 36     | 44     | 0         | 0               | pass                 |
@@ -60,9 +60,11 @@ the last run.
 1. Stderr from the exit-2 deny, which Claude reads. Only on a blocked push.
 2. github-workflow adds a 121-byte `systemMessage` when a `git commit -m`
    message is not a conventional commit.
-3. 60 runs. "Pairs recorded" edits four files per session, so every run writes
-   co-edit pairs to `.ruvector/coedit.json`. "3 known partners" starts a new
-   session each run, so the once-per-file suggestion is injected every time.
+3. 60 runs, after an untimed seed of three sessions. "Pairs recorded" alternates
+   README.md with a partner, so every run writes a co-edit pair to
+   `.ruvector/coedit.json`. "3 known partners" starts a new session each run, so
+   the once-per-file suggestion is injected every time. Two consecutive
+   invocations gave the same 318 bytes.
 4. Cloud `gh auth status` fails here (the `GH_TOKEN` is a proxy placeholder), so
    a shim reported success after making the real call. Without it the hook
    spends 275 ms and shows nothing. The cache TTL is 60 s, so most session
@@ -85,9 +87,9 @@ the last run.
   the enabled stack provider: about 75 ms (p50). If both gt-workflow and
   github-workflow are enabled, it doubles to about 150 ms. Only one provider
   should be enabled at a time.
-- **Every Edit or Write** pays about 155-200 ms of yellow-ruvector hooks (p50),
+- **Every Edit or Write** pays about 150-175 ms of yellow-ruvector hooks (p50),
   more as `.ruvector/coedit.json` grows. The first edit of a file with known
-  partners adds about 234 bytes of context.
+  partners adds about 318 bytes of context.
 - **Session start** waits for the slowest hook: about 1.4 s today
   (yellow-ruvector recall, then yellow-ci at 1.2-1.5 s on a cache miss). In a
   cloud session that starts while yellow-morph's failing install holds its lock,
@@ -95,7 +97,7 @@ the last run.
   other SessionStart hook finishes in under 150 ms.
 - **Model context** at session start is 2.1 KB from yellow-ruvector (up to 7.3
   KB) plus up to about 400 bytes from yellow-review. PreCompact adds 958 bytes
-  per compaction. yellow-ruvector's co-edit suggestions add about 234 bytes per
+  per compaction. yellow-ruvector's co-edit suggestions add about 318 bytes per
   file, once per session. Nothing else injects model context.
 
 ## Over budget
@@ -105,7 +107,7 @@ the last run.
 | CLAUDE-368 | yellow-ruvector `session-start.sh` | 1.4 s semantic recall; pretty-printed JSON with low-score (about 0.20) results; context ceiling 7.3 KB.          |
 | CLAUDE-369 | yellow-ci SessionStart             | `gh auth status` runs before the cache check; 60 s TTL; 1.2-1.5 s on a miss.                                     |
 | CLAUDE-370 | yellow-morph `prewarm-morph.sh`    | `env -i` drops `NODE_EXTRA_CA_CERTS` behind a TLS proxy, so every cloud install fails and later starts wait 2 s. |
-| CLAUDE-372 | yellow-ruvector `post-tool-use.sh` | 133 ms p95 when an edit records co-edit pairs; grows with `.ruvector/coedit.json`.                               |
+| CLAUDE-372 | yellow-ruvector `post-tool-use.sh` | 121 ms p95 when an edit records a co-edit pair; grows with `.ruvector/coedit.json`.                              |
 
 ## Method
 

@@ -82,7 +82,17 @@ const bashPost = (cmd, out) =>
     tool_response: { stdout: out, stderr: '', interrupted: false },
   });
 // Co-edit pairs need the same files edited together in 3+ sessions.
-const coeditFiles = ['README.md', 'CLAUDE.md', 'AGENTS.md', 'CONTRIBUTING.md'];
+// Pairs come from consecutive edits in one session, so README.md sits between
+// each partner. RUN_ID keeps session ids fresh across repeated invocations.
+const coeditCycle = [
+  'README.md',
+  'CLAUDE.md',
+  'README.md',
+  'AGENTS.md',
+  'README.md',
+  'CONTRIBUTING.md',
+];
+
 const edit = (ev, file = 'README.md', sid = base.session_id) =>
   S({
     session_id: sid,
@@ -95,6 +105,17 @@ const edit = (ev, file = 'README.md', sid = base.session_id) =>
     },
     tool_response: { success: true },
   });
+const RUN_ID = `${process.pid}-${Date.now()}`;
+const pairEdit = (i) =>
+  edit(
+    'PostToolUse',
+    coeditCycle[i % coeditCycle.length],
+    `bench-pair-${RUN_ID}-${Math.floor(i / coeditCycle.length)}`
+  );
+// Three full cycles (three sessions) qualify all three README partners.
+const pairSeed = Array.from({ length: coeditCycle.length * 3 }, (_, i) =>
+  pairEdit(i + coeditCycle.length * 1000)
+);
 const ss = S({ hook_event_name: 'SessionStart', source: 'startup' });
 
 const catalog = {};
@@ -134,7 +155,8 @@ const scenarios = {
     Edit: [
       [
         'edit, 3 known partners',
-        (i) => edit('PreToolUse', 'README.md', `bench-pre-${i}`),
+        (i) => edit('PreToolUse', 'README.md', `bench-pre-${RUN_ID}-${i}`),
+        pairSeed,
       ],
     ],
   },
@@ -150,18 +172,8 @@ const scenarios = {
       ],
       ['60KB out', bashPost('cat big.log', big)],
     ],
-    // Four files per session, so every run records co-edit pairs.
-    Edit: [
-      [
-        'edit, pairs recorded',
-        (i) =>
-          edit(
-            'PostToolUse',
-            coeditFiles[i % 4],
-            `bench-pair-${Math.floor(i / 4)}`
-          ),
-      ],
-    ],
+    // README.md alternates with a partner, so every run records a pair.
+    Edit: [['edit, pairs recorded', pairEdit, pairSeed]],
   },
   SessionStart: { '*': [['startup', ss]] },
   Stop: {
@@ -236,7 +248,7 @@ for (const [plugin, j] of Object.entries(catalog)) {
         ? 'Edit'
         : '*';
     const scs = (scenarios[h.ev] || {})[key] || [];
-    for (const [name, input] of scs) {
+    for (const [name, input, seed = []] of scs) {
       const id = `${plugin} ${h.ev} ${name}`;
       if (only && !only.test(id)) continue;
       const root = path.join(REPO, 'plugins', plugin);
@@ -246,6 +258,16 @@ for (const [plugin, j] of Object.entries(catalog)) {
         CLAUDE_PLUGIN_ROOT: root,
         CLAUDE_PLUGIN_DATA: path.join(HOME, '.claude/plugins/data', plugin),
       };
+      // Untimed state seeding (co-edit pairs) before the measured runs.
+      for (const seedInput of seed) {
+        spawnSync('bash', ['-c', cmd], {
+          input: seedInput,
+          env,
+          cwd: PROJ,
+          encoding: 'utf8',
+          timeout: (h.timeout || 60) * 1000,
+        });
+      }
       const times = [];
       let last;
       let first;
