@@ -160,12 +160,12 @@ jobs:
           # refuse links that leave the checkout or enter .git anyway. Only
           # the paths this PR changes, and the directories above them, are
           # checked: one such link already on the default branch would
-          # otherwise fail every PR's review (CLAUDE-365). At the files API's
-          # 3000-path cap the list may be cut short, so the whole tree is
-          # scanned instead. A listed path that is absolute or has an empty,
+          # otherwise fail every PR's review (CLAUDE-365). When the PR changes
+          # 3000 or more files the API's list may be cut short, so the whole
+          # tree is scanned instead. A listed path that is absolute or has an empty,
           # "." or ".." part fails the job. It runs after the marker check, so
           # a reviewed head skips it too.
-          if ! python3 -I - .claude-code-review/changed-files.txt <<'PY'
+          if ! python3 -I - .claude-code-review/changed-files.txt "$changed_count" <<'PY'
           import os, sys
           root = os.path.realpath(".")
           git = os.path.join(root, ".git")
@@ -178,7 +178,9 @@ jobs:
               if not rel or rel.startswith("/") or "\0" in rel or any(x in ("", ".", "..") for x in parts):
                   print(f"::error::unsafe path in the PR file list: {rel!r}")
                   sys.exit(1)
-          if len(paths) >= 3000:
+          # changed_files counts removed files too, so a list cut at 3000
+          # entries is caught even when some of those entries were removals.
+          if int(sys.argv[2]) >= 3000:
               paths = []
               for d, dirs, files in os.walk(root):
                   dirs[:] = [x for x in dirs if os.path.join(d, x) != git]
