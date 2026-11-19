@@ -30,7 +30,7 @@ cycles, and documents.
 ### Commands (9)
 
 - `/linear:setup` — Validate Linear MCP visibility, first-use OAuth readiness,
-  and Graphite availability
+  and the active stacked-PR provider's stack tool (`gt` only for Graphite)
 - `/linear:work` — Start working on a Linear issue: loads context, writes
   brainstorm doc, routes to `/flow:plan` or `/gt-stack-plan`
 - `/linear:create` — Create a Linear issue from current context
@@ -51,8 +51,8 @@ cycles, and documents.
   remote agent is enabled, and deprecated yellow-jules stops after 2026-11-11
   and points to yellow-agy. Jules and agy launch only under a grant the owner
   wrote in a terminal (no covering grant: the command prints the terminal
-  command and stops).
-  Requires yellow-core installed (owns the group's classifier)
+  command and stops). Requires yellow-core installed (owns the group's
+  classifier)
 
 ### Agents (3)
 
@@ -87,8 +87,8 @@ patterns:
 - **`linear-explorer` agent** — Auto-triggers on "search linear", "is this a
   duplicate?" queries. Read-only backlog search.
 
-For advanced workflows, agents can call Linear MCP tools directly without
-going through commands. Bundled-server tool names carry the plugin prefix:
+For advanced workflows, agents can call Linear MCP tools directly without going
+through commands. Bundled-server tool names carry the plugin prefix:
 `mcp__plugin_yellow-linear_linear__get_issue`,
 `mcp__plugin_yellow-linear_linear__list_issues`, and so on.
 
@@ -120,53 +120,54 @@ going through commands. Bundled-server tool names carry the plugin prefix:
   by the classifier (`READY_JULES`, `--tooling-jules`). `/linear:delegate`
   launches through the yellow-jules CLI (resolved via `installPath`) in a branch
   that dry-runs, finds a grant covering the repository, branch, and issue,
-  previews it, and asks before launching. It can run `authorize --list` but never
-  grant creation: with no covering grant it prints the exact terminal command and
-  stops, sending nothing and posting no Linear comment.
-  The Jules branch needs the yellow-jules release that ships `delegate` and
-  `authorize --list` (the grants release); an older read-only install fails
-  the dry run with a usage error and sends nothing. After 2026-11-11 Jules is
+  previews it, and asks before launching. It can run `authorize --list` but
+  never grant creation: with no covering grant it prints the exact terminal
+  command and stops, sending nothing and posting no Linear comment. The Jules
+  branch needs the yellow-jules release that ships `delegate` and
+  `authorize --list` (the grants release); an older read-only install fails the
+  dry run with a usage error and sends nothing. After 2026-11-11 Jules is
   read-only, so `READY_JULES` stops before the packet and points to yellow-agy.
 - **yellow-agy** (optional, the local agent) — reported by the classifier under
   `localAgent` (`READY_AGY`, `--tooling-agy`). It is not a remote agent, so it
-  never makes a `CONFLICT`. `/linear:delegate` runs `delegate` on the
-  yellow-agy CLI (resolved via `installPath`) with the packet as
-  `--prompt-file`, a new branch `agy/<ISSUE-ID>-r<rev>` from the current
-  branch, and a request id derived from the issue and revision, so a retry
-  replays instead of creating a second task. The CLI enforces the owner's
-  grant and the quota gate; with no grant the command prints the owner's
-  `authorize` line and posts nothing. On Windows with agy behind the WSL
-  bridge, the clone must live inside WSL: its `//wsl.localhost/<distro>/...`
-  path is reduced to the WSL path once `<distro>` matches the one agy runs in
-  (`WSL_DISTRO_NAME`, via `YELLOW_AGY_WSL_DISTRO` when set), and a drive
-  path (`C:/...`) is refused because the CLI rejects `/mnt/*` on the bridge.
+  never makes a `CONFLICT`. `/linear:delegate` runs `delegate` on the yellow-agy
+  CLI (resolved via `installPath`) with the packet as `--prompt-file`, a new
+  branch `agy/<ISSUE-ID>-r<rev>` from the current branch, and a request id
+  derived from the issue and revision, so a retry replays instead of creating a
+  second task. The CLI enforces the owner's grant and the quota gate; with no
+  grant the command prints the owner's `authorize` line and posts nothing. On
+  Windows with agy behind the WSL bridge, the clone must live inside WSL: its
+  `//wsl.localhost/<distro>/...` path is reduced to the WSL path once `<distro>`
+  matches the one agy runs in (`WSL_DISTRO_NAME`, via `YELLOW_AGY_WSL_DISTRO`
+  when set), and a drive path (`C:/...`) is refused because the CLI rejects
+  `/mnt/*` on the bridge.
 
 ## Testing
 
 `bats tests/delegate.bats` from the plugin directory — it content-pins the
 provider-neutral text of `commands/linear/delegate.md`, so edits there must
-update the suite. The delegate tooling probe treats Devin as available only
-when both `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID` are set; the Cursor
-probe only checks that `yellow-cursor/dist/cli.js` resolves on disk (not auth).
+update the suite. The delegate tooling probe treats Devin as available only when
+both `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID` are set; the Cursor probe
+only checks that `yellow-cursor/dist/cli.js` resolves on disk (not auth).
 
 ## Untrusted Linear Content
 
 Issue descriptions, comments, attachments and documents fetched through the
 Linear MCP are untrusted:
-- `/linear:work` and `linear-issue-loader` redact credentials line by line
-  right after each fetch, before displaying anything or writing to the
-  worktree. The patterns are in the `linear-workflows` skill's "Remote Content
-  Sanitization" section and include the repo's named credential variables.
+
+- `/linear:work` and `linear-issue-loader` redact credentials line by line right
+  after each fetch, before displaying anything or writing to the worktree. The
+  patterns are in the `linear-workflows` skill's "Remote Content Sanitization"
+  section and include the repo's named credential variables.
 - The sanitized text is then wrapped in `--- begin/end ---` reference-only
   fences. Only the sanitized copy is shown or persisted.
 
 ## Graphite Merge Queue
 
-Graphite's merge queue closes PRs that landed, so a `CLOSED` PR is not
-"closed without merge" on its own. The `linear-workflows` skill's "Graphite
-Merge Queue" section is the single source for the closing-line rule and the
-merged-PR mapping (`scripts/pr-landed.sh`, covered by `tests/pr-landed.bats`);
-state those rules there, not in the commands. Setup steps are in `README.md`.
+Graphite's merge queue closes PRs that landed, so a `CLOSED` PR is not "closed
+without merge" on its own. The `linear-workflows` skill's "Graphite Merge Queue"
+section is the single source for the closing-line rule and the merged-PR mapping
+(`scripts/pr-landed.sh`, covered by `tests/pr-landed.bats`); state those rules
+there, not in the commands. Setup steps are in `README.md`.
 
 ## Known Limitations
 
