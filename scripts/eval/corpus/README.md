@@ -41,8 +41,8 @@ reviewed file.
 Graders are also proven against non-fixes. `selfcheck.lookalikes` are edits to
 the fixed file that only look like a fix, and `check` requires each to fail:
 `r06` defines the redaction helpers but never applies them to the `classify_run`
-result, `r12` keeps the faulty exit guard with extra parentheses or split over
-lines, and `r15` keeps `git diff` or `git log` double-quoted or on one line.
+result, `r12` keeps the faulty exit guard with extra parentheses, split over
+lines, or limited to POSIX or group kill (the wrong polarity), and `r15` keeps `git diff` or `git log` double-quoted or on one line.
 Graders are proven against other valid fixes too: `selfcheck.alternates` are
 edits of the fixed file into a different correct fix, and `check` requires each
 to pass. `r12` moves the exit guard into the non-group `else` branch, or limits
