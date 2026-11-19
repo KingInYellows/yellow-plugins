@@ -87,8 +87,12 @@ here — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the remediation block.
   `track: bug` solution docs as `ERROR-FIX:` entries so debugging and
   review flows can recall past fixes semantically. Seeding is manual —
   re-run it after new solution docs land.
-- **Session recall:** at session start, one semantic `hooks recall` injects
-  past learnings as untrusted reference context.
+- **Session recall:** at session start, the hook injects the recall a
+  background job saved at the previous session start (results scoring 0.3 or
+  more, as plain bullets, under 2 KB) as untrusted reference context, then
+  refreshes it in the background for the next session. The session start
+  never waits for the model load. Set `RUVECTOR_RECALL_MIN_SCORE` (0-1) to
+  move the floor.
 - **MCP integration:** ruvector runs as a stdio MCP server, discovered via
   ToolSearch. `bin/start-ruvector.sh` starts it from the git toplevel, so
   sessions launched from a subdirectory or a new worktree use the project

@@ -1,0 +1,77 @@
+{
+  "source": "plugins/yellow-core/commands/flow/plan.md",
+  "queries": [
+    {
+      "q": "I want to add rate limiting to our public REST API. Before writing any code, put together an implementation plan I can review.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Turn this feature request into a structured implementation plan: users should be able to export their data as CSV.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Plan out how we'd add OAuth login with GitHub to the app. Don't implement it yet.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Write an implementation plan for migrating our job queue from cron scripts to a proper worker.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "We need dark mode in the settings page. Make a step-by-step plan for building it.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Create a plan document for adding audit logging to every admin action.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "Here's the feature: webhook retries with exponential backoff. Draft the implementation plan.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "Break down how to build a search box with autocomplete into a plan with phases and tasks.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "Implement the plan in plans/rate-limit.md, task by task.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Let's brainstorm a few different approaches to caching before we commit to anything.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Which of our plans are finished and ready to archive?",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Draft a requirements spec with numbered requirements for the export feature. No design, no code.",
+      "trigger": false,
+      "split": "train"
+    },
+    { "q": "Add a null check to the parseConfig function.", "trigger": false, "split": "train" },
+    {
+      "q": "What's the difference between a plan and a spec in project management?",
+      "trigger": false,
+      "split": "heldout"
+    },
+    { "q": "Fix the typo in the README heading.", "trigger": false, "split": "heldout" },
+    {
+      "q": "Review whether the work on this branch stayed within the scope of its plan.",
+      "trigger": false,
+      "split": "heldout"
+    }
+  ]
+}

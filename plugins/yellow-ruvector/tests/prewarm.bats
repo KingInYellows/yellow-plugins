@@ -75,11 +75,14 @@ npm_called_within() {
   rm -f "$CLAUDE_PLUGIN_DATA/model-verified"
   run bash -c 'cd "$1" && printf "{\"cwd\":\"%s\"}" "$1" | CLAUDE_PROJECT_DIR="$1" bash "$2"' _ "$proj" "$SS"
   [ "$status" -eq 0 ]
+  sleep 1
   [ ! -e "$BATS_TEST_TMPDIR/recall-ran" ]
   # Once verified (as prewarm's warm-up records it), recall runs.
   bash -c '. "$1"; yellow_ruvector_data_dir; yellow_ruvector_model_fingerprint > "$RUVECTOR_DATA/model-verified"' _ "$LIB"
   run bash -c 'cd "$1" && printf "{\"cwd\":\"%s\"}" "$1" | CLAUDE_PROJECT_DIR="$1" bash "$2"' _ "$proj" "$SS"
   [ "$status" -eq 0 ]
+  # The recall runs in a detached job after the hook answers.
+  for _ in $(seq 1 50); do [ -e "$BATS_TEST_TMPDIR/recall-ran" ] && break; sleep 0.1; done
   [ -e "$BATS_TEST_TMPDIR/recall-ran" ]
 }
 
