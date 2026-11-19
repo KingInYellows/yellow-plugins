@@ -502,6 +502,8 @@ function main(argv) {
       : `Running ${cases.length} cases x ${opts.runs} runs on ${opts.model}, ` +
           `cap ${opts.maxCostUsd} USD API-equivalent (not a bill)`
   );
+  // A reused --out dir may hold an earlier run's aggregate; never score it.
+  fs.rmSync(jsonPath, { force: true });
   const res = spawnSync('claude', args, {
     cwd: stageDir,
     env: { ...process.env, COMPOUND_DRAIN_IN_PROGRESS: '1' },
