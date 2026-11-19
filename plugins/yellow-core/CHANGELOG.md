@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.17.2
+
+### Patch Changes
+
+- [#1856](https://github.com/KingInYellows/yellow-plugins/pull/1856)
+  [`c8da6d4`](https://github.com/KingInYellows/yellow-plugins/commit/c8da6d425f118f544c386f2246e293b84e27de53)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - github-workflow
+  `merge` names the repository gh-stack would merge in and refuses an ambiguous
+  one, a URL for another repository, or a repository that changed since the
+  preview; `merge-single` reports where the head branch lives so a fork branch
+  is not taken for a Graphite one. yellow-core reads gh-stack prerelease
+  versions, and `/setup:all` checks git 2.36+ for the GitHub provider
+  (CLAUDE-347).
+
+- [#1863](https://github.com/KingInYellows/yellow-plugins/pull/1863)
+  [`c77365d`](https://github.com/KingInYellows/yellow-plugins/commit/c77365dd99b0f82358712a504a9a576b08d9058f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Replace the
+  `graphite-queue` label as the owner's merge approval with a new
+  `merge-approved` label (CLAUDE-345). `check-merge-ready` counts it for medium
+  and high tier PRs only when the latest addition of the label was made by a
+  listed human by hand (the REST issue events report `performed_via_github_app`
+  as null) after the head arrived; an addition made through a GitHub App never
+  approves, and unreadable label events are the new `label_events_unknown`
+  token. The report's Graphite-specific `queued` field and the merge-ready
+  `Queue` row are gone. yellow-core's local-config schema and yellow-linear's
+  README describe the new rule and the Graphite merge queue as one path among
+  others.
+
 ## 2.17.1
 
 ### Patch Changes

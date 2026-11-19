@@ -1,5 +1,34 @@
 # github-workflow
 
+## 0.6.0
+
+### Minor Changes
+
+- [#1872](https://github.com/KingInYellows/yellow-plugins/pull/1872)
+  [`8c1b8e7`](https://github.com/KingInYellows/yellow-plugins/commit/8c1b8e7415460cefbb5913ff712a83bba9156622)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Harden stack
+  and single merges (CLAUDE-361). The `merge` preview now reads the landing set
+  from the Stacks REST API the way `gh stack merge` does, so a branch that
+  exists only on GitHub is shown, and a confirmed merge requires the previewed
+  `repository` and `previewToken` and is refused when the set, a head commit,
+  the base or the method changed. A hostless `GH_REPO` uses gh's default host
+  from `hosts.yml`. `merge-single` also checks the Stacks API for stack
+  membership, lists open pull requests built on its branch, and lands a pull
+  request into a release or hotfix branch only when that base is named with
+  `--base`.
+
+### Patch Changes
+
+- [#1856](https://github.com/KingInYellows/yellow-plugins/pull/1856)
+  [`c8da6d4`](https://github.com/KingInYellows/yellow-plugins/commit/c8da6d425f118f544c386f2246e293b84e27de53)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - github-workflow
+  `merge` names the repository gh-stack would merge in and refuses an ambiguous
+  one, a URL for another repository, or a repository that changed since the
+  preview; `merge-single` reports where the head branch lives so a fork branch
+  is not taken for a Graphite one. yellow-core reads gh-stack prerelease
+  versions, and `/setup:all` checks git 2.36+ for the GitHub provider
+  (CLAUDE-347).
+
 ## 0.5.0
 
 ### Minor Changes
