@@ -167,17 +167,27 @@ progress.
   downloads the ONNX model in a detached background job under the install
   lock (yellow-morph's prewarm pattern). Purely an optimization: the MCP
   launcher installs synchronously when needed.
-- `session-start.sh` (SessionStart, 6s) — one semantic `hooks recall
-  --top-k 5` (4.5s budget; 0.3.3 recall loads the ONNX model, 1.2–2.1s warm)
-  returned as `additionalContext` (skipped until prewarm has verified the
-  ONNX model, so the two never download it concurrently; always run when
-  the env selects hash), plus a jq-only embedder-provenance check:
+- `session-start.sh` (SessionStart, 6s; ~60–90ms) — injects the recall a
+  detached job saved at the previous session start
+  (`<plugin data>/recall/<cksum of the store path>.json`, never in the
+  worktree; one JSON document, a regular file under 64 KB, never a
+  symlink): results scoring at least `RUVECTOR_RECALL_MIN_SCORE` (0.3), one
+  `- [type] content` bullet each, at most 1,500 bytes, so the fenced block
+  stays under the 2 KB SessionStart budget; nothing when none pass. It then
+  starts the next `hooks recall --top-k 5` in a detached job (bounded by
+  `RUVECTOR_RECALL_REFRESH_SECS`, 30; 0.3.3 recall loads the ONNX model,
+  1.2–2.1s warm), which replaces the cache atomically only with a recall
+  object. No refresh within `RUVECTOR_RECALL_REFRESH_GAP` (60) seconds of
+  the last one (the `.refresh` stamp beside the cache), and none until
+  prewarm has verified the ONNX model, so the two never download it
+  concurrently (always run when the env selects hash). A project's first
+  session after the upgrade injects nothing (CLAUDE-368). Plus a jq-only embedder-provenance check:
   a `hash`-stamped store with the default (onnx-minilm) embedder, or a
   stamp-less store that already holds vectors (`ERR_LEGACY_STORE_READONLY`),
   adds one `[ruvector] …` line to `systemMessage`; silent for fresh stores
   and when the env selects hash the way upstream resolves it
   (`RUVECTOR_EMBEDDER=hash`, or `RUVECTOR_ONNX=0` with `RUVECTOR_EMBEDDER`
-  unset). The provenance parse and the recall are bounded by
+  unset). The provenance parse, the cache read, and the background recall are bounded by
   GNU `timeout`/`gtimeout` when present, otherwise by `run_budgeted`'s
   portable TERM/KILL watcher. Also re-runs the worktree store heal.
   There is no per-prompt (UserPromptSubmit) recall: semantic recall is too
@@ -195,8 +205,10 @@ progress.
   (`coedit.json` is project data). Stdout is always dual-client allow JSON
   (`continue` + `permission`) so Cursor's Claude-plugin bridge does not
   block the tool.
-- `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit, 1s; ~40–70ms,
-  jq only) — co-edit recording (`hooks/scripts/lib/coedit.sh`). Each
+- `post-tool-use.sh` (PostToolUse on Edit/Write/MultiEdit, 1s; ~55–65ms,
+  jq only; the `coedit.json` rewrite for a new pair runs in a detached job
+  with a 2 s lock wait and 2 s jq bound, CLAUDE-372; `COEDIT_BUMP_SYNC=1`
+  runs it inline for tests) — co-edit recording (`hooks/scripts/lib/coedit.sh`). Each
   successful edit updates the session's last-edited file in
   `.ruvector/coedit-sessions/<session_id>`; a different file edited by the
   same session within 60s adds one to that symmetric pair in
