@@ -47,6 +47,17 @@ if (!fs.existsSync(transcript)) {
   }
   fs.writeFileSync(transcript, lines.join('\n') + '\n');
 }
+// The yellow-core SessionStart hook starts a paid `claude -p` drain when
+// staged entries are due and `claude` resolves on PATH. Refuse to run then.
+const onPath = (process.env.PATH || '')
+  .split(path.delimiter)
+  .some((d) => d && fs.existsSync(path.join(d, 'claude')));
+if (onPath) {
+  process.stderr.write(
+    'hook-cost-bench: `claude` is on PATH; remove it so no drain can start\n'
+  );
+  process.exit(2);
+}
 const env0 = { ...process.env, HOME, CLAUDE_PROJECT_DIR: PROJ };
 delete env0.BATS_VERSION;
 
@@ -70,12 +81,15 @@ const bashPost = (cmd, out) =>
     tool_input: { command: cmd },
     tool_response: { stdout: out, stderr: '', interrupted: false },
   });
-const edit = (ev) =>
+// Co-edit pairs need the same files edited together in 3+ sessions.
+const coeditFiles = ['README.md', 'CLAUDE.md', 'AGENTS.md', 'CONTRIBUTING.md'];
+const edit = (ev, file = 'README.md', sid = base.session_id) =>
   S({
+    session_id: sid,
     hook_event_name: ev,
     tool_name: 'Edit',
     tool_input: {
-      file_path: path.join(PROJ, 'README.md'),
+      file_path: path.join(PROJ, file),
       old_string: 'a',
       new_string: 'b',
     },
@@ -116,7 +130,13 @@ const scenarios = {
       ['git push', bashPre('git push origin HEAD')],
       ['long cmd', bashPre('echo ' + 'y'.repeat(4000) + ' && git status')],
     ],
-    Edit: [['edit', edit('PreToolUse')]],
+    // A new session each run, so the once-per-session suggestion fires.
+    Edit: [
+      [
+        'edit, 3 known partners',
+        (i) => edit('PreToolUse', 'README.md', `bench-pre-${i}`),
+      ],
+    ],
   },
   PostToolUse: {
     Bash: [
@@ -130,7 +150,18 @@ const scenarios = {
       ],
       ['60KB out', bashPost('cat big.log', big)],
     ],
-    Edit: [['edit', edit('PostToolUse')]],
+    // Four files per session, so every run records co-edit pairs.
+    Edit: [
+      [
+        'edit, pairs recorded',
+        (i) =>
+          edit(
+            'PostToolUse',
+            coeditFiles[i % 4],
+            `bench-pair-${Math.floor(i / 4)}`
+          ),
+      ],
+    ],
   },
   SessionStart: { '*': [['startup', ss]] },
   Stop: {
@@ -194,7 +225,9 @@ const pct = (a, p) => {
 };
 const rows = [];
 for (const [plugin, j] of Object.entries(catalog)) {
-  const hooks = findHooks(j, []);
+  // PostToolUse first, so the co-edit pairs it records exist for PreToolUse.
+  const order = (ev) => (ev === 'PostToolUse' ? 0 : 1);
+  const hooks = findHooks(j, []).sort((a, b) => order(a.ev) - order(b.ev));
   for (const h of hooks) {
     if (h.type !== 'command') continue;
     const key = h.matcher.includes('Bash')
@@ -216,10 +249,11 @@ for (const [plugin, j] of Object.entries(catalog)) {
       const times = [];
       let last;
       let first;
+      let failed = 0;
       for (let i = 0; i < N + 2; i++) {
         const t0 = process.hrtime.bigint();
         const r = spawnSync('bash', ['-c', cmd], {
-          input,
+          input: typeof input === 'function' ? input(i) : input,
           env,
           cwd: PROJ,
           encoding: 'utf8',
@@ -228,6 +262,7 @@ for (const [plugin, j] of Object.entries(catalog)) {
         const ms = Number(process.hrtime.bigint() - t0) / 1e6;
         if (i === 0) first = ms;
         if (i >= 2) times.push(ms);
+        if (r.error || (r.status !== 0 && r.status !== 2)) failed++;
         last = r;
       }
       const inj = injected(h.ev, last.stdout || '', last.status, last.stderr);
@@ -253,11 +288,12 @@ for (const [plugin, j] of Object.entries(catalog)) {
         sys_bytes: inj.sys,
         stdout_bytes: inj.raw,
         exit: last.status,
+        failed_runs: failed,
         stdout: (last.stdout || '').slice(0, 300),
         stderr: (last.stderr || '').slice(0, 300),
       });
       process.stderr.write(
-        `${id}: p50 ${rows.at(-1).p50_ms} p95 ${rows.at(-1).p95_ms} ctx ${inj.ctx} sys ${inj.sys}\n`
+        `${id}: p50 ${rows.at(-1).p50_ms} p95 ${rows.at(-1).p95_ms} ctx ${inj.ctx} sys ${inj.sys}${failed ? ` FAILED ${failed} run(s)` : ''}\n`
       );
     }
   }
