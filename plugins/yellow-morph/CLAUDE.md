@@ -120,7 +120,9 @@ do not apply.
   `pnpm generate:manifests` — do not add `hooks/hooks.json`.
 - `plugin.json` MCP env sets `DISABLED_TOOLS=github_codebase_search` and
   `WORKSPACE_MODE=true`; `npm ci` runs under `env -i` so postinstall scripts
-  inherit no secrets.
+  inherit no secrets. Only HOME, PATH, the proxy and CA variables, and
+  `NPM_CONFIG_*`/`npm_config_*` pass through; dropping the CA breaks the install
+  behind a TLS-intercepting proxy (cloud sessions).
 - No automated tests exist for the wrapper/lock logic.
 - **Shell libraries and zsh:** `lib/install-morphmcp.sh` is dual-shell
   (Tier 4) because `/morph:setup` sources it into the user's shell, often
