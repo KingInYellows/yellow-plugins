@@ -13,6 +13,47 @@ and this project adheres to
 
 ---
 
+## [2.1.38] - 2026-11-19
+
+### Changed
+
+- **yellow-review 4.0.0 (breaking), yellow-core 2.17.2, yellow-linear 2.3.2** —
+  The owner's merge approval for medium and high tier pull requests is now a
+  hand-added `merge-approved` label instead of `graphite-queue`.
+  `check-merge-ready` counts it only when its latest addition was made by a
+  listed human by hand (REST issue events report `performed_via_github_app` as
+  null) after the head commit arrived; an addition made through a GitHub App
+  never approves. Unreadable label events give the new `label_events_unknown`
+  token, and the report's `queued` field and the merge-ready `Queue` row are
+  gone (CLAUDE-345, #1863).
+- **yellow-linear 2.3.2, yellow-review 4.0.0** — `/linear:setup` checks the
+  stack tool for the active stacked-PR provider (`gt` for Graphite, the
+  `gh-stack` extension for GitHub) and points to `/stack:status` when the
+  provider is unresolved. yellow-review's CLAUDE.md says `commit-resolve-fixes`
+  submits through its provider and verifies the remote head (CLAUDE-359, #1870).
+- **github-workflow 0.6.0** — The stack `merge` preview reads the landing set
+  from the Stacks REST API the way `gh stack merge` does, and a confirmed merge
+  must carry the previewed `repository` and `previewToken`; it is refused when
+  the set, a head commit, the base or the method changed. `merge-single` also
+  checks the Stacks API for stack membership, lists open pull requests built on
+  its branch, and lands into a release or hotfix branch only when that base is
+  named with `--base` (CLAUDE-361, #1872).
+
+### Fixed
+
+- **github-workflow 0.6.0, yellow-core 2.17.2** — github-workflow `merge` names
+  the repository gh-stack would merge in and refuses an ambiguous one, a URL for
+  another repository, or a repository that changed since the preview;
+  `merge-single` reports where the head branch lives. yellow-core reads gh-stack
+  prerelease versions, and `/setup:all` checks for git 2.36+ with the GitHub
+  provider (CLAUDE-347, #1856).
+- **yellow-review 4.0.0** — `check-merge-ready` fails closed on a
+  `merge-approved` label event whose time does not parse (approval unknown while
+  the label is on, a definite `approval_required` once it is off) (CLAUDE-360,
+  #1868).
+
+---
+
 ## [2.1.37] - 2026-11-18
 
 ### Changed

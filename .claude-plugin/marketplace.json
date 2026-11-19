@@ -24,7 +24,7 @@
     {
       "name": "github-workflow",
       "description": "GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.17.1",
+      "version": "2.17.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -44,7 +44,7 @@
     {
       "name": "yellow-linear",
       "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
-      "version": "2.3.1",
+      "version": "2.3.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -94,7 +94,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.18.3",
+      "version": "4.0.0",
       "author": {
         "name": "KingInYellows"
       },

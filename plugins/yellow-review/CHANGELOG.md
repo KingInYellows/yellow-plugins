@@ -1,5 +1,46 @@
 # Changelog
 
+## 4.0.0
+
+### Major Changes
+
+- [#1863](https://github.com/KingInYellows/yellow-plugins/pull/1863)
+  [`c77365d`](https://github.com/KingInYellows/yellow-plugins/commit/c77365dd99b0f82358712a504a9a576b08d9058f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Replace the
+  `graphite-queue` label as the owner's merge approval with a new
+  `merge-approved` label (CLAUDE-345). `check-merge-ready` counts it for medium
+  and high tier PRs only when the latest addition of the label was made by a
+  listed human by hand (the REST issue events report `performed_via_github_app`
+  as null) after the head arrived; an addition made through a GitHub App never
+  approves, and unreadable label events are the new `label_events_unknown`
+  token. The report's Graphite-specific `queued` field and the merge-ready
+  `Queue` row are gone. yellow-core's local-config schema and yellow-linear's
+  README describe the new rule and the Graphite merge queue as one path among
+  others.
+
+### Patch Changes
+
+- [#1870](https://github.com/KingInYellows/yellow-plugins/pull/1870)
+  [`22a88d6`](https://github.com/KingInYellows/yellow-plugins/commit/22a88d642fdab182bd50fc607d43e505e302ab3b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/linear:setup`
+  judges the stack tool against the active stacked-PR provider: `gt` only for
+  Graphite, the `gh-stack` extension for GitHub, and it points to
+  `/stack:status` when the provider is unresolved. The README no longer lists
+  `gt` as a general prerequisite. yellow-review's CLAUDE.md now says
+  `commit-resolve-fixes` submits through its provider and verifies the remote
+  head, so callers add no `git push` after it (CLAUDE-359).
+
+- [#1868](https://github.com/KingInYellows/yellow-plugins/pull/1868)
+  [`6c90174`](https://github.com/KingInYellows/yellow-plugins/commit/6c90174a615c72e3f5e2acb8e4cde057b72245ce)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `check-merge-ready` no longer drops a `merge-approved` label event whose time
+  does not parse: one such event leaves the label approval unknown
+  (`label_events_unknown`), since it could be a hidden removal (CLAUDE-360).
+  With the label off the PR, unreadable label events now give a definite
+  `approval_required` instead of unknown. Adds tests for same-second label
+  changes and a label added at the head's arrival time, and documents
+  `humanApproval.via` and `.at` in the script's output schema.
+
 ## 3.18.3
 
 ### Patch Changes
