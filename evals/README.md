@@ -56,7 +56,9 @@ A query triggers when the target fires in at least half its runs. The report
 gives recall (should-trigger queries that trigger), specificity (near misses
 that stay quiet), precision, accuracy, held-out accuracy and the mean trigger
 rate on each side. Exit 0 when every selected set reaches held-out accuracy 0.8,
-1 when one does not, 2 on a check failure or a partial run.
+1 when one does not, 2 on a check failure, a partial run, a failed run, or a
+selected query with no valid run (including a `--case` glob that matches
+nothing). The CLI call stops after an hour.
 
 Use `--case '<plugin>--<component>--p*'` (or `--n*`) to rerun one side.
 

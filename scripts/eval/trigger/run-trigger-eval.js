@@ -28,7 +28,8 @@
  *              near misses. Unrun queries are left out of the scores.
  *
  * Exit: 0 when every selected set reaches held-out accuracy >= 0.8, 1 when
- * one does not, 2 on a check failure or a partial or failed run.
+ * one does not, 2 on a check failure, a partial or failed run, or a selected
+ * query with no valid run.
  *
  * Method, costs and the committed baseline: evals/README.md.
  */
@@ -53,6 +54,18 @@ const HELDOUT_PASS = 0.8;
 const MIN_PER_SIDE = 8;
 const ALLOWED_TOOLS = ['Skill', 'Read', 'Glob', 'Grep'];
 const COPY_SKIP = new Set(['.git', 'node_modules', 'tests', 'evals']);
+// A hung CLI must not block forever; a full baseline takes about 5 minutes.
+const RUN_TIMEOUT_MS = 60 * 60 * 1000;
+
+/** Match a `--case` glob the way the CLI does: `*` and `?`, no classes. */
+function caseMatches(glob, name) {
+  if (!glob) return true;
+  const re = glob
+    .split('')
+    .map((ch) => (ch === '*' ? '.*' : ch === '?' ? '.' : escapeRegex(ch)))
+    .join('');
+  return new RegExp(`^${re}$`).test(name);
+}
 
 function parseFrontmatter(text) {
   const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
@@ -298,14 +311,23 @@ function stage(repoRoot, sets, stageDir, opts) {
   return cases;
 }
 
-/** Score `claude plugin eval --json` output against the staged cases. */
+/**
+ * Score `claude plugin eval --json` output against the staged cases the run
+ * selected. A selected case the aggregate lacks, or one with no valid run, is
+ * reported in `unscored` so the caller can fail closed.
+ */
 function score(aggregate, cases) {
   const byName = new Map((aggregate.cases || []).map((c) => [c.name, c]));
   const perQuery = [];
+  const unscored = [];
   let failedRuns = 0;
   for (const meta of cases) {
     const c = byName.get(meta.name);
     const runs = c && c.arms && Array.isArray(c.arms.with) ? c.arms.with : [];
+    if (!runs.length) {
+      unscored.push(meta.name);
+      continue;
+    }
     let fired = 0;
     let valid = 0;
     for (const r of runs) {
@@ -319,6 +341,7 @@ function score(aggregate, cases) {
       const triggered = meta.trigger ? g.passed : !g.passed;
       if (triggered) fired += 1;
     }
+    if (!valid) unscored.push(meta.name);
     const rate = valid ? fired / valid : null;
     const triggers = rate !== null && rate >= TRIGGER_THRESHOLD;
     perQuery.push({
@@ -336,7 +359,7 @@ function score(aggregate, cases) {
   }
   for (const [id, s] of Object.entries(sets)) {
     const scored = s.queries.filter((q) => q.pass !== null);
-    // A set with no scored query was filtered out by --case; leave it out.
+    // Every query errored; `unscored` already names them.
     if (!scored.length) {
       delete sets[id];
       continue;
@@ -363,7 +386,7 @@ function score(aggregate, cases) {
       meanTriggerRateNegative: mean(neg),
     };
   }
-  return { sets, failedRuns };
+  return { sets, failedRuns, unscored };
 }
 
 function fmt(x) {
@@ -510,6 +533,8 @@ function main(argv) {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     maxBuffer: 64 * 1024 * 1024,
+    timeout: RUN_TIMEOUT_MS,
+    killSignal: 'SIGTERM',
   });
   const cliOut = `${res.stdout || ''}${res.stderr || ''}`;
   const cleanup = () => {
@@ -517,7 +542,7 @@ function main(argv) {
   };
   if (res.error) {
     console.error(
-      `run-trigger-eval: could not start claude: ${res.error.message}`
+      `run-trigger-eval: claude plugin eval failed: ${res.error.message}`
     );
     cleanup();
     return 2;
@@ -555,7 +580,10 @@ function main(argv) {
     return 2;
   }
   const aggregate = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-  const scored = score(aggregate, cases);
+  // Score only the cases the CLI was asked to run; a set the --case filter
+  // left out is not part of this run.
+  const selected = cases.filter((c) => caseMatches(opts.caseGlob, c.name));
+  const scored = score(aggregate, selected);
   const summary = {
     claudeVersion: aggregate.claudeVersion,
     startedAt: aggregate.startedAt,
@@ -567,6 +595,7 @@ function main(argv) {
     partial: Boolean(aggregate.partial),
     partialReason: aggregate.partialReason || null,
     failedRuns: scored.failedRuns,
+    unscoredCases: scored.unscored,
     sets: scored.sets,
   };
   fs.writeFileSync(
@@ -581,6 +610,17 @@ function main(argv) {
   // Without --out the results sit inside the stage dir, so it stays.
   if (opts.out) cleanup();
   if (opts.keepStage || !opts.out) console.log(`Stage kept: ${stageDir}`);
+  if (!selected.length || !Object.keys(summary.sets).length) {
+    console.error('run-trigger-eval: no query was scored; check --case');
+    return 2;
+  }
+  if (summary.unscoredCases.length) {
+    console.error(
+      `run-trigger-eval: ${summary.unscoredCases.length} selected case(s) ` +
+        `have no valid run: ${summary.unscoredCases.join(', ')}`
+    );
+    return 2;
+  }
   if (summary.partial || summary.failedRuns > 0) return 2;
   const low = Object.values(summary.sets).some(
     (s) => s.heldoutAccuracy === null || s.heldoutAccuracy < HELDOUT_PASS
@@ -595,6 +635,7 @@ module.exports = {
   pluginDeps,
   stage,
   score,
+  caseMatches,
   parseArgs,
 };
 

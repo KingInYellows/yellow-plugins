@@ -168,19 +168,52 @@ describe('score', () => {
   });
 });
 
-describe('score with a --case filter', () => {
-  it('leaves out a set none of whose queries ran', () => {
-    const cases = [
-      { name: 'a--p01', set: 'p:a', trigger: true, split: 'heldout', q: 'x' },
-      { name: 'b--p01', set: 'p:b', trigger: true, split: 'heldout', q: 'y' },
-    ];
+describe('score fails closed', () => {
+  const cases = [
+    { name: 'a--p01', set: 'p:a', trigger: true, split: 'heldout', q: 'x' },
+    { name: 'b--p01', set: 'p:b', trigger: true, split: 'heldout', q: 'y' },
+  ];
+
+  it('reports a selected case the aggregate lacks as unscored', () => {
     const agg = {
       cases: [
         { name: 'a--p01', arms: { with: [{ graders: [{ passed: true }] }] } },
       ],
     };
-    const { sets } = trigger.score(agg, cases);
+    const { sets, unscored } = trigger.score(agg, cases);
     expect(Object.keys(sets)).toEqual(['p:a']);
     expect(sets['p:a'].heldoutAccuracy).toBe(1);
+    expect(unscored).toEqual(['b--p01']);
+  });
+
+  it('reports a case whose every run errored as unscored', () => {
+    const agg = {
+      cases: [
+        { name: 'a--p01', arms: { with: [{ error: 'exit 1: auth failed' }] } },
+      ],
+    };
+    const res = trigger.score(agg, cases.slice(0, 1));
+    expect(res.unscored).toEqual(['a--p01']);
+    expect(res.failedRuns).toBe(1);
+    expect(res.sets).toEqual({});
+  });
+
+  it('scores nothing from an empty aggregate', () => {
+    const res = trigger.score({ cases: [] }, cases);
+    expect(res.sets).toEqual({});
+    expect(res.unscored).toEqual(['a--p01', 'b--p01']);
+  });
+});
+
+describe('caseMatches', () => {
+  it('matches the CLI --case glob: * and ? only', () => {
+    const name = 'yellow-core--flow-plan--p03';
+    expect(trigger.caseMatches(undefined, name)).toBe(true);
+    expect(trigger.caseMatches('yellow-core--flow-plan--p*', name)).toBe(true);
+    expect(trigger.caseMatches('*--p0?', name)).toBe(true);
+    expect(trigger.caseMatches('yellow-core--flow-plan--n*', name)).toBe(false);
+    expect(trigger.caseMatches('yellow-core', name)).toBe(false);
+    // Regex metacharacters in a glob are literal.
+    expect(trigger.caseMatches('yellow.core*', name)).toBe(false);
   });
 });
