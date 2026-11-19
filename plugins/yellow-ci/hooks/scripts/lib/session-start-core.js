@@ -487,15 +487,23 @@ function scheduleRefresh(cwd, env, key) {
   // The refresh's own warnings (e.g. an unexpected `gh` response) go to
   // refresh-<key>.log beside the marker, overwritten each run, since the
   // detached child has no terminal. O_NOFOLLOW so a planted symlink cannot
-  // redirect the truncating open; on any failure stderr is discarded.
+  // redirect the truncating open, O_NONBLOCK so a planted FIFO cannot stall
+  // the hook (see openNoFollow), and the fd must be a regular file we own;
+  // otherwise stderr is discarded.
   let logFd = 'ignore';
   try {
-    logFd = fs.openSync(
+    const fd = fs.openSync(
       path.join(dir, `refresh-${key}.log`),
       fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC |
-        (fs.constants.O_NOFOLLOW || 0),
+        (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0),
       0o600
     );
+    const st = fs.fstatSync(fd);
+    if (st.isFile() && ownedByUs(st)) {
+      logFd = fd;
+    } else {
+      fs.closeSync(fd);
+    }
   } catch {
     logFd = 'ignore';
   }

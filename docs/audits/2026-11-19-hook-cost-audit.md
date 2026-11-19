@@ -41,8 +41,8 @@ the last run.
 | yellow-ruvector  | PreToolUse   | Edit\|Write\|MultiEdit     | pre-tool-use.sh            | Edit, 3 known partners ³ | 1 s     | 69       | 74     | 83     | 318       | 0               | pass                                 |
 | yellow-ruvector  | PostToolUse  | Edit\|Write\|MultiEdit     | post-tool-use.sh           | Edit, same file ³        | 1 s     | 72       | 74     | 84     | 0         | 0               | pass                                 |
 | yellow-ruvector  | PostToolUse  | Edit\|Write\|MultiEdit     | post-tool-use.sh           | Edit, pairs recorded ³   | 1 s     | 58       | 100    | 121    | 0         | 0               | **over: CLAUDE-372**                 |
-| yellow-ci        | SessionStart | \*                         | entrypoint-claude.js       | cache miss ⁴             | 3 s     | 40       | 62     | 105    | 0         | 0               | pass (was 1,200 / 1,465: CLAUDE-369) |
-| yellow-ci        | SessionStart | \*                         | entrypoint-claude.js       | cache hit ⁴              | 3 s     | -        | 39     | 48     | 0         | 188             | pass (was 280 / 310)                 |
+| yellow-ci        | SessionStart | \*                         | entrypoint-claude.js       | cache miss ⁴             | 3 s     | 45       | 46     | 55     | 0         | 0               | pass (was 1,200 / 1,465: CLAUDE-369) |
+| yellow-ci        | SessionStart | \*                         | entrypoint-claude.js       | cache hit ⁴              | 3 s     | -        | 40     | 47     | 0         | 188             | pass (was 280 / 310)                 |
 | yellow-core      | SessionStart | \*                         | session-start.sh           | no drain due             | 3 s     | 71       | 36     | 44     | 0         | 0               | pass                                 |
 | yellow-core      | SessionStart | \*                         | session-start.sh           | drain dispatched ⁵       | 3 s     | -        | 47     | 49     | 0         | 0               | pass                                 |
 | yellow-core      | Stop         | \*                         | stop.sh                    | 60-record transcript     | 5 s     | 23       | 35     | 45     | 0         | 0               | pass                                 |
@@ -71,14 +71,14 @@ the last run.
    scenarios. The hook no longer calls `gh` in the foreground: a miss shows the
    routing summary only and starts a detached refresh (`gh auth status` +
    `gh run list`, about 1.2 s) that fills the cache for the next session start.
-   The miss cost is the cache read plus that spawn. A refresh started by one run
-   can land before the next run, so a few "miss" runs are hits; p95 is the spawn
-   path. Results are shown for 10 minutes, shown and refreshed up to 1 hour,
-   then only refreshed. Cloud `gh auth status` fails here (the `GH_TOKEN` is a
-   proxy placeholder), so a shim reported success after making the real call;
-   without it the refresh writes nothing and the hook shows routing only. Before
-   the fix: miss 1,200 ms p50 / 1,465 ms p95 (1,025 / 1,168 on re-measure), hit
-   280 / 310 ms, 60 s TTL.
+   The miss cost is the cache read plus that spawn. The bench waits for the
+   previous run's refresh to finish (untimed) before clearing the cache, so
+   every timed run is a miss and no refreshes overlap. Results are shown for 10
+   minutes, shown and refreshed up to 1 hour, then only refreshed. Cloud
+   `gh auth status` fails here (the `GH_TOKEN` is a proxy placeholder), so a
+   shim reported success after making the real call; without it the refresh
+   writes nothing and the hook shows routing only. Before the fix: miss 1,200 ms
+   p50 / 1,465 ms p95 (1,025 / 1,168 on re-measure), hit 280 / 310 ms, 60 s TTL.
 5. Six pending entries and a stub `claude`, so the timing covers lock and
    dispatch only. Reproduce with `BENCH_STUB_CLAUDE=1`, which puts a no-op
    `claude` written under `BENCH_HOME` on the hooks' `PATH`, after seeding six
@@ -105,7 +105,7 @@ the last run.
   partners adds about 318 bytes of context.
 - **Session start** waits for the slowest hook: about 1.4 s today
   (yellow-ruvector recall; yellow-ci was 1.2-1.5 s on a cache miss before
-  CLAUDE-369 and is now under 110 ms p95). In a cloud session that starts while
+  CLAUDE-369 and is now about 55 ms p95). In a cloud session that starts while
   yellow-morph's failing install holds its lock, it waits about 2.0 s. Every
   other SessionStart hook finishes in under 150 ms.
 - **Model context** at session start is 2.1 KB from yellow-ruvector (up to 7.3
@@ -118,7 +118,7 @@ the last run.
 | Ticket     | Hook                               | Problem                                                                                                          |
 | ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | CLAUDE-368 | yellow-ruvector `session-start.sh` | 1.4 s semantic recall; pretty-printed JSON with low-score (about 0.20) results; context ceiling 7.3 KB.          |
-| CLAUDE-369 | yellow-ci SessionStart             | Fixed: `gh` moved to a detached refresh; cache read first; 10 min TTL. Was 1.2-1.5 s on a miss, now 105 ms p95.  |
+| CLAUDE-369 | yellow-ci SessionStart             | Fixed: `gh` moved to a detached refresh; cache read first; 10 min TTL. Was 1.2-1.5 s on a miss, now 55 ms p95.   |
 | CLAUDE-370 | yellow-morph `prewarm-morph.sh`    | `env -i` drops `NODE_EXTRA_CA_CERTS` behind a TLS proxy, so every cloud install fails and later starts wait 2 s. |
 | CLAUDE-372 | yellow-ruvector `post-tool-use.sh` | 121 ms p95 when an edit records a co-edit pair; grows with `.ruvector/coedit.json`.                              |
 

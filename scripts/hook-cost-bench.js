@@ -138,7 +138,23 @@ const ss = S({ hook_event_name: 'SessionStart', source: 'startup' });
 // yellow-ci caches its `gh run list` result per cwd, so back-to-back runs are
 // cache hits. Clearing the result cache (new and legacy locations) and any
 // refresh marker before every run measures the cache-miss path instead.
+// A refresh started by the previous run is waited for (its marker, refresh-<key>
+// without an extension, is removed when it ends) so it cannot repopulate the
+// cache after this prep and turn the next run into a hit. Untimed.
+const sleepMs = (ms) =>
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const clearCiCache = (env) => {
+  const marker = /^refresh-[0-9a-f]+$/;
+  for (let waited = 0; waited < 20000; waited += 50) {
+    let names = [];
+    try {
+      names = fs.readdirSync(env.CLAUDE_PLUGIN_DATA);
+    } catch {
+      break;
+    }
+    if (!names.some((n) => marker.test(n))) break;
+    sleepMs(50);
+  }
   const dirs = [
     env.CLAUDE_PLUGIN_DATA,
     path.join(env.HOME, '.cache/yellow-ci'),

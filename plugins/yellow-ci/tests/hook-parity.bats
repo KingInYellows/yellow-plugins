@@ -356,3 +356,21 @@ age_file() {
   [ ! -e "$dir/refresh-$key" ]
   [ ! -e "$dir/last-check-$key" ]
 }
+
+@test "SessionStart: a FIFO planted at the refresh log path does not stall the hook" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/fifo-log-XXXXXX")"
+  hook_scenario_setup cache-miss-failures "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  local key; key=$(hook_cache_key "$PWD")
+  local dir="$HOME/.local/share/yellow-ci" i
+  mkdir -p "$dir"
+  mkfifo "$dir/refresh-$key.log"
+
+  run timeout 3 node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"Runner routing"* ]]
+  # The refresh still runs, with stderr discarded.
+  for i in $(seq 1 50); do [ -s "$dir/last-check-$key" ] && break; sleep 0.1; done
+  [ -s "$dir/last-check-$key" ]
+}
