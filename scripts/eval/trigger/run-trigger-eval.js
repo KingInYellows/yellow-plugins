@@ -503,6 +503,7 @@ function main(argv) {
     opts.model,
     '-j',
     String(opts.concurrency),
+    // Checked before each run starts; runs in flight can finish past it.
     '--max-cost-usd',
     String(opts.validate ? 0 : opts.maxCostUsd),
     '--threshold',
