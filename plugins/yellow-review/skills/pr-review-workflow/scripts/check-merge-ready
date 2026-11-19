@@ -404,10 +404,10 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
             jq -c --arg h "$A_HEAD" --arg label "$APPROVAL_LABEL" --slurpfile ev "$WORK/events" '
               def utc: (capture("\\A(?<d>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})(?<f>\\.[0-9]+)?(?<z>Z|(?<s>[+-])(?<oh>[0-9]{2}):(?<om>[0-9]{2}))\\z") // null) as $m
                 | if $m == null then null
-                  else (($m.d + "Z") | fromdateiso8601)
+                  else (try ((($m.d + "Z") | fromdateiso8601)
                        - (if $m.z == "Z" then 0
                           else (($m.oh | tonumber) * 3600 + ($m.om | tonumber) * 60) * (if $m.s == "+" then 1 else -1 end) end)
-                       + (if $m.f == null then 0 else ("0" + $m.f | tonumber) end) end;
+                       + (if $m.f == null then 0 else ("0" + $m.f | tonumber) end)) catch null) end;
               .data.repository.pullRequest as $p
               | ([($p.commits.nodes // [])[] | .commit | select(.oid == $h)] | first) as $c
               | ([($c.checkSuites.nodes // [])[]?
@@ -426,10 +426,11 @@ if [ "$APPROVAL_MODE" != off ] && [ "$GH_READY" = true ]; then
                           then [$ev[0][] | .t = (.createdAt | utc)]
                                | if any(.[]; .t == null) then null else . end
                           else null end)}' "$WORK/approval.raw" >"$WORK/labels" 2>/dev/null \
-              || printf '{"headTime":null,"events":null}' >"$WORK/labels"
+              || { note "could not evaluate the label evidence; label approval unknown"
+                   printf '{"headTime":null,"events":null,"failed":true}' >"$WORK/labels"; }
             if jq -e 'type == "array"' "$WORK/events" >/dev/null 2>&1 \
-                && ! jq -e '.events | type == "array"' "$WORK/labels" >/dev/null 2>&1; then
-                note "label event times could not be read; label approval unknown"
+                && jq -e '.failed != true and .events == null' "$WORK/labels" >/dev/null 2>&1; then
+                note "a label event time could not be read; label approval unknown while the label is on the PR"
             fi
         fi
     fi

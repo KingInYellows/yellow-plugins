@@ -837,7 +837,8 @@ latest change to the label must be an addition by a login in
   anyone else, or a new commit on the head makes the approval stale. Unreadable
   events, including one change to the label whose time does not parse (it could
   be a hidden removal), leave the approval unknown (`label_events_unknown`),
-  never approved.
+  never approved; with the label off the PR the result is a definite
+  `approval_required`.
 
 ### Persona Selection Shadow Log (yellow-review)
 

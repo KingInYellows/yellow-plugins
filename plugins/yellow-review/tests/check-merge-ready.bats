@@ -821,7 +821,7 @@ $MOCK_GH_MR_EVENTS"
   [ "$status" -eq 3 ]
   [ "$(jq -r .approval.humanApproval <<<"$output")" = null ]
   [ "$(jq -c .approval.missing <<<"$output")" = '["label_events_unknown"]' ]
-  [[ "$stderr" == *"label event times could not be read"* ]]
+  [[ "$stderr" == *"a label event time could not be read"* ]]
 }
 
 @test "CLAUDE-360: unreadable label events with the label off the PR are a definite approval_required" {
@@ -853,4 +853,16 @@ $MOCK_GH_MR_EVENTS"
   run --separate-stderr "$SCRIPT" test/repo 7
   [ "$status" -eq 0 ]
   [ "$(jq -r .approval.humanApproval.at <<<"$output")" = 2026-11-02T10:05:00Z ]
+}
+
+@test "CLAUDE-360: an impossible label event date is unknown with the label on, and a definite miss with it off" {
+  config 'review_approval_gate: enforce'
+  LABELS="[$(lb Test User 2026-11-02T10:05:00Z),$(lb Test User 2026-99-02T10:20:00Z | jq -c '.event = "unlabeled"')]" with_files src/a.js
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 3 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["label_events_unknown"]' ]
+  MOCK_GH_MRA_BODY=$(jq -c '.data.repository.pullRequest.labels.nodes = []' <<<"$MOCK_GH_MRA_BODY")
+  run --separate-stderr "$SCRIPT" test/repo 7
+  [ "$status" -eq 1 ]
+  [ "$(jq -c .approval.missing <<<"$output")" = '["approval_required"]' ]
 }
