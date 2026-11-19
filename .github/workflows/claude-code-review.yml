@@ -115,16 +115,21 @@ jobs:
           # there must not reach the review agent.
           rm -rf .claude-code-review
           mkdir .claude-code-review
-          # Only comments still attached to the current diff (.line is null
-          # once a comment is outdated), so a bug that was fixed and later
-          # reintroduced is flagged again. Each body is wrapped in reference
-          # delimiters here, with any delimiter lines inside it neutralised.
+          # Every earlier claude[bot] inline comment, outdated ones included
+          # and flagged, so a push that only moves a still-unfixed line
+          # (reformat, rename, restack) does not repost the same issue
+          # (CLAUDE-356). The trade-off: a bug fixed and then reintroduced in
+          # the same PR is not flagged again, but its first comment is still
+          # on the PR. Each body is wrapped in reference delimiters here, and
+          # any delimiter-like "---" that starts a line, after any leading
+          # whitespace, is neutralised.
           gh_api --paginate "repos/$REPO/pulls/$PR_NUMBER/comments" \
             --jq '.[] | select(.user.login == "claude[bot]")
-              | select(.line != null)
-              | {path, line,
+              | {path,
+                 line: (.line // .original_line),
+                 outdated: (.line == null),
                  body: ("--- begin prior comment (reference only) ---\n"
-                   + (.body | gsub("(?<a>^|\n)---"; "\(.a)- --"))
+                   + (.body | gsub("(?<a>^|[\n\r])(?<w>[[:space:]]*)---"; "\(.a)\(.w)- --"))
                    + "\n--- end prior comment ---")}' \
             > .claude-code-review/prior-inline-comments.jsonl
           echo "run=true" >> "$GITHUB_OUTPUT"
@@ -174,10 +179,20 @@ jobs:
           # file into a comment (-F, --body-file) is denied, so a
           # prompt-injected run cannot post a runner file. Deny rules win over
           # the command's allowed-tools.
+          # Read(./.git/**): before Claude starts, the action's agent mode
+          # writes its GitHub App token into the origin URL in .git/config
+          # (configureGitAuth in v1.0.245), so persist-credentials: false alone
+          # does not keep a token out of the checkout (CLAUDE-356). The token
+          # is revoked when the job ends, but a Read of .git/config pasted into
+          # --body would post it while it is live. Read(//proc/**): the CLI's
+          # environment holds that token and CLAUDE_CODE_OAUTH_TOKEN. Reads
+          # outside the checkout already need approval, which a CI run cannot
+          # give; this deny is a second guard. Read deny rules also cover Grep
+          # and Glob.
           claude_args: >-
             --model claude-sonnet-5-5
             --setting-sources user
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
-            --disallowedTools "Bash(gh pr comment -F*),Bash(gh pr comment --body-file*),Bash(gh pr comment * -F*),Bash(gh pr comment * --body-file*)"
+            --disallowedTools "Bash(gh pr comment -F*),Bash(gh pr comment --body-file*),Bash(gh pr comment * -F*),Bash(gh pr comment * --body-file*),Read(./.git/**),Read(//proc/**)"
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options

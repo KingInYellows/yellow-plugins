@@ -404,8 +404,19 @@ vendored code-review command (CLAUDE-248). Its boundary:
   `gh pr list`, all read-only. Neither grants `gh api`, and project settings
   cannot add permissions because they do not load. The gate step, which runs no
   model, writes `claude[bot]`'s earlier inline comments to
-  `.claude-code-review/prior-inline-comments.jsonl`, and the command treats
-  their bodies as reference data.
+  `.claude-code-review/prior-inline-comments.jsonl`, wraps each body in
+  reference delimiters (neutralising `---` at a line start, indented or not),
+  and the command treats them as reference data. Outdated comments are kept and
+  flagged so a push that only moves an unfixed line does not repost it.
+- **Tokens on the runner**: checkout runs with `persist-credentials: false`, but
+  the action's agent mode then writes its own GitHub App token into the origin
+  URL in `.git/config`, and the CLI's environment holds that token and
+  `CLAUDE_CODE_OAUTH_TOKEN` (CLAUDE-356). `--disallowedTools` denies
+  `Read(./.git/**)` and `Read(//proc/**)`; other reads outside the checkout
+  already need an approval a CI run cannot give, and `gh pr comment -F` and
+  `--body-file` are denied. The rest of the checkout is the PR's own content, so
+  pasting it into a comment leaks nothing new. The app token is revoked when the
+  job ends.
 - **Skip marker**: the gate skips a run only when a `claude[bot]` comment that
   starts with `## Code review` ends with
   `<!-- claude-code-review head=<sha> -->` for the current head. A forged or
