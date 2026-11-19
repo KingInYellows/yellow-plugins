@@ -1,0 +1,12 @@
+{
+  "$comment": "Findings from `claude plugin validate --strict` that this repo accepts on purpose (CLAUDE-323). scripts/validate-claude-plugin-strict.js fails on anything not listed here. Each entry matches when the finding's message contains messageIncludes and its repo-relative file matches the file regex. Why each one is accepted: docs/plugin-validation-guide.md \"Claude Code strict validation\".",
+  "known": [
+    {
+      "id": "plugin-root-claude-md",
+      "level": "warning",
+      "messageIncludes": "CLAUDE.md at the plugin root is not loaded as project context",
+      "file": "^plugins/[^/]+/CLAUDE\\.md$",
+      "reason": "Each plugin's CLAUDE.md is contributor documentation for this repo, not runtime context; the plugin's skills carry what users need."
+    }
+  ]
+}

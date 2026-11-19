@@ -1906,6 +1906,41 @@ jobs:
       - name: Corpus self-check
         run: python3 scripts/eval/model-swap/eval.py check "$RUNNER_TEMP/eval-check" scripts/eval/corpus/*.json
 
+  claude-plugin-validate:
+    # Claude Code's own validator beside the in-repo ones (CLAUDE-323). It
+    # fails on any error or warning not in
+    # scripts/claude-plugin-validate-known.json; the documented differences
+    # are in docs/plugin-validation-guide.md "Claude Code strict validation".
+    # The CLI is pinned so a new release cannot fail every PR: bump it on
+    # purpose and update the known list in the same PR.
+    name: Claude Code Plugin Validate (strict)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLAUDE_CODE_CLI_VERSION: '2.1.328'
+      # No login, no model call: keep the CLI from phoning home or updating.
+      DISABLE_AUTOUPDATER: '1'
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pinned Claude Code CLI
+        run: |
+          npm install -g --prefix "$RUNNER_TEMP/claude-cli" "@anthropic-ai/claude-code@${CLAUDE_CODE_CLI_VERSION}"
+          "$RUNNER_TEMP/claude-cli/bin/claude" --version
+
+      - name: claude plugin validate --strict
+        run: node scripts/validate-claude-plugin-strict.js --claude "$RUNNER_TEMP/claude-cli/bin/claude"
+
   # ============================================================================
   # FINAL STATUS CHECK
   # ============================================================================
@@ -1930,6 +1965,7 @@ jobs:
         shell-compat-tests,
         goal-engine-compat,
         eval-offline,
+        claude-plugin-validate,
       ]
 
     steps:
@@ -1949,6 +1985,7 @@ jobs:
           GOAL_ENGINE_COMPAT_RESULT: ${{ needs.goal-engine-compat.result }}
           CHANGESET_CHECK_RESULT: ${{ needs.changeset-check.result }}
           EVAL_OFFLINE_RESULT: ${{ needs.eval-offline.result }}
+          CLAUDE_PLUGIN_VALIDATE_RESULT: ${{ needs.claude-plugin-validate.result }}
         run: |
           if [ "$VALIDATE_SCHEMAS_RESULT" == "success" ] && \
              [ "$VALIDATE_VERSIONS_RESULT" == "success" ] && \
@@ -1963,6 +2000,7 @@ jobs:
              [ "$BUILD_RESULT" == "success" ] && \
              [ "$GOAL_ENGINE_COMPAT_RESULT" == "success" ] && \
              [ "$EVAL_OFFLINE_RESULT" == "success" ] && \
+             [ "$CLAUDE_PLUGIN_VALIDATE_RESULT" == "success" ] && \
              { [ "$CHANGESET_CHECK_RESULT" == "success" ] || [ "$CHANGESET_CHECK_RESULT" == "skipped" ]; }; then
             echo "::notice::✅ All CI validation checks passed"
             exit 0
@@ -1981,6 +2019,7 @@ jobs:
             echo "Build Verification: $BUILD_RESULT"
             echo "Released Goal Engine Compatibility: $GOAL_ENGINE_COMPAT_RESULT"
             echo "Eval Offline Checks: $EVAL_OFFLINE_RESULT"
+            echo "Claude Code Plugin Validate: $CLAUDE_PLUGIN_VALIDATE_RESULT"
             echo "Changeset Required: $CHANGESET_CHECK_RESULT"
             exit 1
           fi

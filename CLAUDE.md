@@ -36,6 +36,7 @@ pnpm test:shell-compat        # tests/shell-compat bats suite: libraries under b
 pnpm validate:plugins         # plugin manifests + plugin-specific rules
 pnpm validate:setup-all       # yellow-core's setup:all coverage vs marketplace
 pnpm validate:versions        # cross-manifest version drift check
+pnpm validate:claude-strict   # claude plugin validate --strict on marketplace + plugins; known diffs in scripts/claude-plugin-validate-known.json
 pnpm validate:generated       # catalog/ -> .claude-plugin/ + .agents/ byte-identity drift check
 pnpm generate:manifests       # manifests from catalog/; Codex/Cursor skill copies from plugins/<name>/skills/
 pnpm generate:snippets        # regenerate install-script generated blocks from snippets/
@@ -57,7 +58,8 @@ bash/zsh suite is `pnpm test:shell-compat` (needs zsh).
 `ci-status` job in `.github/workflows/validate-schemas.yml` additionally
 requires `validate-versions`, `contract-drift`, `security-audit`, `build`,
 `changeset-check`, `plugin-shell-tests`, `yellow-review-shell-tests`,
-`shell-compat-tests`, and `goal-engine-compat`.
+`shell-compat-tests`, `goal-engine-compat`, `eval-offline`, and
+`claude-plugin-validate`.
 
 ## Architecture in Four Facts
 

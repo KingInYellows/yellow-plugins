@@ -23,6 +23,9 @@ jobs:
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
     runs-on: ubuntu-latest
+    # Spend cap, with --max-budget-usd below (CLAUDE-323): a stuck run stops
+    # here instead of holding the subscription token for the 6-hour default.
+    timeout-minutes: 30
     permissions:
       contents: read
       # write: --comment below posts the review as a PR comment and inline
@@ -35,7 +38,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          # Depth 2 brings the merge commit's parents, so the gate step can
+          # list the PR's changed paths from git rather than the API.
+          fetch-depth: 2
           # The review agent can read files in the checkout. Keep the job's
           # GITHUB_TOKEN out of .git/config so it cannot be read and posted
           # back in a comment (CLAUDE-350). Nothing here pushes.
@@ -69,7 +74,8 @@ jobs:
             fi
           done
           # gh api with three tries, so one transient API error does not fail
-          # the job. A 404 is not retried.
+          # the job. A 404, or a 406 for a diff too large to return, is not
+          # retried.
           gh_api() {
             local try out="$RUNNER_TEMP/gh-api.out" err="$RUNNER_TEMP/gh-api.err"
             for try in 1 2 3; do
@@ -77,7 +83,7 @@ jobs:
                 cat "$out"
                 return 0
               fi
-              if grep -q 'HTTP 404' "$err"; then
+              if grep -qE 'HTTP 40[46]' "$err"; then
                 break
               fi
               if [ "$try" -lt 3 ]; then sleep $((try * 5)); fi
@@ -117,29 +123,6 @@ jobs:
           # reviewed or act on another repository.
           printf '%s %s %s\n' "$REPO" "$PR_NUMBER" "$HEAD_SHA" \
             > "$HOME/.claude/hooks/claude-code-review-target"
-          # A symlink committed in the PR could point the Read tool at
-          # .git/config or /proc. Read deny rules check symlink targets, but
-          # refuse links that leave the checkout or enter .git anyway.
-          if ! python3 -I - <<'PY'
-          import os, sys
-          root = os.path.realpath(".")
-          git = os.path.join(root, ".git")
-          bad = []
-          for d, dirs, files in os.walk(root):
-              dirs[:] = [x for x in dirs if os.path.join(d, x) != git]
-              for name in dirs + files:
-                  p = os.path.join(d, name)
-                  if os.path.islink(p):
-                      t = os.path.realpath(p)
-                      if os.path.commonpath([root, t]) != root or os.path.commonpath([git, t]) == git:
-                          bad.append(os.path.relpath(p, root))
-          for b in bad:
-              print(f"::error::symlink leaves the checkout: {b}")
-          sys.exit(1 if bad else 0)
-          PY
-          then
-            exit 1
-          fi
           export MARKER="<!-- claude-code-review head=$HEAD_SHA -->"
           found=$(gh_api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
             --jq '.[]
@@ -156,6 +139,88 @@ jobs:
           # there must not reach the review agent.
           rm -rf .claude-code-review
           mkdir .claude-code-review
+          # The file list and diff below come from the PR as it is now, so
+          # they match this checkout only while HEAD_SHA is still the PR head.
+          # A re-run of an older run would scan the wrong paths: skip it, the
+          # newer head has its own run.
+          pr_info=$(gh_api "repos/$REPO/pulls/$PR_NUMBER" \
+            --jq '"\(.head.sha) \(.changed_files)"')
+          read -r live_head changed_count <<< "$pr_info"
+          if [ "$live_head" != "$HEAD_SHA" ]; then
+            echo "::notice::PR head is now $live_head, not $HEAD_SHA; skipping this older run"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The checkout is GitHub's merge of this head into the base branch.
+          # Its second parent must be HEAD_SHA, or the files below describe
+          # another commit.
+          if [ "$(git rev-parse HEAD^2)" != "$HEAD_SHA" ]; then
+            echo "::error::checkout is not the merge of head $HEAD_SHA"
+            exit 1
+          fi
+          # Paths this PR adds or changes, taken from the two fixed commits in
+          # the checkout, so a push during this step cannot change the list
+          # and there is no 3000-file cap. NUL-separated, so a filename
+          # holding a newline stays one entry.
+          git diff --no-renames --name-only -z --diff-filter=d HEAD^1 HEAD \
+            > .claude-code-review/changed-paths.bin
+          # A symlink committed in the PR could point the Read tool at
+          # .git/config or /proc. Read deny rules check symlink targets, but
+          # refuse links that leave the checkout or enter .git anyway. Only
+          # the paths this PR changes, and the directories above them, are
+          # checked: one such link already on the default branch would
+          # otherwise fail every PR's review (CLAUDE-365). It runs after the
+          # marker check, so a reviewed head skips it too.
+          if ! python3 -I - .claude-code-review/changed-paths.bin <<'PY'
+          import os, sys
+          root = os.path.realpath(".")
+          git = os.path.join(root, ".git")
+          with open(sys.argv[1], "rb") as fh:
+              paths = [p.decode("utf-8", "surrogateescape") for p in fh.read().split(b"\0") if p]
+          bad = set()
+          for rel in paths:
+              parts = rel.split("/")
+              for i in range(1, len(parts) + 1):
+                  p = os.path.join(root, *parts[:i])
+                  if os.path.islink(p):
+                      t = os.path.realpath(p)
+                      if os.path.commonpath([root, t]) != root or os.path.commonpath([git, t]) == git:
+                          bad.add("/".join(parts[:i]))
+          for b in sorted(bad):
+              print(f"::error::symlink leaves the checkout: {b!r}")
+          sys.exit(1 if bad else 0)
+          PY
+          then
+            exit 1
+          fi
+          rm -f .claude-code-review/changed-paths.bin
+          # The whole diff as a file the agent reads in pages (CLAUDE-365).
+          # gh pr diff output is cut off in the tool result on a large PR, and
+          # the Bash guard allows no pipe or redirect to page it. When GitHub
+          # refuses the diff as too large, build it from each file's patch;
+          # files whose patch GitHub leaves out are named so the agent can say
+          # they were not reviewed.
+          if ! gh_api -H 'Accept: application/vnd.github.diff' \
+              "repos/$REPO/pulls/$PR_NUMBER" > .claude-code-review/pr.diff; then
+            echo "::notice::the full diff is too large for one request; building it per file"
+            gh_api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" \
+              --jq '.[] | "diff --git a/\(.previous_filename // .filename) b/\(.filename)\n"
+                + "status: \(.status)\n"
+                + (if .patch then .patch + "\n" else "(no patch from GitHub: binary or too large; not reviewed)\n" end)' \
+              > .claude-code-review/pr.diff
+            if [ "$changed_count" -gt 3000 ]; then
+              echo "($((changed_count - 3000)) more changed files: GitHub lists only 3000; not reviewed)" \
+                >> .claude-code-review/pr.diff
+            fi
+          fi
+          # Check the head again: a push between the first check and the
+          # requests above would give a file list and diff for another commit.
+          live_head=$(gh_api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')
+          if [ "$live_head" != "$HEAD_SHA" ]; then
+            echo "::notice::PR head moved to $live_head while preparing the review; skipping this run"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Every earlier claude[bot] inline comment, outdated ones included
           # and flagged, so a push that only moves a still-unfixed line
           # (reformat, rename, restack) does not repost the same issue
@@ -236,8 +301,13 @@ jobs:
           # Read tool already needs approval outside the checkout, which a CI
           # run cannot give, since the command no longer grants bare Read.
           # Read deny rules also cover Grep and Glob; Bash is the hook's job.
+          # --max-budget-usd: cap on the run's API-equivalent cost, subagents
+          # included (CLAUDE-323). A normal review costs about $1; a run that
+          # hits the cap stops before posting the summary, so the next push
+          # reviews that PR again.
           claude_args: >-
             --model claude-sonnet-5-5
+            --max-budget-usd 5
             --setting-sources user
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
             --disallowedTools "Bash(gh pr comment -F*),Bash(gh pr comment --body-file*),Bash(gh pr comment * -F*),Bash(gh pr comment * --body-file*),Read(./.git),Read(./.git/**),Read(//proc),Read(//proc/**)"
