@@ -42,11 +42,18 @@ Graders are also proven against non-fixes. `selfcheck.lookalikes` are edits to
 the fixed file that only look like a fix, and `check` requires each to fail:
 `r06` defines the redaction helpers but never applies them to the `classify_run`
 result, `r12` keeps the faulty exit guard with extra parentheses, split over
-lines, or limited to POSIX or group kill (the wrong polarity), and `r15` keeps `git diff` or `git log` double-quoted or on one line.
+lines, limited to POSIX or group kill (the wrong polarity), inside the
+group-kill branch, in `stop()`, or with the group kill through a negated pid
+variable, and `r15` keeps `git diff` or `git log` double-quoted or on one line.
 Graders are proven against other valid fixes too: `selfcheck.alternates` are
 edits of the fixed file into a different correct fix, and `check` requires each
-to pass. `r12` moves the exit guard into the non-group `else` branch, or limits
-it with `process.platform === 'win32'` instead of `groupKill`.
+to pass. `r12` moves the exit guard into the non-group `else` branch or an
+`if (!groupKill) { ... }` block that handles Windows first, puts it after a
+group-kill branch that returns, or limits it with
+`process.platform === 'win32'` instead of `groupKill`. The `r12` grader fails
+any exit guard in `process.ts` outside those non-group forms, so it does not
+depend on how the group kill is spelled. It uses an atomic group `(?>...)`, so the
+graders need Python 3.11 or later.
 Every case also records the resolver's real `THREAD` line from the 2026-11-17
 pass as `selfcheck.reply` (for `r08`, `r13` and `r15`, which reported `unclear`
 there, that real line is in `reply_fails` and `reply` is the same line reporting
@@ -73,8 +80,13 @@ the message, an `EXIT` trap in the `mktemp -d` block) with no warning word
 or `inject`) anywhere in the block, so quoting the incident's own anti-pattern
 still passes. Their `selfcheck.lookalikes` append such a block to the incident
 doc and require the case to fail. `p18` flags the block whatever the order of
-`mktemp -d` and the trap, on one line or two; only "fires when this call ..."
-counts as a warning, so a comment such as "cleanup fires on exit" does not.
+`mktemp -d` and the trap, on one line or two, and wherever the trap sits on its
+line (after `;`, `&&`, `then`, `do` or `else`, or inside `{ }` or `( )`). A
+comment that says the trap fires, runs or deletes when this call or shell ends
+counts as a warning, as do `bug`, `too early` and `before Write`, so a comment
+such as "cleanup fires on exit" does not;
+`p18`'s `selfcheck.alternates` quote the anti-pattern with a paraphrased
+warning and require the case to pass.
 
 Runs load `yellow-core` from the checkout with `--plugin-dir` (agent `plugins`
 key) and invoke `/yellow-core:flow:plan` as a slash command, so the command, its
