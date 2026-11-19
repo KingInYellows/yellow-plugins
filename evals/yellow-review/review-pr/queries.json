@@ -1,0 +1,81 @@
+{
+  "source": "plugins/yellow-review/commands/review/review-pr.md",
+  "queries": [
+    {
+      "q": "Can you do a thorough code review of PR #42 in this repo?",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Review pull request 118 before I merge it. I want the full multi-agent pass, not a quick skim.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Please review https://github.com/acme/widgets/pull/731 and post what you find.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "I just opened a PR from my branch feature/rate-limit. Give it a proper review.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Run a comprehensive review on PR 9 and tell me if anything blocks merging.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Look over pull request #2290 for bugs, security problems and test gaps.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "Before my teammate approves it, can you review PR 57 end to end?",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "Give PR #304 a deep review with whatever reviewers fit the change.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "Reviewers left 6 comments on PR #42. Address all of them and resolve the threads.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Review every PR in my stack in order, bottom to top.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Is PR 118 ready to merge? Just check CI, approvals and open threads; don't review the code.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Write a good description for the pull request I'm about to open.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "What does a good code review checklist look like for a Python service?",
+      "trigger": false,
+      "split": "train"
+    },
+    { "q": "Create a pull request for my current branch.", "trigger": false, "split": "heldout" },
+    {
+      "q": "Summarize the review comments people left on PR 77 in two sentences.",
+      "trigger": false,
+      "split": "heldout"
+    },
+    {
+      "q": "Explain the difference between a squash merge and a rebase merge.",
+      "trigger": false,
+      "split": "heldout"
+    }
+  ]
+}
