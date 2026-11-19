@@ -24,9 +24,12 @@ cmd=$(jq -r '.tool_input.command // empty') || deny 'unreadable hook input'
 [ -n "$cmd" ] || deny 'empty command'
 
 target="$HOME/.claude/hooks/claude-code-review-target"
-read -r repo pr head < "$target" 2>/dev/null || deny 'no review target file'
+read -r repo pr head not_reviewed < "$target" 2>/dev/null || deny 'no review target file'
 [[ $repo =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ && $pr =~ ^[0-9]+$ && $head =~ ^[0-9a-f]{40}$ ]] ||
   deny 'malformed review target file'
+# The fourth field, the number of files the review could not see, is written
+# by the gate step since CLAUDE-371; an older workflow leaves it out.
+[[ -z $not_reviewed || $not_reviewed =~ ^[0-9]+$ ]] || deny 'malformed review target file'
 
 # Flags are listed one by one: gh's --jq and --template read the process
 # environment (jq's env), so a generic "plain argument" rule would leak it.
@@ -40,7 +43,17 @@ if [[ $cmd =~ $diff || $cmd =~ $view ]]; then
 fi
 
 nl=$'\n'
-summary="## Code review${nl}${nl}(No issues found\\. Checked for bugs and CLAUDE\\.md compliance\\.|Found [0-9]+ issue\\(s\\); see the inline comments\\.)${nl}${nl}<!-- claude-code-review head=${head} -->${nl}?"
+# The not-reviewed line (CLAUDE-371) is required with the gate's count when it
+# is above 0 and refused when it is 0. Without a count, either form passes.
+skipped_line="changed file\\(s\\) were not reviewed: binary, or too large for GitHub to send\\."
+if [[ -z $not_reviewed ]]; then
+  extra="(${nl}${nl}[0-9]+ ${skipped_line})?"
+elif ((10#$not_reviewed > 0)); then
+  extra="${nl}${nl}$((10#$not_reviewed)) ${skipped_line}"
+else
+  extra=""
+fi
+summary="## Code review${nl}${nl}(No issues found\\. Checked for bugs and CLAUDE\\.md compliance\\.|Found [0-9]+ issue\\(s\\); see the inline comments\\.)${extra}${nl}${nl}<!-- claude-code-review head=${head} -->${nl}?"
 comment="^gh pr comment ${ref} (--body|-b) ('${summary}'|\"${summary}\")\$"
 if [[ $cmd =~ $comment ]]; then
   exit 0

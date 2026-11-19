@@ -39,7 +39,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           # Depth 2 brings the merge commit's parents, so the gate step can
-          # list the PR's changed paths from git rather than the API.
+          # list the PR's changed paths from git rather than the API. A
+          # stacked PR also fetches the default branch tip (prepare-review.sh).
           fetch-depth: 2
           # The review agent can read files in the checkout. Keep the job's
           # GITHUB_TOKEN out of .git/config so it cannot be read and posted
@@ -64,6 +65,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           # A committed .claude or .claude-code-review symlink could point the
           # rm -rf calls below at the runner's home directory (CLAUDE-350).
@@ -118,6 +120,16 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # The input builder (CLAUDE-371): changed paths, symlink scan and
+          # the diff file. Like the guard, a PR cannot change it, and the
+          # review is skipped while it is not on the default branch yet.
+          url="repos/$REPO/contents/.github/claude-code-review/prepare-review.sh?ref=$DEFAULT_BRANCH"
+          if ! gh_api -H 'Accept: application/vnd.github.raw+json' "$url" \
+              > "$RUNNER_TEMP/claude-code-review-prepare.sh"; then
+            echo "::warning::no prepare-review.sh on $DEFAULT_BRANCH; skipping the review"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # The guard only lets the agent touch this PR and post the marker for
           # this head, so a prompt-injected run cannot mark a future head as
           # reviewed or act on another repository.
@@ -145,7 +157,8 @@ jobs:
           # newer head has its own run.
           pr_info=$(gh_api "repos/$REPO/pulls/$PR_NUMBER" \
             --jq '"\(.head.sha) \(.changed_files)"')
-          read -r live_head changed_count <<< "$pr_info"
+          read -r live_head CHANGED_COUNT <<< "$pr_info"
+          export CHANGED_COUNT
           if [ "$live_head" != "$HEAD_SHA" ]; then
             echo "::notice::PR head is now $live_head, not $HEAD_SHA; skipping this older run"
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -158,61 +171,23 @@ jobs:
             echo "::error::checkout is not the merge of head $HEAD_SHA"
             exit 1
           fi
-          # Paths this PR adds or changes, taken from the two fixed commits in
-          # the checkout, so a push during this step cannot change the list
-          # and there is no 3000-file cap. NUL-separated, so a filename
-          # holding a newline stays one entry.
-          git diff --no-renames --name-only -z --diff-filter=d HEAD^1 HEAD \
-            > .claude-code-review/changed-paths.bin
-          # A symlink committed in the PR could point the Read tool at
-          # .git/config or /proc. Read deny rules check symlink targets, but
-          # refuse links that leave the checkout or enter .git anyway. Only
-          # the paths this PR changes, and the directories above them, are
-          # checked: one such link already on the default branch would
-          # otherwise fail every PR's review (CLAUDE-365). It runs after the
-          # marker check, so a reviewed head skips it too.
-          if ! python3 -I - .claude-code-review/changed-paths.bin <<'PY'
-          import os, sys
-          root = os.path.realpath(".")
-          git = os.path.join(root, ".git")
-          with open(sys.argv[1], "rb") as fh:
-              paths = [p.decode("utf-8", "surrogateescape") for p in fh.read().split(b"\0") if p]
-          bad = set()
-          for rel in paths:
-              parts = rel.split("/")
-              for i in range(1, len(parts) + 1):
-                  p = os.path.join(root, *parts[:i])
-                  if os.path.islink(p):
-                      t = os.path.realpath(p)
-                      if os.path.commonpath([root, t]) != root or os.path.commonpath([git, t]) == git:
-                          bad.add("/".join(parts[:i]))
-          for b in sorted(bad):
-              print(f"::error::symlink leaves the checkout: {b!r}")
-          sys.exit(1 if bad else 0)
-          PY
-          then
+          # Changed paths, the symlink scan (stacked parents included,
+          # CLAUDE-373), pr.diff and the count of files the agent cannot
+          # review, all in the script fetched above (CLAUDE-371). It exits
+          # nonzero on an unsafe symlink or any other failure.
+          if ! bash "$RUNNER_TEMP/claude-code-review-prepare.sh"; then
+            echo "::error::could not prepare the review inputs; see above"
             exit 1
           fi
-          rm -f .claude-code-review/changed-paths.bin
-          # The whole diff as a file the agent reads in pages (CLAUDE-365).
-          # gh pr diff output is cut off in the tool result on a large PR, and
-          # the Bash guard allows no pipe or redirect to page it. When GitHub
-          # refuses the diff as too large, build it from each file's patch;
-          # files whose patch GitHub leaves out are named so the agent can say
-          # they were not reviewed.
-          if ! gh_api -H 'Accept: application/vnd.github.diff' \
-              "repos/$REPO/pulls/$PR_NUMBER" > .claude-code-review/pr.diff; then
-            echo "::notice::the full diff is too large for one request; building it per file"
-            gh_api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" \
-              --jq '.[] | "diff --git a/\(.previous_filename // .filename) b/\(.filename)\n"
-                + "status: \(.status)\n"
-                + (if .patch then .patch + "\n" else "(no patch from GitHub: binary or too large; not reviewed)\n" end)' \
-              > .claude-code-review/pr.diff
-            if [ "$changed_count" -gt 3000 ]; then
-              echo "($((changed_count - 3000)) more changed files: GitHub lists only 3000; not reviewed)" \
-                >> .claude-code-review/pr.diff
-            fi
-          fi
+          # Add the not-reviewed count to the guard's target file, so the
+          # guard requires the summary's not-reviewed line exactly when files
+          # were left out, with this number, and refuses it otherwise.
+          read -r not_reviewed < .claude-code-review/not-reviewed-count
+          case "$not_reviewed" in
+            ''|*[!0-9]*) echo "::error::bad not-reviewed count"; exit 1 ;;
+          esac
+          printf '%s %s %s %s\n' "$REPO" "$PR_NUMBER" "$HEAD_SHA" "$not_reviewed" \
+            > "$HOME/.claude/hooks/claude-code-review-target"
           # Check the head again: a push between the first check and the
           # requests above would give a file list and diff for another commit.
           live_head=$(gh_api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')

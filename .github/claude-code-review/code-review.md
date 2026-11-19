@@ -160,11 +160,15 @@ No issues found. Checked for bugs and CLAUDE.md compliance.
 
   When issues were found, replace the middle line with `Found <n> issue(s); see the inline comments.` and include the issues that step 9 skipped as already raised in the count.
 
+  Read `.claude-code-review/not-reviewed-count`: the workflow wrote the number of changed files this review could not see (binary, or no patch from GitHub). When it is above 0, add the line `<n> changed file(s) were not reviewed: binary, or too large for GitHub to send.` after the middle line, with a blank line before it, so the summary does not read as a full review.
+
   Post it as one command. Put the whole body inside single quotes (`'...'`),
   with real line breaks, no `$`, no heredoc and nothing after the closing quote:
   `gh pr comment https://github.com/<owner>/<repo>/pull/<number> --body '## Code review`,
-  then a line break, a blank line, the middle line, a blank line, the marker line and
-  `'`. The workflow's Bash guard blocks every other shape of `gh pr comment`,
+  then a line break, a blank line, the middle line, a blank line, the not-reviewed
+  line and a blank line when the count is above 0, the marker line and `'`. The
+  guard refuses a summary whose not-reviewed line is missing, or has another
+  number, when the count is above 0, and refuses the line when it is 0. The workflow's Bash guard blocks every other shape of `gh pr comment`,
   and every Bash command other than `gh pr diff <pr>` (optionally `--name-only`,
   `--patch` or `--color=never`) and `gh pr view <pr>` (optionally `--json <fields>` or
   `--comments`). `--jq`, `--template`, quotes, `$`, pipes and redirects are
