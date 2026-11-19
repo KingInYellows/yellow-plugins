@@ -226,7 +226,9 @@ the resolve scripts: `references/resolve/dispositions.md`.
 - `commit-resolve-fixes`, `run-verify-command` — commit and verify resolver
   fixes; both refuse worktree-resident `git`/`gh`/`jq` and screen `PATH` and git
   config (`yr_safe_path`, `harden_git_config`), `commit-resolve-fixes` also
-  refuses worktree-resident `gt`/`node`/`awk`; neither pushes.
+  refuses worktree-resident `gt`/`node`/`awk`. `commit-resolve-fixes` submits
+  the commit through the `--provider` it is given and verifies the remote head,
+  so callers add no `git push` after it; `run-verify-command` does not push.
   `commit-resolve-fixes --check-ranges --unattended --clusters-from` applies the
   50-line cap per cluster (best rank first); interactive runs have no cap, and
   an unattended run commits over-cap clusters with `--over-cap-draft`, which

@@ -14,7 +14,9 @@ cycles, and documents.
 
 - Linear account ([linear.app](https://linear.app))
 - Browser access for OAuth login on first use
-- Graphite CLI (`gt`) for branch management
+- The active stacked-PR provider's tool for branch management: Graphite CLI
+  (`gt`) with the Graphite provider, or `gh` with the `gh-stack` extension with
+  the GitHub provider (`/stack:status` shows which is active)
 
 On first MCP tool call, Claude Code opens a browser popup to authenticate with
 your Linear account. The OAuth token is stored in your system keychain and
@@ -31,7 +33,7 @@ server is visible in the current session.
 
 | Command              | Description                                                                      |
 | -------------------- | -------------------------------------------------------------------------------- |
-| `/linear:setup`      | Validate Linear MCP visibility, OAuth readiness, and Graphite availability       |
+| `/linear:setup`      | Validate Linear MCP visibility, OAuth readiness, and the active stack tool       |
 | `/linear:work`       | Start working on a Linear issue — loads context and routes to plan or stack      |
 | `/linear:create`     | Create a Linear issue from current context                                       |
 | `/linear:sync`       | Sync current branch with its Linear issue (load context, link PR, update status) |
