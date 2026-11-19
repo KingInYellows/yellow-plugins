@@ -173,11 +173,13 @@ Each initiative lists its check. "Gate" means the eval gate applies.
   drawn from `docs/solutions/` and past reviewed PRs, in the existing
   `scripts/eval/review-gate/` case format where it fits. Check: the floor
   exists for review, resolve and planning before T3–T5 start.
-- [ ] **R1.2 `claude plugin eval` suite for triggering.** Cases for skill and
+- [x] **R1.2 `claude plugin eval` suite for triggering.** Cases for skill and
   command triggering, including negative cases that must not trigger.
   Deterministic graders (`regex`, `tool_used`) first; model-graded cases on a
   sample only. Check: suite runs locally under a stated per-run cap; the
-  repo's schema and generators accept the `evals` layout.
+  repo's schema and generators accept the `evals` layout. Done: repo-level
+  sets in `evals/`, runner `pnpm eval:skill-trigger`, baseline in
+  `evals/baseline.json` (~20 USD API-equivalent per full run).
 - [ ] **R1.3 Gate definition.** Adopt the CLAUDE-216 method for every gated
   change: measure the noise floor on two identical builds, then register the
   pass bar, repeat count and result location in writing before the edit. No

@@ -178,14 +178,17 @@ yellow_morph_release_install_lock() {
 }
 
 # Copy the manifest+lockfile from the plugin install into the data dir,
-# then run `npm ci` with a sanitized environment. env -i denies ANY
-# inherited secret (ANTHROPIC_API_KEY, GITHUB_TOKEN, etc.) to npm
+# then run `npm ci` with a sanitized environment. env -i keeps inherited
+# secrets (ANTHROPIC_API_KEY, GITHUB_TOKEN, etc.) away from npm
 # postinstall scripts — a tighter boundary than `unset MORPH_API_KEY`,
 # which only blocks the one variable.
 #
-# HOME and PATH are required for npm to function. NPM_CONFIG_* are passed
-# through when present so user-level npm config (registry, proxy, prefix)
-# still applies. Caller is responsible for holding the install lock.
+# HOME and PATH are required for npm to function. The proxy and CA
+# variables, plus NPM_CONFIG_* / npm_config_* (registry, proxy, cafile,
+# prefix), are passed through when present so npm still reaches the
+# registry from behind a TLS-intercepting proxy such as a cloud session's.
+# npm config names that look like credentials (auth, token, password) are
+# dropped. Caller is responsible for holding the install lock.
 yellow_morph_do_install() {
   cp "${CLAUDE_PLUGIN_ROOT}/package.json" \
      "${CLAUDE_PLUGIN_DATA}/package.json"      || return 1
@@ -196,9 +199,27 @@ yellow_morph_do_install() {
     "HOME=${HOME:-/}"
     "PATH=${PATH:-/usr/local/bin:/usr/bin:/bin}"
   )
-  [ -n "${NPM_CONFIG_USERCONFIG:-}" ]   && env_args+=("NPM_CONFIG_USERCONFIG=$NPM_CONFIG_USERCONFIG")
-  [ -n "${NPM_CONFIG_GLOBALCONFIG:-}" ] && env_args+=("NPM_CONFIG_GLOBALCONFIG=$NPM_CONFIG_GLOBALCONFIG")
-  [ -n "${NPM_CONFIG_PREFIX:-}" ]       && env_args+=("NPM_CONFIG_PREFIX=$NPM_CONFIG_PREFIX")
+  # Names come from `env` and values from printenv, not ${!var}, which zsh
+  # lacks: /morph:setup sources this file in the user's login shell.
+  # printenv also drops a name that is only a line inside another
+  # variable's multi-line value. A heredoc, not a pipe, so the loop runs
+  # in this shell and the array survives.
+  local line name value
+  while IFS= read -r line; do
+    name=${line%%=*}
+    case "$name" in
+      NPM_CONFIG_*[Aa][Uu][Tt][Hh]*|npm_config_*[Aa][Uu][Tt][Hh]*|\
+      NPM_CONFIG_*[Tt][Oo][Kk][Ee][Nn]*|npm_config_*[Tt][Oo][Kk][Ee][Nn]*|\
+      NPM_CONFIG_*[Pp][Aa][Ss][Ss]*|npm_config_*[Pp][Aa][Ss][Ss]*)
+        continue ;;
+      HTTPS_PROXY|HTTP_PROXY|NO_PROXY|https_proxy|http_proxy|no_proxy|\
+      NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|NPM_CONFIG_*|npm_config_*)
+        value=$(printenv "$name") || continue
+        [ -n "$value" ] && env_args+=("${name}=${value}") ;;
+    esac
+  done <<EOF
+$(env)
+EOF
 
   ( cd "$CLAUDE_PLUGIN_DATA" \
     && env -i "${env_args[@]}" \

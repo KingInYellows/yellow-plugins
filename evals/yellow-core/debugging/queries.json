@@ -1,0 +1,81 @@
+{
+  "source": "plugins/yellow-core/skills/debugging/SKILL.md",
+  "queries": [
+    {
+      "q": "My test suite started failing after the last merge with `TypeError: Cannot read properties of undefined (reading 'id')` in user.service.ts. Help me find out why.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "I've tried three fixes for this flaky integration test and it still fails about one run in five. Help me get to the root cause.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Here's a stack trace from production:\n\nKeyError: 'tenant_id'\n  File \"app/billing.py\", line 88, in charge\n\nWhat's causing it?",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "The login endpoint returns 500 only when the password contains a quote character. Debug it.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Our nightly job silently stopped writing rows last Tuesday. Investigate why before anyone changes code.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "go test ./... panics with 'concurrent map writes' in the cache package. Track down the cause.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "After upgrading React the form stopped submitting and there's no error in the console. I'm stuck, help me figure out what's going on.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "Issue #512 says CSV exports drop the last row. Find the root cause.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "Add a --verbose flag to the CLI that prints each request URL.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Explain what a race condition is, with a short example.",
+      "trigger": false,
+      "split": "train"
+    },
+    { "q": "Write unit tests for the parseDate helper.", "trigger": false, "split": "train" },
+    {
+      "q": "Refactor the billing module so each function does one thing.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Set up a debugger launch configuration for VS Code in this Node project.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Rename the getUser function to fetchUser everywhere.",
+      "trigger": false,
+      "split": "heldout"
+    },
+    {
+      "q": "What logging library would you recommend for a Go service?",
+      "trigger": false,
+      "split": "heldout"
+    },
+    {
+      "q": "Review the error handling in this module for anything we should improve.",
+      "trigger": false,
+      "split": "heldout"
+    }
+  ]
+}

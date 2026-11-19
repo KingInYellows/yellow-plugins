@@ -1,0 +1,73 @@
+{
+  "source": "plugins/yellow-review/commands/review/resolve-pr.md",
+  "queries": [
+    {
+      "q": "Reviewers left a bunch of comments on PR #42. Address all of them and resolve the threads.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Fix the open review feedback on pull request 118 and push the changes.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "There are unresolved review threads on PR 9. Work through them.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "The bot reviewer flagged 5 issues on https://github.com/acme/widgets/pull/731. Handle the comments.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Deal with all the pending reviewer comments on my PR so it can merge.",
+      "trigger": true,
+      "split": "train"
+    },
+    {
+      "q": "Resolve the review comments on PR #2290, replying where a comment is a false positive.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "My teammate requested changes on PR 57. Make the fixes they asked for and reply to each thread.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    {
+      "q": "Clear out the unresolved feedback on pull request 304.",
+      "trigger": true,
+      "split": "heldout"
+    },
+    { "q": "Do a thorough code review of PR #42.", "trigger": false, "split": "train" },
+    {
+      "q": "Address the reviewer comments on every PR in my stack, bottom to top.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Review PR 118 and then clean up any comment threads, all in one unattended pass.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "How many unresolved review threads does PR 9 have? Just count them.",
+      "trigger": false,
+      "split": "train"
+    },
+    {
+      "q": "Resolve the merge conflicts on my feature branch.",
+      "trigger": false,
+      "split": "train"
+    },
+    { "q": "Is PR 57 ready to merge?", "trigger": false, "split": "heldout" },
+    {
+      "q": "Write a polite reply I can paste to a reviewer who asked me to split my PR.",
+      "trigger": false,
+      "split": "heldout"
+    },
+    { "q": "Fix the failing CI job on my branch.", "trigger": false, "split": "heldout" }
+  ]
+}

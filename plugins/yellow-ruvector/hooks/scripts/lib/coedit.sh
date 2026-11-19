@@ -27,6 +27,10 @@ COEDIT_MAX_BYTES="${COEDIT_MAX_BYTES:-1048576}"
 # COEDIT_JQ_SECS, so every path still prints its allow JSON.
 COEDIT_LOCK_TRIES="${COEDIT_LOCK_TRIES:-8}"
 COEDIT_JQ_SECS="${COEDIT_JQ_SECS:-0.3}"
+# The detached store rewrite (coedit_record) is outside the hook's 1s, so it
+# waits longer for the store lock (2s) and gives its jq 2s.
+COEDIT_BG_LOCK_TRIES="${COEDIT_BG_LOCK_TRIES:-40}"
+COEDIT_BG_JQ_SECS="${COEDIT_BG_JQ_SECS:-2}"
 # A linked worktree's main-worktree lookup is bounded by COEDIT_WT_SECS and
 # charged against the same lock budget (coedit_reset_tries), so lookup +
 # lock waits + one bounded jq stay under the 1s hook timeout.
@@ -493,8 +497,11 @@ coedit_record() {
      && [ -n "$state" ]; then
     # Control characters are rejected inside jq, before the shell sees the
     # string: a NUL would be dropped by $(...) and alias another path.
-    last=$(printf '%s' "$state" | jq -r 'if (.last | type) == "string" and (.last | test("[[:cntrl:]\u0085\u2028\u2029]") | not) then .last else "" end')
-    epoch=$(printf '%s' "$state" | jq -r 'if (.epoch | type) == "number" then .epoch | floor else 0 end')
+    # One jq for both fields: epoch first (digits only), then the path,
+    # which may hold any non-control character, newlines excluded.
+    { IFS= read -r epoch; IFS= read -r last; } < <(printf '%s' "$state" | jq -r '
+      (if (.epoch | type) == "number" then .epoch | floor else 0 end),
+      (if (.last | type) == "string" and (.last | test("[[:cntrl:]\u0085\u2028\u2029]") | not) then .last else "" end)')
   else
     state='{}'
     # A symlink or other non-regular entry at the session path (a restored
@@ -537,10 +544,31 @@ coedit_record() {
     pair=""
   fi
   coedit_unlock_path "$slock"
-  if [ -n "$pair" ] && coedit_lock_path "${dir}/.coedit.lock"; then
-    coedit_bump "$dir" "$last" "$rel"
-    coedit_unlock_path "${dir}/.coedit.lock"
+  [ -n "$pair" ] || return 0
+  # The store rewrite (lock, one jq over coedit.json, atomic write) is most
+  # of a pair-recording edit's cost and grows with the store, so it runs in
+  # a detached job and the hook answers without it (per-tool budget: p95
+  # 100ms). No hook deadline applies there: the job waits for the store lock
+  # up to COEDIT_BG_LOCK_TRIES x 50ms and bounds its jq at COEDIT_BG_JQ_SECS.
+  # A pair lands a moment after the edit; pre-tool-use reads it at the next
+  # edit. COEDIT_BUMP_SYNC=1 runs it in the foreground (tests).
+  if [ "${COEDIT_BUMP_SYNC:-}" = 1 ]; then
+    coedit_bump_locked "$dir" "$last" "$rel"
+    return 0
   fi
+  ( _coedit_tries_left=$COEDIT_BG_LOCK_TRIES COEDIT_JQ_SECS=$COEDIT_BG_JQ_SECS
+    coedit_bump_locked "$dir" "$last" "$rel"
+  ) </dev/null >/dev/null 2>&1 &
+  return 0
+}
+
+# coedit_bump_locked <store-dir> <a> <b> — coedit_bump under the store lock,
+# with whatever lock budget (_coedit_tries_left) the caller left; out of
+# budget, this increment is skipped.
+coedit_bump_locked() {
+  coedit_lock_path "${1}/.coedit.lock" || return 0
+  coedit_bump "$1" "$2" "$3"
+  coedit_unlock_path "${1}/.coedit.lock"
   return 0
 }
 
