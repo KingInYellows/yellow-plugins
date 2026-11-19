@@ -167,8 +167,8 @@ assert_parity_both() {
   # user-writable directory, so a local process could plant a symlink there
   # before this hook runs and have an arbitrary file's bytes spliced into
   # systemMessage. Seed a genuine cache-hit, then swap the file for a symlink
-  # to a "secret" file: the hit must be rejected (falls through to a live,
-  # mocked fetch) rather than echoing the secret's content.
+  # to a "secret" file: the hit must be rejected (treated as a miss) rather
+  # than echoing the secret's content.
   local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/symlink-lastcheck-XXXXXX")"
   hook_scenario_setup cache-hit "$sandbox"
   cd "$HOOK_SCENARIO_WORKDIR"
@@ -296,4 +296,63 @@ age_file() {
   [ "$status" -eq 0 ]
   sleep 1
   [ ! -s "$MOCK_GH_LOG" ]
+}
+
+@test "SessionStart: cache age boundaries (600 s refreshes, 3600 s is not shown)" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/bounds-XXXXXX")"
+  hook_scenario_setup cache-hit "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  local key; key=$(hook_cache_key "$PWD")
+  local dir="$HOME/.local/share/yellow-ci" cache
+  cache="$dir/last-check-$key"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  export MOCK_GH_LOG="$sandbox/gh.log"; : >"$MOCK_GH_LOG"
+
+  # 599 s: fresh, no refresh attempted (no marker created).
+  age_file "$cache" 599
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+  [ ! -e "$dir/refresh-$key" ]
+
+  # 600 s: still shown, and a refresh is started.
+  age_file "$cache" 600
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+  local i
+  for i in $(seq 1 50); do grep -q '^run list' "$MOCK_GH_LOG" && break; sleep 0.1; done
+  grep -q '^run list' "$MOCK_GH_LOG"
+  for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
+
+  # 3599 s: still shown; 3600 s: not shown.
+  export YELLOW_CI_NO_BACKGROUND_REFRESH=1
+  printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$cache"
+  age_file "$cache" 3599
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+  age_file "$cache" 3600
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" != *"cached-branch"* ]]
+}
+
+@test "SessionStart: refresh warnings reach the log; a failed refresh writes no cache" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/refresh-fail-XXXXXX")"
+  hook_scenario_setup malformed-gh-json "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  local key; key=$(hook_cache_key "$PWD")
+  local dir="$HOME/.local/share/yellow-ci" i
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
+  [ ! -e "$dir/refresh-$key" ]
+  grep -q 'Unexpected GitHub API response format' "$dir/refresh-$key.log"
+
+  # Rate-limited (gh exits 1): nothing cached, so the next start refreshes again.
+  rm -f "$dir/last-check-$key"
+  export MOCK_GH_RUNLIST=ratelimit
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
+  [ ! -e "$dir/refresh-$key" ]
+  [ ! -e "$dir/last-check-$key" ]
 }

@@ -279,8 +279,8 @@ const MAX_CACHE_FILE_BYTES = 8192;
 // `{hit: false}` covers "no cache file", "too old", "a symlink" (rejected via
 // O_NOFOLLOW/ELOOP), "owned by someone else", and "larger than any
 // legitimate cache could be" (see MAX_CACHE_FILE_BYTES) — the caller treats
-// all five identically to a plain cache miss and falls through to a live
-// fetch. `{hit: true, content: null}` is the narrower case of a file that
+// all five identically to a plain cache miss: routing summary only, plus a
+// background refresh. `{hit: true, content: null}` is the narrower case of a file that
 // passed every guard but still failed to read (e.g. a transient I/O error):
 // the caller preserves the pre-existing behavior of warning and returning
 // routingSummary only, rather than retrying over the network.
@@ -403,7 +403,7 @@ const MAX_WRITE_BRANCH_LEN = 256;
 // parse error or shape mismatch — including `JSON.parse('null')`, which
 // succeeds and yields `typeof null === 'object'`, so a bare object check
 // alone would not catch it — so the caller degrades to a cache miss. A
-// malformed or hostile cache file must fall back to a live fetch, never
+// malformed or hostile cache file must count as a miss (refreshed), never
 // crash the hook and never be trusted as pre-rendered text.
 //
 // failureCount and branches.length are both capped at GH_RUN_LIST_LIMIT: a
@@ -484,12 +484,27 @@ function scheduleRefresh(cwd, env, key) {
     }
     if (!claim()) return;
   }
+  // The refresh's own warnings (e.g. an unexpected `gh` response) go to
+  // refresh-<key>.log beside the marker, overwritten each run, since the
+  // detached child has no terminal. O_NOFOLLOW so a planted symlink cannot
+  // redirect the truncating open; on any failure stderr is discarded.
+  let logFd = 'ignore';
+  try {
+    logFd = fs.openSync(
+      path.join(dir, `refresh-${key}.log`),
+      fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC |
+        (fs.constants.O_NOFOLLOW || 0),
+      0o600
+    );
+  } catch {
+    logFd = 'ignore';
+  }
   try {
     const child = spawn(process.execPath, [path.join(__dirname, 'refresh-cache.js'), marker], {
       cwd,
       env,
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', 'ignore', logFd],
       windowsHide: true,
     });
     child.on('error', () => {
@@ -498,6 +513,10 @@ function scheduleRefresh(cwd, env, key) {
     child.unref();
   } catch {
     try { fs.rmSync(marker, { force: true }); } catch { /* best effort */ }
+  } finally {
+    if (typeof logFd === 'number') {
+      try { fs.closeSync(logFd); } catch { /* best effort */ }
+    }
   }
 }
 

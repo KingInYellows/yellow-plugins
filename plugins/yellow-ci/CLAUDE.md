@@ -94,13 +94,13 @@ reaches the skill directly), plus the two reference skills:
   under 10 minutes old the cache is shown as is, up to 1 hour it is shown and
   refreshed, older or missing it is only refreshed. The refresh
   (`gh auth status` + `gh run list`) runs in a detached `lib/refresh-cache.js`,
-  guarded by a `refresh-<key>` marker, so the next session start shows it.
-  Ported from the original `session-start.sh` to a dependency-free Node runtime
-  shared across hosts (`entrypoint-claude.js` / `entrypoint-codex.js` →
-  `lib/run-hook.js` → `lib/session-start-core.js`); see "Codex Distribution"
-  below. Carried into the Codex manifest. Codex 0.157.0 executes it after
-  exact-definition trust; untrusted controls remain idle (see the canonical
-  distribution doc).
+  guarded by a `refresh-<key>` marker, so the next session start shows it. Its
+  warnings go to `refresh-<key>.log`, overwritten each run. Ported from the
+  original `session-start.sh` to a dependency-free Node runtime shared across
+  hosts (`entrypoint-claude.js` / `entrypoint-codex.js` → `lib/run-hook.js` →
+  `lib/session-start-core.js`); see "Codex Distribution" below. Carried into the
+  Codex manifest. Codex 0.157.0 executes it after exact-definition trust;
+  untrusted controls remain idle (see the canonical distribution doc).
 
 ## When to Use What
 

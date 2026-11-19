@@ -3,10 +3,11 @@
 # The bash hook (session-start.sh, now ported to Node) and the Node port both
 # read NO meaningful stdin — they derive their output from the environment:
 # the presence of .github/workflows in the cwd, the routing-summary cache under
-# $HOME/.cache/yellow-ci/, whether `gh` is available/authenticated, a 60s
-# md5(PWD) result cache, and what `gh run list` returns (the last two only
-# through refresh-cache.js since CLAUDE-369). So a "fixture" is a
-# named environment scenario, not a stdin payload.
+# $HOME/.cache/yellow-ci/, whether `gh` is available/authenticated, an
+# md5(PWD) result cache (fresh for 10 min, shown up to 1 h), and what
+# `gh run list` returns (`gh` only through refresh-cache.js since
+# CLAUDE-369). So a "fixture" is a named environment scenario, not a stdin
+# payload.
 #
 # `hook_scenario_setup <case> <sandbox>` configures HOME, PATH, MOCK_GH_* and a
 # working directory IN THE CALLING SHELL and sets $HOOK_SCENARIO_WORKDIR to the
@@ -104,10 +105,10 @@ hook_scenario_setup() {
     rate-limited-gh) export MOCK_GH_RUNLIST=ratelimit ;;
   esac
 
-  # cache-hit: pre-seed a fresh (age ~0, <60s TTL) result cache in the NEW
+  # cache-hit: pre-seed a fresh (age ~0, under the 10 min TTL) result cache in the NEW
   # (plugin-data) location so gh is never consulted; the hook must re-render
-  # the cached facts (sanitize + fence) through the same path a live fetch
-  # uses, prefixed with the freshly-read routing summary — it does NOT echo
+  # the cached facts (sanitize + fence) through the same renderOutput a
+  # refreshed cache goes through, prefixed with the freshly-read routing summary — it does NOT echo
   # the cache file's bytes verbatim (see HOOK_SCENARIO_CACHED_TEXT above).
   # Only content written by this Node runtime lives here, so a hit is READ
   # (see legacy-cache-not-trusted below for the untrusted counterpart).
@@ -115,8 +116,8 @@ hook_scenario_setup() {
   # legacy-cache-not-trusted: pre-seed the same fresh result cache but ONLY in
   # the LEGACY location — simulating a cache file still held over from the
   # deleted bash hook right after an upgrade. That hook never sanitized branch
-  # names, so a legacy-only hit must NOT be trusted at all; the hook must
-  # fall through to a live (mocked) `gh run list` instead.
+  # names, so a legacy-only hit must NOT be trusted at all; the hook treats
+  # it as a miss, and the (mocked) refresh writes the new location instead.
   if [ "$case" = "cache-hit" ] || [ "$case" = "legacy-cache-not-trusted" ]; then
     local key
     key=$(hook_cache_key "$work")
