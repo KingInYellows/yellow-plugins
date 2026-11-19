@@ -336,6 +336,11 @@ function score(aggregate, cases) {
   }
   for (const [id, s] of Object.entries(sets)) {
     const scored = s.queries.filter((q) => q.pass !== null);
+    // A set with no scored query was filtered out by --case; leave it out.
+    if (!scored.length) {
+      delete sets[id];
+      continue;
+    }
     const pos = scored.filter((q) => q.trigger);
     const neg = scored.filter((q) => !q.trigger);
     const tp = pos.filter((q) => q.pass).length;
@@ -521,6 +526,23 @@ function main(argv) {
     return 2;
   }
   if (opts.validate) {
+    // A zero ceiling loads every case, launches no run and exits 2 with
+    // partialReason cost_ceiling. Anything else is a failed validation.
+    let reason = null;
+    try {
+      reason = JSON.parse(fs.readFileSync(jsonPath, 'utf8')).partialReason;
+    } catch {
+      reason = null;
+    }
+    if (res.status !== 2 || reason !== 'cost_ceiling') {
+      console.error(cliOut);
+      console.error(
+        `run-trigger-eval: validation did not complete (exit ${res.status}, ` +
+          `partialReason ${reason})`
+      );
+      cleanup();
+      return 2;
+    }
     console.log(`✓ claude plugin eval loaded all ${cases.length} cases`);
     cleanup();
     return 0;

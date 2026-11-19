@@ -167,3 +167,20 @@ describe('score', () => {
     expect(trigger.score(agg, cases.slice(0, 1)).failedRuns).toBe(1);
   });
 });
+
+describe('score with a --case filter', () => {
+  it('leaves out a set none of whose queries ran', () => {
+    const cases = [
+      { name: 'a--p01', set: 'p:a', trigger: true, split: 'heldout', q: 'x' },
+      { name: 'b--p01', set: 'p:b', trigger: true, split: 'heldout', q: 'y' },
+    ];
+    const agg = {
+      cases: [
+        { name: 'a--p01', arms: { with: [{ graders: [{ passed: true }] }] } },
+      ],
+    };
+    const { sets } = trigger.score(agg, cases);
+    expect(Object.keys(sets)).toEqual(['p:a']);
+    expect(sets['p:a'].heldoutAccuracy).toBe(1);
+  });
+});
