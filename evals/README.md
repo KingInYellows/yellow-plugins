@@ -71,9 +71,9 @@ changed.
 ## What fires instead
 
 Smoke runs show two competitors the sets measure on purpose: the model often
-explores with `Bash` or `Glob` before it reaches for a skill, and built-in
-skills compete with ours (`code-review` for `/review:pr`, `debug` for
-`debugging`). A query only counts if our target fires within two turns.
+explores with `Bash` or `Glob` before it reaches for a skill, and the built-in
+skill `code-review` competed with `/review:pr` in traced runs. A query only
+counts if our target fires within two turns.
 
 ## Vehicle
 
@@ -94,3 +94,16 @@ takes n runs and a threshold, isolates each case under a temporary home, and its
 
 `baseline.json` holds the committed per-set and per-query results. Refresh it
 with `--out <dir>` and copy `summary.json` over it.
+
+2026-11-19, Claude Code 2.1.328, Sonnet 5.5, 3 runs, 19.99 USD API-equivalent
+(not a bill), 304 s, no failed runs:
+
+| Set                        | Recall | Specificity | Held-out acc. | Mean rate (should fire) |
+| -------------------------- | -----: | ----------: | ------------: | ----------------------: |
+| `yellow-core:debugging`    |   0.13 |        1.00 |          0.50 |                    0.13 |
+| `yellow-core:flow-plan`    |   0.25 |        1.00 |          0.67 |                    0.21 |
+| `yellow-review:resolve-pr` |   1.00 |        1.00 |          1.00 |                    1.00 |
+| `yellow-review:review-pr`  |   0.50 |        1.00 |          0.83 |                    0.50 |
+
+No near miss fired its target. The gap is recall: `debugging` and `/flow:plan`
+rarely fire from a natural prompt, which is the R2.4 (CLAUDE-326) target.
