@@ -165,8 +165,10 @@ No issues found. Checked for bugs and CLAUDE.md compliance.
   Post it as one command. Put the whole body inside single quotes (`'...'`),
   with real line breaks, no `$`, no heredoc and nothing after the closing quote:
   `gh pr comment https://github.com/<owner>/<repo>/pull/<number> --body '## Code review`,
-  then a line break, a blank line, the middle line, a blank line, the marker line and
-  `'`. The workflow's Bash guard blocks every other shape of `gh pr comment`,
+  then a line break, a blank line, the middle line, a blank line, the not-reviewed
+  line and a blank line when the count is above 0, the marker line and `'`. The
+  guard refuses a summary whose not-reviewed line is missing, or has another
+  number, when the count is above 0, and refuses the line when it is 0. The workflow's Bash guard blocks every other shape of `gh pr comment`,
   and every Bash command other than `gh pr diff <pr>` (optionally `--name-only`,
   `--patch` or `--color=never`) and `gh pr view <pr>` (optionally `--json <fields>` or
   `--comments`). `--jq`, `--template`, quotes, `$`, pipes and redirects are
