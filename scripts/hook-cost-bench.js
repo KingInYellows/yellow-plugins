@@ -143,18 +143,21 @@ const ss = S({ hook_event_name: 'SessionStart', source: 'startup' });
 // cache after this prep and turn the next run into a hit. Untimed.
 const sleepMs = (ms) =>
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-const clearCiCache = (env) => {
+const waitCiRefresh = (env) => {
   const marker = /^refresh-[0-9a-f]+$/;
   for (let waited = 0; waited < 20000; waited += 50) {
     let names = [];
     try {
       names = fs.readdirSync(env.CLAUDE_PLUGIN_DATA);
     } catch {
-      break;
+      return;
     }
-    if (!names.some((n) => marker.test(n))) break;
+    if (!names.some((n) => marker.test(n))) return;
     sleepMs(50);
   }
+};
+const clearCiCache = (env) => {
+  waitCiRefresh(env);
   const dirs = [
     env.CLAUDE_PLUGIN_DATA,
     path.join(env.HOME, '.cache/yellow-ci'),
@@ -244,7 +247,10 @@ const scenarios = {
   },
   SessionStart: {
     '*': [
-      ['startup', ss],
+      // yellow-ci: the first warm-up run is a miss that starts a refresh;
+      // waiting for it (untimed) makes every timed run a cache hit. A no-op
+      // for plugins without refresh markers.
+      ['startup', ss, [], { prep: waitCiRefresh }],
       [
         'startup, cache miss',
         ss,
