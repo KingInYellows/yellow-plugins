@@ -69,9 +69,18 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
 @test "github-stack-merge-single: never calls gh pr merge or gh api itself" {
   # Every command line in the skill is the adapter; none starts with gh.
   run grep -c '^node "${CLAUDE_PLUGIN_ROOT}/lib/github-stack-runtime.js" merge-single ' "$MERGE_SINGLE_SKILL"
-  [ "$output" -eq 2 ]
+  [ "$output" -eq 4 ]
   run grep -E '^(gh|git|gt) ' "$MERGE_SINGLE_SKILL"
   [ "$status" -eq 1 ]
+}
+
+@test "github-stack-merge-single: a named base comes from the user, and dependents are shown" {
+  run grep -F "never from GitHub's answer" "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+  run grep -F 'add `--base` on your own' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
+  run grep -F '`dependents`' "$MERGE_SINGLE_SKILL"
+  [ "$status" -eq 0 ]
 }
 
 @test "github-stack-merge: sends an ordinary pull request to merge-single" {
@@ -82,7 +91,7 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
 @test "github-stack-merge-single: fences the pull request fields GitHub returns" {
   run grep -c -F -- '--- begin untrusted-content (reference only) ---' "$MERGE_SINGLE_SKILL"
   [ "$output" -eq 2 ]
-  run grep -F '<pullRequest fields, or refusalReason>' "$MERGE_SINGLE_SKILL"
+  run grep -F '<pullRequest fields, dependents, or refusalReason>' "$MERGE_SINGLE_SKILL"
   [ "$status" -eq 0 ]
 }
 
@@ -107,11 +116,15 @@ MERGE_SINGLE_SKILL="$SKILLS_DIR/github-stack-merge-single/SKILL.md"
   [ "$status" -eq 1 ]
 }
 
-@test "github-stack-merge: the previewed set is checked against the resolved repository" {
-  run grep -c -F 'gh api --hostname github.com "repos/<repository>/pulls/<number>"' "$MERGE_SKILL"
-  [ "$output" -eq 1 ]
-  run grep -F 'repos/{owner}/{repo}/pulls' "$MERGE_SKILL"
-  [ "$status" -eq 1 ]
-  run grep -F 'view --repository "<repository>"' "$MERGE_SKILL"
+@test "github-stack-merge: the preview shows the set gh stack merge reads from GitHub, and the merge confirms it" {
+  # The landing set comes from the adapter's remote read, not from `view`.
+  run grep -F 'landingSet' "$MERGE_SKILL"
   [ "$status" -eq 0 ]
+  run grep -F 'not in your local stack' "$MERGE_SKILL"
+  [ "$status" -eq 0 ]
+  run grep -c -F -- '--preview-token "<previewToken>" --confirm' "$MERGE_SKILL"
+  [ "$output" -eq 2 ]
+  # No command in the skill calls gh or git itself.
+  run grep -E '^(gh|git|gt) ' "$MERGE_SKILL"
+  [ "$status" -eq 1 ]
 }

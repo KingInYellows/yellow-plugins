@@ -70,6 +70,9 @@
 
 const { spawnSync } = require('child_process');
 const { createHash } = require('crypto');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const MAX_OUTPUT_CHARS = 8000;
 const DEFAULT_TIMEOUT_MS = 120000;
@@ -384,6 +387,45 @@ function remoteRepository(url) {
   return GITHUB_HOSTS.includes(host) ? split.repository : `${host}/${split.repository}`;
 }
 
+/** gh's configuration directory, found the way go-gh `config.ConfigDir()` finds it. */
+function ghConfigDir() {
+  if (process.env.GH_CONFIG_DIR) return process.env.GH_CONFIG_DIR;
+  if (process.env.XDG_CONFIG_HOME) return path.join(process.env.XDG_CONFIG_HOME, 'gh');
+  if (process.platform === 'win32' && process.env.AppData) return path.join(process.env.AppData, 'GitHub CLI');
+  return path.join(os.homedir(), '.config', 'gh');
+}
+
+/**
+ * The host gh gives a hostless `OWNER/REPO`, worked out like go-gh
+ * `auth.DefaultHost()`: `GH_HOST` when set, else the only host in gh's
+ * `hosts.yml` when it lists exactly one, else github.com. Only the top-level
+ * keys of `hosts.yml` are read; a line this cannot read fails closed.
+ * @returns {{ ok: true, host: string } | { ok: false, reason: string }}
+ */
+function ghDefaultHost() {
+  const fromEnv = (process.env.GH_HOST || '').trim();
+  if (fromEnv) return { ok: true, host: fromEnv.toLowerCase() };
+  const file = path.join(ghConfigDir(), 'hosts.yml');
+  let text;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return { ok: true, host: 'github.com' };
+    return { ok: false, reason: `gh's hosts file ${file} could not be read, so the host of a hostless GH_REPO is unknown` };
+  }
+  const hosts = [];
+  for (const line of text.split(/\r?\n/)) {
+    // Comments, blank lines and indented lines (a host's own settings).
+    if (/^\s*(?:#.*)?$/.test(line) || /^\s/.test(line)) continue;
+    const key = /^(?:"([^"]+)"|'([^']+)'|([^\s"'#:][^:]*?))\s*:\s*(?:#.*)?$/.exec(line);
+    if (!key) {
+      return { ok: false, reason: `gh's hosts file ${file} has a line this runtime cannot read, so the host of a hostless GH_REPO is unknown` };
+    }
+    hosts.push((key[1] || key[2] || key[3]).trim().toLowerCase());
+  }
+  return { ok: true, host: hosts.length === 1 ? hosts[0] : 'github.com' };
+}
+
 /** go-gh's remote ranking: upstream, then github, then origin, then the rest. */
 function remoteRank(name) {
   return { upstream: 3, github: 2, origin: 1 }[name.toLowerCase()] || 0;
@@ -413,8 +455,15 @@ function stackRepository() {
       repository = githubRepoOfUrl(override);
     } else {
       const match = /^(?:([^/\s]+)\/)?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/.exec(override);
-      // A hostless override uses GH_HOST, as gh does.
-      const host = match ? (match[1] || (process.env.GH_HOST || '').trim() || 'github.com') : '';
+      // A hostless override uses gh's default host, as gh does.
+      let host = '';
+      if (match && match[1]) {
+        host = match[1];
+      } else if (match) {
+        const fallback = ghDefaultHost();
+        if (!fallback.ok) return { ok: false, reason: fallback.reason };
+        host = fallback.host;
+      }
       if (match && host.toLowerCase() === 'github.com') {
         repository = `${match[2]}/${match[3]}`.toLowerCase();
       }
@@ -868,6 +917,178 @@ function submit({ open, remote }) {
   return shapeResult({ op: 'submit', bin: 'gh', args, execResult, mayHaveMutated: true });
 }
 
+/**
+ * A `gh api` read. `notFound` tells a 404 (gh prints `HTTP 404` on stderr)
+ * from every other failure.
+ * @param {string[]} args
+ * @returns {{ ok: true, json: unknown, args: string[], execResult: object } | { ok: false, notFound: boolean, unreadable: boolean, args: string[], execResult: object }}
+ */
+function apiRead(args) {
+  const execResult = run('gh', args);
+  if (execResult.ok && execResult.code === 0) {
+    try {
+      return { ok: true, json: JSON.parse(execResult.stdout), args, execResult };
+    } catch {
+      return { ok: false, notFound: false, unreadable: true, args, execResult };
+    }
+  }
+  const notFound = execResult.ok && /\bHTTP 404\b/.test(execResult.stderr);
+  return { ok: false, notFound, unreadable: false, args, execResult };
+}
+
+/**
+ * A stack as the Stacks REST API returns it (the shape gh-stack 0.3.0
+ * decodes into `RemoteStack`), or null when it is not that shape.
+ * @returns {{ number: number, baseRef: string, pullRequests: Array<{ number: number, state: string, draft: boolean, merged: boolean, headRef: string, headSha: string }> } | null}
+ */
+function readRemoteStack(json) {
+  if (json === null || typeof json !== 'object' || Array.isArray(json)) return null;
+  if (!Number.isInteger(json.number) || !json.base || typeof json.base.ref !== 'string' || !Array.isArray(json.pull_requests)) {
+    return null;
+  }
+  const pullRequests = [];
+  for (const pr of json.pull_requests) {
+    if (
+      pr === null ||
+      typeof pr !== 'object' ||
+      !Number.isInteger(pr.number) ||
+      typeof pr.state !== 'string' ||
+      typeof pr.draft !== 'boolean' ||
+      !(pr.merged_at === null || pr.merged_at === undefined || typeof pr.merged_at === 'string') ||
+      !pr.head ||
+      typeof pr.head.ref !== 'string' ||
+      typeof pr.head.sha !== 'string'
+    ) {
+      return null;
+    }
+    pullRequests.push({
+      number: pr.number,
+      state: pr.state,
+      draft: pr.draft,
+      merged: typeof pr.merged_at === 'string' && pr.merged_at !== '',
+      headRef: pr.head.ref,
+      headSha: pr.head.sha,
+    });
+  }
+  return { number: json.number, baseRef: json.base.ref, pullRequests };
+}
+
+/**
+ * What `gh stack merge <number> --yes` lands, worked out from the remote
+ * stack the way gh-stack 0.3.0 does it (`mergeCandidates`, `numbersUpTo`):
+ * merged pull requests at the bottom are skipped, the first draft or closed
+ * one blocks everything above it, and the set runs from the bottom up to the
+ * target (or the whole open run for a stack number).
+ * @returns {{ set: object[] } | { reason: string }}
+ */
+function landingSetOf(stack, targetKind, number) {
+  const candidates = [];
+  let blocker = null;
+  for (const pr of stack.pullRequests) {
+    if (pr.merged) continue;
+    if (pr.draft || pr.state === 'closed') {
+      blocker = pr;
+      break;
+    }
+    candidates.push(pr);
+  }
+  const blocked = (pr) => `#${pr.number} is ${pr.draft ? 'a draft' : 'closed'}`;
+  if (targetKind === 'stack') {
+    if (blocker) return { reason: `stack #${stack.number} cannot be merged whole: pull request ${blocked(blocker)}` };
+    if (candidates.length === 0) return { reason: `stack #${stack.number} has no open pull request to merge` };
+    return { set: candidates };
+  }
+  const index = candidates.findIndex((pr) => pr.number === number);
+  if (index >= 0) return { set: candidates.slice(0, index + 1) };
+  const pr = stack.pullRequests.find((entry) => entry.number === number);
+  if (!pr) return { reason: `pull request #${number} is not part of stack #${stack.number}` };
+  if (pr.merged) return { reason: `pull request #${number} is already merged` };
+  if (pr.draft || pr.state === 'closed') return { reason: `pull request ${blocked(pr)}` };
+  return { reason: `pull request #${number} cannot be merged yet: pull request ${blocked(blocker)} below it` };
+}
+
+/**
+ * Read from GitHub what `gh stack merge <number>` would land in
+ * `repository`, the way gh-stack reads it: `number` is tried as a stack
+ * number first, then as a pull request number. Never reads the local stack
+ * file, so a branch that exists only on GitHub is in the set.
+ * @returns {{ landing: { targetKind: string, stackNumber: number, baseRef: string, set: object[] } } | { result: object }}
+ */
+function readLandingSet(op, repository, number) {
+  const unreadable = (read) =>
+    shapeApiResult({
+      op,
+      args: read.args,
+      execResult: read.execResult,
+      mayHaveMutated: false,
+      status: read.unreadable ? 'ERROR' : 'API_FAILURE',
+      recoveryAction: read.unreadable
+        ? "GitHub's answer for the stack could not be read; nothing was merged."
+        : 'Reading the stack from GitHub failed; nothing was merged. Check `gh auth status` and network access, then preview again.',
+    });
+  const byStack = apiRead(['api', '--hostname', 'github.com', `repos/${repository}/stacks/${number}`]);
+  let targetKind = 'stack';
+  let json;
+  let source = byStack;
+  if (byStack.ok) {
+    json = byStack.json;
+  } else if (!byStack.notFound) {
+    return { result: unreadable(byStack) };
+  } else {
+    targetKind = 'pull-request';
+    const byPr = apiRead(['api', '--hostname', 'github.com', `repos/${repository}/stacks?pull_request=${number}`]);
+    if (!byPr.ok) {
+      if (!byPr.notFound) return { result: unreadable(byPr) };
+      return {
+        result: {
+          ...refusalResult(op, `stacked pull requests are not available in ${repository}; nothing was merged`),
+          status: 'STACKS_UNAVAILABLE',
+          recoveryAction: RECOVERY_ACTIONS.STACKS_UNAVAILABLE,
+        },
+      };
+    }
+    if (!Array.isArray(byPr.json)) return { result: unreadable({ ...byPr, unreadable: true }) };
+    if (byPr.json.length === 0) {
+      return {
+        result: {
+          ...refusalResult(op, `#${number} in ${repository} is neither a stack number nor a pull request in a stack; nothing was merged`),
+          status: 'NOT_IN_STACK',
+          recoveryAction: 'An ordinary pull request lands through the merge-single operation, not through merge.',
+        },
+      };
+    }
+    json = byPr.json[0];
+    source = byPr;
+  }
+  const stack = readRemoteStack(json);
+  if (stack === null) return { result: unreadable({ ...source, unreadable: true }) };
+  const landing = landingSetOf(stack, targetKind, Number(number));
+  if (landing.reason) return { result: refusalResult(op, `${landing.reason} in ${repository}; nothing was merged`) };
+  return { landing: { targetKind, stackNumber: stack.number, baseRef: stack.baseRef, set: landing.set } };
+}
+
+/**
+ * A fingerprint of what a `merge` preview showed: the repository, the
+ * target, the stack, its base, every pull request that lands with its head
+ * commit, and the merge method.
+ * @returns {string} 64 hexadecimal characters
+ */
+function mergePreviewTokenOf(repository, number, landing, mergeMethod) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        repository,
+        number,
+        landing.targetKind,
+        landing.stackNumber,
+        landing.baseRef,
+        landing.set.map((pr) => [pr.number, pr.headRef, pr.headSha]),
+        mergeMethod || '',
+      ])
+    )
+    .digest('hex');
+}
+
 /** A github.com pull-request URL, capturing its number. */
 const PR_URL_RE = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/([1-9][0-9]*)\/?$/;
 
@@ -877,17 +1098,21 @@ const PR_URL_RE = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\
  * merge` for a stack.
  *
  * The merge is atomic and covers every unmerged pull request BELOW the
- * target as well as the target itself; callers must show that whole set
- * before confirming. gh-stack 0.3.0 accepts only a stack number or a pull
- * request number here (a URL exits 5), so a pull-request URL is reduced to
- * its number before it reaches argv.
+ * target as well as the target itself. gh-stack picks that set from the
+ * stack on GitHub, not from the local stack file, so the preview reads the
+ * same remote stack (`readLandingSet`) and reports it as `landingSet`; a
+ * branch that exists only on GitHub is in it. gh-stack 0.3.0 accepts only a
+ * stack number or a pull request number here (a URL exits 5), so a
+ * pull-request URL is reduced to its number before it reaches argv.
  *
  * A number means nothing without its repository, so `stackRepository()`
- * works out where gh-stack would merge it. The confirmation request names
- * that repository and reports it as `repository`; a URL must name the same
- * one, and a `repository` the caller passes back must still match it.
+ * works out where gh-stack would merge it. The preview names that
+ * repository and returns a `previewToken`. A confirmed merge needs both
+ * back: the repository must still be the one gh-stack resolves, and the
+ * set, its head commits, the base and the method must still match the
+ * token when the stack is read again just before merging.
  */
-function merge({ target, mergeMethod, repository, confirm }) {
+function merge({ target, mergeMethod, repository, previewToken, confirm }) {
   if (typeof target !== 'string' || target.length === 0) {
     return refusalResult('merge', 'target must be an explicit PR number, PR URL, or stack number');
   }
@@ -908,6 +1133,13 @@ function merge({ target, mergeMethod, repository, confirm }) {
   }
   if (repository !== undefined && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
     return refusalResult('merge', `repository must be OWNER/REPO, got "${repository}"`);
+  }
+  if (mergeMethod !== undefined) {
+    const methodCheck = validateEnum(mergeMethod, MERGE_METHODS, 'mergeMethod');
+    if (!methodCheck.ok) return refusalResult('merge', methodCheck.reason);
+  }
+  if (previewToken !== undefined && !/^[0-9a-f]{64}$/.test(previewToken)) {
+    return refusalResult('merge', 'previewToken must be the 64 hexadecimal characters a preview reported');
   }
   // A number lands in whichever repository gh-stack resolves, so that
   // repository is worked out first, named in the confirmation, and must
@@ -932,21 +1164,46 @@ function merge({ target, mergeMethod, repository, confirm }) {
       `the merge was confirmed for ${repository.toLowerCase()}, but gh stack would merge in ${where} (from ${resolved.source}) now; nothing was merged`
     );
   }
+  if (confirm === true && (repository === undefined || previewToken === undefined)) {
+    return refusalResult(
+      'merge',
+      'confirm needs repository and previewToken: run once without confirm, show what it reports, then pass both back'
+    );
+  }
+  const read = readLandingSet('merge', where, number);
+  if (read.result) return { ...read.result, repository: where };
+  const { landing } = read;
+  const currentToken = mergePreviewTokenOf(where, number, landing, mergeMethod);
+  const numbers = landing.set.map((pr) => `#${pr.number}`).join(', ');
   if (confirm !== true) {
+    const what =
+      landing.targetKind === 'stack'
+        ? `stack #${landing.stackNumber}, every open pull request in it`
+        : 'that pull request and every unmerged pull request below it in the stack';
     return {
       ...confirmationRequiredResult(
         'merge',
-        `merge target "${number}" in ${where} (from ${resolved.source}) lands that pull request and every unmerged pull request below it in the stack, and cannot be undone by this runtime; re-run with repository ${where} and confirm`
+        `merge target "${number}" in ${where} (from ${resolved.source}) lands ${what} (${numbers}, bottom first, into ${landing.baseRef}), and cannot be undone by this runtime; re-run with repository ${where}, previewToken ${currentToken} and confirm`
+      ),
+      repository: where,
+      targetKind: landing.targetKind,
+      stackNumber: landing.stackNumber,
+      baseRef: redact(landing.baseRef),
+      landingSet: landing.set.map((pr) => ({ number: pr.number, headRef: redact(pr.headRef), headSha: redact(pr.headSha) })),
+      previewToken: currentToken,
+    };
+  }
+  if (previewToken !== currentToken) {
+    return {
+      ...refusalResult(
+        'merge',
+        `the confirmation does not match the stack on GitHub now (${numbers} into ${landing.baseRef} in ${where}): a pull request, head commit, base or the method changed since the preview. Nothing was merged. Preview again and ask again`
       ),
       repository: where,
     };
   }
   const args = ['stack', 'merge', number, '--yes'];
-  if (mergeMethod !== undefined) {
-    const methodCheck = validateEnum(mergeMethod, MERGE_METHODS, 'mergeMethod');
-    if (!methodCheck.ok) return refusalResult('merge', methodCheck.reason);
-    args.push('--merge-method', methodCheck.value);
-  }
+  if (mergeMethod !== undefined) args.push('--merge-method', mergeMethod);
   // Pin the child to the repository that was checked and confirmed, so a
   // remote changed in between cannot move the merge somewhere else.
   const execResult = run('gh', args, { GH_REPO: `github.com/${where}` });
@@ -956,12 +1213,21 @@ function merge({ target, mergeMethod, repository, confirm }) {
 /**
  * Read pull request `target` from GitHub for `merge-single` and decide
  * whether it is an ordinary one that may be landed on its own.
+ *
+ * A pull request is refused as stacked when its own answer carries a
+ * `stack` object OR the Stacks API lists a stack for it, so the bottom
+ * layer of a stack cannot pass if one of the two leaves it out. A pull
+ * request based on a branch other than the default branch passes only when
+ * the caller names that branch as `base` (a release or hotfix branch) and
+ * no open pull request has that branch as its head (which would make this
+ * pull request a layer of a chain).
  * @param {string} op
  * @param {string} target a validated pull request number
+ * @param {string|undefined} namedBase a non-default base branch the caller named
  * @returns {{ result: object } | { pullRequest: { number: number, repository: string, baseRef: string, headRef: string, headRepository: string, headSha: string } }}
  *   `result` is the finished refusal or lookup failure.
  */
-function readOrdinaryPullRequest(op, target) {
+function readOrdinaryPullRequest(op, target, namedBase) {
   const lookupArgs = ['api', `repos/{owner}/{repo}/pulls/${target}`];
   const lookup = run('gh', lookupArgs);
   if (!lookup.ok || lookup.code !== 0) {
@@ -1010,11 +1276,13 @@ function readOrdinaryPullRequest(op, target) {
     const stackNumber =
       typeof pr.stack === 'object' && Number.isInteger(pr.stack.number) ? ` (stack #${pr.stack.number})` : '';
     reason = `${where} belongs to a stack${stackNumber}; land it with the merge operation, which merges it together with the pull requests below it`;
-  } else if (found.baseRef !== defaultBranch) {
-    // A pull request based on another branch is a layer of something, for
-    // example a stack that another provider manages and GitHub does not
-    // report. Landing it would merge it into that branch, not the trunk.
-    reason = `${where} targets "${found.baseRef}", not the default branch "${defaultBranch}"; it depends on another branch, so it is not an independent pull request`;
+  } else if (namedBase !== undefined && namedBase !== found.baseRef) {
+    reason = `${where} targets "${found.baseRef}", not the base "${namedBase}" that was named`;
+  } else if (found.baseRef !== defaultBranch && namedBase === undefined) {
+    // A pull request based on another branch may be a layer of a stack that
+    // GitHub does not report, or may target a release or hotfix branch.
+    // Only the caller can tell, so it has to name that branch.
+    reason = `${where} targets "${found.baseRef}", not the default branch "${defaultBranch}". If "${found.baseRef}" is a release or hotfix branch, name it as the base to land the pull request there; if it is another pull request's branch, this pull request is a layer of a stack and does not land on its own`;
   } else if (!MERGEABLE_STATES.includes(pr.mergeable_state)) {
     const state = text(pr.mergeable_state) || 'missing';
     reason =
@@ -1022,7 +1290,86 @@ function readOrdinaryPullRequest(op, target) {
         ? `GitHub has not worked out yet whether ${where} can be merged (state "${state}"); run again in a moment`
         : `GitHub reports ${where} as "${state}", not ready to merge: a required check, review, update or the merge queue is outstanding. This operation does not override that`;
   }
-  return reason ? { result: refusalResult(op, reason) } : { pullRequest: found };
+  if (reason) return { result: refusalResult(op, reason) };
+
+  const failed = (read) =>
+    shapeApiResult({
+      op,
+      args: read.args,
+      execResult: read.execResult,
+      mayHaveMutated: false,
+      status: read.unreadable ? 'ERROR' : 'API_FAILURE',
+      recoveryAction: `A check on ${where} could not be read from GitHub; nothing was merged. Preview again once GitHub answers.`,
+    });
+  // Second stack signal: the Stacks API. A 404 means the repository has no
+  // stacked pull requests at all.
+  const stacks = apiRead(['api', `repos/{owner}/{repo}/stacks?pull_request=${target}`]);
+  if (!stacks.ok && !stacks.notFound) return { result: failed(stacks) };
+  if (stacks.ok) {
+    if (!Array.isArray(stacks.json)) return { result: failed({ ...stacks, unreadable: true }) };
+    if (stacks.json.length > 0) {
+      const first = stacks.json[0];
+      const stackNumber = first && Number.isInteger(first.number) ? ` (stack #${first.number})` : '';
+      return {
+        result: refusalResult(
+          op,
+          `${where} belongs to a stack${stackNumber}; land it with the merge operation, which merges it together with the pull requests below it`
+        ),
+      };
+    }
+  }
+  if (found.baseRef !== defaultBranch) {
+    // A named base that is another open pull request's head is a chain no
+    // provider registered: landing this one would merge it into that layer.
+    const owner = found.repository.split('/')[0];
+    const below = apiRead([
+      'api',
+      `repos/{owner}/{repo}/pulls?state=open&per_page=100&head=${encodeURIComponent(`${owner}:${found.baseRef}`)}`,
+    ]);
+    if (!below.ok) return { result: failed(below) };
+    if (!Array.isArray(below.json)) return { result: failed({ ...below, unreadable: true }) };
+    const layer = below.json.find((pr) => pr && Number.isInteger(pr.number));
+    if (layer) {
+      return {
+        result: refusalResult(
+          op,
+          `${where} targets "${found.baseRef}", the branch of open pull request #${layer.number}, so it is a layer of a chain of pull requests; land the chain from the bottom instead`
+        ),
+      };
+    }
+  }
+  return { pullRequest: found };
+}
+
+/**
+ * Open pull requests based on the head branch of `pullRequest`: a chain of
+ * pull requests that no provider registered as a stack. Only a head branch
+ * in the repository itself can be another pull request's base.
+ * @returns {{ dependents: Array<{ number: number, headRef: string }> } | { result: object }}
+ */
+function readDependents(op, pullRequest, headInRepository) {
+  if (!headInRepository) return { dependents: [] };
+  const read = apiRead([
+    'api',
+    `repos/{owner}/{repo}/pulls?state=open&per_page=100&base=${encodeURIComponent(pullRequest.headRef)}`,
+  ]);
+  if (!read.ok || !Array.isArray(read.json)) {
+    return {
+      result: shapeApiResult({
+        op,
+        args: read.args,
+        execResult: read.execResult,
+        mayHaveMutated: false,
+        status: read.ok ? 'ERROR' : 'API_FAILURE',
+        recoveryAction: 'The open pull requests based on this branch could not be read from GitHub; nothing was merged. Preview again once GitHub answers.',
+      }),
+    };
+  }
+  return {
+    dependents: read.json
+      .filter((pr) => pr && Number.isInteger(pr.number))
+      .map((pr) => ({ number: pr.number, headRef: redact(pr.head && typeof pr.head.ref === 'string' ? pr.head.ref : '') })),
+  };
 }
 
 /**
@@ -1056,9 +1403,13 @@ function previewTokenOf(pullRequest, mergeMethod) {
  *
  * - `target` is a pull request number only, and `mergeMethod` is required;
  * - the pull request is read from GitHub first and refused when it is not
- *   open, is a draft, carries a `stack` object, is based on a branch
- *   other than the repository's default branch, or is not reported as
- *   mergeable;
+ *   open, is a draft, carries a `stack` object or is listed by the Stacks
+ *   API, is based on a branch other than the default branch that the
+ *   caller did not name as `base` (or that is another open pull request's
+ *   head), or is not reported as mergeable;
+ * - the preview also lists open pull requests based on its head branch
+ *   (`dependents`): a chain no provider registered, which this does not
+ *   land or retarget;
  * - without `confirm: true` nothing is merged and the result reports the
  *   head commit and base branch that were read, with a `previewToken`
  *   that fingerprints them;
@@ -1067,14 +1418,14 @@ function previewTokenOf(pullRequest, mergeMethod) {
  *   GitHub checks the head again (`sha` on the merge call), so what lands
  *   is what was shown.
  *
- * Both calls are `gh api` with the `{owner}/{repo}` placeholders, so the
- * check and the merge always address the same repository, whichever way
+ * Every call is `gh api` with the `{owner}/{repo}` placeholders, so the
+ * checks and the merge always address the same repository, whichever way
  * `gh` resolves it. The REST merge call would let a repository admin
  * through branch protection, so a pull request GitHub does not report as
  * mergeable (`mergeable_state`) is refused before the call. No auto-merge,
  * no branch deletion.
  */
-function mergeSingle({ target, mergeMethod, previewToken, confirm }) {
+function mergeSingle({ target, mergeMethod, base, previewToken, confirm }) {
   const op = 'merge-single';
   if (typeof target !== 'string' || !/^[1-9][0-9]*$/.test(target)) {
     return refusalResult(op, `target must be a pull request number, got "${target === undefined ? '' : target}"`);
@@ -1087,6 +1438,10 @@ function mergeSingle({ target, mergeMethod, previewToken, confirm }) {
   if (previewToken !== undefined && !/^[0-9a-f]{64}$/.test(previewToken)) {
     return refusalResult(op, 'previewToken must be the 64 hexadecimal characters a preview reported');
   }
+  if (base !== undefined) {
+    const baseCheck = validateBranchName(base);
+    if (!baseCheck.ok) return refusalResult(op, baseCheck.reason);
+  }
   if (confirm === true && previewToken === undefined) {
     return refusalResult(
       op,
@@ -1094,16 +1449,24 @@ function mergeSingle({ target, mergeMethod, previewToken, confirm }) {
     );
   }
 
-  const read = readOrdinaryPullRequest(op, target);
+  const read = readOrdinaryPullRequest(op, target, base);
   if (read.result) return read.result;
   const { pullRequest } = read;
+  const headInRepository =
+    pullRequest.headRepository !== '' && pullRequest.headRepository.toLowerCase() === pullRequest.repository.toLowerCase();
   const shown = `pull request #${target} of ${pullRequest.repository} into ${pullRequest.baseRef} at head ${pullRequest.headSha}`;
   const currentToken = previewTokenOf(pullRequest, methodCheck.value);
   if (confirm !== true) {
+    const chain = readDependents(op, pullRequest, headInRepository);
+    if (chain.result) return chain.result;
+    const warning =
+      chain.dependents.length > 0
+        ? ` Open pull requests ${chain.dependents.map((pr) => `#${pr.number}`).join(', ')} are based on its branch: a chain no provider registered as a stack, which this merge does not land or retarget.`
+        : '';
     return {
       ...confirmationRequiredResult(
         op,
-        `merge-single lands ${shown} with method ${methodCheck.value}, and cannot be undone by this runtime; re-run with previewToken ${currentToken} and confirm`
+        `merge-single lands ${shown} with method ${methodCheck.value}, and cannot be undone by this runtime; re-run with previewToken ${currentToken} and confirm.${warning}`
       ),
       pullRequest: {
         ...pullRequest,
@@ -1111,10 +1474,9 @@ function mergeSingle({ target, mergeMethod, previewToken, confirm }) {
         baseRef: redact(pullRequest.baseRef),
         headRef: redact(pullRequest.headRef),
         headRepository: redact(pullRequest.headRepository),
-        headInRepository:
-          pullRequest.headRepository !== '' &&
-          pullRequest.headRepository.toLowerCase() === pullRequest.repository.toLowerCase(),
+        headInRepository,
       },
+      dependents: chain.dependents,
       previewToken: currentToken,
     };
   }
@@ -1306,5 +1668,6 @@ module.exports = {
   merge,
   mergeSingle,
   previewTokenOf,
+  mergePreviewTokenOf,
   unstack,
 };

@@ -9,7 +9,7 @@
  */
 
 import { execFileSync } from 'child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -30,6 +30,7 @@ const {
   merge,
   mergeSingle,
   previewTokenOf,
+  mergePreviewTokenOf,
   unstack,
   validateBranchName,
   validateRepoRelativePath,
@@ -68,7 +69,40 @@ const ENV_KEYS = [
   'FAKE_GH_GET_EXIT',
   'FAKE_GH_PUT_STDOUT',
   'FAKE_GH_PUT_EXIT',
+  'FAKE_GH_API_DIR',
+  'GH_CONFIG_DIR',
 ];
+
+/**
+ * Answer a `gh api` read through the fake's FAKE_GH_API_DIR: the endpoint
+ * without its repos/<owner>/<repo>/ prefix, non-alphanumerics as `_`.
+ */
+function route(dir: string, endpoint: string, body: string, exit = 0, stderr = ''): void {
+  const key = endpoint.replace(/^repos\/[^/]*\/[^/]*\//, '').replace(/[^A-Za-z0-9]/g, '_');
+  writeFileSync(join(dir, key), body);
+  writeFileSync(join(dir, `${key}.exit`), String(exit));
+  writeFileSync(join(dir, `${key}.stderr`), stderr);
+}
+
+const NOT_FOUND = 'gh: Not Found (HTTP 404)\n';
+const SHA = (c: string): string => c.repeat(40);
+
+/** A Stacks REST API stack: pull requests bottom to top. */
+function remoteStack(number: number, prs: Array<Record<string, unknown>>, base = 'main'): string {
+  return JSON.stringify({
+    id: 900 + number,
+    number,
+    base: { ref: base },
+    open: true,
+    pull_requests: prs.map((pr) => ({
+      state: 'open',
+      draft: false,
+      merged_at: null,
+      head: { ref: `layer-${pr.number}`, sha: SHA(String((pr.number as number) % 10)) },
+      ...pr,
+    })),
+  });
+}
 let originalPath: string | undefined;
 const originalEnv: Record<string, string | undefined> = {};
 
@@ -79,6 +113,8 @@ beforeEach(() => {
     originalEnv[key] = process.env[key];
     delete process.env[key];
   }
+  // Never read the real gh configuration of whoever runs the suite.
+  process.env.GH_CONFIG_DIR = join(tmpdir(), 'github-stack-runtime-no-gh-config');
 });
 
 afterEach(() => {
@@ -324,8 +360,42 @@ describe('submit — --auto always present, --open only when explicit (draft by 
 });
 
 describe('merge — explicit target and confirm required; never gh pr merge', () => {
+  let apiDir: string;
+  let logFile: string;
+
+  /** Preview, then confirm with what the preview reported. */
+  function confirmed(params: Record<string, unknown>): Record<string, any> {
+    const preview = merge({ ...params, confirm: undefined });
+    expect(preview.status).toBe('REQUIRES_CONFIRMATION');
+    return merge({
+      ...params,
+      repository: params.repository ?? preview.repository,
+      previewToken: preview.previewToken,
+      confirm: true,
+    });
+  }
+
+  function apiCalls(): string[] {
+    try {
+      return readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
   beforeEach(() => {
     process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/o/r.git';
+    apiDir = mkdtempSync(join(tmpdir(), 'merge-api-'));
+    logFile = join(apiDir, 'gh.log');
+    process.env.FAKE_GH_API_DIR = apiDir;
+    process.env.FAKE_GH_LOG = logFile;
+    // 42 is not a stack number; it is the middle layer of stack 7.
+    route(apiDir, 'repos/o/r/stacks/42', '{"message":"Not Found"}', 1, NOT_FOUND);
+    route(apiDir, 'repos/o/r/stacks?pull_request=42', `[${remoteStack(7, [{ number: 41 }, { number: 42 }, { number: 43 }])}]`);
+  });
+
+  afterEach(() => {
+    rmSync(apiDir, { recursive: true, force: true });
   });
 
   it('refuses without an explicit target', () => {
@@ -340,17 +410,142 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     expect(result.safeSummary).toContain('in o/r');
   });
 
-  it('builds gh stack merge <target> --yes once confirmed', () => {
+  it('builds gh stack merge <target> --yes once confirmed with the previewed repository and token', () => {
     process.env.FAKE_GH_EXIT = '0';
-    const result = merge({ target: '42', confirm: true });
+    const result = confirmed({ target: '42' });
     expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'merge', '42', '--yes'] });
     expect(result.repository).toBe('o/r');
+  });
+
+  it('refuses a confirmed merge without the repository or the preview token, before reading anything', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    const token = merge({ target: '42' }).previewToken;
+    rmSync(logFile, { force: true });
+    for (const params of [
+      { target: '42', confirm: true },
+      { target: '42', repository: 'o/r', confirm: true },
+      { target: '42', previewToken: token, confirm: true },
+    ]) {
+      const result = merge(params);
+      expect(result.status).toBe('INVALID_ARGS');
+      expect(result.command).toBeNull();
+      expect(result.refusalReason).toContain('confirm needs repository and previewToken');
+    }
+    expect(merge({ target: '42', repository: 'o/r', previewToken: 'abc', confirm: true }).status).toBe('INVALID_ARGS');
+    expect(apiCalls()).toEqual([]);
+  });
+
+  it('previews the set gh stack merge lands from the stack on GitHub, not the local stack file', () => {
+    // #41 has no local branch; gh-stack still lands it, so the preview shows it.
+    route(
+      apiDir,
+      'repos/o/r/stacks?pull_request=42',
+      `[${remoteStack(7, [{ number: 40, state: 'closed', merged_at: '2026-11-18T00:00:00Z' }, { number: 41 }, { number: 42 }, { number: 43, draft: true }])}]`
+    );
+    const result = merge({ target: '42' });
+    expect(result.status).toBe('REQUIRES_CONFIRMATION');
+    expect(result.targetKind).toBe('pull-request');
+    expect(result.stackNumber).toBe(7);
+    expect(result.baseRef).toBe('main');
+    expect(result.landingSet).toEqual([
+      { number: 41, headRef: 'layer-41', headSha: SHA('1') },
+      { number: 42, headRef: 'layer-42', headSha: SHA('2') },
+    ]);
+    expect(result.safeSummary).toContain('#41, #42, bottom first, into main');
+    expect(result.previewToken).toMatch(/^[0-9a-f]{64}$/);
+    expect(apiCalls()).toEqual([
+      'api --hostname github.com repos/o/r/stacks/42',
+      'api --hostname github.com repos/o/r/stacks?pull_request=42',
+    ]);
+  });
+
+  it('reads a stack number as gh-stack does: the whole open stack lands', () => {
+    route(apiDir, 'repos/o/r/stacks/7', remoteStack(7, [{ number: 41 }, { number: 42 }, { number: 43 }]));
+    const result = merge({ target: '7' });
+    expect(result.status).toBe('REQUIRES_CONFIRMATION');
+    expect(result.targetKind).toBe('stack');
+    expect(result.landingSet.map((pr: { number: number }) => pr.number)).toEqual([41, 42, 43]);
+    expect(result.safeSummary).toContain('stack #7, every open pull request in it');
+    route(apiDir, 'repos/o/r/stacks/7', remoteStack(7, [{ number: 41 }, { number: 42, draft: true }, { number: 43 }]));
+    const blocked = merge({ target: '7' });
+    expect(blocked.status).toBe('INVALID_ARGS');
+    expect(blocked.refusalReason).toContain('cannot be merged whole: pull request #42 is a draft');
+  });
+
+  it('refuses a target that gh-stack would not land: a draft or closed layer, one blocked below, one already merged', () => {
+    const cases: Array<[Array<Record<string, unknown>>, string]> = [
+      [[{ number: 41 }, { number: 42, draft: true }], '#42 is a draft'],
+      [[{ number: 41 }, { number: 42, state: 'closed' }], '#42 is closed'],
+      [[{ number: 41, draft: true }, { number: 42 }], '#42 cannot be merged yet: pull request #41 is a draft below it'],
+      [[{ number: 42, state: 'closed', merged_at: '2026-11-18T00:00:00Z' }], '#42 is already merged'],
+      [[{ number: 41 }], '#42 is not part of stack #7'],
+    ];
+    for (const [prs, reason] of cases) {
+      route(apiDir, 'repos/o/r/stacks?pull_request=42', `[${remoteStack(7, prs)}]`);
+      for (const confirm of [false, true]) {
+        const result = merge({ target: '42', repository: 'o/r', previewToken: 'a'.repeat(64), confirm });
+        expect(result.status).toBe('INVALID_ARGS');
+        expect(result.command).toBeNull();
+        expect(result.refusalReason).toContain(reason);
+      }
+    }
+  });
+
+  it('an ordinary pull request is NOT_IN_STACK, and a repository without stacks is STACKS_UNAVAILABLE', () => {
+    route(apiDir, 'repos/o/r/stacks?pull_request=42', '[]');
+    const plain = merge({ target: '42' });
+    expect(plain.status).toBe('NOT_IN_STACK');
+    expect(plain.recoveryAction).toContain('merge-single');
+    route(apiDir, 'repos/o/r/stacks?pull_request=42', '{"message":"Not Found"}', 1, NOT_FOUND);
+    expect(merge({ target: '42' }).status).toBe('STACKS_UNAVAILABLE');
+  });
+
+  it('fails closed when the stack cannot be read, and merges nothing', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    route(apiDir, 'repos/o/r/stacks/42', '{"message":"Server Error"}', 1, 'gh: Server Error (HTTP 500)\n');
+    const failed = merge({ target: '42', repository: 'o/r', previewToken: 'a'.repeat(64), confirm: true });
+    expect(failed.status).toBe('API_FAILURE');
+    expect(failed.mayHaveMutated).toBe(false);
+    expect(failed.command?.args).not.toContain('merge');
+    route(apiDir, 'repos/o/r/stacks/42', '{"message":"Not Found"}', 1, NOT_FOUND);
+    route(apiDir, 'repos/o/r/stacks?pull_request=42', '[{"number":7}]');
+    expect(merge({ target: '42' }).status).toBe('ERROR');
+  });
+
+  it('refuses the merge when the set, a head commit, the base or the method changed after the preview', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    const preview = merge({ target: '42' });
+    const changes = [
+      remoteStack(7, [{ number: 40 }, { number: 41 }, { number: 42 }]),
+      remoteStack(7, [{ number: 41, head: { ref: 'layer-41', sha: SHA('f') } }, { number: 42 }]),
+      remoteStack(7, [{ number: 41 }, { number: 42 }], 'release'),
+    ];
+    for (const stack of changes) {
+      route(apiDir, 'repos/o/r/stacks?pull_request=42', `[${stack}]`);
+      const result = merge({ target: '42', repository: 'o/r', previewToken: preview.previewToken, confirm: true });
+      expect(result.status).toBe('INVALID_ARGS');
+      expect(result.command).toBeNull();
+      expect(result.refusalReason).toContain('Nothing was merged');
+    }
+    route(apiDir, 'repos/o/r/stacks?pull_request=42', `[${remoteStack(7, [{ number: 41 }, { number: 42 }, { number: 43 }])}]`);
+    const otherMethod = merge({ target: '42', mergeMethod: 'squash', repository: 'o/r', previewToken: preview.previewToken, confirm: true });
+    expect(otherMethod.status).toBe('INVALID_ARGS');
+    expect(confirmed({ target: '42', mergeMethod: 'squash' }).command?.args).toEqual(['stack', 'merge', '42', '--yes', '--merge-method', 'squash']);
+  });
+
+  it('the preview token covers the repository, the target, the set and the method', () => {
+    const landing = { targetKind: 'pull-request', stackNumber: 7, baseRef: 'main', set: [{ number: 42, headRef: 'x', headSha: SHA('2') }] };
+    const base = mergePreviewTokenOf('o/r', '42', landing, undefined);
+    expect(mergePreviewTokenOf('o/r', '42', landing, 'squash')).not.toBe(base);
+    expect(mergePreviewTokenOf('x/y', '42', landing, undefined)).not.toBe(base);
+    expect(mergePreviewTokenOf('o/r', '43', landing, undefined)).not.toBe(base);
+    expect(mergePreviewTokenOf('o/r', '42', { ...landing, set: [{ ...landing.set[0], headRef: 'y' }] }, undefined)).not.toBe(base);
   });
 
   it('reduces a github.com pull request URL to its number — gh stack merge exits 5 on a URL', () => {
     process.env.FAKE_GH_EXIT = '0';
     process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/O/r.git';
-    const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
+    const result = confirmed({ target: 'https://github.com/o/r/pull/42' });
     expect(result.command).toEqual({ bin: 'gh', args: ['stack', 'merge', '42', '--yes'] });
   });
 
@@ -366,7 +561,7 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
       'https://github.com:443/O/r.git/',
     ]) {
       process.env.FAKE_GIT_REMOTE_URLS = `origin=${url}`;
-      expect(merge({ target: 'https://github.com/o/r/pull/42', confirm: true }).status).toBe('SUCCESS');
+      expect(confirmed({ target: 'https://github.com/o/r/pull/42' }).status).toBe('SUCCESS');
     }
   });
 
@@ -392,7 +587,7 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     process.env.FAKE_GH_EXIT = '0';
     for (const override of ['o/r', 'github.com/O/R', 'https://github.com/o/r']) {
       process.env.GH_REPO = override;
-      const result = merge({ target: 'https://github.com/o/r/pull/42', confirm: true });
+      const result = confirmed({ target: 'https://github.com/o/r/pull/42' });
       expect(result.command?.args).toEqual(['stack', 'merge', '42', '--yes']);
     }
     expect(merge({ target: 'https://github.com/o/r/pull/42' }).safeSummary).toContain('in o/r');
@@ -431,13 +626,42 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     expect(merge({ target: '42' }).repository).toBe('o/r');
   });
 
+  it("reads a hostless GH_REPO on gh's default host: the only host in hosts.yml, else github.com", () => {
+    const configDir = join(apiDir, 'gh-config');
+    mkdirSync(configDir);
+    process.env.GH_CONFIG_DIR = configDir;
+    process.env.GH_REPO = 'o/r';
+    const hosts = join(configDir, 'hosts.yml');
+    writeFileSync(hosts, 'ghe.example.com:\n    user: me\n    git_protocol: https\n');
+    const elsewhere = merge({ target: '42' });
+    expect(elsewhere.status).toBe('INVALID_ARGS');
+    expect(elsewhere.command).toBeNull();
+    expect(elsewhere.refusalReason).toContain('GH_REPO');
+    expect(apiCalls()).toEqual([]);
+    writeFileSync(hosts, '# gh hosts\n"github.com":\n    user: me\n');
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+    writeFileSync(hosts, 'github.com:\n    user: me\nghe.example.com:\n    user: me\n');
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+    writeFileSync(hosts, '');
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+    writeFileSync(hosts, '{github.com: {user: me}}\n');
+    expect(merge({ target: '42' }).refusalReason).toContain('cannot read');
+    // GH_HOST still wins over the hosts file, and a host in GH_REPO over both.
+    writeFileSync(hosts, 'ghe.example.com:\n    user: me\n');
+    process.env.GH_HOST = 'github.com';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+    delete process.env.GH_HOST;
+    process.env.GH_REPO = 'github.com/o/r';
+    expect(merge({ target: '42' }).repository).toBe('o/r');
+  });
+
   it('with a fork and its upstream, a URL must name the repository gh resolves (upstream ranks first)', () => {
     process.env.FAKE_GH_EXIT = '0';
     process.env.FAKE_GIT_REMOTE_URLS = 'origin=https://github.com/me/r.git upstream=https://github.com/o/r.git';
     const fork = merge({ target: 'https://github.com/me/r/pull/42', confirm: true });
     expect(fork.status).toBe('INVALID_ARGS');
     expect(fork.refusalReason).toContain('o/r');
-    expect(merge({ target: 'https://github.com/o/r/pull/42', confirm: true }).status).toBe('SUCCESS');
+    expect(confirmed({ target: 'https://github.com/o/r/pull/42' }).status).toBe('SUCCESS');
     expect(merge({ target: '42' }).repository).toBe('o/r');
   });
 
@@ -466,7 +690,7 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
     const moved = merge({ target: '42', repository: 'x/y', confirm: true });
     expect(moved.status).toBe('INVALID_ARGS');
     expect(moved.command).toBeNull();
-    expect(merge({ target: '42', repository: 'O/R', confirm: true }).status).toBe('SUCCESS');
+    expect(confirmed({ target: '42', repository: 'O/R' }).status).toBe('SUCCESS');
     expect(merge({ target: '42', repository: 'o/r --squash', confirm: true }).status).toBe('INVALID_ARGS');
   });
 
@@ -499,7 +723,7 @@ describe('merge — explicit target and confirm required; never gh pr merge', ()
   it('pins the confirmed merge to the checked repository', () => {
     process.env.FAKE_GH_EXIT = '0';
     process.env.FAKE_GH_REPORT_GH_REPO = '1';
-    const result = merge({ target: '42', repository: 'o/r', confirm: true });
+    const result = confirmed({ target: '42', repository: 'o/r' });
     expect(result.status).toBe('SUCCESS');
     expect(result.stderr).toContain('gh-repo: github.com/o/r');
   });
@@ -628,7 +852,10 @@ describe('merge-single — one ordinary pull request, never a stacked one', () =
     logDir = mkdtempSync(join(tmpdir(), 'merge-single-'));
     logFile = join(logDir, 'gh.log');
     process.env.FAKE_GH_LOG = logFile;
+    process.env.FAKE_GH_API_DIR = logDir;
     process.env.FAKE_GH_GET_STDOUT = pullRequest();
+    route(logDir, 'repos/{owner}/{repo}/stacks?pull_request=42', '[]');
+    route(logDir, 'repos/{owner}/{repo}/pulls?state=open&per_page=100&base=feat%2Fx', '[]');
     process.env.FAKE_GH_PUT_STDOUT = JSON.stringify({ merged: true, sha: OTHER, message: 'Pull Request successfully merged' });
   });
 
@@ -673,7 +900,56 @@ describe('merge-single — one ordinary pull request, never a stacked one', () =
     });
     expect(result.safeSummary).toContain(HEAD);
     expect(result.previewToken).toBe(token());
-    expect(calls()).toEqual(['api repos/{owner}/{repo}/pulls/42']);
+    expect(result.dependents).toEqual([]);
+    expect(calls()).toEqual([
+      'api repos/{owner}/{repo}/pulls/42',
+      'api repos/{owner}/{repo}/stacks?pull_request=42',
+      'api repos/{owner}/{repo}/pulls?state=open&per_page=100&base=feat%2Fx',
+    ]);
+  });
+
+  it('refuses a pull request the Stacks API lists in a stack, even when its own answer has no stack field', () => {
+    route(logDir, 'repos/{owner}/{repo}/stacks?pull_request=42', `[${remoteStack(1825, [{ number: 42 }, { number: 43 }])}]`);
+    for (const confirm of [false, true]) {
+      const result = mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm });
+      expect(result.status).toBe('INVALID_ARGS');
+      expect(result.refusalReason).toContain('belongs to a stack (stack #1825)');
+    }
+    expect(calls().some((line) => line.includes('PUT'))).toBe(false);
+  });
+
+  it('treats a repository without stacks (404) as unstacked, and fails closed on any other Stacks API failure', () => {
+    route(logDir, 'repos/{owner}/{repo}/stacks?pull_request=42', '{"message":"Not Found"}', 1, NOT_FOUND);
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm: true }).status).toBe('SUCCESS');
+    route(logDir, 'repos/{owner}/{repo}/stacks?pull_request=42', '{"message":"Bad credentials"}', 1, 'gh: Bad credentials (HTTP 401)\n');
+    const failed = mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token(), confirm: true });
+    expect(failed.status).toBe('API_FAILURE');
+    expect(failed.mayHaveMutated).toBe(false);
+    route(logDir, 'repos/{owner}/{repo}/stacks?pull_request=42', '{}');
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash' }).status).toBe('ERROR');
+  });
+
+  it('lists open pull requests based on its branch in the preview: a chain no provider registered', () => {
+    route(
+      logDir,
+      'repos/{owner}/{repo}/pulls?state=open&per_page=100&base=feat%2Fx',
+      JSON.stringify([{ number: 43, head: { ref: 'feat/y' } }, { number: 44, head: { ref: 'feat/z' } }])
+    );
+    const result = mergeSingle({ target: '42', mergeMethod: 'squash' });
+    expect(result.status).toBe('REQUIRES_CONFIRMATION');
+    expect(result.dependents).toEqual([
+      { number: 43, headRef: 'feat/y' },
+      { number: 44, headRef: 'feat/z' },
+    ]);
+    expect(result.safeSummary).toContain('#43, #44 are based on its branch');
+    route(logDir, 'repos/{owner}/{repo}/pulls?state=open&per_page=100&base=feat%2Fx', '{"message":"x"}', 1, 'gh: x (HTTP 502)\n');
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash' }).status).toBe('API_FAILURE');
+  });
+
+  it('does not look for pull requests based on a fork head branch', () => {
+    process.env.FAKE_GH_GET_STDOUT = pullRequest({ head: { sha: HEAD, ref: 'feat/x', repo: { full_name: 'me/r' } } });
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash' }).dependents).toEqual([]);
+    expect(calls().some((line) => line.includes('base='))).toBe(false);
   });
 
   it('reports a head branch that lives in a fork, or in a deleted fork, as outside the repository', () => {
@@ -743,14 +1019,33 @@ describe('merge-single — one ordinary pull request, never a stacked one', () =
     expect(calls().some((line) => line.includes('PUT'))).toBe(false);
   });
 
-  it('refuses a pull request based on a branch other than the default branch', () => {
+  it('refuses a pull request based on a branch other than the default branch unless that base is named', () => {
     process.env.FAKE_GH_GET_STDOUT = pullRequest({ base: { ref: 'feat/lower-layer', repo: { full_name: 'o/r', default_branch: 'main' } } });
     for (const confirm of [false, true]) {
       const result = mergeSingle({ target: '42', mergeMethod: 'squash', previewToken: token('squash', { baseRef: 'feat/lower-layer' }), confirm });
       expect(result.status).toBe('INVALID_ARGS');
-      expect(result.refusalReason).toContain('not an independent pull request');
+      expect(result.refusalReason).toContain('not the default branch "main"');
+      expect(result.refusalReason).toContain('release or hotfix branch');
+      const wrong = mergeSingle({ target: '42', mergeMethod: 'squash', base: 'release/1.2', previewToken: token('squash', { baseRef: 'feat/lower-layer' }), confirm });
+      expect(wrong.refusalReason).toContain('not the base "release/1.2" that was named');
     }
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash', base: '--force' }).status).toBe('INVALID_ARGS');
     expect(calls().some((line) => line.includes('PUT'))).toBe(false);
+  });
+
+  it('lands a pull request on a named release branch that no open pull request has as its head', () => {
+    process.env.FAKE_GH_GET_STDOUT = pullRequest({ base: { ref: 'release/1.2', repo: { full_name: 'o/r', default_branch: 'main' } } });
+    route(logDir, 'repos/{owner}/{repo}/pulls?state=open&per_page=100&head=o%3Arelease%2F1.2', '[]');
+    const previewToken = token('squash', { baseRef: 'release/1.2' });
+    const preview = mergeSingle({ target: '42', mergeMethod: 'squash', base: 'release/1.2' });
+    expect(preview.status).toBe('REQUIRES_CONFIRMATION');
+    expect(preview.previewToken).toBe(previewToken);
+    expect(mergeSingle({ target: '42', mergeMethod: 'squash', base: 'release/1.2', previewToken, confirm: true }).status).toBe('SUCCESS');
+    // The named base is another open pull request's branch: a layer of a chain.
+    route(logDir, 'repos/{owner}/{repo}/pulls?state=open&per_page=100&head=o%3Arelease%2F1.2', '[{"number":41}]');
+    const layer = mergeSingle({ target: '42', mergeMethod: 'squash', base: 'release/1.2', previewToken, confirm: true });
+    expect(layer.status).toBe('INVALID_ARGS');
+    expect(layer.refusalReason).toContain('the branch of open pull request #41');
   });
 
   it('refuses a pull request GitHub does not report as mergeable, so an admin token cannot bypass protection', () => {
@@ -785,6 +1080,7 @@ describe('merge-single — one ordinary pull request, never a stacked one', () =
     });
     expect(calls()).toEqual([
       'api repos/{owner}/{repo}/pulls/42',
+      'api repos/{owner}/{repo}/stacks?pull_request=42',
       `api -X PUT repos/{owner}/{repo}/pulls/42/merge -f merge_method=rebase -f sha=${HEAD}`,
     ]);
   });

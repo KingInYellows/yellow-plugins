@@ -87,7 +87,10 @@ deleted.
 - how `gh pr merge` and the REST merge endpoint behave on a stacked pull request
 - `merge-single` against GitHub: it is covered by fixture tests only. The
   `stack` field it checks was read from live pull requests (present on #1823,
-  absent on unstacked ones)
+  absent on unstacked ones). Its second stack signal
+  (`GET repos/<repo>/stacks?pull_request=<n>`) and the merge preview's reads of
+  the Stacks REST API follow the v0.3.0 source (`internal/github/github.go`) and
+  have not been run live
 
 One live lifecycle (submit, restack, sync, partial merge, sync) has been run,
 from a workstation clone that called the adapter directly. No machine has GitHub
