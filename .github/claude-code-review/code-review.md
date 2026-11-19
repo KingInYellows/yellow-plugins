@@ -162,8 +162,10 @@ No issues found. Checked for bugs and CLAUDE.md compliance.
   `gh pr comment https://github.com/<owner>/<repo>/pull/<number> --body '## Code review`,
   then a line break, a blank line, the middle line, a blank line, the marker line and
   `'`. The workflow's Bash guard blocks every other shape of `gh pr comment`,
-  and every Bash command other than `gh pr diff` and `gh pr view` with plain
-  arguments (no quotes, `$`, pipes or redirects).
+  and every Bash command other than `gh pr diff <pr>` (optionally `--name-only`
+  or `--patch`) and `gh pr view <pr>` (optionally `--json <fields>` or
+  `--comments`). `--jq`, `--template`, quotes, `$`, pipes and redirects are
+  blocked.
 
 - When linking to code in inline comments, follow the following format precisely, otherwise the Markdown preview won't render correctly: https://github.com/anthropics/claude-code/blob/c21d3c10bc8e898b7ac1a2d745bdc9bc4e423afe/package.json#L10-L15
   - Requires full git sha

@@ -415,7 +415,8 @@ vendored code-review command (CLAUDE-248). Its boundary:
   still lets `"$VAR"` or `"$(cat file)"` expand in the body, so deny rules alone
   cannot close this. A `PreToolUse` hook installed from the default branch
   (`.github/claude-code-review/bash-guard.sh`) allows only `gh pr diff` and
-  `gh pr view` with plain arguments and a `gh pr comment` whose body is the
+  `gh pr view` with a short list of flags (no `--jq` or `--template`, whose jq
+  `env` reads the process environment) and a `gh pr comment` whose body is the
   fixed summary; it blocks every other Bash call, including in subagents. The
   gate skips the review when the hook is missing. For the file tools,
   `--disallowedTools` denies `Read` on `.git` and `/proc`, and the command no

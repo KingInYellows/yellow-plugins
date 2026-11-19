@@ -179,7 +179,7 @@ jobs:
           # review agent ran (CLAUDE-230). Foreground subagents make the parent
           # wait for each one.
           # hooks: the gate step installed the Bash guard from the default
-          # branch. It allows only gh pr diff/view with plain arguments and a
+          # branch. It allows only gh pr diff/view with a few listed flags and a
           # gh pr comment whose body is the fixed summary, so no variable,
           # command substitution or read-only command (cat, echo, env) can
           # put a token in a comment (CLAUDE-356).
