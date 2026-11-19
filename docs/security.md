@@ -423,13 +423,14 @@ vendored code-review command (CLAUDE-248). Its boundary:
   repositories or mark a future head as reviewed. The gate skips the review when
   the hook cannot be fetched. After the skip-marker check it fails when a path
   the PR changes, or a directory above it, is a symlink that leaves the checkout
-  or points into `.git` (the whole tree when the PR lists 3000 or more files),
-  so a link already on the default branch does not fail other PRs (CLAUDE-365).
-  The gate also writes the PR diff to `.claude-code-review/pr.diff`, which the
-  agent reads in pages instead of a `gh pr diff` result that is cut off on a
-  large PR. For the file tools, `--disallowedTools` denies `Read` on `.git` and
-  `/proc`, and the command no longer grants bare `Read`, so the Read tool needs
-  an approval outside the checkout that a CI run cannot give. The rest of the
+  or points into `.git` (paths from `git diff` between the checked-out merge
+  commit and its base parent, so a push mid-run cannot change them), so a link
+  already on the default branch does not fail other PRs (CLAUDE-365). The gate
+  also writes the PR diff to `.claude-code-review/pr.diff`, which the agent
+  reads in pages instead of a `gh pr diff` result that is cut off on a large PR.
+  For the file tools, `--disallowedTools` denies `Read` on `.git` and `/proc`,
+  and the command no longer grants bare `Read`, so the Read tool needs an
+  approval outside the checkout that a CI run cannot give. The rest of the
   checkout is the PR's own content, so pasting it into an inline comment leaks
   nothing new. The app token is revoked when the job ends.
 - **Skip marker**: the gate skips a run only when a `claude[bot]` comment that
