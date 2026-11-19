@@ -153,8 +153,8 @@ No issues found. Checked for bugs and CLAUDE.md compliance.
 
   Post it as one command, with the body in single quotes and real line breaks,
   no `$`, no heredoc and nothing after the closing quote:
-  `gh pr comment <owner>/<repo>/pull/<number> --body '## Code review`, then a
-  line break, a blank line, the middle line, a blank line, the marker line and
+  `gh pr comment https://github.com/<owner>/<repo>/pull/<number> --body '## Code review`,
+  then a line break, a blank line, the middle line, a blank line, the marker line and
   `'`. The workflow's Bash guard blocks every other shape of `gh pr comment`,
   and every Bash command other than `gh pr diff` and `gh pr view` with plain
   arguments (no quotes, `$`, pipes or redirects).
