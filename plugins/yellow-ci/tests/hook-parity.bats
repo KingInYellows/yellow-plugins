@@ -308,8 +308,10 @@ age_file() {
   unset YELLOW_CI_NO_BACKGROUND_REFRESH
   export MOCK_GH_LOG="$sandbox/gh.log"; : >"$MOCK_GH_LOG"
 
-  # 599 s: fresh, no refresh attempted (no marker created).
-  age_file "$cache" 599
+  # 598 s: fresh, no refresh attempted (no marker created). The hook reads
+  # the clock in a later process, so a second can tick over between
+  # age_file and the check; the "just under" cases keep a 2 s margin.
+  age_file "$cache" 598
   run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
   [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
   [ ! -e "$dir/refresh-$key" ]
@@ -323,10 +325,10 @@ age_file() {
   grep -q '^run list' "$MOCK_GH_LOG"
   for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
 
-  # 3599 s: still shown; 3600 s: not shown.
+  # 3598 s: still shown; 3600 s: not shown.
   export YELLOW_CI_NO_BACKGROUND_REFRESH=1
   printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$cache"
-  age_file "$cache" 3599
+  age_file "$cache" 3598
   run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
   [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
   age_file "$cache" 3600
