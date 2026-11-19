@@ -179,6 +179,15 @@ jobs:
             echo "::error::could not prepare the review inputs; see above"
             exit 1
           fi
+          # Add the not-reviewed count to the guard's target file, so the
+          # guard requires the summary's not-reviewed line exactly when files
+          # were left out, with this number, and refuses it otherwise.
+          read -r not_reviewed < .claude-code-review/not-reviewed-count
+          case "$not_reviewed" in
+            ''|*[!0-9]*) echo "::error::bad not-reviewed count"; exit 1 ;;
+          esac
+          printf '%s %s %s %s\n' "$REPO" "$PR_NUMBER" "$HEAD_SHA" "$not_reviewed" \
+            > "$HOME/.claude/hooks/claude-code-review-target"
           # Check the head again: a push between the first check and the
           # requests above would give a file list and diff for another commit.
           live_head=$(gh_api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')

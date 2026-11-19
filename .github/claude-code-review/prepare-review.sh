@@ -62,11 +62,21 @@ if [ "$BASE_REF" != "$DEFAULT_BRANCH" ]; then
   # token goes in through the environment for this one command, never into
   # .git/config, which the review agent could read.
   auth=$(printf 'x-access-token:%s' "${GH_TOKEN:?}" | base64 -w0)
-  GIT_CONFIG_COUNT=1 \
-    GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
-    GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth" \
-    git fetch --quiet --no-tags --depth=1 origin \
-    "+refs/heads/$DEFAULT_BRANCH:refs/claude-code-review/default"
+  # Three tries, like gh_api, so one network error does not fail the review.
+  for try in 1 2 3; do
+    if GIT_CONFIG_COUNT=1 \
+      GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+      GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth" \
+      timeout 120 git fetch --quiet --no-tags --depth=1 origin \
+      "+refs/heads/$DEFAULT_BRANCH:refs/claude-code-review/default"; then
+      break
+    fi
+    if [ "$try" -eq 3 ]; then
+      echo "::error::could not fetch $DEFAULT_BRANCH to scan the stack's paths"
+      exit 1
+    fi
+    sleep $((try * 5))
+  done
   git diff --no-renames --name-only -z --diff-filter=d \
     refs/claude-code-review/default HEAD >> "$tmp/changed-paths.bin"
 fi
@@ -124,6 +134,10 @@ if source == "files":
             out.write(f"status: {f.get('status')}\n")
             if f.get("patch"):
                 out.write(f["patch"] + "\n")
+            elif f.get("status") in ("renamed", "changed", "removed") and not f.get("changes"):
+                # A pure rename, a mode change or a deletion has no content to
+                # review, so it is not counted.
+                out.write("(no content change)\n")
             else:
                 out.write("(no patch from GitHub: binary or too large; not reviewed)\n")
                 skipped.append(name)

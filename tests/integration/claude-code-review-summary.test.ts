@@ -40,10 +40,16 @@ const URL = `https://github.com/${REPO}/pull/${PR}`;
 
 const home = mkdtempSync(join(tmpdir(), 'ccr-guard-'));
 mkdirSync(join(home, '.claude', 'hooks'), { recursive: true });
-writeFileSync(
-  join(home, '.claude', 'hooks', 'claude-code-review-target'),
-  `${REPO} ${PR} ${SHA}\n`
-);
+const targetFile = join(home, '.claude', 'hooks', 'claude-code-review-target');
+// The gate writes the not-reviewed count as a fourth field; an older
+// workflow leaves it out.
+function setTarget(count?: number): void {
+  writeFileSync(
+    targetFile,
+    `${REPO} ${PR} ${SHA}${count === undefined ? '' : ` ${count}`}\n`
+  );
+}
+setTarget();
 afterAll(() => rmSync(home, { recursive: true, force: true }));
 
 function guard(command: string): number | null {
@@ -110,6 +116,26 @@ describe('Claude Code Review summary wording', () => {
     expect(guard(`gh pr comment ${URL} --body '${summary(extra, none)}'`)).toBe(
       2
     );
+  });
+
+  it('the guard requires the not-reviewed line with the gate count, and only then', () => {
+    const none = example![1].split('\n')[2];
+    const line = (k: number) => notReviewedLine![1].replace('<n>', String(k));
+    const post = (extra?: string) =>
+      guard(`gh pr comment ${URL} --body '${summary(none, extra)}'`);
+    try {
+      setTarget(0);
+      expect(post()).toBe(0);
+      expect(post(line(2))).toBe(2);
+      setTarget(2);
+      expect(post(line(2))).toBe(0);
+      expect(post()).toBe(2);
+      expect(post(line(3))).toBe(2);
+      setTarget(Number.NaN);
+      expect(post()).toBe(2);
+    } finally {
+      setTarget();
+    }
   });
 
   it('the guard still blocks other wording, another head and a $ in the body', () => {

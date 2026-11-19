@@ -435,12 +435,13 @@ vendored code-review command (CLAUDE-248). Its boundary:
   `.claude-code-review/pr.diff`, which the agent reads in pages instead of a
   `gh pr diff` result that is cut off on a large PR, and counts the files the
   agent cannot see (binary, or no patch from GitHub), which the summary then
-  names with a fixed line the Bash guard allows. For the file tools,
-  `--disallowedTools` denies `Read` on `.git` and `/proc`, and the command no
-  longer grants bare `Read`, so the Read tool needs an approval outside the
-  checkout that a CI run cannot give. The rest of the checkout is the PR's own
-  content, so pasting it into an inline comment leaks nothing new. The app token
-  is revoked when the job ends.
+  names with a fixed line; the Bash guard requires that line, with that count,
+  exactly when the count is above 0. For the file tools, `--disallowedTools`
+  denies `Read` on `.git` and `/proc`, and the command no longer grants bare
+  `Read`, so the Read tool needs an approval outside the checkout that a CI run
+  cannot give. The rest of the checkout is the PR's own content, so pasting it
+  into an inline comment leaks nothing new. The app token is revoked when the
+  job ends.
 - **Skip marker**: the gate skips a run only when a `claude[bot]` comment that
   starts with `## Code review` ends with
   `<!-- claude-code-review head=<sha> -->` for the current head. A forged or

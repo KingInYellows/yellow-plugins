@@ -262,6 +262,13 @@ describe('claude-code-review prepare-review.sh: diff file', () => {
           patch: '@@ -0,0 +1 @@\n+z',
         },
         { filename: 'big.bin', status: 'added' },
+        {
+          filename: 'moved.txt',
+          previous_filename: 'was.txt',
+          status: 'renamed',
+          changes: 0,
+        },
+        { filename: 'run.sh', status: 'changed', changes: 0 },
       ],
       changedCount: 3002,
     });
@@ -280,6 +287,9 @@ describe('claude-code-review prepare-review.sh: diff file', () => {
     expect(diff).toContain(
       '(2 more changed files: GitHub lists only 3000; not reviewed)'
     );
+    expect(diff).toContain(
+      'diff --git a/was.txt b/moved.txt\nstatus: renamed\n(no content change)\n'
+    );
     expect(notReviewed(r.dir)).toBe('3');
     expect(r.out).toContain(
       "'big.bin' and 2 more past GitHub's 3000-file list"
@@ -295,7 +305,12 @@ describe('claude-code-review workflow wiring', () => {
     expect(WORKFLOW).toContain(
       'bash "$RUNNER_TEMP/claude-code-review-prepare.sh"'
     );
-    for (const v of ['BASE_REF:', 'export CHANGED_COUNT', 'GH_TOKEN:']) {
+    for (const v of [
+      'BASE_REF:',
+      'export CHANGED_COUNT',
+      'GH_TOKEN:',
+      'read -r not_reviewed < .claude-code-review/not-reviewed-count',
+    ]) {
       expect(WORKFLOW).toContain(v);
     }
   });
