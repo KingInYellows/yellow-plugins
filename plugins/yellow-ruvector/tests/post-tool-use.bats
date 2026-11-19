@@ -20,6 +20,10 @@ setup() {
     chmod +x "$MOCK_BIN/$b"
   done
   COEDIT="$RUVECTOR_DIR/coedit.json"
+  # The store rewrite normally runs in a detached job (CLAUDE-372). The
+  # suite checks coedit.json right after each hook, so it runs it in the
+  # foreground; the "detached" tests below cover the default.
+  export COEDIT_BUMP_SYNC=1
 }
 
 teardown() {
@@ -57,6 +61,33 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/b.ts src/a.ts)" -eq 1 ]
   edit s1 "$PROJECT_ROOT/src/a.ts"
   [ "$(pair src/a.ts src/b.ts)" -eq 2 ]
+}
+
+@test "detached: the pair lands in coedit.json after the hook returns" {
+  unset COEDIT_BUMP_SYNC
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  edit s1 "$PROJECT_ROOT/src/b.ts"
+  for _ in $(seq 1 50); do [ "$(pair src/a.ts src/b.ts)" -eq 1 ] && break; sleep 0.1; done
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
+  [ "$(pair src/b.ts src/a.ts)" -eq 1 ]
+}
+
+@test "detached: a slow store rewrite never holds the hook" {
+  unset COEDIT_BUMP_SYNC
+  # A jq that sleeps only for the store rewrite (its program builds the
+  # pair map with $maxbytes); every other jq call passes through.
+  real_jq=$(command -v jq)
+  sb="$BATS_TEST_TMPDIR/slowjq"; mkdir -p "$sb"
+  printf '#!/bin/sh\ncase "$*" in *maxbytes*) sleep 1.5;; esac\nexec "%s" "$@"\n' "$real_jq" > "$sb/jq"
+  chmod +x "$sb/jq"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  start=$(date +%s%N)
+  printf '%s' "$(event s1 Edit "$PROJECT_ROOT/src/b.ts")" \
+    | PATH="$sb:$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT" >/dev/null
+  elapsed_ms=$(( ($(date +%s%N) - start) / 1000000 ))
+  [ "$elapsed_ms" -lt 1000 ]
+  for _ in $(seq 1 50); do [ "$(pair src/a.ts src/b.ts)" -eq 1 ] && break; sleep 0.1; done
+  [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
 @test "an inherited TIMEOUT_CMD is probed, not trusted, so pairs still record" {

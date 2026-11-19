@@ -104,10 +104,25 @@ the last run.
 
 | Ticket     | Hook                               | Problem                                                                                                          |
 | ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| CLAUDE-368 | yellow-ruvector `session-start.sh` | 1.4 s semantic recall; pretty-printed JSON with low-score (about 0.20) results; context ceiling 7.3 KB.          |
+| CLAUDE-368 | yellow-ruvector `session-start.sh` | Fixed: recall prefetched in the background; score floor 0.3; bullets under 2 KB. Re-measured below.              |
 | CLAUDE-369 | yellow-ci SessionStart             | `gh auth status` runs before the cache check; 60 s TTL; 1.2-1.5 s on a miss.                                     |
 | CLAUDE-370 | yellow-morph `prewarm-morph.sh`    | `env -i` drops `NODE_EXTRA_CA_CERTS` behind a TLS proxy, so every cloud install fails and later starts wait 2 s. |
-| CLAUDE-372 | yellow-ruvector `post-tool-use.sh` | 121 ms p95 when an edit records a co-edit pair; grows with `.ruvector/coedit.json`.                              |
+| CLAUDE-372 | yellow-ruvector `post-tool-use.sh` | Fixed: the `coedit.json` rewrite runs in a detached job. Re-measured below.                                      |
+
+## Re-measured after fixes
+
+2026-11-19, same cloud container type, 20 runs each, with a 20-memory store
+(`old` is main before the fix, run in the same session as `new`):
+
+| Hook                                      | old p50 / p95 (ms) | new p50 / p95 (ms) | old context | new context |
+| ----------------------------------------- | ------------------ | ------------------ | ----------- | ----------- |
+| yellow-ruvector `session-start.sh`        | 1,018 / 1,133      | 65 / 93            | 1,515 B     | 329 B       |
+| yellow-ruvector `post-tool-use.sh`, pairs | 92 / 108           | 60 / 64            | 0           | 0           |
+
+The new session-start figure holds when runs are at least a minute apart or a
+refresh is already recent. Back-to-back runs that each start a refresh (a 1 s
+model load on a 4-core container) measured p95 484 ms, which is why the hook
+skips a refresh started in the last 60 s.
 
 ## Method
 
