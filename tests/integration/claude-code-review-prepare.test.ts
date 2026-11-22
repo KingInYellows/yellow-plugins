@@ -387,23 +387,7 @@ interface GateOptions {
   httpStatus?: number;
 }
 
-// Run the shipped gate body with a private HOME, runner directory, and local commands.
-function runGate({
-  count = '0',
-  missingFile = '',
-  httpStatus = 404,
-}: GateOptions = {}) {
-  const dir = mkdtempSync(join(tmp, 'gate-'));
-  const output = join(dir, 'output');
-  const home = join(dir, 'home');
-  mkdirSync(home);
-  writeFileSync(output, '');
-  command(dir, 'sleep', 'exit 0');
-  command(dir, 'git', `[[ "$*" == 'rev-parse HEAD^2' ]] && echo "$HEAD_SHA"`);
-  command(
-    dir,
-    'gh',
-    `
+const gateGhStub = `
 if [[ -n $FAILED_FILE && $* == *"/$FAILED_FILE?ref=main"* ]]; then
   echo attempt >> attempts
   echo "gh: fixture (HTTP $HTTP_STATUS)" >&2
@@ -417,8 +401,22 @@ case "$*" in
   *'.head.sha'*) echo "$HEAD_SHA" ;;
   *) echo "unexpected gh $*" >&2; exit 1 ;;
 esac
-`
-  );
+`;
+
+// Run the shipped gate body with a private HOME, runner directory, and local commands.
+function runGate({
+  count = '0',
+  missingFile = '',
+  httpStatus = 404,
+}: GateOptions = {}) {
+  const dir = mkdtempSync(join(tmp, 'gate-'));
+  const output = join(dir, 'output');
+  const home = join(dir, 'home');
+  mkdirSync(home);
+  writeFileSync(output, '');
+  command(dir, 'sleep', 'exit 0');
+  command(dir, 'git', `[[ "$*" == 'rev-parse HEAD^2' ]] && echo "$HEAD_SHA"`);
+  command(dir, 'gh', gateGhStub);
   const r = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', GATE.run], {
     cwd: dir,
     encoding: 'utf8',
