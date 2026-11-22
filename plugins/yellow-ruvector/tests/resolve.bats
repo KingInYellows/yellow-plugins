@@ -488,7 +488,7 @@ fake_install() {
   cat >"$STUBS/stat" <<'SH'
 #!/bin/sh
 case "$1 $2" in
-  '-c %d-%i-%.9W') [ "$STAT_KIND" = gnu ] || exit 1; echo '5-42-0.000000000' ;;
+  '-c %d-%i-%w') [ "$STAT_KIND" = gnu ] || exit 1; echo '5-42--' ;;
   '-f %d-%i-%.9FB') [ "$STAT_KIND" = bsd ] || exit 1; printf '5-42-%s\n' "$BIRTH" ;;
   *) exit 1 ;;
 esac
