@@ -178,7 +178,9 @@ progress.
   64 KB, never a symlink): results scoring at least `RUVECTOR_RECALL_MIN_SCORE`
   (0.3), one `- [type] content` bullet each, at most 1,500 bytes, so the fenced
   block stays under the 2 KB SessionStart budget; nothing when none pass.
-  Filesystems without a usable birth timestamp skip cached recall. It then starts the next `hooks recall --top-k 5` in a detached job (bounded by
+  Filesystems without a usable birth timestamp skip cached recall.
+  For an identifiable store, the hook starts the next
+  `hooks recall --top-k 5` in a detached job (bounded by
   `RUVECTOR_RECALL_REFRESH_SECS`, 30; 0.3.3 recall loads the ONNX model,
   1.2–2.1s warm), which replaces the cache atomically only with a recall
   object. No refresh within `RUVECTOR_RECALL_REFRESH_GAP` (60) seconds of
@@ -227,8 +229,8 @@ progress.
   calls have a 0.3 s timeout. The detached rewrite has its own 40 lock
   retries at 50 ms each and a 2 s `jq` timeout (`COEDIT_BG_LOCK_TRIES` and
   `COEDIT_BG_JQ_SECS`). A busy store or a timed-out rewrite loses only
-  the pair increment; the session has already advanced. A lock over a minute old is reclaimed once per
-  generation (`<lock>.reclaim.<inode>-<mtime>` markers; the SessionStart worker
+  the pair increment. The session has already advanced. A lock over a minute
+  old is reclaimed once per generation (`<lock>.reclaim.<inode>-<mtime>` markers; the SessionStart worker
   prunes those over 10 minutes old, the hooks never list them). The stored
   previous path is re-normalized before pairing. A `coedit.json` over 1 MB is
   set aside unparsed, every write rebuilds the pairs symmetric, and the file is
