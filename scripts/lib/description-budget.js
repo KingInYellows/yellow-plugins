@@ -63,6 +63,20 @@ function classifyBudgetFile(filePath, pluginsDir) {
   return { pluginName, kind };
 }
 
+function measureDescriptionFields(data, kind) {
+  if (kind !== 'agents' && data['disable-model-invocation'] === true) {
+    return { status: 'skip' };
+  }
+  if (typeof data.description !== 'string' || !data.description) {
+    return { status: 'issue', reason: 'missing-description' };
+  }
+  let chars = data.description.length;
+  if (typeof data.when_to_use === 'string') {
+    chars += data.when_to_use.length;
+  }
+  return { status: 'counted', chars };
+}
+
 function measureBudgetEntry(
   content,
   kind,
@@ -82,17 +96,7 @@ function measureBudgetEntry(
   if (!data) {
     return { status: 'issue', reason: 'malformed' };
   }
-  if (kind !== 'agents' && data['disable-model-invocation'] === true) {
-    return { status: 'skip' };
-  }
-  if (typeof data.description !== 'string' || !data.description) {
-    return { status: 'issue', reason: 'missing-description' };
-  }
-  let chars = data.description.length;
-  if (typeof data.when_to_use === 'string') {
-    chars += data.when_to_use.length;
-  }
-  return { status: 'counted', chars };
+  return measureDescriptionFields(data, kind);
 }
 
 function collectDescriptionBudget({

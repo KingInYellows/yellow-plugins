@@ -6,16 +6,6 @@ const fs = require('fs');
 const path = require('path');
 
 const YAML = require('yaml');
-const {
-  UPDATE_DESCRIPTION_BASELINE_FLAG,
-  checkDescriptionBudget,
-  collectDescriptionBudget,
-  describeDescriptionBudget,
-  formatBomError,
-  hasLeadingBom,
-  resolveDescriptionBaselinePath,
-  updateDescriptionBaseline,
-} = require('./lib/description-budget');
 
 const ROOT = path.resolve(__dirname, '..');
 // Allow tests to point the validator at a fixture tree by setting
@@ -505,6 +495,16 @@ const colonlessSubagentPattern =
 // so both spellings are matched; group 1 is the tool word, group 2 the bare name.
 const taskBarewordPattern = /\b(Task|Agent)\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 
+const {
+  UPDATE_DESCRIPTION_BASELINE_FLAG,
+  checkDescriptionBudget,
+  collectDescriptionBudget,
+  describeDescriptionBudget,
+  formatBomError,
+  hasLeadingBom,
+  resolveDescriptionBaselinePath,
+  updateDescriptionBaseline,
+} = require('./lib/description-budget');
 // Strip YAML frontmatter and fenced code blocks. Shared by RULE 15b, RULE 18,
 // and the colon-less/bareword subagent reference checks (fence-aware:
 // teaching docs show illustrative examples inside fences and must not trip
