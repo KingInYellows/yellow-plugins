@@ -6,6 +6,16 @@ const fs = require('fs');
 const path = require('path');
 
 const YAML = require('yaml');
+const {
+  UPDATE_DESCRIPTION_BASELINE_FLAG,
+  checkDescriptionBudget,
+  collectDescriptionBudget,
+  describeDescriptionBudget,
+  formatBomError,
+  hasLeadingBom,
+  resolveDescriptionBaselinePath,
+  updateDescriptionBaseline,
+} = require('./lib/description-budget');
 
 const ROOT = path.resolve(__dirname, '..');
 // Allow tests to point the validator at a fixture tree by setting
@@ -246,8 +256,8 @@ const DURABLE_BAR_FILES = [
   'yellow-core/agents/workflow/staging-scorer.md',
 ];
 
-// RULE 23 — description budget (error tier). Documented beside its code;
-// search for "RULE 23 — description budget".
+// RULE 23 — description budget (error tier), isolated in
+// scripts/lib/description-budget.js.
 //
 // RULE 24 — ERROR tier. A command and a skill in one plugin must not share a
 // `name:`. Claude Code resolves such a pair to the command, for the typed
@@ -292,10 +302,12 @@ const DURABLE_BAR_FILES = [
 //   15c: `description:` without a "Use when" trigger clause — weak
 //        descriptions make Claude Code's skill selection unreliable.
 //   15d: multi-line `description:` value (block scalars `>` / `|`,
-//        multi-line quoted strings, wrapped plain scalars). Runs on SKILL.md,
-//        agents and commands. Prettier produces this form when it rewraps a
-//        long description; an unindented continuation line drops the whole
-//        frontmatter, and other parsers may read only the first line (see
+//        multi-line quoted strings, or values wrapped/pushed onto later lines),
+//        whether the key is unquoted or quoted (`"description":` / `'description':`).
+//        Runs on SKILL.md, agents and commands. Prettier produces this form
+//        when it rewraps a long description; an unindented continuation line
+//        can drop the whole frontmatter, and other parsers may read only the
+//        first line (see
 //        docs/solutions/code-quality/prettier-description-wrap-silent-truncation.md).
 //
 // RULE 20 — ERROR tier, same walk. `user-invokable` (k) is not a Claude
@@ -540,6 +552,10 @@ function buildLastSegmentIndex(pluginAgents) {
 function validateAgentFile(filePath, ctx) {
   const { errors, warnings, pluginAgents } = ctx;
   const content = fs.readFileSync(filePath, 'utf8');
+  if (hasLeadingBom(content)) {
+    errors.push(formatBomError(relative(filePath)));
+    return;
+  }
   const frontmatter = extractFrontmatter(content);
 
   if (!frontmatter) {
@@ -1511,6 +1527,7 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
   // advisory here would let a nameless skill reach a release unnoticed.
   for (const filePath of skillFiles) {
     if (!entryPointId(filePath, 'skill').declared) {
+      if (hasLeadingBom(fs.readFileSync(filePath, 'utf8'))) continue;
       errors.push(
         `[RULE 18] ${relative(filePath)}: SKILL.md has no \`name:\` in its ` +
           `frontmatter. \`name:\` is the runtime identifier a ` +
@@ -1663,6 +1680,10 @@ function validateSkillFiles(skillFiles, ctx) {
   const { errors, warnings } = ctx;
   for (const filePath of skillFiles) {
     const content = fs.readFileSync(filePath, 'utf8');
+    if (hasLeadingBom(content)) {
+      errors.push(formatBomError(relative(filePath)));
+      continue;
+    }
 
     // 15a — line ceiling (see countLines for the counting contract).
     const lineCount = countLines(content);
@@ -1754,28 +1775,28 @@ function validateSkillFiles(skillFiles, ctx) {
   }
 }
 
-// RULE 15d — multi-line description. Checked against the RAW frontmatter
-// text (not the parsed value): YAML folds block scalars, multi-line quoted
-// strings, and wrapped plain scalars into one normal string, so only the raw
-// form shows the shape. Two shapes:
-//   (a) block scalar — value starts with `>` or `|`;
-//   (b) continuation — an indented line follows `description:`, which in a
-//       top-level frontmatter mapping can only be a continuation of the
-//       description value. Blank lines between `description:` and the
-//       indented continuation are tolerated — YAML permits them inside a
-//       quoted scalar, so a blank separator must not let the continuation
-//       slip past.
-// `[ \t]*` not `\s*` — \s matches the newline and would false-positive on
-// the next line's first character. `.` in the capture tolerates a trailing
-// `\r` on CRLF input.
+// RULE 15d — multi-line description. Checked via YAML.parseDocument so both
+// unquoted (`description:`) and quoted (`"description":` / `'description':`)
+// top-level keys are recognized, nested `description` keys and trailing or
+// indented comments do not false-positive, and both block scalars (`>` / `|`)
+// and wrapped values (including values pushed onto the line after the key)
+// are caught from the raw frontmatter source span.
 function checkDescriptionSingleLine(frontmatter, filePath, warnings) {
   if (!frontmatter) return;
-  const descLine = frontmatter.match(/^description:[ \t]*(.*)$/m);
-  if (!descLine) return;
-  const isBlockScalar = /^[>|]/.test(descLine[1]);
-  const afterDescLine = frontmatter.slice(descLine.index + descLine[0].length);
-  const hasContinuation = /^\r?\n(?:[ \t]*\r?\n)*[ \t]+\S/.test(afterDescLine);
-  if (isBlockScalar || hasContinuation) {
+  const doc = YAML.parseDocument(frontmatter);
+  if (doc.errors.length > 0 || !YAML.isMap(doc.contents)) return;
+  const pair = doc.contents.items.find(
+    (item) => YAML.isScalar(item.key) && item.key.value === 'description'
+  );
+  if (!pair || !pair.key || !pair.value) return;
+  const node = pair.value;
+  const isBlockScalar =
+    node.type === 'BLOCK_LITERAL' || node.type === 'BLOCK_FOLDED';
+  const spansLines =
+    Array.isArray(pair.key.range) &&
+    Array.isArray(node.range) &&
+    /[\r\n]/.test(frontmatter.slice(pair.key.range[0], node.range[1]));
+  if (isBlockScalar || spansLines) {
     warnings.push(
       `[RULE 15d advisory] ${relative(filePath)}: \`description:\` spans ` +
         `multiple lines (block scalar, multi-line quoted string, or wrapped ` +
@@ -1789,11 +1810,16 @@ function checkDescriptionSingleLine(frontmatter, filePath, warnings) {
 
 // RULE 15d for commands. Agents get it in validateAgentFile and skills in
 // validateSkillFiles, which already hold the raw frontmatter. Malformed YAML
-// is an error here as it is there: RULE 23 skips a file it cannot parse, so
-// an unreported parse failure would take a command out of the budget.
+// and leading UTF-8 BOM are errors here as they are there: RULE 23 skips files
+// it cannot parse, so an unreported failure would hide a broken command.
 function validateCommandDescriptions(commandFiles, errors, warnings) {
   for (const filePath of commandFiles) {
-    const frontmatter = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
+    const content = fs.readFileSync(filePath, 'utf8');
+    if (hasLeadingBom(content)) {
+      errors.push(formatBomError(relative(filePath)));
+      continue;
+    }
+    const frontmatter = extractFrontmatter(content);
     if (frontmatter === null) continue;
     try {
       YAML.parse(frontmatter);
@@ -2142,192 +2168,29 @@ function validateSizeCeilings(commandFiles, agentFiles, warnings) {
   }
 }
 
-// RULE 23 — description budget, ERROR tier on growth. Every command, agent
-// and skill `description:` is loaded into each Claude Code session, so the
-// total is a standing context cost. The committed baseline holds one number
-// per plugin; a plugin above its number fails until the author raises it in
-// the same PR, which makes growth a reviewable diff. A plugin below its
-// number only prints a notice, so two PRs that shrink the same plugin cannot
-// fail each other. No overall total is stored: it would conflict in every
-// parallel PR and is derivable.
-//
-// Counted: parsed `description` plus `when_to_use`, in characters, for
-// markdown at any depth under a plugin's commands/ or agents/ directory and
-// for skills/<name>/SKILL.md. Classifying by the directory directly under the
-// plugin also drops the generated codex/skills and cursor/skills copies. A
-// command or skill with `disable-model-invocation: true` is not listed to the
-// model and is skipped; Codex and Cursor still list it.
-//
-// A counted file the budget cannot measure is an error, never a silent zero:
-// malformed YAML is reported by the per-file rules, and a file with no string
-// description is reported here. The update flag refuses to write while either
-// exists, so a broken file cannot lower the committed number.
-const DESCRIPTION_KINDS = ['commands', 'agents', 'skills'];
-const UPDATE_DESCRIPTION_BASELINE_FLAG = '--update-description-baseline';
-const UPDATE_DESCRIPTION_BASELINE_COMMAND = 'pnpm update:description-baseline';
-// Fixture runs (VALIDATE_PLUGINS_DIR set) skip the check unless they name
-// their own baseline, so a fixture tree is never compared with the real one.
-function descriptionBaselinePath() {
-  if (process.env.VALIDATE_DESCRIPTION_BASELINE) {
-    return path.resolve(process.env.VALIDATE_DESCRIPTION_BASELINE);
-  }
-  if (process.env.VALIDATE_PLUGINS_DIR) return null;
-  return path.join(ROOT, 'scripts', 'description-budget-baseline.json');
-}
-
-function collectDescriptionBudget(pluginNames, files) {
-  // No prototype, so a directory named `__proto__` is an ordinary key.
-  const plugins = Object.create(null);
-  for (const name of [...pluginNames].sort()) plugins[name] = 0;
-  const kinds = { commands: 0, agents: 0, skills: 0 };
-  const perFile = Object.create(null);
-  const undescribed = [];
-  const malformed = [];
-  const unparsedAgents = [];
-  // A Set: the callers' lists overlap for a path that has both a commands/
-  // and an agents/ segment, and each file counts once, under its top-level
-  // directory.
-  for (const filePath of new Set(files)) {
-    const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
-    const [pluginName, kind] = parts;
-    if (!DESCRIPTION_KINDS.includes(kind)) continue;
-    // Only skills/<name>/SKILL.md is a skill manifest.
-    if (kind === 'skills' && (parts.length !== 4 || parts[3] !== 'SKILL.md')) {
-      continue;
-    }
-    const frontmatter = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
-    const data = parseFrontmatter(frontmatter);
-    if (frontmatter !== null && !data) {
-      malformed.push(filePath);
-      continue;
-    }
-    // No frontmatter. For an agent that is already an error in
-    // validateAgentFile, which update mode never reaches, so the file is
-    // kept apart to block a baseline write. A command or skill is reported
-    // as undescribed.
-    if (!data) {
-      (kind === 'agents' ? unparsedAgents : undescribed).push(filePath);
-      continue;
-    }
-    if (kind !== 'agents' && data['disable-model-invocation'] === true) {
-      continue;
-    }
-    if (typeof data.description !== 'string' || !data.description) {
-      undescribed.push(filePath);
-      continue;
-    }
-    let chars = 0;
-    for (const key of ['description', 'when_to_use']) {
-      if (typeof data[key] === 'string') chars += data[key].length;
-    }
-    plugins[pluginName] += chars;
-    kinds[kind] += chars;
-    (perFile[pluginName] ||= []).push({ filePath, chars });
-  }
-  return { plugins, kinds, perFile, undescribed, malformed, unparsedAgents };
-}
-
-function checkDescriptionBudget(budget, baselinePath, errors, notices) {
-  let baseline;
-  try {
-    baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
-  } catch (e) {
-    errors.push(
-      `RULE 23 — cannot read the description baseline ` +
-        `${relative(baselinePath)} (${e.code || e.name}); run ` +
-        `\`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\`.`
-    );
-    return;
-  }
-  const entries = baseline && baseline.plugins;
-  if (
-    !entries ||
-    baseline.unit !== 'chars' ||
-    typeof entries !== 'object' ||
-    Array.isArray(entries)
-  ) {
-    errors.push(
-      `RULE 23 — ${relative(baselinePath)} must have \`"unit": "chars"\` and ` +
-        `a \`plugins\` object; run \`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\`.`
-    );
-    return;
-  }
-  for (const name of Object.keys(budget.plugins)) {
-    const current = budget.plugins[name];
-    const hasEntry = Object.prototype.hasOwnProperty.call(entries, name);
-    if (hasEntry && !(Number.isInteger(entries[name]) && entries[name] >= 0)) {
-      errors.push(
-        `RULE 23 — ${name}: baseline entry must be a non-negative integer; ` +
-          `run \`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\`.`
-      );
-      continue;
-    }
-    const allowed = hasEntry ? entries[name] : 0;
-    if (current > allowed) {
-      errors.push(
-        `RULE 23 — ${name}: description total ${current} chars is over its ` +
-          `baseline ${allowed} (+${current - allowed}). Shorten the ` +
-          `descriptions, or run \`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\` ` +
-          `and commit the baseline so the growth is reviewed. Largest: ` +
-          `${largestDescriptions(budget.perFile[name])}.`
-      );
-    } else if (current < allowed) {
-      notices.push(
-        `[RULE 23 notice] ${name}: description total ${current} chars is ` +
-          `under its baseline ${allowed} (-${allowed - current}); run ` +
-          `\`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\` to lower it.`
-      );
-    }
-  }
-  for (const filePath of budget.undescribed) {
-    errors.push(undescribedError(filePath));
-  }
-  for (const name of Object.keys(entries).sort()) {
-    if (!Object.prototype.hasOwnProperty.call(budget.plugins, name)) {
-      notices.push(
-        `[RULE 23 notice] baseline entry "${name}" has no plugin directory; ` +
-          `run \`${UPDATE_DESCRIPTION_BASELINE_COMMAND}\` to drop it.`
-      );
-    }
-  }
-}
-
-function undescribedError(filePath) {
-  return (
-    `RULE 23 — ${relative(filePath)}: no string \`description:\` in the ` +
-    `frontmatter. Claude Code may list its first body text instead, which ` +
-    `the budget cannot count; add a description.`
-  );
-}
-
-function largestDescriptions(entries = []) {
-  return [...entries]
-    .sort((a, b) => b.chars - a.chars)
-    .slice(0, 3)
-    .map(({ filePath, chars }) => `${relative(filePath)} (${chars})`)
-    .join(', ');
-}
-
-// Temp file then rename, so an interrupted run cannot leave a truncated
-// baseline that the next run reports as unreadable.
-function writeDescriptionBaseline(budget, baselinePath) {
-  const tmpPath = `${baselinePath}.${process.pid}.tmp`;
-  fs.writeFileSync(
-    tmpPath,
-    `${JSON.stringify({ unit: 'chars', plugins: budget.plugins }, null, 2)}\n`
-  );
-  fs.renameSync(tmpPath, baselinePath);
-}
-
-function describeDescriptionBudget(budget) {
-  const { commands, agents, skills } = budget.kinds;
-  return (
-    `Description budget: ${commands + agents + skills} chars ` +
-    `(commands ${commands}, agents ${agents}, skills ${skills})`
-  );
-}
+const USAGE = `Usage: node scripts/validate-agent-authoring.js [${UPDATE_DESCRIPTION_BASELINE_FLAG}]`;
 
 function main() {
+  const args = process.argv.slice(2);
+  const updateBaseline = args.includes(UPDATE_DESCRIPTION_BASELINE_FLAG);
+  const unknown = args.filter(
+    (arg) => arg !== UPDATE_DESCRIPTION_BASELINE_FLAG
+  );
+  if (unknown.length > 0) {
+    logError(`Unknown argument(s): ${unknown.join(' ')}`);
+    console.error(USAGE);
+    process.exit(1);
+  }
+
+  const baselinePath = resolveDescriptionBaselinePath({ rootDir: ROOT });
+  if (updateBaseline && !baselinePath) {
+    logError(
+      `${UPDATE_DESCRIPTION_BASELINE_FLAG} needs VALIDATE_DESCRIPTION_BASELINE ` +
+        `when VALIDATE_PLUGINS_DIR is set`
+    );
+    process.exit(1);
+  }
+
   const pluginNames = new Set(
     fs
       .readdirSync(PLUGINS_DIR, { withFileTypes: true })
@@ -2366,43 +2229,24 @@ function main() {
       path.basename(filePath) === 'SKILL.md'
   );
 
-  const baselinePath = descriptionBaselinePath();
-  const budget = collectDescriptionBudget(pluginNames, [
-    ...commandFiles,
-    ...agentFiles,
-    ...skillFiles,
-  ]);
-  if (process.argv.includes(UPDATE_DESCRIPTION_BASELINE_FLAG)) {
-    if (!baselinePath) {
-      logError(
-        `${UPDATE_DESCRIPTION_BASELINE_FLAG} needs VALIDATE_DESCRIPTION_BASELINE ` +
-          `when VALIDATE_PLUGINS_DIR is set`
-      );
-      process.exit(1);
-    }
-    const blockers = [
-      ...budget.malformed.map(
-        (filePath) => `${relative(filePath)}: malformed YAML frontmatter`
-      ),
-      ...budget.undescribed.map(undescribedError),
-      ...budget.unparsedAgents.map(
-        (filePath) => `${relative(filePath)}: no YAML frontmatter`
-      ),
-    ];
-    if (blockers.length > 0) {
-      for (const blocker of blockers) logError(blocker);
-      logError('Baseline not written: fix the files above first.');
-      process.exit(1);
-    }
-    try {
-      writeDescriptionBaseline(budget, baselinePath);
-    } catch (e) {
-      logError(`cannot write ${relative(baselinePath)} (${e.code || e.name})`);
-      process.exit(1);
-    }
-    logSuccess(
-      `Wrote ${relative(baselinePath)} — ${describeDescriptionBudget(budget)}`
-    );
+  const budget = baselinePath
+    ? collectDescriptionBudget({
+        pluginsDir: PLUGINS_DIR,
+        pluginNames,
+        files: [...commandFiles, ...agentFiles, ...skillFiles],
+        extractFrontmatter,
+        parseFrontmatter,
+      })
+    : null;
+  if (updateBaseline) {
+    const ok = updateDescriptionBaseline({
+      budget,
+      baselinePath,
+      formatPath: relative,
+      logError,
+      logSuccess,
+    });
+    if (!ok) process.exit(1);
     return;
   }
 
@@ -2445,7 +2289,11 @@ function main() {
   validateStagingPromoterFrontmatter(agentFiles, errors);
   validateMemoryWriteSectionGate(agentFiles, errors);
   if (baselinePath) {
-    checkDescriptionBudget(budget, baselinePath, errors, notices);
+    checkDescriptionBudget(budget, baselinePath, {
+      formatPath: relative,
+      errors,
+      notices,
+    });
   }
 
   // Print warnings first so they remain visible above the trailing

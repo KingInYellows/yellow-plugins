@@ -43,7 +43,7 @@ every field below. The effort-inheritance behaviour was observed on
 | Field | Type | Notes |
 |---|---|---|
 | `name` | `string` | Lowercase `a-z`, digits, hyphens only. No spaces, underscores, uppercase. Convention: matches filename minus `.md`. |
-| `description` | `string` (single-line) | **Must be single-line inline.** Folded scalars (`>`) and literal blocks (`|`) silently truncate to first line (parser bug, GH #10504). Include a "Use when…" trigger clause for reliable automatic delegation. |
+| `description` | `string` (single-line) | **Single-line inline convention (RULE 15d).** Keep on one line with `# prettier-ignore` above long values. An unindented continuation can drop the whole frontmatter and other parsers may read only the first line; earlier claims that Claude Code silently truncates valid `>` / `\|` scalars (GH #10504) are unverified on current builds (`anthropics/claude-code#94301` on v2.1.274 found valid multi-line forms load in full for skills and commands; agents were not tested). Include a "Use when…" trigger clause for reliable automatic delegation. |
 
 ### Optional fields — behavioral
 
@@ -281,7 +281,7 @@ The `plugin-directory-name` is the directory name (e.g., `yellow-research`), NOT
 
 ## Why This Matters
 
-- **`description` single-line rule:** Folded scalars silently truncate — the parser reads only the first line. This is confirmed parser behavior (GH #10504), not a subtle edge case. Every folded-scalar description passes YAML validation but delivers a broken routing signal.
+- **`description` single-line convention (RULE 15d):** Keep `description:` on one line (use `# prettier-ignore` above long values). Earlier notes cited GH #10504 claiming Claude Code's parser silently truncates folded scalars to the first line, which is unverified on current Claude Code (`anthropics/claude-code#94301` on v2.1.274 observed valid multi-line forms loading in full for skills and commands; agents were not tested). Keeping one line prevents Prettier-induced unindented continuations from dropping frontmatter and protects tools or parsers that read only the first line.
 - **Plugin subagents silently drop three fields:** `permissionMode`, `mcpServers`, and `hooks` are no-ops when shipped from a plugin. Reviewing a plugin PR that adds any of these is reviewing dead frontmatter unless the agent is later moved to user/project scope.
 - **`memory:` is a tool expansion:** Adding `memory: project` to an agent advertised as read-only silently grants Read/Write/Edit. The "read-only contract" exists only in the system prompt — the runtime grant is real. Fix: add `disallowedTools: [Write, Edit, MultiEdit]` to enforce the prose contract at the runtime layer.
 - **`memory: true` is invalid:** Boolean form silently does nothing. Use `user`/`project`/`local` strings.
@@ -374,5 +374,6 @@ tools: Read, Bash, Glob
 | v2.1.119+ | 2026-04 | `permissionMode` honored for built-in agents via `--agent <name>` |
 | — (doc re-check) | 2026-09-02 | `max` effort re-verified against the Claude Code sub-agents reference and the platform effort docs — accepted on Sonnet 5 / Opus 5 / Fable 5.x, retiring the earlier "Opus 4.6-exclusive" caveat; `fable` model alias added; `experimental.cacheTtl` (`5m`/`1h` nested under `experimental:`) documented from the 2.1.259 check |
 | — (doc re-check) | 2026-09-05 | `experimental.cacheTtl` precedence rule added: a `subagentPromptCacheTtl` setting or env var overrides the frontmatter field entirely (frontmatter is the fallback, not a peer or override). Verified against the installed 2.1.261 binary's agent frontmatter schema text; found during PR #748 review after six doc surfaces stated the usage-credits caveat but omitted this precedence rule. |
+| — (doc re-check) | 2026-11-22 | `description` single-line notes corrected: replaced unverified GH #10504 silent-truncation claim with the RULE 15d rationale (unindented continuations can drop frontmatter; other parsers may read only the first line; `anthropics/claude-code#94301` on v2.1.274). |
 
 Fields with no deprecation history as of 2026-05-04. Reports of deprecated `deny-tools`, `auto-invoke`, and `extends` fields could not be confirmed against the official changelog — treat as unverified.

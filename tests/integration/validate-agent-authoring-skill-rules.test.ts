@@ -233,9 +233,9 @@ const LITERAL_DESCRIPTION_SKILL = FOLDED_DESCRIPTION_SKILL.replace(
 );
 
 // 15d trigger (multi-line quoted string): YAML folds this into one string
-// containing "Use when", so 15c stays silent — only the raw-continuation
-// check can catch it. This is the exact truncation shape the repo has been
-// bitten by (see the solutions doc cited by the rule).
+// containing "Use when", so 15c stays silent — only the YAML source-span
+// check catches it. This is the wrapped multi-line shape Prettier produces
+// (see docs/solutions/code-quality/prettier-description-wrap-silent-truncation.md).
 const QUOTED_MULTILINE_DESCRIPTION_SKILL = `---
 name: quoted-multiline-skill
 description: 'Quoted fixture spanning lines.

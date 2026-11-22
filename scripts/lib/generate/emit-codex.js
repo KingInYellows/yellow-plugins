@@ -689,9 +689,9 @@ function buildCodexSkillTree(rootDir, name, source) {
     const body = raw.slice(match[0].length);
     // lineWidth: 0 + blockQuote: false keep the frontmatter's `description`
     // on one line — YAML.stringify's default 80-col fold (and its
-    // newline-triggered block-scalar fallback) would otherwise silently
-    // violate the single-line `description:` requirement the Claude Code
-    // frontmatter parser expects (see FRONTMATTER_RE's comment above).
+    // newline-triggered block-scalar fallback) would otherwise violate the
+    // repo's single-line `description:` convention (RULE 15d in
+    // scripts/validate-agent-authoring.js).
     const normalizedFrontmatter = YAML.stringify(
       { name: parsed.name, description: parsed.description },
       null,

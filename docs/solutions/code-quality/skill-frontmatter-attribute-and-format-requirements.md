@@ -2,15 +2,15 @@
 title: 'Skill and Agent Frontmatter Attribute Name and Format Requirements'
 category: code-quality
 track: knowledge
-problem: 'Wrong skill/agent frontmatter attribute spelling (user-invocable vs user-invokable) and unsupported YAML folded scalar in description silently truncates parser output'
+problem: 'Wrong skill/agent frontmatter attribute spelling (user-invocable vs user-invokable) and multi-line YAML scalars in description violating single-line convention'
 tags: [claude-code, skill, agent, frontmatter, yaml, plugin-authoring]
 module: plugins (all)
 symptom:
   "VS Code diagnostics: 'Attribute user-invocable is not supported' and
   'Unexpected indentation' on SKILL.md and agent .md files"
 root_cause:
-  'Wrong attribute spelling (user-invocable vs user-invokable) and unsupported
-  YAML folded scalar format in descriptions'
+  'Wrong attribute spelling (user-invocable vs user-invokable) and multi-line
+  YAML scalar format in descriptions'
 date: 2026-02-17
 pr: '#23, #69'
 ---
@@ -23,8 +23,10 @@ pr: '#23, #69'
 > parses only `user-invocable`, which is also the spelling in the official skills
 > reference. Every SKILL.md was renamed back and RULE 20 in
 > `scripts/validate-agent-authoring.js` now rejects `user-invokable` at error
-> tier. The single-line `description:` rules below are unchanged and still
-> apply. The history is kept verbatim so the reversal is traceable.
+> tier. RULE 15d still recommends single-line descriptions. See the
+> [runtime evidence](#runtime-evidence-for-multi-line-descriptions) for the
+> limits of the earlier parser diagnosis. The history is kept verbatim so the
+> reversals are traceable.
 
 ## Problem
 
@@ -57,6 +59,8 @@ the first skill was written with `user-invocable` and all subsequent skills
 copied the pattern.
 
 ### 2. YAML folded scalars not supported
+
+> **Historical claim.** See the [runtime evidence](#runtime-evidence-for-multi-line-descriptions) below.
 
 Claude Code's frontmatter parser does **not** support YAML folded scalar syntax
 (`>`). It uses a simple line-by-line parser, not a full YAML parser.
@@ -141,9 +145,11 @@ grep -r '^description: >$' plugins/*/skills/*/SKILL.md
 
 ## Agent .md Files: Same Rule, Different Trigger
 
-The YAML folded scalar restriction applies equally to agent `.md` files, not
-only SKILL.md files. The failure mode is silent: Claude Code's frontmatter
-parser silently drops the description rather than emitting a diagnostic.
+The single-line `description:` convention applies equally to agent `.md` files,
+not only `SKILL.md` files (RULE 15d warns on skills, agents, and commands).
+Earlier notes below claimed Claude Code's frontmatter parser silently drops or
+truncates multi-line agent descriptions; that runtime behavior is unverified on
+current Claude Code (agents were not tested in `anthropics/claude-code#94301`).
 
 **Broken agent frontmatter (PR #69, `test-reporter.md`):**
 
@@ -179,6 +185,8 @@ description: 'Identifies recurring anti-patterns and structural problems in plug
   code. Use when reviewing multiple agent files for systematic quality issues.'
 ---
 ```
+
+> **Historical claim.** See the [runtime evidence](#runtime-evidence-for-multi-line-descriptions) below.
 
 Claude Code's line-by-line frontmatter parser reads `description:` as the
 first line only: `'Identifies recurring anti-patterns...'` (truncated, possibly
@@ -234,6 +242,8 @@ description: >-
   to project conventions. Checks cross-references and link validity.
 ---
 ```
+
+> **Historical claim.** See the [runtime evidence](#runtime-evidence-for-multi-line-descriptions) below.
 
 Claude Code's line-by-line parser treats `>-` the same as `>` — it reads only
 `description: >-` as the value (an empty/malformed string), and all continuation
@@ -295,12 +305,13 @@ special characters predictably.
 1. **Use the correct attribute name:** `user-invokable` (with k) is superseded
    as of 2026-09-02 — use `user-invocable` (with c); see "Update — 2026-09-02"
    at the end of this doc (the original text here said `user-invokable`)
-2. **Keep frontmatter values single-line:** No `>`, `>-`, `>+`, `|`, `|-`,
-   `|+`, or multi-line YAML constructs in any `.md` plugin file (skills AND
-   agents)
-3. **On-touch check:** Run the updated grep above whenever any agent or skill
-   `.md` is modified — folded scalars may be pre-existing and surface only on
-   next touch
+2. **Keep `description:` values single-line:** No `>`, `>-`, `>+`, `|`, `|-`,
+   `|+`, or multi-line YAML constructs in any command, agent, or skill `.md`
+   file; add `# prettier-ignore` above long descriptions to prevent Prettier
+   rewrapping
+3. **Validator check:** Run `pnpm validate:agents` — RULE 15d warns on
+   multi-line `description:` values across skills, agents, and commands
+   (including quoted `description` keys)
 4. **Check VS Code diagnostics** before committing changes to SKILL.md files
 5. **Update `create-agent-skills` SKILL.md** when attribute names change — it's
    the documentation source other plugin authors reference
@@ -460,3 +471,23 @@ validated.
 **Status:** documented as a follow-up, not yet implemented in
 `scripts/validate-agent-authoring.js` as of this update — RULE 20 still only
 checks for `user-invokable`'s absence.
+
+---
+
+## Update — 2026-11-22
+
+### Runtime evidence for multi-line descriptions
+
+Earlier sections of this document stated that Claude Code uses a line-by-line
+frontmatter parser that silently truncates or drops valid multi-line YAML
+`description:` values (`>`, `>-`, `|`, multi-line quoted scalars). That runtime
+behavior is unverified on current Claude Code: on v2.1.274
+(`anthropics/claude-code#94301`), valid multi-line descriptions loaded in full
+for skills and commands, while an unindented continuation dropped the entire
+frontmatter (agents were not tested).
+
+The single-line `description:` convention remains active across commands,
+agents, and skills via RULE 15d in `scripts/validate-agent-authoring.js`
+(covering both unquoted and quoted `description` keys via `YAML.parseDocument`)
+to guard against Prettier-induced unindented continuations and parsers that read
+only the first line. See `plans/description-validators.md`.
