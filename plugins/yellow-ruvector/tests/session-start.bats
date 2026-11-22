@@ -1,11 +1,20 @@
 #!/usr/bin/env bats
 # Tests for hooks/scripts/session-start.sh
 bats_require_minimum_version 1.5.0
-# The hook delegates to ruvector CLI (hooks session-start / hooks recall)
-# under a 3s hooks.json watchdog. These tests prove the per-call timeout
-# wrapping: a hanging ruvector binary must not stop {"continue": true} from
-# being emitted within budget. NOTE: this suite is the repo's first bats file
-# simulating a HANGING binary (sleep stub), not just a failing one.
+# The hook injects the cached recall a background job saved at the previous
+# session start and starts a detached `hooks recall` refresh under a 6s
+# hooks.json watchdog. These tests cover cached recall, store-identity keying,
+# provenance warnings, and per-call timeout wrapping: a hanging ruvector binary
+# must not stop {"continue": true} from being emitted within budget.
+
+update_recall_paths() {
+  local _key
+  _key=$(bash -c '. "$1"; ruvector_recall_key "$2"' _ \
+    "$BATS_TEST_DIRNAME/../hooks/scripts/lib/resolve.sh" \
+    "$(cd "$RUVECTOR_DIR" && pwd -P)") || return 1
+  RECALL_CACHE="$CLAUDE_PLUGIN_DATA/recall/${_key}.json"
+  RECALL_STAMP="$CLAUDE_PLUGIN_DATA/recall/${_key}.refresh"
+}
 
 setup() {
   PROJECT_ROOT="$(mktemp -d)"
@@ -13,13 +22,11 @@ setup() {
   mkdir -p "$RUVECTOR_DIR"
   HOOK_SCRIPT="$BATS_TEST_DIRNAME/../hooks/scripts/session-start.sh"
   MOCK_BIN="$(mktemp -d)"
-  # The recall cache lives in the plugin data dir, keyed by the store's
-  # physical path (session-start.sh recall_paths).
+  # The recall cache lives in the plugin data dir, keyed by physical store
+  # path and stable store identity (session-start.sh recall_paths).
   CLAUDE_PLUGIN_DATA="$(cd "$(mktemp -d)" && pwd -P)"
   export CLAUDE_PLUGIN_DATA
-  _key=$(printf '%s' "$(cd "$RUVECTOR_DIR" && pwd -P)" | cksum | tr -c '0-9\n' '-')
-  RECALL_CACHE="$CLAUDE_PLUGIN_DATA/recall/${_key}.json"
-  RECALL_STAMP="$CLAUDE_PLUGIN_DATA/recall/${_key}.refresh"
+  update_recall_paths
 }
 
 teardown() {
@@ -165,6 +172,25 @@ exit 0'
   [ ! -e "$RECALL_CACHE" ]
   for _ in $(seq 1 50); do [ -s "$RECALL_CACHE" ] && break; sleep 0.1; done
   [ -s "$RECALL_CACHE" ]
+}
+
+@test "ordinary store writes retain warm recall while a replacement at the same path starts cold" {
+  make_recall_stub previous-store 0.9
+  run run_hook_warm '{}'
+  jq -e '.hookSpecificOutput.additionalContext | contains("previous-store")' <<<"$output"
+  touch "$RUVECTOR_DIR/example-entry"
+  run run_hook '{}'
+  jq -e '.hookSpecificOutput.additionalContext | contains("previous-store")' <<<"$output"
+
+  mv "$RUVECTOR_DIR" "$PROJECT_ROOT/old-store"
+  mkdir "$RUVECTOR_DIR"
+  make_recall_stub replacement-store 0.9
+  run run_hook '{}'
+  jq -e 'has("hookSpecificOutput") | not' <<<"$output"
+  update_recall_paths
+  wait_for "$RECALL_CACHE"
+  run run_hook '{}'
+  jq -e '.hookSpecificOutput.additionalContext | contains("replacement-store")' <<<"$output"
 }
 
 @test "results under the minimum score are dropped; none passing injects nothing" {

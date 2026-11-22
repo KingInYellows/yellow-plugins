@@ -351,3 +351,18 @@ run_budgeted() {
   [ -n "$flag" ] && rm -rf -- "$flag" 2>/dev/null
   return "$rc"
 }
+
+# ruvector_recall_key <physical-store-dir> — used for both cached recall and its refresh stamp.
+# The store directory can be deleted and recreated at the same path and
+# even reuse the same inode. Its birth time survives ordinary store writes.
+ruvector_recall_key() {
+  local identity path_sum
+  [ -d "$1" ] && [ ! -L "$1" ] || return 1
+  # GNU stat emits zero for an unavailable birth time. Skip prefetch when
+  # neither stat dialect supplies a usable identity.
+  identity=$(LC_ALL=C stat -c '%d-%i-%.9W' -- "$1" 2>/dev/null) ||
+    identity=$(LC_ALL=C stat -f '%d-%i-%.9FB' "$1" 2>/dev/null) || return 1
+  [[ "$identity" =~ ^[0-9]+-[0-9]+-[1-9][0-9]*\.[0-9]{9}$ ]] || return 1
+  path_sum=$(printf '%s' "$1" | cksum) || return 1
+  printf 'v2-%s-%s' "$identity" "${path_sum%% *}"
+}
