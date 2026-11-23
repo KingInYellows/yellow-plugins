@@ -50,6 +50,16 @@
 # accordingly (routing summary now included ahead of the failure line, where
 # it previously was not, since the cache no longer embeds a stale copy of it).
 #
+# DELIBERATE DIVERGENCE (CLAUDE-369, every case but cache-hit and
+# no-workflows): the hook no longer calls `gh` in the foreground. A cache miss
+# shows the routing summary only and starts a detached refresh-cache.js, which
+# runs `gh auth status` + `gh run list` and writes the cache the NEXT session
+# start reads. The bash hook did both in one process, so each golden now
+# describes "refresh, then start": assert_parity runs refresh-cache.js first
+# (YELLOW_CI_NO_BACKGROUND_REFRESH=1 keeps the hook itself from launching
+# one) and compares the refresh's stderr followed by the hook's stderr with
+# the golden. The goldens are unchanged. The one-step miss is tested below.
+#
 # STDOUT is compared JSON-semantically (jq -S -c) because the bash hook emitted
 # jq's pretty multi-line JSON while the Node port emits compact JSON — the
 # decision is what must match, not the byte formatting. STDERR and EXIT_CODE are
@@ -94,11 +104,21 @@ assert_parity() {
   hook_scenario_setup "$case" "$sandbox"
   cd "$HOOK_SCENARIO_WORKDIR"
 
+  # A seeded cache-hit is already fresh; every other case starts from a miss,
+  # so the background refresh runs first (see the CLAUDE-369 note above).
+  local refresh_err=""
+  if [ "$case" != "cache-hit" ]; then
+    refresh_err=$(node "$SCRIPTS_DIR/lib/refresh-cache.js" 2>&1 >/dev/null)
+  fi
+
   run --separate-stderr node "$SCRIPTS_DIR/$entrypoint" <"$FIXTURE_ROOT/$case.stdin"
 
   [ "$status" -eq "$(golden_exit_code "$golden")" ]
   assert_stdout_matches_golden "$output" "$(golden_section "$golden" STDOUT)"
-  [ "$stderr" = "$(golden_section "$golden" STDERR)" ]
+  local all_err="$refresh_err"
+  if [ -n "$stderr" ]; then all_err="${all_err:+$all_err
+}$stderr"; fi
+  [ "$all_err" = "$(golden_section "$golden" STDERR)" ]
 }
 
 assert_parity_both() {
@@ -112,7 +132,7 @@ assert_parity_both() {
 @test "SessionStart parity: gh-missing (routing only)" { assert_parity_both gh-missing; }
 @test "SessionStart parity: gh-unauthed (routing only)" { assert_parity_both gh-unauthed; }
 @test "SessionStart parity: cache-hit (new plugin-data location, trusted)" { assert_parity_both cache-hit; }
-@test "SessionStart parity: legacy-only cache hit is not trusted (falls through to live fetch)" { assert_parity_both legacy-cache-not-trusted; }
+@test "SessionStart parity: legacy-only cache hit is not trusted (refreshed, not shown)" { assert_parity_both legacy-cache-not-trusted; }
 @test "SessionStart parity: cache-miss-failures (routing + failure line)" { assert_parity_both cache-miss-failures; }
 @test "SessionStart parity: malformed-gh-json (routing only + stderr warning)" { assert_parity_both malformed-gh-json; }
 @test "SessionStart parity: rate-limited-gh (routing only)" { assert_parity_both rate-limited-gh; }
@@ -123,6 +143,7 @@ assert_parity_both() {
   local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/hostile-XXXXXX")"
   hook_scenario_setup hostile-branch "$sandbox"
   cd "$HOOK_SCENARIO_WORKDIR"
+  node "$SCRIPTS_DIR/lib/refresh-cache.js"
   run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
   [ "$status" -eq 0 ]
 
@@ -146,8 +167,8 @@ assert_parity_both() {
   # user-writable directory, so a local process could plant a symlink there
   # before this hook runs and have an arbitrary file's bytes spliced into
   # systemMessage. Seed a genuine cache-hit, then swap the file for a symlink
-  # to a "secret" file: the hit must be rejected (falls through to a live,
-  # mocked fetch) rather than echoing the secret's content.
+  # to a "secret" file: the hit must be rejected (treated as a miss) rather
+  # than echoing the secret's content.
   local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/symlink-lastcheck-XXXXXX")"
   hook_scenario_setup cache-hit "$sandbox"
   cd "$HOOK_SCENARIO_WORKDIR"
@@ -181,4 +202,183 @@ assert_parity_both() {
   [ "$status" -eq 0 ]
   local msg; msg=$(printf '%s' "$output" | jq -r '.systemMessage')
   [[ "$msg" != *"SECRET-FILE-CONTENT-DO-NOT-LEAK"* ]]
+}
+
+# --- CLAUDE-369: no network in the foreground --------------------------------
+
+# Age a file by N seconds. touch -d is not portable (GNU vs BSD), and
+# node is always present, so set the mtime with it.
+age_file() {
+  node -e 'const fs=require("fs");const t=Date.now()/1000-Number(process.argv[2]);fs.utimesSync(process.argv[1],t,t)' "$1" "$2"
+}
+
+@test "SessionStart: a fresh cache hit never calls gh" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/fresh-XXXXXX")"
+  hook_scenario_setup cache-hit "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  export MOCK_GH_LOG="$sandbox/gh.log"; : >"$MOCK_GH_LOG"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+  sleep 1
+  [ ! -s "$MOCK_GH_LOG" ]
+  [ -z "$(ls "$HOME/.local/share/yellow-ci" | grep '^refresh-' || true)" ]
+}
+
+@test "SessionStart: a miss shows routing only, calls no gh, and a background refresh fills the cache" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/miss-XXXXXX")"
+  hook_scenario_setup cache-miss-failures "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  export MOCK_GH_LOG="$sandbox/gh.log"; : >"$MOCK_GH_LOG"
+
+  # Foreground only: no gh call, no failure line.
+  run --separate-stderr node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  local msg; msg=$(printf '%s' "$output" | jq -r '.systemMessage')
+  [[ "$msg" == *"Runner routing"* ]]
+  [[ "$msg" != *"recent failure"* ]]
+  [ ! -s "$MOCK_GH_LOG" ]
+
+  # With the background refresh on, the cache appears without a second start.
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  local key; key=$(hook_cache_key "$PWD")
+  local cache="$HOME/.local/share/yellow-ci/last-check-$key" i
+  for i in $(seq 1 50); do [ -s "$cache" ] && break; sleep 0.1; done
+  [ -s "$cache" ]
+  grep -q '^run list' "$MOCK_GH_LOG"
+
+  # The refresh marker is removed when the refresh ends.
+  for i in $(seq 1 50); do [ -e "$HOME/.local/share/yellow-ci/refresh-$key" ] || break; sleep 0.1; done
+  [ ! -e "$HOME/.local/share/yellow-ci/refresh-$key" ]
+
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"3 recent failure(s)"* ]]
+}
+
+@test "SessionStart: a stale cache is shown and refreshed; a too-old one is not shown" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/stale-XXXXXX")"
+  hook_scenario_setup cache-hit "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  export MOCK_GH_LOG="$sandbox/gh.log"; : >"$MOCK_GH_LOG"
+  local key; key=$(hook_cache_key "$PWD")
+  local cache="$HOME/.local/share/yellow-ci/last-check-$key" i
+
+  age_file "$cache" 900
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+  for i in $(seq 1 50); do grep -q '^run list' "$MOCK_GH_LOG" && break; sleep 0.1; done
+  grep -q '^run list' "$MOCK_GH_LOG"
+
+  for i in $(seq 1 50); do [ -e "$HOME/.local/share/yellow-ci/refresh-$key" ] || break; sleep 0.1; done
+  printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$cache"
+  age_file "$cache" 7200
+  export YELLOW_CI_NO_BACKGROUND_REFRESH=1
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" != *"cached-branch"* ]]
+}
+
+@test "SessionStart: a live refresh marker stops a second refresh" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/marker-XXXXXX")"
+  hook_scenario_setup cache-miss-failures "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  export MOCK_GH_LOG="$sandbox/gh.log"; : >"$MOCK_GH_LOG"
+  local key; key=$(hook_cache_key "$PWD")
+  mkdir -p "$HOME/.local/share/yellow-ci"
+  : >"$HOME/.local/share/yellow-ci/refresh-$key"
+
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  sleep 1
+  [ ! -s "$MOCK_GH_LOG" ]
+}
+
+@test "SessionStart: cache age boundaries (600 s refreshes, 3600 s is not shown)" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/bounds-XXXXXX")"
+  hook_scenario_setup cache-hit "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  local key; key=$(hook_cache_key "$PWD")
+  local dir="$HOME/.local/share/yellow-ci" cache
+  cache="$dir/last-check-$key"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  export MOCK_GH_LOG="$sandbox/gh.log"; : >"$MOCK_GH_LOG"
+
+  # 598 s: fresh, no refresh attempted (no marker created). The hook reads
+  # the clock in a later process, so a second can tick over between
+  # age_file and the check; the "just under" cases keep a 2 s margin.
+  age_file "$cache" 598
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+  [ ! -e "$dir/refresh-$key" ]
+
+  # 600 s: still shown, and a refresh is started.
+  age_file "$cache" 600
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+  local i
+  for i in $(seq 1 50); do grep -q '^run list' "$MOCK_GH_LOG" && break; sleep 0.1; done
+  grep -q '^run list' "$MOCK_GH_LOG"
+  for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
+
+  # 3598 s: still shown; 3600 s: not shown.
+  export YELLOW_CI_NO_BACKGROUND_REFRESH=1
+  printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$cache"
+  age_file "$cache" 3598
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+  age_file "$cache" 3600
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" != *"cached-branch"* ]]
+}
+
+@test "SessionStart: refresh warnings reach the log; a failed refresh writes no cache" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/refresh-fail-XXXXXX")"
+  hook_scenario_setup malformed-gh-json "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  local key; key=$(hook_cache_key "$PWD")
+  local dir="$HOME/.local/share/yellow-ci" i
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
+  [ ! -e "$dir/refresh-$key" ]
+  grep -q 'Unexpected GitHub API response format' "$dir/refresh-$key.log"
+  # A malformed reply is not cached as zero failures.
+  [ ! -e "$dir/last-check-$key" ]
+  # ...and it leaves an existing cache as it was.
+  printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$dir/last-check-$key"
+  node "$SCRIPTS_DIR/lib/refresh-cache.js"
+  [ "$(cat "$dir/last-check-$key")" = "$HOOK_SCENARIO_CACHED_TEXT" ]
+  rm -f "$dir/last-check-$key"
+
+  # Rate-limited (gh exits 1): nothing cached, so the next start refreshes again.
+  export MOCK_GH_RUNLIST=ratelimit
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
+  [ ! -e "$dir/refresh-$key" ]
+  [ ! -e "$dir/last-check-$key" ]
+}
+
+@test "SessionStart: a FIFO planted at the refresh log path does not stall the hook" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/fifo-log-XXXXXX")"
+  hook_scenario_setup cache-miss-failures "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  local key; key=$(hook_cache_key "$PWD")
+  local dir="$HOME/.local/share/yellow-ci" i
+  mkdir -p "$dir"
+  mkfifo "$dir/refresh-$key.log"
+
+  run timeout 3 node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"Runner routing"* ]]
+  # The refresh still runs, with stderr discarded.
+  for i in $(seq 1 50); do [ -s "$dir/last-check-$key" ] && break; sleep 0.1; done
+  [ -s "$dir/last-check-$key" ]
 }
