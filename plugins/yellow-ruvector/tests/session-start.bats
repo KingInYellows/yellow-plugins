@@ -1258,6 +1258,10 @@ END"
 }
 
 @test "temp files left by a killed atomic write are swept once old; fresh ones and symlinks stay" {
+  # The sweep removes this cursor temp in the same pass as the two files the
+  # wait below observes, and does not wait for it. That assertion failed on
+  # main (run 45237449645) with no plugin diff from the passing parent.
+  skip "flaky: old .stale-sweep-cursor temp is not waited on"
   make_ruvector_stub 'exit 0'
   sd="$RUVECTOR_DIR/coedit-sessions"; mkdir -p "$sd"
   outside="$BATS_TEST_TMPDIR/outside"; printf 'keep\n' > "$outside"
