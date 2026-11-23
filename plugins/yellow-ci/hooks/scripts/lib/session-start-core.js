@@ -453,6 +453,47 @@ function hasWorkflows(cwd) {
   }
 }
 
+// Create the marker exclusively. Reclaim an expired marker once, then let
+// the exclusive open decide which waiting process wins.
+function claimRefreshMarker(dir, marker) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    try {
+      fs.closeSync(fs.openSync(marker, 'wx'));
+      return true;
+    } catch (err) {
+      if (err.code !== 'EEXIST') return false;
+    }
+    // lstat judges a planted symlink as itself.
+    if (Date.now() - fs.lstatSync(marker).mtimeMs < REFRESH_MARKER_MAX_AGE_MS) return false;
+    fs.rmSync(marker, { force: true });
+    fs.closeSync(fs.openSync(marker, 'wx'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function openRefreshLog(marker) {
+  // A detached worker has no terminal. Open its log without following a
+  // symlink or blocking on a FIFO, and pass only an owned regular file.
+  let fd;
+  try {
+    fd = fs.openSync(
+      `${marker}.log`,
+      fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC |
+        (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0),
+      0o600
+    );
+    const st = fs.fstatSync(fd);
+    if (st.isFile() && ownedByUs(st)) return fd;
+  } catch { /* Fall back to discarded stderr. */ }
+  if (fd !== undefined) {
+    try { fs.closeSync(fd); } catch { /* best effort */ }
+  }
+  return 'ignore';
+}
+
 // Start a detached refresh of this cwd's result cache and return at once.
 // The child gets its own process group (detached) and no stdio, so neither
 // the host nor a caller waiting on this hook's pipes waits for it. An
@@ -464,58 +505,8 @@ function scheduleRefresh(cwd, env, key) {
   if (env.YELLOW_CI_NO_BACKGROUND_REFRESH === '1') return;
   const dir = newCacheDir(env);
   const marker = path.join(dir, `refresh-${key}`);
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-  } catch {
-    return;
-  }
-  const claim = () => {
-    try {
-      fs.closeSync(fs.openSync(marker, 'wx'));
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  if (!claim()) {
-    let st;
-    try {
-      // lstat: a planted symlink is judged (and removed) as itself.
-      st = fs.lstatSync(marker);
-    } catch {
-      return;
-    }
-    if (Date.now() - st.mtimeMs < REFRESH_MARKER_MAX_AGE_MS) return;
-    try {
-      fs.rmSync(marker, { force: true });
-    } catch {
-      return;
-    }
-    if (!claim()) return;
-  }
-  // The refresh's own warnings (e.g. an unexpected `gh` response) go to
-  // refresh-<key>.log beside the marker, overwritten each run, since the
-  // detached child has no terminal. O_NOFOLLOW so a planted symlink cannot
-  // redirect the truncating open, O_NONBLOCK so a planted FIFO cannot stall
-  // the hook (see openNoFollow), and the fd must be a regular file we own;
-  // otherwise stderr is discarded.
-  let logFd = 'ignore';
-  try {
-    const fd = fs.openSync(
-      path.join(dir, `refresh-${key}.log`),
-      fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC |
-        (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0),
-      0o600
-    );
-    const st = fs.fstatSync(fd);
-    if (st.isFile() && ownedByUs(st)) {
-      logFd = fd;
-    } else {
-      fs.closeSync(fd);
-    }
-  } catch {
-    logFd = 'ignore';
-  }
+  if (!claimRefreshMarker(dir, marker)) return;
+  const logFd = openRefreshLog(marker);
   try {
     const child = spawn(process.execPath, [path.join(__dirname, 'refresh-cache.js'), marker], {
       cwd,
@@ -605,6 +596,26 @@ function runSessionStart({ cwd, env }) {
   return done(routingSummary);
 }
 
+// Cache raw facts. renderOutput sanitizes and fences the branch names on
+// every read. Preserve the empty responses accepted by the gh adapter.
+function parseRefreshFacts(stdout) {
+  const trimmed = stdout.trim();
+  if (trimmed === '' || trimmed === 'null') return { failureCount: 0, branches: [] };
+  let runs;
+  try {
+    runs = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(runs)) return null;
+  const branches = runs
+    .map((run) => run && run.headBranch)
+    .filter((branch) => typeof branch === 'string' && branch.length > 0)
+    // Bound BEFORE the cache write (see MAX_WRITE_BRANCH_LEN).
+    .map((branch) => branch.slice(0, MAX_WRITE_BRANCH_LEN));
+  return { failureCount: runs.length, branches };
+}
+
 /**
  * Background refresh, run by refresh-cache.js in a detached process: checks
  * `gh` auth, fetches recent failed runs and writes the result cache as FACTS.
@@ -626,38 +637,17 @@ function refreshCache({ cwd, env }) {
   const { failed, stdout: failedJson } = ghRunList(env);
   if (failed) return done();
 
-  // Parse into FACTS only — failureCount plus RAW candidate branch names.
-  // Sanitizing/fencing happens in renderOutput on every read, never here.
-  let failureCount = 0;
-  let rawBranches = [];
-  const trimmed = failedJson.trim();
-  if (trimmed !== '' && trimmed !== '[]' && trimmed !== 'null') {
-    let parsed;
-    try {
-      parsed = JSON.parse(failedJson);
-    } catch {
-      parsed = undefined;
-    }
-    if (Array.isArray(parsed)) {
-      failureCount = parsed.length;
-      rawBranches = parsed
-        .map((r) => r && r.headBranch)
-        .filter((b) => typeof b === 'string' && b.length > 0)
-        // Bound BEFORE the cache write (see MAX_WRITE_BRANCH_LEN) — a valid
-        // Unicode branch name must never grow the cache past
-        // MAX_CACHE_FILE_BYTES.
-        .map((b) => b.slice(0, MAX_WRITE_BRANCH_LEN));
-    } else {
-      // Keep the previous cache: a malformed reply is not "zero failures".
-      warn('[yellow-ci] Warning: Unexpected GitHub API response format');
-      return done();
-    }
+  const facts = parseRefreshFacts(failedJson);
+  if (!facts) {
+    // Keep the previous cache on a malformed reply.
+    warn('[yellow-ci] Warning: Unexpected GitHub API response format');
+    return done();
   }
 
   const writeCacheDir = newCacheDir(env);
   try {
     fs.mkdirSync(writeCacheDir, { recursive: true });
-    const cacheContent = JSON.stringify({ failureCount, branches: rawBranches });
+    const cacheContent = JSON.stringify(facts);
     writeCacheAtomic(
       path.join(writeCacheDir, `last-check-${cacheKeyFor(cwd)}`),
       cacheContent,
