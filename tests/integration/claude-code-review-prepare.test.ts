@@ -8,7 +8,6 @@
  */
 import { spawnSync } from 'node:child_process';
 import {
-  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -21,6 +20,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
+import YAML from 'yaml';
 
 const ROOT = resolve(__dirname, '..', '..');
 const SCRIPT = join(ROOT, '.github/claude-code-review/prepare-review.sh');
@@ -29,26 +29,49 @@ const WORKFLOW = readFileSync(
   'utf8'
 );
 
+const GATE = YAML.parse(WORKFLOW).jobs['claude-review'].steps.find(
+  (step: { id?: string }) => step.id === 'gate'
+);
+
 const tmp = mkdtempSync(join(tmpdir(), 'ccr-prep-'));
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
-// Fake gh: the full diff comes from $FAKE_GH/full.diff (a 406 when absent),
-// the per-file list from $FAKE_GH/files.jsonl.
 const binDir = join(tmp, 'bin');
 mkdirSync(binDir);
-writeFileSync(
-  join(binDir, 'gh'),
-  `#!/usr/bin/env bash
+
+function command(dir: string, name: string, body: string): void {
+  writeFileSync(join(dir, name), `#!/usr/bin/env bash\n${body}\n`, {
+    mode: 0o755,
+  });
+}
+
+function lines(path: string): string[] {
+  return existsSync(path)
+    ? readFileSync(path, 'utf8').trimEnd().split('\n')
+    : [];
+}
+
+command(binDir, 'sleep', `echo "sleep $1" >> "$FAKE_GH/calls"`);
+command(
+  binDir,
+  'gh',
+  `
 case "$*" in
-  *'application/vnd.github.diff'*)
-    if [ -f "$FAKE_GH/full.diff" ]; then cat "$FAKE_GH/full.diff"; exit 0; fi
-    echo 'gh: Sorry, the diff exceeded the maximum number of files (HTTP 406)' >&2; exit 1 ;;
-  *'/files'*) cat "$FAKE_GH/files.jsonl" ;;
+  *'application/vnd.github.diff'*) route=diff ;;
+  *'/files'*) route=files ;;
   *) echo "unexpected gh $*" >&2; exit 1 ;;
 esac
+echo "$route" >> "$FAKE_GH/calls"
+if [[ -f "$FAKE_GH/$route-errors" ]]; then
+  attempt=$(grep -cx "$route" "$FAKE_GH/calls")
+  error=$(sed -n "\${attempt}p" "$FAKE_GH/$route-errors")
+  if [[ -n "$error" ]]; then echo "gh: fixture (HTTP $error)" >&2; exit 1; fi
+fi
+if [[ $route == files ]]; then cat "$FAKE_GH/files.jsonl"; exit; fi
+if [[ -f "$FAKE_GH/full.diff" ]]; then cat "$FAKE_GH/full.diff"; exit; fi
+echo 'gh: diff too large (HTTP 406)' >&2; exit 1
 `
 );
-chmodSync(join(binDir, 'gh'), 0o755);
 
 let n = 0;
 
@@ -84,6 +107,8 @@ interface Setup {
   fullDiff?: string;
   files?: object[];
   changedCount?: number;
+  errors?: Partial<Record<'diff' | 'files', number[]>>;
+  failFetch?: boolean;
 }
 
 /**
@@ -94,6 +119,7 @@ function prepare(s: Setup): {
   status: number | null;
   out: string;
   dir: string;
+  calls: string[];
 } {
   n += 1;
   const dir = join(tmp, `repo${n}`);
@@ -106,6 +132,19 @@ function prepare(s: Setup): {
     join(fake, 'files.jsonl'),
     (s.files || []).map((f) => JSON.stringify(f)).join('\n')
   );
+  for (const [route, errors] of Object.entries(s.errors ?? {})) {
+    writeFileSync(join(fake, `${route}-errors`), errors.join('\n') + '\n');
+  }
+  if (s.failFetch) {
+    command(
+      fake,
+      'git',
+      `
+if [[ $1 == fetch ]]; then echo fetch >> "$FAKE_GH/calls"; exit 1; fi
+PATH="$ORIGINAL_PATH" exec git "$@"
+`
+    );
+  }
   git(dir, 'init', '-q', '-b', 'main');
   commit(dir, (d) => writeFileSync(join(d, 'README'), 'x'), 'init');
   commit(dir, s.main || (() => {}), 'main');
@@ -126,7 +165,8 @@ function prepare(s: Setup): {
     encoding: 'utf8',
     env: {
       ...process.env,
-      PATH: `${binDir}:${process.env.PATH}`,
+      PATH: `${fake}:${binDir}:${process.env.PATH}`,
+      ORIGINAL_PATH: process.env.PATH,
       FAKE_GH: fake,
       GH_TOKEN: 'test-token',
       REPO: 'o/r',
@@ -136,7 +176,12 @@ function prepare(s: Setup): {
       CHANGED_COUNT: String(s.changedCount ?? 1),
     },
   });
-  return { status: r.status, out: r.stdout + r.stderr, dir };
+  return {
+    status: r.status,
+    out: r.stdout + r.stderr,
+    dir,
+    calls: lines(join(fake, 'calls')),
+  };
 }
 
 const ok = { fullDiff: 'diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b\n' };
@@ -297,21 +342,157 @@ describe('claude-code-review prepare-review.sh: diff file', () => {
   });
 });
 
-describe('claude-code-review workflow wiring', () => {
-  it('installs the script from the default branch and runs it', () => {
-    expect(WORKFLOW).toContain(
-      'contents/.github/claude-code-review/prepare-review.sh?ref=$DEFAULT_BRANCH'
-    );
-    expect(WORKFLOW).toContain(
-      'bash "$RUNNER_TEMP/claude-code-review-prepare.sh"'
-    );
-    for (const v of [
-      'BASE_REF:',
-      'export CHANGED_COUNT',
-      'GH_TOKEN:',
-      'read -r not_reviewed < .claude-code-review/not-reviewed-count',
-    ]) {
-      expect(WORKFLOW).toContain(v);
-    }
+describe('prepare-review retry policy', () => {
+  it('retries a transient API error and uses the successful response', () => {
+    const r = prepare({ ...ok, errors: { diff: [503] } });
+    expect(r.status).toBe(0);
+    expect(r.calls).toEqual(['diff', 'sleep 5', 'diff']);
+    expect(
+      readFileSync(join(r.dir, '.claude-code-review/pr.diff'), 'utf8')
+    ).toBe(ok.fullDiff);
   });
+
+  it.each([404, 406])('tries a permanent HTTP %i error once', (status) => {
+    const r = prepare({ errors: { diff: [status], files: [status] } });
+    expect(r.status).toBe(1);
+    expect(r.calls).toEqual(['diff', 'files']);
+    expect(r.out).toContain(`HTTP ${status}`);
+  });
+
+  it('fails after all three attempts to retrieve the file list', () => {
+    const r = prepare({ errors: { files: [503, 503, 503] } });
+    expect(r.status).toBe(1);
+    expect(r.calls).toEqual([
+      'diff',
+      'files',
+      'sleep 5',
+      'files',
+      'sleep 10',
+      'files',
+    ]);
+    expect(r.out).toContain('HTTP 503');
+  });
+
+  it('fails a stacked review after the third default-branch fetch', () => {
+    const r = prepare({ ...ok, parent: () => {}, failFetch: true });
+    expect(r.status).toBe(1);
+    expect(r.calls).toEqual(['fetch', 'sleep 5', 'fetch', 'sleep 10', 'fetch']);
+    expect(r.out).toContain('::error::could not fetch main');
+  });
+});
+
+interface GateOptions {
+  count?: string | null;
+  missingFile?: string;
+  httpStatus?: number;
+}
+
+const gateGhStub = `
+if [[ -n $FAILED_FILE && $* == *"/$FAILED_FILE?ref=main"* ]]; then
+  echo attempt >> attempts
+  echo "gh: fixture (HTTP $HTTP_STATUS)" >&2
+  exit 1
+fi
+case "$*" in
+  *'/prepare-review.sh?ref=main'*) if [[ $COUNT_MISSING == true ]]; then echo ':'; exit 0; fi; echo 'printf "%s\\n" "$COUNT" > .claude-code-review/not-reviewed-count' ;;
+  *'/bash-guard.sh?ref=main'*|*'/code-review.md?ref=main'*) echo '# fixture' ;;
+  *'/comments'*) : ;;
+  *'changed_files'*) echo "$HEAD_SHA 7" ;;
+  *'.head.sha'*) echo "$HEAD_SHA" ;;
+  *) echo "unexpected gh $*" >&2; exit 1 ;;
+esac
+`;
+
+// Run the shipped gate body with a private HOME, runner directory, and local commands.
+function runGate({
+  count = '0',
+  missingFile = '',
+  httpStatus = 404,
+}: GateOptions = {}) {
+  const dir = mkdtempSync(join(tmp, 'gate-'));
+  const output = join(dir, 'output');
+  const home = join(dir, 'home');
+  mkdirSync(home);
+  writeFileSync(output, '');
+  command(dir, 'sleep', 'exit 0');
+  command(dir, 'git', `[[ "$*" == 'rev-parse HEAD^2' ]] && echo "$HEAD_SHA"`);
+  command(dir, 'gh', gateGhStub);
+  const r = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', GATE.run], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: {
+      PATH: `${dir}:${process.env.PATH}`,
+      HOME: home,
+      RUNNER_TEMP: dir,
+      GITHUB_OUTPUT: output,
+      GH_TOKEN: 'test-token',
+      REPO: 'o/r',
+      PR_NUMBER: '7',
+      HEAD_SHA: 'abc123',
+      DEFAULT_BRANCH: 'main',
+      BASE_REF: 'main',
+      COUNT: count ?? '',
+      COUNT_MISSING: String(count === null),
+      FAILED_FILE: missingFile,
+      HTTP_STATUS: String(httpStatus),
+    },
+  });
+  return {
+    status: r.status,
+    out: r.stdout + r.stderr,
+    output: readFileSync(output, 'utf8'),
+    target: join(home, '.claude/hooks/claude-code-review-target'),
+    attempts: lines(join(dir, 'attempts')).length,
+  };
+}
+
+describe('workflow review gate', () => {
+  it('passes the PR context to the gate', () => {
+    expect(GATE.env).toMatchObject({
+      GH_TOKEN: '${{ github.token }}',
+      REPO: '${{ github.repository }}',
+      HEAD_SHA: '${{ github.event.pull_request.head.sha }}',
+      PR_NUMBER: '${{ github.event.pull_request.number }}',
+      BASE_REF: '${{ github.event.pull_request.base.ref }}',
+      DEFAULT_BRANCH: '${{ github.event.repository.default_branch }}',
+    });
+  });
+  it.each(['0', '12'])(
+    'writes all four target fields for count %s',
+    (count) => {
+      const r = runGate({ count });
+      expect(r.status).toBe(0);
+      expect(r.output).toBe('run=true\n');
+      expect(readFileSync(r.target, 'utf8')).toBe(`o/r 7 abc123 ${count}\n`);
+    }
+  );
+  it.each(['', 'abc'])('rejects invalid count %j', (count) => {
+    const r = runGate({ count });
+    expect(r.status).toBe(1);
+    expect(r.out).toContain('::error::bad not-reviewed count');
+    expect(r.output).toBe('');
+  });
+  it('fails if the prepare script did not write the count file', () => {
+    const r = runGate({ count: null });
+    expect(r.status).toBe(1);
+    expect(r.output).toBe('');
+  });
+  describe.each(['bash-guard.sh', 'prepare-review.sh'])(
+    'fetching %s',
+    (file) => {
+      it.each([
+        { httpStatus: 404, attempts: 1, status: 0, output: 'run=false\n' },
+        { httpStatus: 406, attempts: 1, status: 1, output: '' },
+        { httpStatus: 503, attempts: 3, status: 1, output: '' },
+      ])(
+        'handles HTTP $httpStatus',
+        ({ httpStatus, attempts, status, output }) => {
+          const r = runGate({ missingFile: file, httpStatus });
+          expect(r.status).toBe(status);
+          expect(r.attempts).toBe(attempts);
+          expect(r.output).toBe(output);
+        }
+      );
+    }
+  );
 });

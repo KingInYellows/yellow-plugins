@@ -79,19 +79,37 @@ jobs:
           # the job. A 404, or a 406 for a diff too large to return, is not
           # retried.
           gh_api() {
-            local try out="$RUNNER_TEMP/gh-api.out" err="$RUNNER_TEMP/gh-api.err"
+            local try status=1 out="$RUNNER_TEMP/gh-api.out" err="$RUNNER_TEMP/gh-api.err"
             for try in 1 2 3; do
               if gh api "$@" > "$out" 2> "$err"; then
                 cat "$out"
                 return 0
               fi
-              if grep -qE 'HTTP 40[46]' "$err"; then
-                break
-              fi
+              # gh puts the HTTP response status at the end of its error line.
+              case "$(tail -n 1 "$err")" in
+                *'(HTTP 404)') status=44; break ;;
+                *'(HTTP 406)') break ;;
+              esac
               if [ "$try" -lt 3 ]; then sleep $((try * 5)); fi
             done
             cat "$err" >&2
-            return 1
+            return "$status"
+          }
+          fetch_review_file() {
+            local name=$1 dest=$2 status
+            local url="repos/$REPO/contents/.github/claude-code-review/$name?ref=$DEFAULT_BRANCH"
+            if gh_api -H 'Accept: application/vnd.github.raw+json' "$url" > "$dest"; then
+              return 0
+            else
+              status=$?
+            fi
+            if [ "$status" -eq 44 ]; then
+              echo "::warning::$name is missing on $DEFAULT_BRANCH; skipping the review"
+              echo "run=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::could not fetch $name from $DEFAULT_BRANCH"
+            exit 1
           }
           mkdir -p "$HOME/.claude/commands"
           # The review step loads user settings only (--setting-sources user),
@@ -107,29 +125,11 @@ jobs:
             echo "::error::could not fetch the review command from $DEFAULT_BRANCH"
             exit 1
           fi
-          # The Bash guard hook (CLAUDE-356) the review step's settings run
-          # before every Bash call. Without it the agent could expand a token
-          # into a comment, so when the guard cannot be fetched (not yet on the
-          # default branch, or an API error) the job skips the review with a
-          # warning instead of running it unguarded.
+          # Bootstrap may run before either file exists on the default branch.
+          # A missing file skips the review; every other fetch failure fails the job.
           mkdir -p "$HOME/.claude/hooks"
-          url="repos/$REPO/contents/.github/claude-code-review/bash-guard.sh?ref=$DEFAULT_BRANCH"
-          if ! gh_api -H 'Accept: application/vnd.github.raw+json' "$url" \
-              > "$HOME/.claude/hooks/claude-code-review-bash-guard.sh"; then
-            echo "::warning::no Bash guard on $DEFAULT_BRANCH; skipping the review"
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # The input builder (CLAUDE-371): changed paths, symlink scan and
-          # the diff file. Like the guard, a PR cannot change it, and the
-          # review is skipped while it is not on the default branch yet.
-          url="repos/$REPO/contents/.github/claude-code-review/prepare-review.sh?ref=$DEFAULT_BRANCH"
-          if ! gh_api -H 'Accept: application/vnd.github.raw+json' "$url" \
-              > "$RUNNER_TEMP/claude-code-review-prepare.sh"; then
-            echo "::warning::no prepare-review.sh on $DEFAULT_BRANCH; skipping the review"
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          fetch_review_file bash-guard.sh "$HOME/.claude/hooks/claude-code-review-bash-guard.sh"
+          fetch_review_file prepare-review.sh "$RUNNER_TEMP/claude-code-review-prepare.sh"
           # The guard only lets the agent touch this PR and post the marker for
           # this head, so a prompt-injected run cannot mark a future head as
           # reviewed or act on another repository.
