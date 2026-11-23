@@ -1,0 +1,19 @@
+plugins/yellow-ci/hooks/scripts/lib/session-start-core.js
+  s_314caac26ae194::t_29a4e687b04e34 505-512
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "180dab1dc1585ff72e31735e9f6b1219938738c8",
+  "prompts": {},
+  "sessions": {
+    "s_314caac26ae194": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20989-8616-7aa2-9fc4-0f915705a36b",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
