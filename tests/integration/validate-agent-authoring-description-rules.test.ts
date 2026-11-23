@@ -161,6 +161,94 @@ describe('validate-agent-authoring description rules', () => {
       const { stdout } = runValidator(plugins);
       expect(stdout.match(/RULE 15d/g)).toHaveLength(1);
     });
+
+    it.each([
+      [
+        'double-quoted key with folded block scalar in command',
+        'alpha/commands/demo/cmd.md',
+        command('"description": >-\n  Folded under double-quoted key.'),
+      ],
+      [
+        'double-quoted key with folded block scalar in agent',
+        'alpha/agents/demo-agent.md',
+        agent('"description": >\n  Folded under double-quoted key.'),
+      ],
+      [
+        'single-quoted key with literal block scalar in skill',
+        'alpha/skills/demo-skill/SKILL.md',
+        skill(
+          "'description': |\n  Literal under single-quoted key. Use when testing."
+        ),
+      ],
+      [
+        'double-quoted key with wrapped quoted description in command',
+        'alpha/commands/demo/cmd.md',
+        command('"description": \'Wrapped\n  under double-quoted key.\''),
+      ],
+      [
+        'single-quoted key with value pushed onto the next line in command',
+        'alpha/commands/demo/cmd.md',
+        command(
+          "'description':\n  'Pushed to next line under single-quoted key.'"
+        ),
+      ],
+      [
+        'unquoted key with single-line value pushed onto the next line',
+        'alpha/commands/demo/cmd.md',
+        command("description:\n  'Single line on next line.'"),
+      ],
+    ])('warns on %s', (_label, relPath, body) => {
+      writeAgent(plugins, relPath, body);
+      const { status, stdout } = runValidator(plugins);
+      expect(status).toBe(0);
+      expect(stdout).toContain('[RULE 15d advisory]');
+      expect(stdout).toContain(relPath);
+    });
+
+    it('stays silent on single-line descriptions under quoted keys', () => {
+      writeAgent(
+        plugins,
+        'alpha/commands/demo/cmd.md',
+        command(`"description": "${TEN}"`)
+      );
+      writeAgent(
+        plugins,
+        'alpha/agents/demo-agent.md',
+        agent(`'description': '${TEN}'`)
+      );
+      writeAgent(
+        plugins,
+        'alpha/skills/demo-skill/SKILL.md',
+        skill(`"description": "${TEN} Use when testing."`)
+      );
+      const { status, stdout } = runValidator(plugins);
+      expect(status).toBe(0);
+      expect(stdout).not.toContain('RULE 15d');
+    });
+
+    it('stays silent on a single-line description followed by an indented comment', () => {
+      writeAgent(
+        plugins,
+        'alpha/commands/demo/cmd.md',
+        command(`description: ${TEN}\n  # indented YAML comment`)
+      );
+      const { status, stdout } = runValidator(plugins);
+      expect(status).toBe(0);
+      expect(stdout).not.toContain('RULE 15d');
+    });
+
+    it('stays silent on a nested metadata.description block when top-level description is single-line', () => {
+      writeAgent(
+        plugins,
+        'alpha/commands/demo/cmd.md',
+        command(
+          `description: ${TEN}\nmetadata:\n  description: >\n    nested block`
+        )
+      );
+      const { status, stdout } = runValidator(plugins);
+      expect(status).toBe(0);
+      expect(stdout).not.toContain('RULE 15d');
+    });
   });
 
   describe('RULE 23 description budget', () => {
@@ -264,10 +352,6 @@ describe('validate-agent-authoring description rules', () => {
       ['no description key', command('argument-hint: x')],
       ['an empty description', command("description: ''")],
       ['no frontmatter', '# Command\n\nBody.\n'],
-      [
-        'a byte-order mark before the frontmatter',
-        '\uFEFF' + command(`description: ${TEN}`),
-      ],
     ])('fails on a command with %s, which it cannot count', (_label, body) => {
       writeAgent(plugins, 'alpha/commands/demo/cmd.md', body);
       writeBaseline({ alpha: 0 });
@@ -277,6 +361,45 @@ describe('validate-agent-authoring description rules', () => {
         'commands/demo/cmd.md: no string `description:`'
       );
     });
+
+    it.each([
+      [
+        'command',
+        'alpha/commands/demo/cmd.md',
+        '\uFEFF' + command(`description: ${TEN}`),
+      ],
+      [
+        'agent',
+        'alpha/agents/demo-agent.md',
+        '\uFEFF' + agent(`description: ${TEN}`),
+      ],
+      [
+        'skill',
+        'alpha/skills/demo-skill/SKILL.md',
+        '\uFEFF' + skill(`description: ${TEN} Use when testing.`),
+      ],
+    ])(
+      'distinguishes a leading UTF-8 BOM in a %s from missing frontmatter or description',
+      (_kind, relPath, body) => {
+        writeAgent(plugins, relPath, body);
+        const withoutBaseline = runValidator(plugins);
+        expect(withoutBaseline.status).toBe(1);
+        expect(withoutBaseline.stderr).toContain('leading UTF-8 BOM');
+        expect(withoutBaseline.stderr).not.toContain('missing frontmatter');
+        expect(withoutBaseline.stderr).not.toContain('RULE 18');
+        expect(withoutBaseline.stdout).not.toContain('RULE 15c');
+
+        writeBaseline({ alpha: 0 });
+        const withBaseline = runBudget();
+        expect(withBaseline.status).toBe(1);
+        expect(withBaseline.output.match(/leading UTF-8 BOM/g)).toHaveLength(1);
+        expect(withBaseline.output).toContain(relPath);
+        expect(withBaseline.output).not.toContain('no string `description:`');
+        expect(withBaseline.output).not.toContain('missing frontmatter');
+        expect(withBaseline.output).not.toContain('RULE 15c');
+        expect(withBaseline.output).not.toContain('RULE 18');
+      }
+    );
 
     it('fails on a skill with no description', () => {
       writeAgent(
@@ -498,6 +621,24 @@ describe('validate-agent-authoring description rules', () => {
         expect(readFileSync(baselineFile, 'utf8')).toBe(before);
       });
 
+      it('over a file with a leading UTF-8 BOM', () => {
+        writeAlpha();
+        writeAgent(
+          plugins,
+          'alpha/commands/demo/bom.md',
+          '\uFEFF' + command(`description: ${TEN}`)
+        );
+        writeBaseline({ alpha: 35 });
+        const before = readFileSync(baselineFile, 'utf8');
+        const { status, output } = runBudget(updateFlag);
+        expect(status).toBe(1);
+        expect(output).toContain('commands/demo/bom.md: leading UTF-8 BOM');
+        expect(output).toContain('Baseline not written');
+        expect(output).not.toContain('no string `description:`');
+        expect(output).not.toContain('no YAML frontmatter');
+        expect(readFileSync(baselineFile, 'utf8')).toBe(before);
+      });
+
       it('in a fixture run that names no baseline', () => {
         writeAlpha();
         const result = spawnSync('node', [VALIDATOR, ...updateFlag], {
@@ -506,6 +647,39 @@ describe('validate-agent-authoring description rules', () => {
         });
         expect(result.status).toBe(1);
         expect(result.stderr).toContain('needs VALIDATE_DESCRIPTION_BASELINE');
+      });
+    });
+
+    describe('CLI flag validation', () => {
+      it.each([
+        ['--unknown'],
+        ['--update-description-baselines'],
+        ['unexpected'],
+      ])('rejects unknown argument %s with usage', (arg) => {
+        writeAlpha();
+        writeBaseline({ alpha: 35 });
+        const { status, output } = runBudget([arg]);
+        expect(status).toBe(1);
+        expect(output).toContain(`Unknown argument(s): ${arg}`);
+        expect(output).toContain(
+          'Usage: node scripts/validate-agent-authoring.js [--update-description-baseline]'
+        );
+      });
+
+      it('rejects an unknown flag combined with --update-description-baseline without writing', () => {
+        writeAlpha();
+        writeBaseline({ alpha: 99 });
+        const before = readFileSync(baselineFile, 'utf8');
+        const { status, output } = runBudget([
+          '--update-description-baseline',
+          '--bogus',
+        ]);
+        expect(status).toBe(1);
+        expect(output).toContain('Unknown argument(s): --bogus');
+        expect(output).toContain(
+          'Usage: node scripts/validate-agent-authoring.js [--update-description-baseline]'
+        );
+        expect(readFileSync(baselineFile, 'utf8')).toBe(before);
       });
     });
   });
