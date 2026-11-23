@@ -502,10 +502,14 @@ function openRefreshLog(marker) {
 // YELLOW_CI_NO_BACKGROUND_REFRESH=1 turns the launch off (tests run
 // refresh-cache.js themselves).
 function scheduleRefresh(cwd, env, key) {
-  if (env.YELLOW_CI_NO_BACKGROUND_REFRESH === '1') return;
-  const dir = newCacheDir(env);
-  const marker = path.join(dir, `refresh-${key}`);
-  if (!claimRefreshMarker(dir, marker)) return;
+  if (env.YELLOW_CI_NO_BACKGROUND_REFRESH !== '1') {
+    const dir = newCacheDir(env);
+    const marker = path.join(dir, `refresh-${key}`);
+    if (claimRefreshMarker(dir, marker)) launchRefreshWorker(cwd, env, marker);
+  }
+}
+
+function launchRefreshWorker(cwd, env, marker) {
   const logFd = openRefreshLog(marker);
   try {
     const child = spawn(process.execPath, [path.join(__dirname, 'refresh-cache.js'), marker], {
