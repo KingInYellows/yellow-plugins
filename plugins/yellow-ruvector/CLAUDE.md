@@ -95,8 +95,9 @@ ruvector.
 - **Hook architecture:** Hooks run the plugin-managed CLI resolved by
   `hooks/scripts/lib/resolve.sh` (`RUVECTOR_BIN` overrides it in tests;
   a global `ruvector` on PATH is never used) from the git toplevel.
-  `session-start.sh` captures `hooks recall` stdout into
-  `hookSpecificOutput.additionalContext`; the co-edit hooks
+  `session-start.sh` injects the cached recall saved by the previous session's
+  background refresh into `hookSpecificOutput.additionalContext` and triggers a
+  detached `hooks recall` refresh for the next session; the co-edit hooks
   (`pre-tool-use.sh`, `post-tool-use.sh`) use jq only. Every hook prints dual-client allow JSON.
   Operator warnings stay on `systemMessage`. **No hook writes
   `.ruvector/intelligence.json`** — memories come only from MCP
@@ -169,12 +170,17 @@ progress.
   launcher installs synchronously when needed.
 - `session-start.sh` (SessionStart, 6s; ~60–90ms) — injects the recall a
   detached job saved at the previous session start
-  (`<plugin data>/recall/<cksum of the store path>.json`, never in the
-  worktree; one JSON document, a regular file under 64 KB, never a
-  symlink): results scoring at least `RUVECTOR_RECALL_MIN_SCORE` (0.3), one
-  `- [type] content` bullet each, at most 1,500 bytes, so the fenced block
-  stays under the 2 KB SessionStart budget; nothing when none pass. It then
-  starts the next `hooks recall --top-k 5` in a detached job (bounded by
+  (`<plugin data>/recall/<key>.json`, never in the worktree; keyed by physical
+  store path and stable store directory identity — `dev`, `inode`, and birth
+  time — so a replaced store at the same path never reads the
+  previous store's memories or refresh stamp, while ordinary writes inside
+  `.ruvector/` preserve cache hits; one JSON document, a regular file under
+  64 KB, never a symlink): results scoring at least `RUVECTOR_RECALL_MIN_SCORE`
+  (0.3), one `- [type] content` bullet each, at most 1,500 bytes, so the fenced
+  block stays under the 2 KB SessionStart budget; nothing when none pass.
+  Filesystems without a usable birth timestamp skip cached recall.
+  For an identifiable store, the hook starts the next
+  `hooks recall --top-k 5` in a detached job (bounded by
   `RUVECTOR_RECALL_REFRESH_SECS`, 30; 0.3.3 recall loads the ONNX model,
   1.2–2.1s warm), which replaces the cache atomically only with a recall
   object. No refresh within `RUVECTOR_RECALL_REFRESH_GAP` (60) seconds of
@@ -217,19 +223,20 @@ progress.
   control characters, or over 512 chars are ignored. Writes are temp file +
   rename. A per-session directory lock (mkdir plus an exclusive `.owner`
   file, since uutils mkdir is not exclusive under a race) covers the
-  session file's read-decide-write, and the store lock only the pair update; together they
-  wait at most ~0.4s per edit (a linked worktree's 0.15s main-worktree
-  lookup comes out of that), then skip (a busy store loses one increment,
-  never the session's latest edit). A lock over a minute old is reclaimed
-  once per generation (`<lock>.reclaim.<inode>-<mtime>` markers; the
-  SessionStart worker prunes those over 10 minutes old, the hooks never
-  list them). The stored previous path is re-normalized before
-  pairing. Every jq over the store is killed after 0.3s (the edit's
-  increment is skipped), a `coedit.json` over 1 MB is set aside unparsed,
-  every write rebuilds the pairs symmetric, and the file is capped at 2000
-  directed pairs and 80% of that 1 MB, keeping the pair just seen and then
-  the highest counts (so a new pair can accumulate at the cap), so the
-  writer never produces a file it would later set aside.
+  session file's read-decide-write, and the store lock only the pair update.
+  Foreground lock waits share an eight-try budget (~0.4 s), including the
+  tries charged for parsing and root/worktree lookup. Foreground store `jq`
+  calls have a 0.3 s timeout. The detached rewrite has its own 40 lock
+  retries at 50 ms each and a 2 s `jq` timeout (`COEDIT_BG_LOCK_TRIES` and
+  `COEDIT_BG_JQ_SECS`). A busy store or a timed-out rewrite loses only
+  the pair increment. The session has already advanced. A lock over a minute
+  old is reclaimed once per generation (`<lock>.reclaim.<inode>-<mtime>` markers; the SessionStart worker
+  prunes those over 10 minutes old, the hooks never list them). The stored
+  previous path is re-normalized before pairing. A `coedit.json` over 1 MB is
+  set aside unparsed, every write rebuilds the pairs symmetric, and the file is
+  capped at 2000 directed pairs and 80% of that 1 MB, keeping the pair just
+  seen and then the highest counts (so a new pair can accumulate at the cap),
+  so the writer never produces a file it would later set aside.
   Per-session state keeps concurrent sessions and worktrees (which share the
   store) from pairing each other's edits; `session-start.sh` prunes session
   files older than 7 days. MultiEdit's path is the top-level
@@ -369,8 +376,10 @@ commands (`/flow:brainstorm`, `/flow:plan`, `/flow:work`).
 ## Testing
 
 `bats tests/` from the plugin directory — one suite per hook
-(`session-start`, `pre-tool-use`, `post-tool-use` — co-edit recording,
-including a 20-way concurrency check — and `repair-cursor-pretooluse`) plus `start-ruvector.bats` (launcher),
+(`session-start` — including cached recall, store-identity replacement, and
+ordinary-write cache-hit checks — `pre-tool-use`, `post-tool-use` — co-edit
+recording, including detached lock-exhaustion, 20-way concurrency, and
+background `jq`-timeout checks — and `repair-cursor-pretooluse`) plus `start-ruvector.bats` (launcher),
 `remove-legacy-hooks.bats`, `prewarm.bats` (install decision, npm stubbed),
 `resolve.bats`, `validate.bats`, `mcp-allowlist.bats`,
 `memory-manager-flush.bats`, and `status-provenance.bats` (extracts the

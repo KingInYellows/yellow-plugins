@@ -483,3 +483,21 @@ fake_install() {
   # One stall ends the probing: the second candidate is not waited on too.
   [ $(( (end - start) / 1000000 )) -lt 900 ]
 }
+
+@test "recall keys distinguish reused inodes on BSD and skip filesystems without birth times" {
+  cat >"$STUBS/stat" <<'SH'
+#!/bin/sh
+case "$1 $2" in
+  '-c %d-%i-%w') [ "$STAT_KIND" = gnu ] || exit 1; echo '5-42--' ;;
+  '-f %d-%i-%.9FB') [ "$STAT_KIND" = bsd ] || exit 1; printf '5-42-%s\n' "$BIRTH" ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$STUBS/stat"
+  . "$LIB"
+  run env PATH="$STUBS:$PATH" STAT_KIND=gnu bash -c '. "$1"; ruvector_recall_key "$2"' _ "$LIB" "$WORK"
+  [ "$status" -ne 0 ]
+  one=$(PATH="$STUBS:$PATH" STAT_KIND=bsd BIRTH=123.123456781 ruvector_recall_key "$WORK")
+  two=$(PATH="$STUBS:$PATH" STAT_KIND=bsd BIRTH=123.123456782 ruvector_recall_key "$WORK")
+  [ "$one" != "$two" ]
+}
