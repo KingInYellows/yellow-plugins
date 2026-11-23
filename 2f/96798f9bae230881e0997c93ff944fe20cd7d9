@@ -1,0 +1,23 @@
+docs/research/mcp-server-footprint.md
+  s_314caac26ae194::t_b2d626ab9166af 1-82
+plans/claude-code-quality-and-cost-roadmap.md
+  s_314caac26ae194::t_3ee90fc552e48a 307-308
+plans/mcp-server-footprint.md
+  s_314caac26ae194::t_2ed57340fd75e3 1-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f96798f9bae230881e0997c93ff944fe20cd7d9",
+  "prompts": {},
+  "sessions": {
+    "s_314caac26ae194": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20989-8616-7aa2-9fc4-0f915705a36b",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
