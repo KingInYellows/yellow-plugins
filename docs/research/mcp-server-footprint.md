@@ -3,30 +3,35 @@
 Measured November 23, 2026 against yellow-plugins `b5be57b65`. Eight
 marketplace plugins register 13 MCP servers. Seven plugins declare 12 inline.
 The eighth, gt-workflow, points to a separate file that declares Graphite.
-Eight servers returned a tool list. Five hosted endpoints required
-authentication. [Implementation plan](../../plans/mcp-server-footprint.md).
+Eight servers returned raw tool lists. The authenticated Claude client
+reported counts for four more; one count comes solely from vendor docs. [Implementation plan](../../plans/mcp-server-footprint.md).
 
 | Plugin | Server | Instructions B | Input schemas B | Tool descriptors B | Tools | Discovery wording in first 4,096 characters |
 | --- | --- | ---: | ---: | ---: | ---: | --- |
 | gt-workflow | graphite | 0 | 614 | 3,980 | 2 | None supplied. |
-| yellow-composio | composio-server | — | — | — | 7 documented | Unknown. Anonymous initialization returned 401. [Connect tools](https://docs.composio.dev/docs/composio-connect) |
+| yellow-composio | composio-server | — | — | — | 12 via client | Unknown. Anonymous initialization returned 401. The vendor documents seven meta-tools. [Connect tools](https://docs.composio.dev/docs/composio-connect) |
 | yellow-devin | devin | — | — | — | 20 documented | Unknown. Anonymous initialization returned 401. Published count excludes legacy aliases. [Available tools](https://docs.devin.ai/work-with-devin/devin-mcp#available-tools) |
-| yellow-linear | linear | — | — | — | — | Unknown. Anonymous initialization returned 401. Record the OAuth scope when measuring this endpoint. [Linear MCP](https://linear.app/docs/mcp) |
+| yellow-linear | linear | — | — | — | 78 via client | Unknown. Anonymous initialization returned 401. Record the OAuth scope when measuring this endpoint. [Linear MCP](https://linear.app/docs/mcp) |
 | yellow-morph | morph | 0 | 1,693 | 3,945 | 2 | None supplied. |
-| yellow-research | ceramic | — | — | — | — | Unknown. Anonymous initialization returned 401. |
+| yellow-research | ceramic | — | — | — | 1 via client | Unknown. Anonymous initialization returned 401. |
 | yellow-research | deepwiki | 3,926 | 748 | 1,709 | 3 | Yes. The opening says “AI-powered documentation for GitHub repositories”; the prefix names the public wiki tools and describes private-only tools. |
 | yellow-research | exa | 0 | 6,436 | 9,285 | 7 | None supplied. |
-| yellow-research | parallel | — | — | — | 4 documented | Unknown. Anonymous initialization returned 401. [Upstream Task MCP](https://github.com/parallel-web/task-mcp/tree/bc0daf6b76cf0e403c0c3aeac15ff67452adf018) |
+| yellow-research | parallel | — | — | — | 4 via client | Unknown. Anonymous initialization returned 401. [Upstream Task MCP](https://github.com/parallel-web/task-mcp/tree/bc0daf6b76cf0e403c0c3aeac15ff67452adf018) |
 | yellow-research | perplexity | 616 | 3,861 | 7,388 | 4 | Yes. The opening says “web-grounded search, research, and reasoning” and names which tool to use for URLs, cited answers, deep research and analysis. |
 | yellow-research | tavily | 0 | 6,452 | 7,378 | 5 | None supplied. |
 | yellow-ruvector | ruvector | 0 | 804 / 94 | 1,408 / 363 | 5 / 2 | None supplied in either profile. Full allowlist first, fresh-store guard second. |
 | yellow-semgrep | semgrep | 0 | 3,075 | 54,079 | 7 | None supplied. |
 
-A dash means the endpoint did not return that field. Documented counts come
-from the provider and may differ from an authenticated session. For the five
-401 rows, the remaining measurement requires an authorized session to the
-exact manifest URL. Repeat initialization and pagination there and record
-scope and service version alongside the numbers. A discovery result of
+A dash marks a field the probe could not measure. On the five 401 rows,
+the installed Claude Code 2.1.330 client's `mcp_status` control request
+reported tool counts for four matching authenticated URLs. Composio
+reported server version 0.1.0, Linear 1.0.2, Parallel 1.0.5 and Ceramic
+1.23.3. These counts describe that client's access on the measurement date.
+Its status response omits raw tool schemas and initialization instructions.
+Devin reported `needs-auth`, so its count comes from vendor documentation.
+For those five byte measurements, repeat raw initialization and pagination
+with an authorized MCP client that exposes both fields, and record its
+scope and service version. A discovery result of
 “None supplied” means the measured instruction string had zero bytes.
 Descriptions on individual tools still provide a separate discovery surface.
 
@@ -54,7 +59,7 @@ Descriptions on individual tools still provide a separate discovery surface.
 The local probes used disposable working directories and homes. Packages
 and flags came from the shipped wrappers. Placeholder keys allowed
 credential-gated local packages to list their tools. HTTP probes were
-anonymous. Local package versions were `gt` 1.8.6, Morph 0.8.181,
+anonymous; the separate client status query used existing sessions. Local package versions were `gt` 1.8.6, Morph 0.8.181,
 Exa 3.1.8, Perplexity 0.8.2, Tavily 0.2.17, RuVector 0.3.3 and Semgrep
 CLI 1.154.0. DeepWiki advertised server version 4.0.2. Graphite and
 Semgrep depend on the installed CLI, so record its version on repeat runs.
