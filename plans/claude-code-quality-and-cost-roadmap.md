@@ -304,7 +304,8 @@ Each initiative lists its check. "Gate" means the eval gate applies.
 - [ ] **R8.1 MCP footprint measurement.** Byte counts of server instructions
   and tool schemas for the 12 shipped servers; keywords within the first
   4,096 characters of each instruction. Tool counts per server were not
-  measured in this research.
+  measured in this research. See the [server footprint baseline](../docs/research/mcp-server-footprint.md)
+  for measured values and the outstanding authenticated captures.
 - [ ] **R8.2 Research-provider spend controls** in `/flow:deepen-plan` and
   `/research:deep`: the metered-dollar hot spot.
 - [ ] **R8.3 yellow-rtk pilot decision.** Rewrite the plan, run the one-week
