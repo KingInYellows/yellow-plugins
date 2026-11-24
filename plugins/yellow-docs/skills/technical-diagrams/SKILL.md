@@ -56,12 +56,17 @@ only an export, locate the source or ask which artifact should become editable.
    elements, ambiguous arrows, and density. For a board, inspect its own view.
    Correct parse errors and visible defects before saving. Report exactly which
    checks were unavailable and why.
-5. In the foreground, show the draft or diff, destination and checks. Ask for
-   approval of this change before saving the authoritative source or sending
-   diagram content to a board. In draft-only mode, return this material to the
-   caller and stop. On approval, re-read the source or board revision. Apply
-   only the reviewed edits to the current version. If the target changed in a
-   way that affects those edits, present the revised draft for review.
+5. In draft-only mode, return the draft, destination and checks to the caller.
+   In the foreground, show them to the user and obtain explicit approval
+   before saving or sending content to a board. On Claude use AskUserQuestion.
+   On other hosts use the available confirmation prompt or wait for an explicit
+   reply in chat. For a shared source, submit the edit against the revision
+   reviewed, using the connector's conditional update or the native editor's
+   conflict-aware transaction. If that revision changed, reread and reapply
+   the scoped diff, and seek fresh approval for a changed proposal. If the
+   host cannot protect a shared edit against a concurrent save, return the
+   patch for application in the editor. For local files, use the workspace
+   I/O rules in the path reference.
 6. Reopen the saved result. Inspect the final render if it differs from the
    reviewed draft, including after a board update. Save a derived preview
    beside a file when useful and give its regeneration command or export steps.

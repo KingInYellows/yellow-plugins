@@ -14,7 +14,7 @@ import re
 import sys
 
 raw = sys.argv[1]
-if not re.fullmatch(r"[\w./ –—-]+", raw):
+if not re.fullmatch(r"[\w./ (),–—-]+", raw):
     raise SystemExit("Invalid path characters")
 path = Path(raw)
 if path.anchor or ".." in path.parts or any(p.startswith("-") for p in path.parts):
@@ -31,5 +31,11 @@ if target.resolve() != target:
 print(target)
 ```
 
-Use the returned path only on success. Check the destination again at save
-time. For a board, use the connector's resource selector and board identifier.
+This check identifies a candidate. Perform the actual read or save with a
+workspace-scoped tool that enforces containment and rejects symlink or
+reparse-point traversal at open time. For POSIX file APIs, start from an open
+trusted root, walk parent directories with directory-relative no-follow opens,
+and use the retained parent descriptor for the final no-follow open or atomic
+replacement. Render scratch output separately and install it through the same
+scoped operation. When the host lacks a safe operation, return the proposed
+diff for application in the editor. For a board, use its connector and ID.

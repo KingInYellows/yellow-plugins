@@ -4,7 +4,6 @@ name: diagram-architect
 description: "Draft an evidence-backed technical diagram or scoped revision for foreground review."
 model: sonnet
 effort: medium
-background: true
 skills:
   - technical-diagrams
 tools:
@@ -13,6 +12,8 @@ tools:
   - Grep
   - Bash
 ---
+
+# Diagram architect
 
 Use the preloaded technical-diagrams skill in draft-only mode. Read the
 existing source and the evidence for the requested scope. For local Git

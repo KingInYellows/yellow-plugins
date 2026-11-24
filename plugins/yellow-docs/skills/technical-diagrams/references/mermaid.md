@@ -3,7 +3,7 @@
 Select the Mermaid diagram type based on what is being visualized:
 
 | Scenario | Diagram Type | Mermaid Syntax |
-|----------|-------------|----------------|
+| --- | --- | --- |
 | Module dependencies / imports | Flowchart | `flowchart LR` |
 | API call sequences / message exchange | Sequence | `sequenceDiagram` |
 | Class / type hierarchies | Class | `classDiagram` |
@@ -14,13 +14,13 @@ Select the Mermaid diagram type based on what is being visualized:
 | Data flow / pipelines | Flowchart | `flowchart LR` |
 | Git branching strategies | Gitgraph | `gitgraph` (if supported) |
 
-### Layout Direction
+## Layout Direction
 
 - `LR` (left-to-right) for process flows, pipelines, data flow
 - `TB` (top-to-bottom) for hierarchies, architectures, org charts
 - Use subgraphs to group related nodes and reduce visual clutter
 
-### Node Limits
+## Node Limits
 
 - Target: 15–30 nodes for readability
 - Hard limit: 50 for dense graphs (density > 0.3), 100 for sparse
@@ -29,12 +29,12 @@ Select the Mermaid diagram type based on what is being visualized:
 - Max Mermaid text: 50,000 characters
 - Node labels: max 30 characters; abbreviate if needed
 
-### Collapse Strategies (when exceeding limits)
+## Collapse Strategies (when exceeding limits)
 
 1. **Folder-depth collapse**: Summarize at directory depth N using subgraphs
 2. **Focus mode**: Show selected module + immediate neighbors only
 
-### Styling
+## Styling
 
 - `classDef` for semantic coloring: green=active, gray=deprecated, red=error
 - Keep labels concise (3–5 words)
