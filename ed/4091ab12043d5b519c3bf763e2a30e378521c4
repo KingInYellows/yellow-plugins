@@ -1,0 +1,25 @@
+plugins/yellow-docs/codex/skills/technical-diagrams/SKILL.md
+  s_7b2dab31099127::t_c544b6b6a60ff5 61-68
+plugins/yellow-docs/codex/skills/technical-diagrams/references/workspace-paths.md
+  s_7b2dab31099127::t_10ea50658c7588 14,17-20
+plugins/yellow-docs/skills/technical-diagrams/SKILL.md
+  s_7b2dab31099127::t_31b8fc10c1d9e1 63-70
+plugins/yellow-docs/skills/technical-diagrams/references/workspace-paths.md
+  s_7b2dab31099127::t_6214dbe58e1c2c 14,17-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ed4091ab12043d5b519c3bf763e2a30e378521c4",
+  "prompts": {},
+  "sessions": {
+    "s_7b2dab31099127": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20f68-2b30-7793-aace-18775d21f364",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
