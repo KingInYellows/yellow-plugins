@@ -1,0 +1,84 @@
+catalog/plugins/yellow-docs.json
+  s_7b2dab31099127::t_f58e1174c04e6b 3,25,29
+.claude-plugin/marketplace.json
+  s_7b2dab31099127::t_f58e1174c04e6b 186
+plugins/yellow-docs/codex/skills/technical-diagrams/SKILL.md
+  s_7b2dab31099127::t_f24b73cbe05aec 41-42,61-62
+  s_7b2dab31099127::t_f58e1174c04e6b 1-2,4-40,43-54,57-60,63-65,70-71
+  s_7b2dab31099127::t_00704620a06201 3,55-56
+  s_7b2dab31099127::t_470de34eb980bf 66-69
+plugins/yellow-docs/.claude-plugin/plugin.json
+  s_7b2dab31099127::t_f58e1174c04e6b 5
+plugins/yellow-docs/agents/generation/diagram-architect.md
+  s_7b2dab31099127::t_29a2a137fd1787 3-4,9,17-19,21-24
+docs/security.md
+  s_7b2dab31099127::t_f58e1174c04e6b 57-64
+plugins/yellow-docs/skills/docs-conventions/SKILL.md
+  s_7b2dab31099127::t_1c9b68ec2a189c 194-195
+  s_7b2dab31099127::t_29a2a137fd1787 132,134-135
+  s_7b2dab31099127::t_f58e1174c04e6b 17
+plugins/yellow-docs/codex/skills/technical-diagrams/references/mermaid.md
+  s_7b2dab31099127::t_f58e1174c04e6b 1-56
+plugins/yellow-docs/codex/skills/technical-diagrams/references/workspace-paths.md
+  s_7b2dab31099127::t_f58e1174c04e6b 1-4,9-16,18-19,21,27-35
+  s_7b2dab31099127::t_f24b73cbe05aec 26
+  s_7b2dab31099127::t_c35ae37d730916 5-8,17,20,22-25
+plugins/yellow-docs/skills/technical-diagrams/references/workspace-paths.md
+  s_7b2dab31099127::t_f24b73cbe05aec 26
+  s_7b2dab31099127::t_29a2a137fd1787 1-4,9-16,18-19,21,27-35
+  s_7b2dab31099127::t_b3366067590bcb 5-8,17,20,22-25
+scripts/description-budget-baseline.json
+  s_7b2dab31099127::t_00704620a06201 17
+.agents/plugins/marketplace.json
+  s_7b2dab31099127::t_f58e1174c04e6b 113
+.changeset/yellow-docs-technical-diagrams.md
+  s_7b2dab31099127::t_29a2a137fd1787 1-6
+plugins/yellow-docs/skills/technical-diagrams/references/mermaid.md
+  s_7b2dab31099127::t_29a2a137fd1787 1-56
+plugins/yellow-docs/package.json
+  s_7b2dab31099127::t_f58e1174c04e6b 5
+plugins/yellow-docs/CLAUDE.md
+  s_7b2dab31099127::t_2f2a4ee46a3108 3,144
+  s_7b2dab31099127::t_1c9b68ec2a189c 145
+  s_7b2dab31099127::t_f58e1174c04e6b 16-17,40,59,87,89-90,138-139,142,146-148
+  s_7b2dab31099127::t_00704620a06201 11,91
+plugins/yellow-docs/.codex-plugin/plugin.json
+  s_7b2dab31099127::t_f58e1174c04e6b 22
+docs/codex-distribution.md
+  s_7b2dab31099127::t_f58e1174c04e6b 38
+  s_7b2dab31099127::t_2f2a4ee46a3108 48
+plugins/yellow-docs/skills/technical-diagrams/SKILL.md
+  s_7b2dab31099127::t_29a2a137fd1787 1-3,5-42,45-56,59-62,65-67,72-73
+  s_7b2dab31099127::t_00704620a06201 4,57-58
+  s_7b2dab31099127::t_f24b73cbe05aec 43-44,63-64
+  s_7b2dab31099127::t_989f1467e70f08 68-71
+README.md
+  s_7b2dab31099127::t_2f2a4ee46a3108 44,56-58
+  s_7b2dab31099127::t_f58e1174c04e6b 55,333
+plugins/yellow-docs/README.md
+  s_7b2dab31099127::t_eea4e67e7d972f 89
+  s_7b2dab31099127::t_2f2a4ee46a3108 3,90
+  s_7b2dab31099127::t_1c9b68ec2a189c 80,91
+  s_7b2dab31099127::t_f58e1174c04e6b 13,30,62-66,88,92-94
+  s_7b2dab31099127::t_f24b73cbe05aec 82-86
+plugins/yellow-docs/commands/docs/diagram.md
+  s_7b2dab31099127::t_29a2a137fd1787 3-4,10,13-40
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_7b2dab31099127::t_a699c8823c3210 189,795
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f14868711a18abe0039e6cd7d42a67a21e4ce1b",
+  "prompts": {},
+  "sessions": {
+    "s_7b2dab31099127": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20f68-2b30-7793-aace-18775d21f364",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
