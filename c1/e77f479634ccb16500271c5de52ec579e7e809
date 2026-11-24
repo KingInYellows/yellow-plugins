@@ -1,0 +1,38 @@
+plugins/yellow-docs/agents/generation/diagram-architect.md
+  s_7b2dab31099127::t_bd41c46c8ef0bf 16
+  s_7b2dab31099127::t_a903a230499ab6 17
+plugins/yellow-docs/CLAUDE.md
+  s_7b2dab31099127::t_bd41c46c8ef0bf 17-18
+plugins/yellow-docs/codex/skills/technical-diagrams/references/workspace-paths.md
+  s_7b2dab31099127::t_bd41c46c8ef0bf 17,34-41
+README.md
+  s_7b2dab31099127::t_b546b16b025fe1 44
+plugins/yellow-docs/skills/technical-diagrams/references/workspace-paths.md
+  s_7b2dab31099127::t_bd41c46c8ef0bf 17,34-41
+plugins/yellow-docs/skills/technical-diagrams/SKILL.md
+  s_7b2dab31099127::t_bd41c46c8ef0bf 59-69
+plugins/yellow-docs/codex/skills/technical-diagrams/references/mermaid.md
+  s_7b2dab31099127::t_bd41c46c8ef0bf 6,17,23,32,37
+plugins/yellow-docs/codex/skills/technical-diagrams/SKILL.md
+  s_7b2dab31099127::t_bd41c46c8ef0bf 57-67
+plugins/yellow-docs/commands/docs/diagram.md
+  s_7b2dab31099127::t_bd41c46c8ef0bf 11,28-31,33-45,50-52
+plugins/yellow-docs/skills/technical-diagrams/references/mermaid.md
+  s_7b2dab31099127::t_bd41c46c8ef0bf 6,17,23,32,37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c1e77f479634ccb16500271c5de52ec579e7e809",
+  "prompts": {},
+  "sessions": {
+    "s_7b2dab31099127": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20f68-2b30-7793-aace-18775d21f364",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
