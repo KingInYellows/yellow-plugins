@@ -294,7 +294,7 @@ describe('validate-agent-authoring description rules', () => {
       ],
     ])(
       'does not warn 15d or fail RULE 23 when an unindented colon continuation in a %s becomes a new YAML key',
-      (_kind, relPath, body) => {
+      (kind, relPath, body) => {
         writeAgent(plugins, relPath, body);
         const withoutBaseline = runValidator(plugins);
         expect(withoutBaseline.stdout).not.toContain('RULE 15d');
@@ -304,9 +304,20 @@ describe('validate-agent-authoring description rules', () => {
         // the same valid-YAML shape exists in plugin frontmatter.
         writeBaseline({ alpha: 1000 });
         const withBaseline = runBudget();
+        expect(withBaseline.status).toBe(0);
         expect(withBaseline.output).not.toContain('RULE 15d');
         expect(withBaseline.output).not.toContain('malformed YAML');
         expect(withBaseline.output).not.toContain('no string `description:`');
+        // "Wrapped fixture text" is 20 chars; assert the count so a skipped
+        // entry cannot pass these negative assertions alone.
+        const kindCounts = {
+          command: 'commands 20, agents 0, skills 0',
+          agent: 'commands 0, agents 20, skills 0',
+          skill: 'commands 0, agents 0, skills 20',
+        };
+        expect(withBaseline.output).toContain(
+          `Description budget: 20 chars (${kindCounts[kind]})`
+        );
       }
     );
   });

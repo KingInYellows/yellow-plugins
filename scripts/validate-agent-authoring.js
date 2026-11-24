@@ -2268,6 +2268,7 @@ function main() {
         files: [...commandFiles, ...agentFiles, ...skillFiles],
         extractFrontmatter,
         parseFrontmatter,
+        readFile: readText,
       })
     : null;
   if (updateBaseline) {
