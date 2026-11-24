@@ -58,13 +58,14 @@ only an export, locate the source or ask which artifact should become editable.
    In the foreground, show them to the user and obtain explicit approval
    before saving or sending content to a board. On Claude use AskUserQuestion.
    On other hosts use the available confirmation prompt or wait for an explicit
-   reply in chat. For a shared source, submit the edit against the revision
-   reviewed, using the connector's conditional update or the native editor's
-   conflict-aware transaction. If that revision changed, reread and reapply
-   the scoped diff, and seek fresh approval for a changed proposal. If the
-   host cannot protect a shared edit against a concurrent save, return the
-   patch for application in the editor. For local files, use the workspace
-   I/O rules in the path reference.
+   reply in chat. Record the local content fingerprint or board revision when
+   preparing the draft. At save time, condition the edit on that same version
+   using a conflict-aware editor transaction, a conditional update, or a lock
+   respected by all writers while checking and installing. For a new file use
+   exclusive creation. If the version changed, reread the latest source and
+   reapply only the scoped diff. Seek fresh approval for any changed proposal.
+   When the host cannot protect the update, return a patch for application in
+   the editor. Local saves must also follow the workspace I/O rules.
 6. Reopen the saved result. Inspect the final render if it differs from the
    reviewed draft, including after a board update. Save a derived preview
    beside a file when useful and give its regeneration command or export steps.

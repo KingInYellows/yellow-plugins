@@ -10,11 +10,14 @@ structured argv.
 ```python
 from pathlib import Path
 import os
-import re
 import sys
+import unicodedata
 
 raw = sys.argv[1]
-if not re.fullmatch(r"[\w./ (),–—-]+", raw):
+if not raw or any(
+    not (c.isalnum() or unicodedata.category(c).startswith("M") or c in "_./ (),–—-")
+    for c in raw
+):
     raise SystemExit("Invalid path characters")
 path = Path(raw)
 if path.anchor or ".." in path.parts or any(p.startswith("-") for p in path.parts):
