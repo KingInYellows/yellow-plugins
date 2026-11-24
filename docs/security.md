@@ -54,6 +54,14 @@ credential is supplied, copied or read. A connected stdio server and
 `authStatus: unsupported` do not prove Graphite account authentication. The
 receipt marks Phase 1 acceptance partial even when these controls pass.
 
+### Technical diagram destinations
+
+The yellow-docs diagram skill uses local rendering for repository artifacts.
+A user-selected collaborative board is an external destination. Review its
+identity and the proposed diagram content with the user before sending or
+saving changes, and omit credentials from labels and previews. Board access
+comes from the host connector.
+
 ### Plugins Without MCP Servers
 
 - **yellow-review** — Ships no MCP server; uses `gh` CLI (GitHub CLI) for

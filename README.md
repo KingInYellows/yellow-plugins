@@ -41,7 +41,7 @@ them with `/stack:select`. See
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns                                       | 7 agents, 6 commands, 2 skills, 1 hook         |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, orchestrate plan-implement-review chains (legacy — see yellow-cursor)   | 1 agent, 9 commands, 1 skill, 1 MCP            |
 | `yellow-jules`        | Google Jules integration (deprecated: read-only after 2026-11-11, off 2026-12-31) — delegate, supervise, review sessions under grants   | 10 commands, 2 skills                          |
-| `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 2 skills                |
+| `yellow-docs`         | Documentation audit, generation, and evidence-backed technical diagrams for any repository                                              | 10 agents, 6 commands, 3 skills                |
 | `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup/request, stub run, approval-gated real run that may spend)                  | 4 commands                                     |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 MCP                              |
@@ -52,9 +52,10 @@ them with `/stack:select`. See
 
 ## Codex Distribution
 
-The private/local Codex catalog selects ten plugins and 31 skills. The six new
-workflow slices are worktree inventory, documentation audit, complexity scan,
-public DeepWiki research, offline Cursor planning and local Codex readiness. See
+The private/local Codex catalog selects ten plugins and 32 skills. Workflows
+include worktree inventory, documentation audit, technical diagrams, complexity
+scans, public DeepWiki research, offline Cursor planning and local Codex
+readiness. See
 the exact support, setup, cache-refresh and unsupported states in
 [Codex distribution](docs/codex-distribution.md). WSL CLI evidence does not
 establish Windows desktop support. Claude command/setup behavior stays separate.
@@ -329,7 +330,7 @@ yellow-plugins/
 │   ├── yellow-cursor/         # Cursor Cloud Agent delegation, pilot target (10 commands, 2 skills)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 2 skills, 1 hook)
 │   ├── yellow-devin/          # Devin.AI, legacy (1 agent, 9 commands, 1 skill, 1 MCP)
-│   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 2 skills)
+│   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 3 skills)
 │   ├── yellow-goal/           # yellow-goal engine bridge (4 commands)
 │   ├── yellow-jules/          # Google Jules, deprecated, grant-gated (10 commands, 2 skills)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
