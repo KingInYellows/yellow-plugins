@@ -519,6 +519,32 @@ const {
 } = require('./lib/setup-all-list');
 const { isUserInvocableSkill } = require('./lib/skill-frontmatter');
 
+// One UTF-8 read per file per run. Several rules (BOM, RULE 15, RULE 18,
+// RULE 23) otherwise re-read the same path, and a file whose path has both
+// a commands/ and an agents/ segment is in two walk lists.
+const fileTextCache = new Map();
+const reportedBomPaths = new Set();
+
+function resetFileTextCache() {
+  fileTextCache.clear();
+  reportedBomPaths.clear();
+}
+
+function readText(filePath) {
+  let text = fileTextCache.get(filePath);
+  if (text === undefined) {
+    text = fs.readFileSync(filePath, 'utf8');
+    fileTextCache.set(filePath, text);
+  }
+  return text;
+}
+
+function noteBomError(filePath, errors) {
+  if (reportedBomPaths.has(filePath)) return;
+  reportedBomPaths.add(filePath);
+  errors.push(formatBomError(relative(filePath)));
+}
+
 // Map final agent-name segment → Set of fully-qualified 3-segment refs.
 // The colon-less/bareword checks gate on registry membership (RULE 13
 // lesson: membership logic must be anchored to actual plugin ownership,
@@ -551,9 +577,9 @@ function buildLastSegmentIndex(pluginAgents) {
 // ctx.warnings and registers discovered agent names in ctx.pluginAgents.
 function validateAgentFile(filePath, ctx) {
   const { errors, warnings, pluginAgents } = ctx;
-  const content = fs.readFileSync(filePath, 'utf8');
+  const content = readText(filePath);
   if (hasLeadingBom(content)) {
-    errors.push(formatBomError(relative(filePath)));
+    noteBomError(filePath, errors);
     return;
   }
   const frontmatter = extractFrontmatter(content);
@@ -895,7 +921,7 @@ function validateSubagentReferences(markdownFiles, ctx) {
   const { pluginNames, pluginAgents, twoToThreeSegment, errors } = ctx;
   const lastSegmentIndex = buildLastSegmentIndex(pluginAgents);
   for (const filePath of markdownFiles) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     for (const match of content.matchAll(pluginSubagentPattern)) {
       const subagentType = match[1];
       const pluginName = subagentType.split(':', 1)[0];
@@ -983,7 +1009,7 @@ function validateStagingPromoterFrontmatter(agentFiles, errors) {
       // Don't fail; the agent itself is what's checked, not its absence.
       continue;
     }
-    const content = fs.readFileSync(agentPath, 'utf8');
+    const content = readText(agentPath);
     const frontmatter = extractFrontmatter(content) || '';
 
     // Use the parseList() helper to extract disallowedTools as a real
@@ -1023,7 +1049,7 @@ function validateMemoryWriteSectionGate(agentFiles, errors) {
   if (!promoter) {
     return;
   }
-  const content = fs.readFileSync(promoter, 'utf8');
+  const content = readText(promoter);
   // Strip frontmatter so we don't false-positive on metadata. CRLF-tolerant:
   // WSL2-authored files arrive with \r\n line endings before `.gitattributes`
   // normalization, and this regex must match either form (mirrors the pattern
@@ -1082,7 +1108,7 @@ function validateMemoryWriteSectionGate(agentFiles, errors) {
 // Validate that command files do not source plugin files via BASH_SOURCE.
 function validateCommandFiles(commandFiles, errors) {
   for (const filePath of commandFiles) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     const frontmatter = extractFrontmatter(content);
     const codeBlocks = content.match(/```[^\n]*\n[\s\S]*?```/g) || [];
     const codeContent = (frontmatter || '') + '\n' + codeBlocks.join('\n');
@@ -1132,7 +1158,7 @@ function validateMemoryProtocolSentinel(markdownFiles, errors) {
       }
       continue;
     }
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     if (!content.includes(MEMORY_PROTOCOL_SENTINEL)) {
       errors.push(
         `${relative(filePath)}: RULE 16 — missing or corrupted memory-` +
@@ -1151,7 +1177,7 @@ function validateMemoryProtocolSentinel(markdownFiles, errors) {
 
   for (const filePath of markdownFiles) {
     if (declared.has(filePath)) continue;
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     if (content.includes('ruvector-protocol-constants')) {
       errors.push(
         `${relative(filePath)}: RULE 16 — undeclared copy of the memory-` +
@@ -1196,7 +1222,7 @@ function validateDurableBar(markdownFiles, errors) {
   const optedIn = declaredPaths.some(
     (p) =>
       fs.existsSync(p) &&
-      fs.readFileSync(p, 'utf8').includes(DURABLE_BAR_START)
+      readText(p).includes(DURABLE_BAR_START)
   );
   const checkDeclared = strict || optedIn;
   const copies = [];
@@ -1212,7 +1238,7 @@ function validateDurableBar(markdownFiles, errors) {
       }
       continue;
     }
-    const block = extractDurableBar(fs.readFileSync(filePath, 'utf8'));
+    const block = extractDurableBar(readText(filePath));
     if (!block) {
       errors.push(
         `${relative(filePath)}: RULE 22 — missing durable-bar block. Keep ` +
@@ -1250,7 +1276,7 @@ function validateDurableBar(markdownFiles, errors) {
 
   for (const filePath of markdownFiles) {
     if (declared.has(filePath)) continue;
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     if (content.includes(DURABLE_BAR_START)) {
       errors.push(
         `${relative(filePath)}: RULE 22 — undeclared durable-bar copy. Add ` +
@@ -1296,7 +1322,7 @@ function extractUsageSection(body) {
 
 function validateSkillWrapperDrift(commandFiles, errors) {
   for (const filePath of commandFiles) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     const fmBlockMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
     const frontmatter = fmBlockMatch ? extractFrontmatter(content) : null;
     const body = fmBlockMatch ? content.slice(fmBlockMatch[0].length) : content;
@@ -1355,7 +1381,7 @@ function entryPointId(filePath, kind) {
   const parts = path.relative(PLUGINS_DIR, filePath).split(path.sep);
   const plugin = parts[0];
   const raw = parseScalar(
-    extractFrontmatter(fs.readFileSync(filePath, 'utf8')),
+    extractFrontmatter(readText(filePath)),
     'name'
   );
   const declared = typeof raw === 'string' && raw.trim() ? raw.trim() : null;
@@ -1527,7 +1553,7 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
   // advisory here would let a nameless skill reach a release unnoticed.
   for (const filePath of skillFiles) {
     if (!entryPointId(filePath, 'skill').declared) {
-      if (hasLeadingBom(fs.readFileSync(filePath, 'utf8'))) continue;
+      if (hasLeadingBom(readText(filePath))) continue;
       errors.push(
         `[RULE 18] ${relative(filePath)}: SKILL.md has no \`name:\` in its ` +
           `frontmatter. \`name:\` is the runtime identifier a ` +
@@ -1540,7 +1566,7 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
   const dispatchTargets = buildDispatchTargetIndex(commandFiles, skillFiles);
 
   for (const filePath of markdownFiles) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     const fmBlockMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
     const body = fmBlockMatch ? content.slice(fmBlockMatch[0].length) : content;
 
@@ -1610,7 +1636,7 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
         );
         continue;
       }
-      const declaringContent = fs.readFileSync(absPath, 'utf8');
+      const declaringContent = readText(absPath);
       for (const placeholder of placeholders) {
         if (!declaringContent.includes(placeholder)) {
           errors.push(
@@ -1655,7 +1681,7 @@ const SKILL_TOOL_MENTION_RE = /\bSkill`?\s+tool\b/;
 
 function validateSkillToolGrant(files, errors, { toolsKey }) {
   for (const filePath of files) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     if (!SKILL_TOOL_MENTION_RE.test(stripFencedContent(content))) continue;
 
     const frontmatter = extractFrontmatter(content);
@@ -1679,9 +1705,9 @@ function validateSkillToolGrant(files, errors, { toolsKey }) {
 function validateSkillFiles(skillFiles, ctx) {
   const { errors, warnings } = ctx;
   for (const filePath of skillFiles) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     if (hasLeadingBom(content)) {
-      errors.push(formatBomError(relative(filePath)));
+      noteBomError(filePath, errors);
       continue;
     }
 
@@ -1784,6 +1810,11 @@ function validateSkillFiles(skillFiles, ctx) {
 function checkDescriptionSingleLine(frontmatter, filePath, warnings) {
   if (!frontmatter) return;
   const doc = YAML.parseDocument(frontmatter);
+  // An unindented continuation that contains `: ` is valid YAML: it becomes
+  // a new key and truncates `description`. We do not warn on that shape
+  // (no RULE 15d, no RULE 23) because the same syntax is legitimate in
+  // plugin frontmatter and a warning would false-positive until a measured
+  // check exists. See the RULE 15d colon-continuation fixture.
   if (doc.errors.length > 0 || !YAML.isMap(doc.contents)) return;
   const pair = doc.contents.items.find(
     (item) => YAML.isScalar(item.key) && item.key.value === 'description'
@@ -1814,9 +1845,9 @@ function checkDescriptionSingleLine(frontmatter, filePath, warnings) {
 // it cannot parse, so an unreported failure would hide a broken command.
 function validateCommandDescriptions(commandFiles, errors, warnings) {
   for (const filePath of commandFiles) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     if (hasLeadingBom(content)) {
-      errors.push(formatBomError(relative(filePath)));
+      noteBomError(filePath, errors);
       continue;
     }
     const frontmatter = extractFrontmatter(content);
@@ -1868,7 +1899,7 @@ function collectModelInvocationDisabled(commandFiles, skillFiles, errors) {
   const disabled = new Map();
   const isDisabled = (filePath) => {
     const data = parseFrontmatter(
-      extractFrontmatter(fs.readFileSync(filePath, 'utf8'))
+      extractFrontmatter(readText(filePath))
     );
     if (!data || !(MODEL_INVOCATION_KEY in data)) return false;
     const value = data[MODEL_INVOCATION_KEY];
@@ -1891,7 +1922,7 @@ function collectModelInvocationDisabled(commandFiles, skillFiles, errors) {
     const entry = entryPointId(filePath, 'skill');
     // codex/ and cursor/ copies keep no such key.
     if (!entry.primary || !isDisabled(filePath)) continue;
-    if (!isUserInvocableSkill(fs.readFileSync(filePath, 'utf8'))) {
+    if (!isUserInvocableSkill(readText(filePath))) {
       errors.push(
         `${relative(filePath)}: RULE 25 — sets \`${MODEL_INVOCATION_KEY}: true\` ` +
           `and \`user-invocable: false\`, so neither the model nor the user ` +
@@ -1941,7 +1972,7 @@ function validateModelInvocationFlag(files, errors, warnings) {
   };
 
   for (const filePath of markdownFiles) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     const fmBlock = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
     const body = fmBlock ? content.slice(fmBlock[0].length) : content;
     const seen = new Set();
@@ -1956,7 +1987,7 @@ function validateModelInvocationFlag(files, errors, warnings) {
   }
 
   for (const filePath of agentFiles) {
-    const frontmatter = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
+    const frontmatter = extractFrontmatter(readText(filePath));
     if (!frontmatter) continue;
     for (const skill of parseList(frontmatter, 'skills')) {
       report(relative(filePath), 'preloads the skill', skill, pluginOf(filePath));
@@ -1972,7 +2003,7 @@ function validateModelInvocationFlag(files, errors, warnings) {
   );
   if (fs.existsSync(setupAllPath)) {
     const section = extractMarkedSection(
-      fs.readFileSync(setupAllPath, 'utf8'),
+      readText(setupAllPath),
       DELEGATED_START,
       DELEGATED_END
     );
@@ -2035,7 +2066,7 @@ function validateModelInvocationFlag(files, errors, warnings) {
   for (const filePath of modelFacing) {
     let text;
     try {
-      text = fs.readFileSync(filePath, 'utf8');
+      text = readText(filePath);
     } catch (e) {
       if (e.code !== 'ENOENT') {
         warnings.push(
@@ -2067,7 +2098,7 @@ function validateModelInvocationFlag(files, errors, warnings) {
   const addVisible = (filePath, plugin) => {
     if (disabledPaths.has(filePath)) return;
     const data = parseFrontmatter(
-      extractFrontmatter(fs.readFileSync(filePath, 'utf8'))
+      extractFrontmatter(readText(filePath))
     );
     if (!data) return;
     const text = ['description', 'when_to_use']
@@ -2102,7 +2133,7 @@ function validateModelInvocationFlag(files, errors, warnings) {
     )
   );
   for (const filePath of proseFiles) {
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readText(filePath);
     const fmBlock = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
     const body = fmBlock ? content.slice(fmBlock[0].length) : content;
     const lines = stripFencedContent(body, { stripFrontmatter: false }).split(
@@ -2155,7 +2186,7 @@ function validateSizeCeilings(commandFiles, agentFiles, warnings) {
   ];
   for (const { files, ceiling, kind } of groups) {
     for (const filePath of files) {
-      const lineCount = countLines(fs.readFileSync(filePath, 'utf8'));
+      const lineCount = countLines(readText(filePath));
       if (lineCount > ceiling) {
         warnings.push(
           `[RULE 21 advisory] ${relative(filePath)}: ${lineCount} lines ` +
@@ -2171,6 +2202,7 @@ function validateSizeCeilings(commandFiles, agentFiles, warnings) {
 const USAGE = `Usage: node scripts/validate-agent-authoring.js [${UPDATE_DESCRIPTION_BASELINE_FLAG}]`;
 
 function main() {
+  resetFileTextCache();
   const args = process.argv.slice(2);
   const updateBaseline = args.includes(UPDATE_DESCRIPTION_BASELINE_FLAG);
   const unknown = args.filter(

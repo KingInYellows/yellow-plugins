@@ -249,6 +249,66 @@ describe('validate-agent-authoring description rules', () => {
       expect(status).toBe(0);
       expect(stdout).not.toContain('RULE 15d');
     });
+
+    it.each([
+      [
+        'command',
+        'alpha/commands/demo/cmd.md',
+        command('description: >\n  Folded fixture. Use when testing.'),
+      ],
+      [
+        'agent',
+        'alpha/agents/demo-agent.md',
+        agent('description: |\n  Literal fixture. Use when testing.'),
+      ],
+      [
+        'skill',
+        'alpha/skills/demo-skill/SKILL.md',
+        skill('description: >\n  Folded fixture. Use when testing.'),
+      ],
+    ])('warns on a CRLF %s frontmatter with a block-scalar description', (_kind, relPath, body) => {
+      writeAgent(plugins, relPath, body.replaceAll('\n', '\r\n'));
+      const { status, stdout } = runValidator(plugins);
+      expect(status).toBe(0);
+      expect(stdout).toContain('[RULE 15d advisory]');
+      expect(stdout).toContain(relPath);
+    });
+
+    it.each([
+      [
+        'command',
+        'alpha/commands/demo/cmd.md',
+        command('description: Wrapped fixture text\nallowed-for: something else'),
+      ],
+      [
+        'agent',
+        'alpha/agents/demo-agent.md',
+        agent('description: Wrapped fixture text\nallowed-for: something else'),
+      ],
+      [
+        'skill',
+        'alpha/skills/demo-skill/SKILL.md',
+        skill(
+          'description: Wrapped fixture text\nallowed-for: something else\n'
+        ),
+      ],
+    ])(
+      'does not warn 15d or fail RULE 23 when an unindented colon continuation in a %s becomes a new YAML key',
+      (_kind, relPath, body) => {
+        writeAgent(plugins, relPath, body);
+        const withoutBaseline = runValidator(plugins);
+        expect(withoutBaseline.stdout).not.toContain('RULE 15d');
+        expect(withoutBaseline.stderr).not.toContain('malformed YAML');
+        // description is truncated to the first line, which is still a string,
+        // so RULE 23 has nothing to count as missing. Documented, not warned:
+        // the same valid-YAML shape exists in plugin frontmatter.
+        writeBaseline({ alpha: 1000 });
+        const withBaseline = runBudget();
+        expect(withBaseline.output).not.toContain('RULE 15d');
+        expect(withBaseline.output).not.toContain('malformed YAML');
+        expect(withBaseline.output).not.toContain('no string `description:`');
+      }
+    );
   });
 
   describe('RULE 23 description budget', () => {
@@ -400,6 +460,25 @@ describe('validate-agent-authoring description rules', () => {
         expect(withBaseline.output).not.toContain('RULE 18');
       }
     );
+
+    it('reports a leading UTF-8 BOM once when the path matches both command and agent walks', () => {
+      writeAgent(
+        plugins,
+        'alpha/commands/demo/agents/both.md',
+        '\uFEFF' + command(`description: ${TEN}`)
+      );
+      const withoutBaseline = runValidator(plugins);
+      expect(withoutBaseline.status).toBe(1);
+      expect((withoutBaseline.stderr.match(/leading UTF-8 BOM/g) || []).length).toBe(1);
+      expect(withoutBaseline.stderr).toContain('commands/demo/agents/both.md');
+
+      writeBaseline({ alpha: 0 });
+      const withBaseline = runBudget();
+      expect(withBaseline.status).toBe(1);
+      expect((withBaseline.output.match(/leading UTF-8 BOM/g) || []).length).toBe(1);
+      expect(withBaseline.output).toContain('commands/demo/agents/both.md');
+      expect(withBaseline.output).not.toContain('no string `description:`');
+    });
 
     it('fails on a skill with no description', () => {
       writeAgent(
@@ -621,18 +700,33 @@ describe('validate-agent-authoring description rules', () => {
         expect(readFileSync(baselineFile, 'utf8')).toBe(before);
       });
 
-      it('over a file with a leading UTF-8 BOM', () => {
-        writeAlpha();
-        writeAgent(
-          plugins,
+      it.each([
+        [
+          'command',
           'alpha/commands/demo/bom.md',
-          '\uFEFF' + command(`description: ${TEN}`)
-        );
+          '\uFEFF' + command(`description: ${TEN}`),
+          'commands/demo/bom.md',
+        ],
+        [
+          'agent',
+          'alpha/agents/bom-agent.md',
+          '\uFEFF' + agent(`description: ${TEN}`),
+          'agents/bom-agent.md',
+        ],
+        [
+          'skill',
+          'alpha/skills/bom-skill/SKILL.md',
+          '\uFEFF' + skill(`description: ${TEN} Use when testing.`),
+          'skills/bom-skill/SKILL.md',
+        ],
+      ])('over a %s with a leading UTF-8 BOM', (_kind, relPath, body, listed) => {
+        writeAlpha();
+        writeAgent(plugins, relPath, body);
         writeBaseline({ alpha: 35 });
         const before = readFileSync(baselineFile, 'utf8');
         const { status, output } = runBudget(updateFlag);
         expect(status).toBe(1);
-        expect(output).toContain('commands/demo/bom.md: leading UTF-8 BOM');
+        expect(output).toContain(`${listed}: leading UTF-8 BOM`);
         expect(output).toContain('Baseline not written');
         expect(output).not.toContain('no string `description:`');
         expect(output).not.toContain('no YAML frontmatter');
