@@ -13,6 +13,30 @@ and this project adheres to
 
 ---
 
+## [2.1.39] - 2026-11-24
+
+### Added
+
+- **yellow-docs 1.5.0** adds the technical-diagrams skill for Claude and Codex.
+  It updates Mermaid, draw.io, and connected canvas diagrams from project
+  evidence while preserving human edits.
+
+### Changed
+
+- **yellow-ruvector 2.1.0** reads cached semantic recall at session start,
+  refreshes it in the background, and records co-edits asynchronously. Replacing
+  a store at the same path invalidates its cached recall.
+- **yellow-ci 1.5.12** reads cached GitHub status at session start and refreshes
+  it in the background.
+
+### Fixed
+
+- **yellow-morph 1.3.5** forwards proxy and CA settings during installation,
+  including uppercase and lowercase proxy variables. Only selected npm
+  configuration variables reach the installer.
+
+---
+
 ## [2.1.38] - 2026-11-19
 
 ### Changed
