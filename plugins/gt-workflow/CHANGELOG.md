@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.2.1
+
+### Patch Changes
+
+- [#1918](https://github.com/KingInYellows/yellow-plugins/pull/1918)
+  [`8220d84`](https://github.com/KingInYellows/yellow-plugins/commit/8220d84a0d48ae36a45bc46a6084220b3b93b894)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  github-workflow's `check-git-push` hook now allows a plain `git push`
+  (including `git push -u origin <branch>`) and blocks only force pushes,
+  `--mirror` and branch deletes, which can break a pull request stacked on the
+  branch. A push the hook cannot read in full is still blocked, and pushing a
+  branch in a gh-stack stack gets a reminder to run `/github-stack:sync`.
+  gt-workflow's hook is unchanged; its copy of the shared push detector gains
+  the `analyzeGitPushCommand` export.
+
 ## 2.2.0
 
 ### Minor Changes

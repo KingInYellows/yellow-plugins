@@ -13,6 +13,28 @@ and this project adheres to
 
 ---
 
+## [2.1.40] - 2026-11-25
+
+### Changed
+
+- **github-workflow 0.7.0** lets agents run a plain `git push`, including
+  `git push -u origin <branch>`. Its hook still blocks force pushes, `--mirror`
+  and branch deletes, which can break a pull request stacked on the branch, and
+  any push it cannot read in full. Pushing a branch that belongs to a gh-stack
+  stack gets a reminder to run `/github-stack:sync`.
+- **gt-workflow 2.2.1** keeps blocking every raw `git push`; its copy of the
+  shared push detector gains the `analyzeGitPushCommand` export.
+
+### Fixed
+
+- **yellow-core 2.17.3** makes `/setup:all`, `/stack:status` and the
+  stack-provider-router skill probe only the stacked-PR provider the repository
+  uses, so a GitHub-stacks repository never runs `gt`. `/setup:all` and
+  `/statusline:setup` no longer report a plugin left only in the plugin cache as
+  installed.
+
+---
+
 ## [2.1.39] - 2026-11-24
 
 ### Added
