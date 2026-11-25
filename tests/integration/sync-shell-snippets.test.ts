@@ -80,6 +80,7 @@ function generatedBlock(name: string, body: string): string {
 const HELPERS_BODY = `readonly RED='\\033[0;31m'\nerror() { printf '%s\\n' "$1" >&2; exit 1; }`;
 const VERSION_GTE_BODY = `version_gte() { [ "$1" = "$2" ]; }`;
 const ROOT_BODY = `resolve_yellow_core_root() { printf '%s' "$1"; }`;
+const LIST_BODY = `plugin_list_json() { claude plugin list --json; }`;
 
 // Match the script's TARGETS manifest exactly so the per-target loop
 // finds every entry. Focus drift tests on the ast-grep target (single
@@ -95,6 +96,7 @@ function seedAllTargets(tmp: string, focusBlock: string): void {
   write(tmp, 'scripts/snippets/install-helpers.sh', `${HELPERS_BODY}\n`);
   write(tmp, 'scripts/snippets/install-version-gte.sh', `${VERSION_GTE_BODY}\n`);
   write(tmp, 'scripts/snippets/yellow-core-root.sh', `${ROOT_BODY}\n`);
+  write(tmp, 'scripts/snippets/plugin-list-json.sh', `${LIST_BODY}\n`);
 
   const helpersBlock = generatedBlock('install-helpers', HELPERS_BODY);
   const versionBlock = generatedBlock('install-version-gte', VERSION_GTE_BODY);
@@ -113,12 +115,25 @@ function seedAllTargets(tmp: string, focusBlock: string): void {
   // can drift it without touching the other targets.
   write(tmp, FOCUS_TARGET, buildSimpleTarget([focusBlock]));
   const rootBlock = generatedBlock('yellow-core-root', ROOT_BODY);
-  write(tmp, 'plugins/yellow-core/commands/stack/status.md', rootBlock + '\n');
+  const listBlock = generatedBlock('plugin-list-json', LIST_BODY);
+  write(
+    tmp,
+    'plugins/yellow-core/commands/stack/status.md',
+    `${rootBlock}\n${listBlock}\n`
+  );
   write(
     tmp,
     'plugins/yellow-core/skills/stack-provider-router/SKILL.md',
-    rootBlock + '\n'
+    `${rootBlock}\n${listBlock}\n`
   );
+  for (const target of [
+    'plugins/yellow-core/skills/stack-provider-guard/SKILL.md',
+    'plugins/yellow-core/commands/setup/all.md',
+    'plugins/yellow-core/commands/statusline/setup.md',
+    'plugins/yellow-claudemod/commands/claudemod/setup.md',
+  ]) {
+    write(tmp, target, `${listBlock}\n`);
+  }
 }
 
 describe('sync-shell-snippets.js', () => {
