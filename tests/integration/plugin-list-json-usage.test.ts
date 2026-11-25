@@ -27,12 +27,13 @@ function markdownFiles(dir: string): string[] {
   return out;
 }
 
-function directCalls(text: string): string[] {
+function directCalls(text: string, isShell = false): string[] {
   const hits: string[] = [];
   let inHelper = false;
-  let inFence = false;
+  // A .sh file is code throughout; Markdown is code only inside fences.
+  let inFence = isShell;
   for (const line of text.split('\n')) {
-    if (/^\s*```/.test(line)) inFence = !inFence;
+    if (!isShell && /^\s*```/.test(line)) inFence = !inFence;
     if (line.includes(BEGIN)) inHelper = true;
     const code = line.replace(/^\s*#.*$/, '');
     if (inFence && !inHelper && DIRECT.test(code)) {
@@ -47,24 +48,37 @@ describe('plugin_list_json usage', () => {
   it('no plugin shell block calls `claude plugin list` directly', () => {
     const offenders: string[] = [];
     for (const file of markdownFiles(PLUGINS)) {
-      for (const hit of directCalls(readFileSync(file, 'utf8'))) {
+      const shell = file.endsWith('.sh');
+      for (const hit of directCalls(readFileSync(file, 'utf8'), shell)) {
         offenders.push(`${relative(ROOT, file)}: ${hit}`);
       }
     }
     expect(offenders).toEqual([]);
   });
 
-  it('every call site passes a repository root', () => {
+  it('every call site passes a non-empty repository root', () => {
     const files = markdownFiles(PLUGINS).filter((f) =>
       readFileSync(f, 'utf8').includes(BEGIN)
     );
     expect(files.length).toBeGreaterThanOrEqual(9);
     for (const file of files) {
-      const calls = readFileSync(file, 'utf8').match(
-        /plugin_list_json "[^"\n]*"(?=\s*2>)/g
-      );
-      expect(calls, relative(ROOT, file)).not.toBeNull();
+      const text = readFileSync(file, 'utf8');
+      const name = relative(ROOT, file);
+      const blocks = text.split(BEGIN).length - 1;
+      // Every use of the helper, minus its own definition line.
+      const uses = (
+        text.match(/(?<![\w$])plugin_list_json\b(?!\(\))[^\n]*/g) ?? []
+      ).filter((use) => !use.startsWith('plugin_list_json()'));
+      expect(uses.length, name).toBeGreaterThanOrEqual(blocks);
+      for (const use of uses) {
+        expect(use, name).toMatch(/^plugin_list_json "(?!")[^"\n]*"/);
+      }
     }
+  });
+
+  it('scans .sh files as code without fences', () => {
+    expect(directCalls('claude plugin list --json', true)).toHaveLength(1);
+    expect(directCalls('claude plugin list --json')).toHaveLength(0);
   });
 
   it('flags a direct call outside the helper', () => {
