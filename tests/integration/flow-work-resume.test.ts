@@ -135,6 +135,7 @@ beforeEach(() => {
   symlinkSync(catPath, join(bin, 'cat'));
   sh('git', ['init', '-q', '-b', 'main']);
   mkdirSync(join(repo, 'plans'));
+  writeFileSync(join(repo, PLAN), '# Plan\n\n- [ ] one\n- [ ] two\n');
   commit('chore: initial', 'README.md');
 });
 
@@ -212,6 +213,40 @@ describe('committed-steps (CLAUDE-384)', () => {
       base: 'main',
       steps: [2],
     });
+  });
+
+  it('reads the plan path from --plan-file', () => {
+    sh('git', ['checkout', '-q', '-b', 'feat/x']);
+    commit(`feat: task one\n\nFlow-Work-Step: ${PLAN}#1\n`, 'a.txt');
+    const planFile = join(tmp, 'plan-arg.txt');
+    writeFileSync(planFile, `${PLAN}\r\n`);
+    expect(
+      cli(['committed-steps', '--plan-file', planFile, '--base', 'main'])
+    ).toMatchObject({ status: 'OK', plan: PLAN, steps: [1] });
+  });
+
+  it('rejects unsafe or missing plan paths with ERROR', () => {
+    const bad = [
+      'plans/$(touch PWNED).md',
+      'plans/a b.md',
+      'plans/-x.md',
+      '../outside.md',
+      'plans/feature.txt',
+      'plans/missing.md',
+    ];
+    for (const plan of bad) {
+      const planFile = join(tmp, 'plan-arg.txt');
+      writeFileSync(planFile, `${plan}\n`);
+      const result = cli([
+        'committed-steps',
+        '--plan-file',
+        planFile,
+        '--base',
+        'main',
+      ]);
+      expect(result.status, plan).toBe('ERROR');
+    }
+    expect(existsSync(join(repo, 'PWNED'))).toBe(false);
   });
 
   it('reports ERROR, not an empty list, when the base cannot be read', () => {

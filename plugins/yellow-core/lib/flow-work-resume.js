@@ -7,7 +7,7 @@
  *
  * Two read-only modes, each printing one JSON object on stdout:
  *
- *   committed-steps --plan <path> [--base <ref>]
+ *   committed-steps --plan-file <file> [--base <ref>]   (or --plan <path>)
  *     Single-branch runs. Phase 2 commits a step before it ticks the step's
  *     plan checkbox, so a session lost in between leaves a committed step
  *     unticked. Each step commit carries a `Flow-Work-Step: <plan>#<N>`
@@ -43,6 +43,7 @@
 'use strict';
 
 const { spawnSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 
 const TRAILER_KEY = 'Flow-Work-Step';
@@ -102,7 +103,19 @@ function normalizePlanPath(plan, root, cwd) {
   const abs = path.resolve(cwd, plan);
   const rel = path.relative(root, abs);
   if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) return null;
-  return rel.split(path.sep).join('/');
+  const posix = rel.split(path.sep).join('/');
+  // Allowlist: the same characters the trailer is written with, no leading
+  // hyphen in any component, no `.`/`..` components, a Markdown file.
+  if (!/^[A-Za-z0-9._/-]+$/.test(posix)) return null;
+  if (!posix.endsWith('.md')) return null;
+  if (
+    posix
+      .split('/')
+      .some((c) => c === '' || c === '.' || c === '..' || c.startsWith('-'))
+  ) {
+    return null;
+  }
+  return posix;
 }
 
 function defaultBase(cwd) {
@@ -137,16 +150,57 @@ function stepsFromTrailerValues(values, plan) {
   return [...steps].sort((a, b) => a - b);
 }
 
+// Read the plan path from a file the command wrote with the Write tool, so
+// the path never passes through a shell command line.
+function readPlanFile(file) {
+  let text;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    return { error: `cannot read --plan-file: ${err.code || err.message}` };
+  }
+  const lines = text
+    .replace(/\r/g, '')
+    .split('\n')
+    .filter((l) => l.length > 0);
+  if (lines.length !== 1) {
+    return { error: '--plan-file must hold exactly one line: the plan path' };
+  }
+  return { plan: lines[0] };
+}
+
 function committedSteps(opts, cwd) {
-  if (!opts.plan)
-    return { status: 'ERROR', detail: 'committed-steps needs --plan' };
+  let raw = opts.plan;
+  if (opts['plan-file']) {
+    const read = readPlanFile(opts['plan-file']);
+    if (read.error) return { status: 'ERROR', detail: read.error };
+    raw = read.plan;
+  }
+  if (!raw) {
+    return {
+      status: 'ERROR',
+      detail: 'committed-steps needs --plan-file (or --plan)',
+    };
+  }
   const root = repoRoot(cwd);
   if (!root) return { status: 'ERROR', detail: 'not inside a git repository' };
-  const plan = normalizePlanPath(opts.plan, root, cwd);
+  const plan = normalizePlanPath(raw, root, cwd);
   if (!plan) {
     return {
       status: 'ERROR',
-      detail: `plan path is outside the repository: ${opts.plan}`,
+      detail: `unsafe plan path (must be a .md file inside the repository, letters, digits, . _ / - only): ${JSON.stringify(raw)}`,
+    };
+  }
+  let stat;
+  try {
+    stat = fs.lstatSync(path.join(root, plan));
+  } catch {
+    stat = null;
+  }
+  if (!stat || !stat.isFile()) {
+    return {
+      status: 'ERROR',
+      detail: `plan is not a regular file: ${plan}`,
     };
   }
   const base = opts.base || defaultBase(cwd);
@@ -382,7 +436,7 @@ function main(argv) {
   const parsed = parseArgs(rest);
   if (parsed.error || (mode !== 'committed-steps' && mode !== 'stack-item')) {
     process.stderr.write(
-      `${parsed.error ? `${parsed.error}\n` : ''}usage: flow-work-resume.js committed-steps --plan <path> [--base <ref>]\n` +
+      `${parsed.error ? `${parsed.error}\n` : ''}usage: flow-work-resume.js committed-steps --plan-file <file holding the plan path> [--base <ref>]\n` +
         '       flow-work-resume.js stack-item --branch <name> --base <expected-base> [--repo <owner/name>]\n'
     );
     return 2;

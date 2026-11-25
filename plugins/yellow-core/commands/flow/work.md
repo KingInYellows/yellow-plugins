@@ -510,21 +510,34 @@ After all stack items are complete, skip Phase 2 and proceed directly to Phase 3
 
    **Repair from commit evidence first.** Step 1i commits a step before step 1k
    ticks its box, so a lost session can leave committed steps unticked,
-   including the very first one. When the section has task checkboxes, run
+   including the very first one. When the section has task checkboxes, pass the
+   plan path through a file, never the command line (a file name can hold
+   `$(...)`). Mint the file name:
 
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/lib/flow-work-resume.js" committed-steps --plan "<plan path>"
+   planfile=$(mktemp -u /tmp/flow-work-plan-XXXXXX.txt)
+   printf 'planfile=%s\n' "$planfile"
    ```
 
-   It lists the step numbers whose `Flow-Work-Step: <plan>#<N>` trailer (step
-   1i) is on a commit in this branch since it left trunk; a commit for another
-   plan, or one that only mentions a step in its text, never counts. Pass
-   `--base <trunk>` when trunk is not `origin/HEAD`, `main` or `master`. On
-   `status: "OK"`, for each listed step whose box is still `- [ ]`, tick the box
-   (same Edit and read-back as step 1k) and announce "Step N was committed but
-   not ticked; ticked it." On `status: "ERROR"`, report `detail` and ask via
-   AskUserQuestion whether to continue, treating every unticked step as not yet
-   run, or stop. Then branch on the repaired boxes:
+   Write the plan path, as one line, to that literal path with the **Write
+   tool**. Then, in a fresh Bash call with `planfile=<the path printed above>`:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/lib/flow-work-resume.js" committed-steps --plan-file "$planfile"
+   rm -f -- "$planfile"
+   ```
+
+   The helper accepts only a repository-relative `.md` path of letters, digits,
+   `.`, `_`, `/` and `-` (no `..`, no leading `-`) that names a regular file. It
+   lists the step numbers whose `Flow-Work-Step: <plan>#<N>` trailer (step 1i)
+   is on a commit in this branch since it left trunk (`origin/HEAD`, else `main`
+   or `master`); a commit for another plan, or one that only mentions a step in
+   its text, never counts. On `status: "OK"`, for each listed step whose box is
+   still `- [ ]`, tick the box (same Edit and read-back as step 1k) and announce
+   "Step N was committed but not ticked; ticked it." On `status: "ERROR"`,
+   report `detail` and ask via AskUserQuestion whether to continue, treating
+   every unticked step as not yet run, or stop. Then branch on the repaired
+   boxes:
    - **No task checkboxes in that section** (prose-only steps, authored before
      per-step boxes existed): announce "This plan predates per-step checkboxes;
      resume unavailable — running all steps," and run all tasks normally. The
