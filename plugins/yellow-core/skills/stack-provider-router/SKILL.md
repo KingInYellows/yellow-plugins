@@ -183,6 +183,9 @@ printf '%s' "$plugin_json" | node "$LIB" classify \
 
 Read `state` from the JSON.
 
+If `toolingKnown` is `false`, do not dispatch work for any `READY_*` state;
+follow Step 3 instead.
+
 **`READY_GRAPHITE`** — the active provider is `gt-workflow`. Dispatch
 Graphite-owned work there (for example `/gt-workflow:smart-submit`, `/gt-workflow:gt-sync`,
 `/gt-workflow:gt-stack-plan`).

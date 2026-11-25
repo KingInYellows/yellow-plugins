@@ -76,9 +76,21 @@ _enabled_install_path() {
 _stack_target=""
 _stack_cores=""
 [ "$_plugin_list_ok" -eq 1 ] && _stack_cores=$(_enabled_install_path 'yellow-core@yellow-plugins' all)
+# Outside a repository the library keeps every project/local row, so drop
+# them here, as the remote-agent block does: another checkout's provider
+# must not decide this one.
+_stack_rows=$_plugin_list_json
+if [ -z "$repo_top" ] && [ -n "$_stack_cores" ]; then
+  _stack_rows=$(printf '%s' "$_plugin_list_json" | node -e '
+    let rows;
+    try { rows = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch { process.exit(1); }
+    if (!Array.isArray(rows)) process.exit(1);
+    process.stdout.write(JSON.stringify(rows.filter((r) => !(r && (r.scope === "project" || r.scope === "local")))));
+  ' 2>/dev/null) || _stack_rows=$_plugin_list_json
+fi
 _stack_target=$(printf '%s\n' "$_stack_cores" | while IFS= read -r _stack_core; do
   [ -n "$_stack_core" ] && [ -f "$_stack_core/lib/stack-provider-state.js" ] || continue
-  if _t=$(printf '%s' "$_plugin_list_json" | node "$_stack_core/lib/stack-provider-state.js" target \
+  if _t=$(printf '%s' "$_stack_rows" | node "$_stack_core/lib/stack-provider-state.js" target \
       --plugins-file - --intent-file "${repo_top:-.}/.yellow-stack.yml" --project-path "$repo_top" 2>/dev/null); then
     printf '%s' "$_t"
     break
@@ -86,7 +98,7 @@ _stack_target=$(printf '%s\n' "$_stack_cores" | while IFS= read -r _stack_core; 
 done)
 case "$_stack_target" in graphite | github) ;; *) _stack_target=both ;; esac
 printf 'stack_probe_target: %s\n' "$_stack_target"
-unset _stack_cores
+unset _stack_cores _stack_rows
 # setup-all-stack-provider:end
 
 printf '=== Runtime ===\n'
