@@ -146,10 +146,9 @@ case "$RECALL_REFRESH_SECS" in ''|*[!0-9]*) RECALL_REFRESH_SECS=30 ;; esac
 # .ruvector must resolve to the main checkout's store).
 STORE_DIR=$(coedit_store_dir "$PROJECT_DIR") || STORE_DIR=""
 
-# The cache and its refresh stamp live in the plugin data dir (validated as
-# the MCP launcher does), keyed by the store's physical path: never in the
-# worktree, where yellow-review's resolve guard counts every new ignored file
-# and a checkout could ship one.
+# Keep the cache and refresh stamp in the validated plugin data directory.
+# Worktree artifacts would trip yellow-review's ignored-file guard. Both names
+# include the physical store's identity so replacing it starts a fresh cache.
 RECALL_DIR="" RECALL_CACHE="" RECALL_STAMP=""
 recall_paths() {
   local key
@@ -159,7 +158,7 @@ recall_paths() {
   : "${CLAUDE_PLUGIN_ROOT:=$RUVECTOR_PLUGIN_ROOT}"
   export CLAUDE_PLUGIN_ROOT
   yellow_ruvector_validate_paths --data-only >/dev/null 2>&1 || return 1
-  key=$(printf '%s' "$STORE_DIR" | cksum | tr -c '0-9\n' '-') || return 1
+  key=$(ruvector_recall_key "$STORE_DIR") || return 1
   RECALL_DIR="${RUVECTOR_DATA}/recall"
   RECALL_CACHE="${RECALL_DIR}/${key}.json"
   RECALL_STAMP="${RECALL_DIR}/${key}.refresh"

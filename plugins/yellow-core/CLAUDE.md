@@ -133,7 +133,9 @@ the reference.
 
 - `stack-provider-state.js` — single owner of provider state; carries a
   `capabilityProvider` replica that `validate-provider-groups.js` checks
-  (`ERROR-PROVIDER-006`)
+  (`ERROR-PROVIDER-006`). Its `target` mode (`probeTarget`) picks which
+  provider CLI `/stack:status`, the router skill and `/setup:all` probe, so a
+  GitHub-stacks repository never runs `gt` (and the reverse)
 - `stack-operation-registry.js` — maps the nine neutral stack operations to one
   Graphite and one GitHub implementation or `null`; `/flow:work` and
   `worktree-restack.sh` derive from it in prose, so change all together

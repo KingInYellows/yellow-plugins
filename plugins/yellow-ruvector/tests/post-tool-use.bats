@@ -90,6 +90,78 @@ pair() { jq -r --arg a "$1" --arg b "$2" '.pairs[$a][$b] // 0' "$COEDIT" 2>/dev/
   [ "$(pair src/a.ts src/b.ts)" -eq 1 ]
 }
 
+@test "detached: an exhausted store lock drops only the waiting increment" {
+  unset COEDIT_BUMP_SYNC
+  export COEDIT_BG_LOCK_TRIES=2
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  mkdir "$RUVECTOR_DIR/.coedit.lock"
+  export LOCK_UNDER_TEST="$RUVECTOR_DIR/.coedit.lock" ATTEMPTS="$BATS_TEST_TMPDIR/attempts"
+  REAL_MKDIR=$(command -v mkdir)
+  export REAL_MKDIR
+  cat >"$MOCK_BIN/mkdir" <<'SH'
+#!/bin/sh
+"$REAL_MKDIR" "$@"
+rc=$?
+if [ "$1" = "$LOCK_UNDER_TEST" ] && [ "$rc" -ne 0 ]; then
+  echo busy >>"$ATTEMPTS"
+fi
+exit "$rc"
+SH
+  chmod +x "$MOCK_BIN/mkdir"
+  run run_hook "$(event s1 Edit "$PROJECT_ROOT/src/b.ts")"
+  [ "$status" -eq 0 ]
+  jq -e '.continue == true and .permission == "allow"' <<<"$output"
+  # Initial attempt and two retries, all observed after mkdir failed.
+  for _ in $(seq 1 100); do
+    [ -e "$ATTEMPTS" ] && [ "$(wc -l <"$ATTEMPTS")" -eq 3 ] && break
+    sleep 0.05
+  done
+  [ "$(wc -l <"$ATTEMPTS")" -eq 3 ]
+  rmdir "$LOCK_UNDER_TEST"
+  edit s1 "$PROJECT_ROOT/src/c.ts"
+  for _ in $(seq 1 100); do [ "$(pair src/b.ts src/c.ts)" -eq 1 ] && break; sleep 0.05; done
+  [ "$(pair src/b.ts src/c.ts)" -eq 1 ]
+  [ "$(pair src/a.ts src/b.ts)" -eq 0 ]
+}
+
+@test "detached: twenty sessions preserve every concurrent pair update" {
+  unset COEDIT_BUMP_SYNC
+  # Exercise queuing independently of the runner's scheduling latency.
+  export COEDIT_BG_LOCK_TRIES=180
+  for i in $(seq 1 20); do edit "s$i" "$PROJECT_ROOT/src/a.ts"; done
+  for i in $(seq 1 20); do edit "s$i" "$PROJECT_ROOT/src/b.ts" & done
+  wait
+  for _ in $(seq 1 200); do [ "$(pair src/a.ts src/b.ts)" -eq 20 ] && break; sleep 0.05; done
+  jq -es 'length == 1 and .[0].pairs == {"src/a.ts":{"src/b.ts":20},"src/b.ts":{"src/a.ts":20}}' "$COEDIT"
+}
+
+@test "detached: a timed-out jq leaves a large store intact and releases its lock" {
+  unset COEDIT_BUMP_SYNC
+  export COEDIT_BG_JQ_SECS=0.2
+  jq -cn '{version:1, pairs:([range(0;6000) | {key:("src/x\(.)"), value:{"src/y":1}}] | from_entries)}' >"$COEDIT"
+  [ "$(wc -c <"$COEDIT")" -gt 100000 ]
+  cp "$COEDIT" "$BATS_TEST_TMPDIR/before"
+  REAL_JQ=$(command -v jq)
+  export REAL_JQ REWRITE_STARTED="$BATS_TEST_TMPDIR/started"
+  cat >"$MOCK_BIN/jq" <<'SH'
+#!/bin/sh
+case "$*" in *maxbytes*) : >"$REWRITE_STARTED"; printf '{"version":'; exec sleep 10;; esac
+exec "$REAL_JQ" "$@"
+SH
+  chmod +x "$MOCK_BIN/jq"
+  edit s1 "$PROJECT_ROOT/src/a.ts"
+  run run_hook "$(event s1 Edit "$PROJECT_ROOT/src/b.ts")"
+  [ "$status" -eq 0 ]
+  jq -e '.continue == true and .permission == "allow"' <<<"$output"
+  for _ in $(seq 1 100); do
+    [ -e "$REWRITE_STARTED" ] && [ ! -d "$RUVECTOR_DIR/.coedit.lock" ] && break
+    sleep 0.05
+  done
+  [ -e "$REWRITE_STARTED" ]
+  [ ! -d "$RUVECTOR_DIR/.coedit.lock" ]
+  cmp "$COEDIT" "$BATS_TEST_TMPDIR/before"
+}
+
 @test "an inherited TIMEOUT_CMD is probed, not trusted, so pairs still record" {
   printf '#!/bin/sh\nexit 1\n' > "$BATS_TEST_TMPDIR/timeout"
   chmod +x "$BATS_TEST_TMPDIR/timeout"

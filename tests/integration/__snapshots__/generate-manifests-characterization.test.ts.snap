@@ -17,7 +17,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -27,7 +27,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "github-workflow",
       "description": "GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -37,7 +37,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.17.2",
+      "version": "2.17.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -107,7 +107,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-ruvector",
       "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
-      "version": "2.0.7",
+      "version": "2.1.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -137,7 +137,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-ci",
       "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
-      "version": "1.5.11",
+      "version": "1.5.12",
       "author": {
         "name": "KingInYellows"
       },
@@ -167,7 +167,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-morph",
       "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
-      "version": "1.3.4",
+      "version": "1.3.5",
       "author": {
         "name": "KingInYellows"
       },
@@ -186,8 +186,8 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     },
     {
       "name": "yellow-docs",
-      "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
-      "version": "1.4.1",
+      "description": "Documentation audit, generation, and evidence-backed technical diagrams for any repository",
+      "version": "1.5.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -270,7 +270,7 @@ exports[`manifest byte-identity baseline > plugins/github-workflow/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "github-workflow",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "GitHub-native stacked-PR provider. Creates, submits, amends, syncs, navigates, cleans up, and merges stacks through a validated CLI adapter over the official github/gh-stack extension.",
   "author": {
     "name": "KingInYellows",
@@ -325,7 +325,7 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "gt-workflow",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Graphite-native workflow commands for stacked PR development. Provides smart commit-and-submit with parallel audit agents, stack planning, sync, and navigation — all through the gt CLI.",
   "author": {
     "name": "KingInYellows",
@@ -433,7 +433,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ci/.claude-plugin/plug
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-ci",
-  "version": "1.5.11",
+  "version": "1.5.12",
   "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
   "author": {
     "name": "KingInYellows",
@@ -575,7 +575,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "2.17.2",
+  "version": "2.17.3",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
@@ -791,8 +791,8 @@ exports[`manifest byte-identity baseline > plugins/yellow-docs/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-docs",
-  "version": "1.4.1",
-  "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
+  "version": "1.5.0",
+  "description": "Documentation audit, generation, and evidence-backed technical diagrams for any repository",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -903,7 +903,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-morph/.claude-plugin/p
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-morph",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
   "author": {
     "name": "KingInYellows",
@@ -1122,7 +1122,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-ruvector",
-  "version": "2.0.7",
+  "version": "2.1.0",
   "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
   "author": {
     "name": "KingInYellows",

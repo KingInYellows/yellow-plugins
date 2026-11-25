@@ -1,6 +1,6 @@
 {
   "name": "yellow-docs",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -19,7 +19,7 @@
     "developerName": "KingInYellows",
     "websiteURL": "https://github.com/KingInYellows/yellow-plugins#yellow-docs"
   },
-  "description": "One bounded read-only docs-audit workflow. Other commands, agents, skills and hooks remain excluded.",
+  "description": "Audit repository documentation and create or revise editable technical diagrams with user approval.",
   "commands": [],
   "skills": "./codex/skills"
 }

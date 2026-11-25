@@ -51,11 +51,13 @@ chmod +x "$TMPD/shim/npm"
   NPM_CONFIG_USERCONFIG=/cfg/npmrc NO_PROXY= MORPH_API_KEY=secret \
   http_proxy=http://proxy.test:3129 no_proxy=localhost SSL_CERT_FILE=/ca/ssl.crt \
   NPM_CONFIG__AUTH=secret npm_config__authToken=secret NPM_CONFIG_PASSWORD=secret \
+  https_proxy=http://proxy.test:3130 ALL_PROXY=http://proxy.test:3131 all_proxy=http://proxy.test:3132 \
+  NPM_CONFIG_OTP=secret npm_config_otp=secret npm_config_custom=secret \
   GITHUB_TOKEN=secret MULTI="$(printf 'a\nNPM_CONFIG_FAKE=leak')"
   export PATH HTTPS_PROXY NODE_EXTRA_CA_CERTS npm_config_cafile \
     NPM_CONFIG_USERCONFIG NO_PROXY MORPH_API_KEY GITHUB_TOKEN MULTI \
     http_proxy no_proxy SSL_CERT_FILE NPM_CONFIG__AUTH npm_config__authToken \
-    NPM_CONFIG_PASSWORD
+    NPM_CONFIG_PASSWORD https_proxy ALL_PROXY all_proxy NPM_CONFIG_OTP npm_config_otp npm_config_custom
   yellow_morph_do_install >| "$TMPD/npm-env"
   printf 'do_install=%s\n' "$?"
-  grep -E '^(HTTPS_PROXY|http_proxy|no_proxy|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|npm_config_cafile|npm_config__authToken|NPM_CONFIG_(USERCONFIG|_AUTH|PASSWORD|FAKE)|NO_PROXY|MORPH_API_KEY|GITHUB_TOKEN|MULTI)=' "$TMPD/npm-env" )
+  grep -E '^(https_proxy|ALL_PROXY|all_proxy|npm_config_otp|npm_config_custom|NPM_CONFIG_OTP|HTTPS_PROXY|http_proxy|no_proxy|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|npm_config_cafile|npm_config__authToken|NPM_CONFIG_(USERCONFIG|_AUTH|PASSWORD|FAKE)|NO_PROXY|MORPH_API_KEY|GITHUB_TOKEN|MULTI)=' "$TMPD/npm-env" )

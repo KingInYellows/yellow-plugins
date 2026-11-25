@@ -41,7 +41,7 @@ skills from Claude command wrappers. See
 | `/stack:status`         | Report which stacked-PR provider is active and classify the state as `UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`, `CONFLICT`, `CONFIG_MISMATCH`, `MANAGED_CONFLICT`, or `PARTIAL_TOOLING` (read-only) |
 | `/stack:select`         | Select the active stacked-PR provider (`graphite` or `github`) at `user`/`project`/`local` scope — shows the exact `claude plugin` commands first, refuses managed-scope conflicts, never edits settings JSON, never falls back |
 | `/statusline:setup`     | Generate and install an adaptive statusline for plugins; `observer` enables, refreshes or disables the opt-in context observer |
-| `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard |
+| `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard; probes only the repository's stack provider and ignores plugins left only in the plugin cache |
 | `/setup:claude-web`     | Audit a repository and scaffold files Claude Code Web needs (`.claude/settings.json`, `scripts/install_pkgs.sh`, `.gitattributes`, `.gitignore`, `.github/workflows/claude.yml`) |
 | `/worktree:cleanup`     | Scan git worktrees, classify by state, and remove stale worktrees with safeguards |
 | `/worktree:restack` | Restack branches in separate worktrees; restore after; pause with `--continue` / `--abort` |

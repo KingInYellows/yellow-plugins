@@ -1,6 +1,6 @@
 # yellow-docs
 
-Documentation audit, generation, and Mermaid diagram creation for any
+Documentation audit, generation, and evidence-backed technical diagrams for any
 repository. Detects project structure and adapts analysis accordingly.
 
 ## Commands
@@ -10,7 +10,7 @@ repository. Detects project structure and adapts analysis accordingly.
 | `/docs:setup` | Validate prerequisites and detect project structure |
 | `/docs:audit` | Scan repo for documentation gaps, staleness, and coverage |
 | `/docs:generate` | AI-assisted documentation generation with human review |
-| `/docs:diagram` | Context-aware Mermaid diagram generation |
+| `/docs:diagram` | Evidence-backed technical diagrams |
 | `/docs:refresh` | Update stale docs based on code changes |
 | `/docs:review` | Multi-persona review of a planning document (PRD, brainstorm, spec, ADR) using 6 always-applicable personas plus 1 conditional adversarial reviewer |
 
@@ -27,7 +27,7 @@ repository. Detects project structure and adapts analysis accordingly.
 | Agent | Description |
 |-------|-------------|
 | `doc-generator` | AI-assisted content creation with human review gates |
-| `diagram-architect` | Context-aware Mermaid diagram generation |
+| `diagram-architect` | Evidence-backed technical diagrams |
 
 ### Review (7)
 
@@ -59,8 +59,11 @@ Then enable `yellow-docs` from the plugin list.
   identification with P1/P2/P3 severity
 - **Doc generation**: Template-driven generation with human review gates for
   READMEs, API references, architecture overviews, and module docs
-- **Mermaid diagrams**: Auto-selects diagram type (flowchart, sequence, class,
-  state, ER, mindmap) based on code structure analysis
+- **Technical diagrams**: Use `/docs:diagram architecture` for a Mermaid
+  overview, or ask `technical-diagrams` to revise an existing draw.io file or
+  selected collaborative board. Review the proposed edit before saving.
+  Each view has one editable source. The skill preserves manual layout,
+  checks the rendered result, and reports missing renderer or board access.
 - **Doc refresh**: Detects stale docs by comparing git history, generates
   per-file update diffs for review
 - **Document review (`/docs:review`)**: `coherence-reviewer` reports every
@@ -74,13 +77,18 @@ Then enable `yellow-docs` from the plugin list.
 - **General-purpose**: Works in any git repo — TypeScript, Python, Rust, Go,
   and more
 
-## Codex compatibility expansion
+## Try a draw.io revision
 
-The shared docs-audit skill provides a bounded read-only workflow. Installed
-Codex acceptance and exact support are recorded in the canonical
-[Codex distribution](../../docs/codex-distribution.md) table. Other commands,
-agents and hooks retain their existing host contracts.
+Move and rename a node in the editor, note its position and label, and save.
+Ask the skill to connect two other nodes. Review the change, then open the
+same cloud file on a second device. Check that the moved node kept its label
+and position and the new arrow points from the intended source to the intended
+target. Use the board or file link to identify the shared original. [draw.io collaboration guide](https://www.drawio.com/docs/manual/collaboration/concurrent-editing/).
 
-Installed Codex acceptance passed for the selected skill, including safe
-failure and unrelated controls. Other plugin components remain excluded.
-See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).
+## Codex skills
+
+Use `$yellow-docs:technical-diagrams` to create or revise a diagram and
+`$yellow-docs:docs-audit` for a read-only documentation audit. See the
+[Codex distribution](../../docs/codex-distribution.md) for installation and
+the [installed audit evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md)
+for the audit workflow.

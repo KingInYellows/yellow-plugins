@@ -90,9 +90,14 @@ reaches the skill directly), plus the two reference skills:
 ### Hooks (1)
 
 - `SessionStart` (Node runtime under `hooks/scripts/`) — Detect CI context,
-  check for recent failures (60s cache, 3s budget). Ported from the original
-  `session-start.sh` to a dependency-free Node runtime shared across hosts
-  (`entrypoint-claude.js` / `entrypoint-codex.js` → `lib/run-hook.js` →
+  report recent failures from a result cache. The foreground never calls `gh`:
+  under 10 minutes old the cache is shown as is, up to 1 hour it is shown and
+  refreshed, older or missing it is only refreshed. The refresh
+  (`gh auth status` + `gh run list`) runs in a detached `lib/refresh-cache.js`,
+  guarded by a `refresh-<key>` marker, so the next session start shows it. Its
+  warnings go to `refresh-<key>.log`, overwritten each run. Ported from the
+  original `session-start.sh` to a dependency-free Node runtime shared across
+  hosts (`entrypoint-claude.js` / `entrypoint-codex.js` → `lib/run-hook.js` →
   `lib/session-start-core.js`); see "Codex Distribution" below. Carried into the
   Codex manifest. Codex 0.157.0 executes it after exact-definition trust;
   untrusted controls remain idle (see the canonical distribution doc).
@@ -182,8 +187,8 @@ Routing summary surfaced via session-start hook `systemMessage`.
 ### Cache Locations (R38)
 
 Runtime cache (routing summary + merged runner-targets JSON, and the
-SessionStart hook's 60s result cache) is **written** under a plugin-data
-directory, resolved as
+SessionStart hook's result cache and its `refresh-<key>` marker) is **written**
+under a plugin-data directory, resolved as
 `${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ci}`. On
 **read**, the new location is preferred and the legacy
 `${HOME}/.cache/yellow-ci/` path is used only as a **read-only** fallback (it is

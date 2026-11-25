@@ -110,7 +110,7 @@
     },
     {
       "name": "yellow-docs",
-      "description": "One bounded read-only docs-audit workflow. Other commands, agents, skills and hooks remain excluded.",
+      "description": "Audit repository documentation and create or revise editable technical diagrams with user approval.",
       "category": "Developer Tools",
       "source": {
         "source": "local",

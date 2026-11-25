@@ -15,9 +15,19 @@
 //               state into it (.ruvector/), so never point it at a real repo.
 //   BENCH_HOME  throwaway HOME. Keep `claude` off PATH, or the yellow-core
 //               SessionStart hook can start a real (paid) drain.
+//   BENCH_STUB_CLAUDE=1
+//               opt-in for the yellow-core "drain dispatched" row: puts a
+//               no-op `claude` stub (written under BENCH_HOME) on the hooks'
+//               PATH, so a due drain dispatches to the stub and spends
+//               nothing. A real `claude` on PATH is still refused.
 //   N           measured runs per hook (default 20); ONLY  regex filter.
+//
+// Scenario tuples are [name, input, seed?, opts?]. opts.plugins limits the
+// scenario to those plugins, opts.prep(env) runs untimed before every run,
+// and opts.measure(i) returns false for runs that take another code path.
 'use strict';
 const { spawnSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -59,7 +69,16 @@ if (onPath) {
   process.exit(2);
 }
 const env0 = { ...process.env, HOME, CLAUDE_PROJECT_DIR: PROJ };
+// yellow-core honours test-only drain overrides when BATS_VERSION is set; the
+// bench must measure the production path, so it is always removed.
 delete env0.BATS_VERSION;
+if (process.env.BENCH_STUB_CLAUDE === '1') {
+  const stubDir = path.join(HOME, 'bench-stub-bin');
+  fs.mkdirSync(stubDir, { recursive: true });
+  const stub = path.join(stubDir, 'claude');
+  fs.writeFileSync(stub, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  env0.PATH = `${stubDir}${path.delimiter}${env0.PATH || ''}`;
+}
 
 const big = 'x'.repeat(60000);
 const base = {
@@ -117,6 +136,73 @@ const pairSeed = Array.from({ length: coeditCycle.length * 3 }, (_, i) =>
   pairEdit(i + coeditCycle.length * 1000)
 );
 const ss = S({ hook_event_name: 'SessionStart', source: 'startup' });
+// yellow-ci caches its `gh run list` result per cwd, so back-to-back runs are
+// cache hits. Clearing the result cache (new and legacy locations) and any
+// refresh marker before every run measures the cache-miss path instead.
+// A refresh started by the previous run is waited for (its marker, refresh-<key>
+// without an extension, is removed when it ends) so it cannot repopulate the
+// cache after this prep and turn the next run into a hit. Untimed.
+const sleepMs = (ms) =>
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+// The wait outlasts the worker's own gh timeouts (5 s auth + 15 s run list,
+// plus node startup). A marker that survives it means a refresh may still
+// write, so stop rather than time a run against a moving cache.
+const waitCiRefresh = (env) => {
+  const marker = /^refresh-[0-9a-f]+$/;
+  for (let waited = 0; waited < 30000; waited += 50) {
+    let names = [];
+    try {
+      names = fs.readdirSync(env.CLAUDE_PLUGIN_DATA);
+    } catch {
+      return;
+    }
+    if (!names.some((n) => marker.test(n))) return;
+    sleepMs(50);
+  }
+  throw new Error('yellow-ci refresh still running after 30 s; aborting');
+};
+// Cache-hit prep: wait for the warm-up's refresh, then report (false) when no
+// yellow-ci result cache exists, e.g. gh unauthenticated, so the row is
+// flagged instead of passing cache-miss timings off as hits. Only yellow-ci
+// writes last-check-* files; other plugins' rows are never flagged.
+const primeCiCache = (env, plugin) => {
+  waitCiRefresh(env);
+  if (plugin !== 'yellow-ci') return true;
+  // The hook keys its cache on md5(process.cwd()), i.e. PROJ with symlinks
+  // resolved. Only that file counts, and only while it is fresh (under the
+  // hook's 10 min TTL): another project's cache or an expired one must not
+  // mark a failed refresh as primed.
+  const key = crypto
+    .createHash('md5')
+    .update(fs.realpathSync(PROJ))
+    .digest('hex');
+  try {
+    const { mtimeMs } = fs.statSync(
+      path.join(env.CLAUDE_PLUGIN_DATA, `last-check-${key}`)
+    );
+    return Date.now() - mtimeMs < 600000;
+  } catch {
+    return false;
+  }
+};
+const clearCiCache = (env) => {
+  waitCiRefresh(env);
+  const dirs = [
+    env.CLAUDE_PLUGIN_DATA,
+    path.join(env.HOME, '.cache/yellow-ci'),
+  ];
+  for (const dir of dirs) {
+    let names = [];
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const n of names)
+      if (/^(last-check-|refresh-)/.test(n))
+        fs.rmSync(path.join(dir, n), { force: true, recursive: true });
+  }
+};
 
 const catalog = {};
 for (const f of fs.readdirSync(path.join(REPO, 'catalog/plugins'))) {
@@ -172,10 +258,36 @@ const scenarios = {
       ],
       ['60KB out', bashPost('cat big.log', big)],
     ],
-    // README.md alternates with a partner, so every run records a pair.
-    Edit: [['edit, pairs recorded', pairEdit, pairSeed]],
+    // One session, one file: no partner, so no pair is recorded.
+    // README.md alternates with a partner, so every run records a pair,
+    // except the first edit of each new session id, which is not timed.
+    Edit: [
+      [
+        'edit, same file',
+        edit('PostToolUse', 'README.md', `bench-same-${RUN_ID}`),
+      ],
+      [
+        'edit, pairs recorded',
+        pairEdit,
+        pairSeed,
+        { measure: (i) => i % coeditCycle.length !== 0 },
+      ],
+    ],
   },
-  SessionStart: { '*': [['startup', ss]] },
+  SessionStart: {
+    '*': [
+      // yellow-ci: the first warm-up run is a miss that starts a refresh;
+      // waiting for it (untimed) makes every timed run a cache hit. A no-op
+      // for plugins without refresh markers.
+      ['startup', ss, [], { prep: primeCiCache }],
+      [
+        'startup, cache miss',
+        ss,
+        [],
+        { plugins: ['yellow-ci'], prep: clearCiCache },
+      ],
+    ],
+  },
   Stop: {
     '*': [['stop', S({ hook_event_name: 'Stop', stop_hook_active: false })]],
   },
@@ -256,8 +368,9 @@ for (const [plugin, j] of Object.entries(catalog)) {
         ? 'Edit'
         : '*';
     const scs = (scenarios[h.ev] || {})[key] || [];
-    for (const [name, input, seed = []] of scs) {
+    for (const [name, input, seed = [], opts = {}] of scs) {
       const id = `${plugin} ${h.ev} ${name}`;
+      if (opts.plugins && !opts.plugins.includes(plugin)) continue;
       if (only && !only.test(id)) continue;
       const root = path.join(REPO, 'plugins', plugin);
       const cmd = h.command.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, root);
@@ -270,20 +383,28 @@ for (const [plugin, j] of Object.entries(catalog)) {
       const seedCmd = recorder
         ? recorder.command.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, root)
         : cmd;
+      let seedFailed = 0;
       for (const seedInput of seed) {
-        spawnSync('bash', ['-c', seedCmd], {
+        const sr = spawnSync('bash', ['-c', seedCmd], {
           input: seedInput,
           env,
           cwd: PROJ,
           encoding: 'utf8',
           timeout: ((recorder || h).timeout || 60) * 1000,
         });
+        if (sr.error || sr.status !== 0) seedFailed++;
       }
       const times = [];
       let last;
       let first;
       let failed = 0;
-      for (let i = 0; i < N + 2; i++) {
+      // The first two timed-path runs are warm-up; runs that opts.measure
+      // rejects still execute (they build state) but are never timed.
+      let eligible = 0;
+      // Timed runs whose prep reported an unusable state (see primeCiCache).
+      let unprimed = 0;
+      for (let i = 0; times.length < N; i++) {
+        const primed = opts.prep ? opts.prep(env, plugin) !== false : true;
         const t0 = process.hrtime.bigint();
         const r = spawnSync('bash', ['-c', cmd], {
           input: typeof input === 'function' ? input(i) : input,
@@ -293,10 +414,15 @@ for (const [plugin, j] of Object.entries(catalog)) {
           timeout: (h.timeout || 60) * 1000,
         });
         const ms = Number(process.hrtime.bigint() - t0) / 1e6;
-        if (i === 0) first = ms;
-        if (i >= 2) times.push(ms);
         if (r.error || (r.status !== 0 && r.status !== 2)) failed++;
         last = r;
+        if (opts.measure && !opts.measure(i)) continue;
+        if (eligible === 0) first = ms;
+        if (eligible >= 2) {
+          times.push(ms);
+          if (!primed) unprimed++;
+        }
+        eligible++;
       }
       const inj = injected(h.ev, last.stdout || '', last.status, last.stderr);
       rows.push({
@@ -322,11 +448,13 @@ for (const [plugin, j] of Object.entries(catalog)) {
         stdout_bytes: inj.raw,
         exit: last.status,
         failed_runs: failed,
+        seed_failed: seedFailed,
+        unprimed_runs: unprimed,
         stdout: (last.stdout || '').slice(0, 300),
         stderr: (last.stderr || '').slice(0, 300),
       });
       process.stderr.write(
-        `${id}: p50 ${rows.at(-1).p50_ms} p95 ${rows.at(-1).p95_ms} ctx ${inj.ctx} sys ${inj.sys}${failed ? ` FAILED ${failed} run(s)` : ''}\n`
+        `${id}: p50 ${rows.at(-1).p50_ms} p95 ${rows.at(-1).p95_ms} ctx ${inj.ctx} sys ${inj.sys}${failed ? ` FAILED ${failed} run(s)` : ''}${seedFailed ? ` SEED FAILED ${seedFailed}/${seed.length}` : ''}${unprimed ? ` UNPRIMED ${unprimed}/${N} (no cache: timings are misses)` : ''}\n`
       );
     }
   }

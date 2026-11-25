@@ -351,3 +351,23 @@ run_budgeted() {
   [ -n "$flag" ] && rm -rf -- "$flag" 2>/dev/null
   return "$rc"
 }
+
+# ruvector_recall_key <physical-store-dir> — used for both cached recall and its refresh stamp.
+# The store directory can be deleted and recreated at the same path and
+# even reuse the same inode. Its birth time survives ordinary store writes.
+ruvector_recall_key() {
+  local identity path_sum gnu_identity
+  [ -d "$1" ] && [ ! -L "$1" ] || return 1
+  # GNU and uutils stat both retain nanoseconds in %w. On Ubuntu 26.04
+  # uutils rounds %.9W to seconds. An unavailable birth time prints "-".
+  if identity=$(LC_ALL=C TZ=UTC stat -c '%d-%i-%w' -- "$1" 2>/dev/null); then
+    gnu_identity='^[0-9]+-[0-9]+-[0-9]{4}-[0-9-]+ [0-9:]+\.[0-9]{9} \+0000$'
+    [[ "$identity" =~ $gnu_identity ]] || return 1
+    identity=${identity//[ :+]/-}
+  else
+    identity=$(LC_ALL=C stat -f '%d-%i-%.9FB' "$1" 2>/dev/null) || return 1
+    [[ "$identity" =~ ^[0-9]+-[0-9]+-[1-9][0-9]*\.[0-9]{9}$ ]] || return 1
+  fi
+  path_sum=$(printf '%s' "$1" | cksum) || return 1
+  printf 'v2-%s-%s' "$identity" "${path_sum%% *}"
+}

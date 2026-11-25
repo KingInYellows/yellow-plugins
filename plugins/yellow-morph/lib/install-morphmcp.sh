@@ -183,12 +183,8 @@ yellow_morph_release_install_lock() {
 # postinstall scripts — a tighter boundary than `unset MORPH_API_KEY`,
 # which only blocks the one variable.
 #
-# HOME and PATH are required for npm to function. The proxy and CA
-# variables, plus NPM_CONFIG_* / npm_config_* (registry, proxy, cafile,
-# prefix), are passed through when present so npm still reaches the
-# registry from behind a TLS-intercepting proxy such as a cloud session's.
-# npm config names that look like credentials (auth, token, password) are
-# dropped. Caller is responsible for holding the install lock.
+# Forward the proxy, CA and npm configuration settings needed for installation.
+# Keep npm credential variables outside the child process environment.
 yellow_morph_do_install() {
   cp "${CLAUDE_PLUGIN_ROOT}/package.json" \
      "${CLAUDE_PLUGIN_DATA}/package.json"      || return 1
@@ -199,27 +195,17 @@ yellow_morph_do_install() {
     "HOME=${HOME:-/}"
     "PATH=${PATH:-/usr/local/bin:/usr/bin:/bin}"
   )
-  # Names come from `env` and values from printenv, not ${!var}, which zsh
-  # lacks: /morph:setup sources this file in the user's login shell.
-  # printenv also drops a name that is only a line inside another
-  # variable's multi-line value. A heredoc, not a pipe, so the loop runs
-  # in this shell and the array survives.
-  local line name value
-  while IFS= read -r line; do
-    name=${line%%=*}
-    case "$name" in
-      NPM_CONFIG_*[Aa][Uu][Tt][Hh]*|npm_config_*[Aa][Uu][Tt][Hh]*|\
-      NPM_CONFIG_*[Tt][Oo][Kk][Ee][Nn]*|npm_config_*[Tt][Oo][Kk][Ee][Nn]*|\
-      NPM_CONFIG_*[Pp][Aa][Ss][Ss]*|npm_config_*[Pp][Aa][Ss][Ss]*)
-        continue ;;
-      HTTPS_PROXY|HTTP_PROXY|NO_PROXY|https_proxy|http_proxy|no_proxy|\
-      NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|NPM_CONFIG_*|npm_config_*)
-        value=$(printenv "$name") || continue
-        [ -n "$value" ] && env_args+=("${name}=${value}") ;;
-    esac
-  done <<EOF
-$(env)
-EOF
+  # Read only known names. printenv works under both bash and zsh.
+  local name value
+  for name in HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy \
+    NO_PROXY no_proxy NODE_EXTRA_CA_CERTS SSL_CERT_FILE \
+    NPM_CONFIG_REGISTRY npm_config_registry NPM_CONFIG_CAFILE npm_config_cafile \
+    NPM_CONFIG_PROXY npm_config_proxy NPM_CONFIG_HTTPS_PROXY npm_config_https_proxy \
+    NPM_CONFIG_NOPROXY npm_config_noproxy NPM_CONFIG_PREFIX npm_config_prefix \
+    NPM_CONFIG_USERCONFIG npm_config_userconfig NPM_CONFIG_GLOBALCONFIG npm_config_globalconfig; do
+    value=$(printenv "$name") || continue
+    [ -n "$value" ] && env_args+=("${name}=${value}")
+  done
 
   ( cd "$CLAUDE_PLUGIN_DATA" \
     && env -i "${env_args[@]}" \
