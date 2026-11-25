@@ -105,6 +105,7 @@ function collectDescriptionBudget({
   files,
   extractFrontmatter,
   parseFrontmatter,
+  readFile = (filePath) => fs.readFileSync(filePath, 'utf8'),
 }) {
   // No prototype, so a directory named `__proto__` is an ordinary key.
   const plugins = Object.create(null);
@@ -121,7 +122,7 @@ function collectDescriptionBudget({
     const { pluginName, kind } = classified;
     if (!Object.prototype.hasOwnProperty.call(plugins, pluginName)) continue;
 
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = readFile(filePath);
     const entry = measureBudgetEntry(content, kind, {
       extractFrontmatter,
       parseFrontmatter,
