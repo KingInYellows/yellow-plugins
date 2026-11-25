@@ -3,18 +3,12 @@
 # for the current directory's .claude/ settings, so every surface that reads
 # it runs the query from the repository root through the generated
 # plugin_list_json helper (scripts/snippets/plugin-list-json.sh).
+# tests/integration/plugin-list-json-usage.test.ts checks that no plugin
+# Markdown calls the CLI directly.
 # Run from the plugin directory: `bats tests/plugin-list-json.bats`
 
 setup() {
   PLUGIN_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
-  SURFACES=(
-    "$PLUGIN_DIR/commands/stack/status.md"
-    "$PLUGIN_DIR/skills/stack-provider-router/SKILL.md"
-    "$PLUGIN_DIR/skills/stack-provider-guard/SKILL.md"
-    "$PLUGIN_DIR/commands/setup/all.md"
-    "$PLUGIN_DIR/commands/statusline/setup.md"
-    "$PLUGIN_DIR/../yellow-claudemod/commands/claudemod/setup.md"
-  )
   TMP="$(mktemp -d)"
   mkdir -p "$TMP/bin" "$TMP/repo/sub/deep"
   # Stub CLI: report the directory it ran in, as the real CLI's fold does.
@@ -29,17 +23,6 @@ teardown() {
   cd "$BATS_TEST_DIRNAME" || true
   [ -n "${TMP:-}" ] && [ -d "$TMP" ] && rm -rf "$TMP"
   return 0
-}
-
-@test "every surface embeds the helper and has no direct list call" {
-  for f in "${SURFACES[@]}"; do
-    grep -Fq 'scripts/snippets/plugin-list-json.sh' "$f"
-    grep -Eq 'plugin_list_json "\$repo_(root|top)"' "$f"
-    # Outside the generated helper, nothing calls the CLI directly.
-    run bash -c "awk '/# >>> generated: plugin-list-json /,/# <<< generated: plugin-list-json <<</{next} {print}' '$f' \
-      | grep -E '\\\$\\(claude plugin list --json|\\| *claude plugin list --json|^ *claude plugin list --json'"
-    [ "$status" -eq 1 ] || { echo "$f: $output"; return 1; }
-  done
 }
 
 @test "the helper queries from the repository root, not the subdirectory" {

@@ -34,9 +34,28 @@ elif gh extension list 2>/dev/null | grep -qE '(^|[[:space:]])github/gh-stack([[
 else
   printf 'gh_stack:   NOT FOUND (or gh extension list failed)\n'
 fi
+# >>> generated: plugin-list-json (source: scripts/snippets/plugin-list-json.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# shellcheck shell=bash
+# `claude plugin list --json` folds project/local enable and disable
+# overrides into each row's `enabled` value only for the settings under the
+# CURRENT directory's .claude/. From a subdirectory, a project-scope disable
+# of a user-scope plugin still reads as enabled. Run it from the repository
+# root; an unreachable root is a failed read, never a read from elsewhere.
+# Canonical source: scripts/snippets/plugin-list-json.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
+plugin_list_json() {
+  if [ -n "${1:-}" ]; then
+    (cd -- "$1" >/dev/null 2>&1 && claude plugin list --json)
+  else
+    claude plugin list --json
+  fi
+}
+# <<< generated: plugin-list-json <<<
+
 printf '=== Stacked-PR provider (enabled plugins) ===\n'
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
-claude plugin list --json 2>/dev/null | PROJECT_PATH="$repo_root" node -e '
+plugin_list_json "$repo_root" 2>/dev/null | PROJECT_PATH="$repo_root" node -e '
   const fs = require("fs");
   let rows;
   try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = null; }

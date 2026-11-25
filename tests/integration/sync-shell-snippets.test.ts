@@ -130,7 +130,10 @@ function seedAllTargets(tmp: string, focusBlock: string): void {
     'plugins/yellow-core/skills/stack-provider-guard/SKILL.md',
     'plugins/yellow-core/commands/setup/all.md',
     'plugins/yellow-core/commands/statusline/setup.md',
+    'plugins/yellow-core/commands/stack/select.md',
     'plugins/yellow-claudemod/commands/claudemod/setup.md',
+    'plugins/yellow-linear/commands/linear/setup.md',
+    'plugins/yellow-linear/commands/linear/delegate.md',
   ]) {
     write(tmp, target, `${listBlock}\n`);
   }
@@ -185,6 +188,20 @@ describe('sync-shell-snippets.js', () => {
       .split('\n')
       .filter((l) => l.includes('snippet not found'));
     expect(errorLines.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('rewrites every block of a snippet in a multi-fence target', () => {
+    seedAllTargets(tmp, generatedBlock('install-helpers', HELPERS_BODY));
+    const target = 'plugins/yellow-linear/commands/linear/delegate.md';
+    const stale = generatedBlock('plugin-list-json', 'readonly TAMPERED=1');
+    write(tmp, target, `${stale}\n\nmiddle\n\n${stale}\n`);
+    expect(run(tmp, ['--check']).status).toBe(1);
+    expect(run(tmp).status).toBe(0);
+    const after = readFileSync(join(tmp, target), 'utf8');
+    expect(after).not.toContain('TAMPERED');
+    expect(after.split(LIST_BODY)).toHaveLength(3);
+    expect(after).toContain('middle');
+    expect(run(tmp, ['--check']).status).toBe(0);
   });
 
   it('apply mode (no flag) rewrites a drifted block back to canonical content', () => {

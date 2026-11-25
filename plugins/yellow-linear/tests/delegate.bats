@@ -477,7 +477,7 @@ JS
   run bash -c 'printf "%s\n" "$1" | grep -F "YELLOW_TODO_yellow_jules_root"' _ "$jules_block"
   [ "$status" -eq 1 ]
   printf '%s\n' "$jules_block" | grep -qF 'YELLOW_JULES_ROOT=$(resolve_plugin_root yellow-jules dist/cli.js)'
-  printf '%s\n' "$jules_block" | grep -qF '_plugin_list_json=$(claude plugin list --json 2>/dev/null)'
+  printf '%s\n' "$jules_block" | grep -qF '_plugin_list_json=$(plugin_list_json "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)'
 }
 
 @test "the jules block binds the packet to an allocated, unlinked directory under the git scratch root" {
