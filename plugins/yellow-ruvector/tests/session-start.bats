@@ -1267,7 +1267,13 @@ END"
   printf '{}' > "$sd/s2.tmp.Fresh123"
   ln -s "$outside" "$sd/s3.tmp.Link1234"
   run run_hook '{"cwd":""}'
-  for _ in $(seq 1 80); do [ -e "$RUVECTOR_DIR/coedit.json.tmp.AbCd1234" ] || [ -e "$sd/s1.tmp.XyZ98765" ] || break; sleep 0.1; done
+  # The detached sweep removes all three old temps; wait for each one, the
+  # cursor temp included (run 45237449645 checked it before its removal).
+  for _ in $(seq 1 80); do
+    [ -e "$RUVECTOR_DIR/coedit.json.tmp.AbCd1234" ] || [ -e "$sd/s1.tmp.XyZ98765" ] \
+      || [ -e "$sd/.stale-sweep-cursor.tmp.Qq11Ww22" ] || break
+    sleep 0.1
+  done
   [ ! -e "$RUVECTOR_DIR/coedit.json.tmp.AbCd1234" ]
   [ ! -e "$sd/s1.tmp.XyZ98765" ]
   [ ! -e "$sd/.stale-sweep-cursor.tmp.Qq11Ww22" ]
