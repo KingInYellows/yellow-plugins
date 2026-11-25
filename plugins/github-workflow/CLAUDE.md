@@ -123,16 +123,17 @@ provider-neutrality invariant):
   branch up. A push whose words the detector cannot read in full is denied with
   its own message: one inside a nested shell, heredoc or pager, an alias or
   plumbing (`send-pack`, `subtree push`, remote helpers), a `-c`/`--config-env`
-  override (`remote.origin.mirror=true`), xargs, or any `$`/substitution word
-  (it can expand to a flag or refspec). A plain push of a branch listed in
-  `<git-common-dir>/gh-stack` (read by `hooks/scripts/lib/stack-membership.js`,
-  no git process) is allowed with `hookSpecificOutput.additionalContext` telling
-  the model to run `/github-stack:sync` afterwards; it sets no
-  `permissionDecision`, so the user's own permission rules still apply.
-  Repository config that turns a plain push into a mirror or forced push
-  (`remote.<name>.mirror`, a `+` in `remote.<name>.push`) is out of scope.
-  Detection is `hooks/scripts/lib/git-push-detector.js`, a byte-identical copy
-  of gt-workflow's tokenising detector (the root
+  override (`remote.origin.mirror=true`), `--receive-pack`/`--exec` (git runs
+  their value), xargs, or any `$`/substitution word (it can expand to a flag or
+  refspec). A plain push of a branch listed in `<git-common-dir>/gh-stack` (read
+  by `hooks/scripts/lib/stack-membership.js`, no git process) is allowed with
+  `hookSpecificOutput.additionalContext` telling the model to run
+  `/github-stack:sync` afterwards; it sets no `permissionDecision`, so the
+  user's own permission rules still apply. Repository config that turns a plain
+  push into a mirror or forced push (`remote.<name>.mirror`, a `+` in
+  `remote.<name>.push`) is out of scope. Detection is
+  `hooks/scripts/lib/git-push-detector.js`, a byte-identical copy of
+  gt-workflow's tokenising detector (the root
   `tests/integration/git-push-detector-parity.test.ts` fails on drift — edit
   both copies together); this plugin uses its `analyzeGitPushCommand`, which
   scans the whole command and returns every push's words, while gt-workflow uses

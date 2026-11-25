@@ -72,7 +72,9 @@ run_entrypoint() {
     'git -c remote.origin.mirror=true push' 'git subtree push --prefix x origin y' \
     'git send-pack origin main' 'echo -f | xargs git push' \
     'git push -o $OPTS origin main' 'git push --push-option $OPTS origin main' \
-    'git push --repo $R' 'git push -uo $OPTS origin main'; do
+    'git push --repo $R' 'git push -uo $OPTS origin main' \
+    'git push --receive-pack=git-receive-pack origin main' 'git push --exec x origin main' \
+    'git push --receive origin main'; do
     run --separate-stderr run_entrypoint check-git-push "{\"tool_input\":{\"command\":\"$c\"}}"
     [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
     [[ "$stderr" == *"cannot check this"* ]] || { echo "wrong message: $c $stderr"; return 1; }

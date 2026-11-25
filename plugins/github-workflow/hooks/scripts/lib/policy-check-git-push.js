@@ -41,7 +41,7 @@ const DESTRUCTIVE_MESSAGE = [
 
 const OPAQUE_MESSAGE = [
   '⛔  The hook cannot check this `git push` for force or delete: it runs through a nested shell, an alias,',
-  '   push plumbing, a `-c` override, xargs, or a `$` value decided at runtime.',
+  '   push plumbing, a `-c` override, `--receive-pack`/`--exec`, xargs, or a `$` value decided at runtime.',
   '   Run a plain `git push [-u] <remote> <branch>` with literal names, or use `/github-stack:submit`.',
 ].join('\n');
 
@@ -54,10 +54,12 @@ const MALFORMED_MESSAGE =
   '⛔  Hook input has a non-string tool_input.command. Cannot verify command safety.';
 
 // `git push` options that take the next word as their value.
-const VALUE_OPTIONS = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec']);
+const VALUE_OPTIONS = new Set(['-o', '--push-option', '--repo']);
 // Long options that force, mirror or delete. git accepts any unambiguous
 // prefix (`--forc`, `--mir`), so a prefix of one of these counts too.
 const DESTRUCTIVE_LONG = ['force', 'force-with-lease', 'force-if-includes', 'mirror', 'delete', 'prune'];
+// Long options whose value is a program git runs.
+const EXEC_LONG = ['receive-pack', 'exec'];
 // Short options that force or delete; `o` takes a value.
 const DESTRUCTIVE_SHORT = new Set(['f', 'd']);
 
@@ -90,6 +92,9 @@ function classifyPushArgs(args) {
     if (word.startsWith('--')) {
       const name = word.slice(2).split('=')[0];
       if (name.startsWith('no-')) continue;
+      // `--receive-pack`/`--exec` name a program the push runs, so its
+      // value can hide another (destructive) command. Prefixes count.
+      if (name !== '' && EXEC_LONG.some((opt) => opt.startsWith(name))) return { kind: 'opaque', refspecs: [] };
       if (name !== '' && DESTRUCTIVE_LONG.some((opt) => opt.startsWith(name))) kind = 'destructive';
       if (VALUE_OPTIONS.has('--' + name) && !word.includes('=')) i += 1;
       continue;
