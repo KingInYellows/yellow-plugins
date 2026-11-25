@@ -125,8 +125,8 @@ provider-neutrality invariant):
   plumbing (`send-pack`, `subtree push`, remote helpers), a `-c`/`--config-env`
   override (`remote.origin.mirror=true`) or the same config through any
   `GIT_CONFIG*` variable, `--receive-pack`/`--exec` (git runs their value),
-  xargs, a process substitution, or any `$`/substitution word (it can expand to
-  a flag or refspec). A plain push of a branch listed in
+  xargs, a process substitution, `$'…'` quoting, or any `$`/substitution word
+  (it can expand to a flag or refspec). A plain push of a branch listed in
   `<git-common-dir>/gh-stack` (read by `hooks/scripts/lib/stack-membership.js`,
   no git process) is allowed with `hookSpecificOutput.additionalContext` telling
   the model to run `/github-stack:sync` afterwards; it sets no

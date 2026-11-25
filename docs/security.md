@@ -239,11 +239,11 @@ yellow-ci, gt-workflow, and github-workflow run a dependency-free Node runtime
 `--force*`, `+refspec`), `--mirror` and deletes (`-d`, `--delete`, `--prune`,
 `:branch`), plus any push it cannot read in full: a nested shell, alias,
 plumbing, `-c`/`--config-env` or `GIT_CONFIG*` override,
-`--receive-pack`/`--exec`, xargs, process substitution, or a `$`/substitution
-word. Its detector is a byte-identical copy of gt-workflow's. The boundary
-covers the command text only: a force or mirror push that repository or user git
-config already sets up (`remote.<name>.mirror`, a `+` refspec in
-`remote.<name>.push`) is outside its protection.
+`--receive-pack`/`--exec`, xargs, process substitution, `$'…'` quoting, or a
+`$`/substitution word. Its detector is a byte-identical copy of gt-workflow's.
+The boundary covers the command text only: a force or mirror push that
+repository or user git config already sets up (`remote.<name>.mirror`, a `+`
+refspec in `remote.<name>.push`) is outside its protection.
 
 **yellow-ci SessionStart (Node port).** Ported from `session-start.sh` to a
 dependency-free Node runtime (`hooks/scripts/`); byte/semantic parity is gated
