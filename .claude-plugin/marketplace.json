@@ -14,7 +14,7 @@
     {
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -24,7 +24,7 @@
     {
       "name": "github-workflow",
       "description": "GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.17.2",
+      "version": "2.17.3",
       "author": {
         "name": "KingInYellows"
       },
