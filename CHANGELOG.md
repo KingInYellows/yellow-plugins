@@ -13,6 +13,16 @@ and this project adheres to
 
 ---
 
+## [2.1.41] - 2026-11-25
+
+### Fixed
+
+- **yellow-ruvector 2.1.1** fixes a flaky SessionStart test: it now waits for
+  the old co-edit cursor temp to be swept before checking that it is gone. No
+  hook behavior changes.
+
+---
+
 ## [2.1.40] - 2026-11-25
 
 ### Changed
