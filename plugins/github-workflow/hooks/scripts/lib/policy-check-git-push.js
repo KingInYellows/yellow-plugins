@@ -42,7 +42,7 @@ const DESTRUCTIVE_MESSAGE = [
 const OPAQUE_MESSAGE = [
   '⛔  The hook cannot check this `git push` for force or delete: it runs through a nested shell, an alias,',
   '   push plumbing, a `-c` or `GIT_CONFIG_*` override, `--receive-pack`/`--exec`, xargs, a process substitution,',
-  "   `$'…'` quoting, or a `$` value decided at runtime.",
+  "   `$'…'` quoting, an `ext::`-style remote helper URL, or a `$` value decided at runtime.",
   '   Run a plain `git push [-u] <remote> <branch>` with literal names, or use `/github-stack:submit`.',
 ].join('\n');
 
@@ -72,7 +72,9 @@ function classifyPushArgs(args) {
   // `$` or a substitution can expand to a flag or a `+`/`:` refspec. Check
   // every word up front, including option values the loop below skips
   // (`-o $OPTS` with OPTS='x --force').
-  if (args.some((w) => w.includes('\u0000') || w.includes('$') || w.includes('`'))) {
+  // `<transport>::<address>` (`ext::<command>`, including via `--repo=`)
+  // runs a remote helper that can execute any command.
+  if (args.some((w) => w.includes('\u0000') || w.includes('$') || w.includes('`') || w.includes('::'))) {
     return { kind: 'opaque', refspecs: [] };
   }
   const positionals = [];
@@ -160,7 +162,8 @@ function checkGitPush(camelCaseEnvelope, io = {}) {
   // the lexer, so the recorded words would shift and hide a flag. ANSI-C
   // (`$'--\u0066orce'`) and locale (`$"…"`) quoting have escapes the lexer
   // does not fully decode, so a push using them is unreadable too.
-  if (pushes.length > 0 && (/GIT_CONFIG/.test(command) || /[<>]\(/.test(command) || /\$['"]/.test(command))) {
+  // `GIT_ALLOW_PROTOCOL` can enable the `ext::` transport inline.
+  if (pushes.length > 0 && (/GIT_CONFIG/.test(command) || /[<>]\(/.test(command) || /\$['"]/.test(command) || /GIT_ALLOW_PROTOCOL/.test(command))) {
     return { decision: 'deny', message: OPAQUE_MESSAGE };
   }
 

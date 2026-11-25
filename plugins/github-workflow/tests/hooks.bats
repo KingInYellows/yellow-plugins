@@ -78,7 +78,9 @@ run_entrypoint() {
     'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.mirror GIT_CONFIG_VALUE_0=true git push origin' \
     'env GIT_CONFIG_PARAMETERS=x git push origin main' 'export GIT_CONFIG_GLOBAL=/tmp/c; git push' \
     'git push -o <(printf x) --force origin main' \
-    "git push \$'--\\\\u0066orce' origin main" "git push \$'--\\\\U00000066orce' origin main"; do
+    "git push \$'--\\\\u0066orce' origin main" "git push \$'--\\\\U00000066orce' origin main" \
+    "GIT_ALLOW_PROTOCOL=ext:file git push 'ext::git push --force ../t main' main" \
+    "git push --repo=ext::sh main" "git -c protocol.ext.allow=always push ext::sh main"; do
     run --separate-stderr run_entrypoint check-git-push "{\"tool_input\":{\"command\":\"$c\"}}"
     [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
     [[ "$stderr" == *"cannot check this"* ]] || { echo "wrong message: $c $stderr"; return 1; }
