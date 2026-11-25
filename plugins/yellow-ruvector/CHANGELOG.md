@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.1
+
+### Patch Changes
+
+- [#1911](https://github.com/KingInYellows/yellow-plugins/pull/1911)
+  [`4f2725e`](https://github.com/KingInYellows/yellow-plugins/commit/4f2725ec32c1a20669abbe65520d97037724d0aa)
+  Thanks [@cursor](https://github.com/apps/cursor)! - Fix a flaky SessionStart
+  test: wait for the old co-edit cursor temp to be swept before asserting it is
+  gone, instead of checking it as soon as the other two temps disappear. The
+  test's other temp-sweep checks keep running.
+
 ## 2.1.0
 
 ### Minor Changes
