@@ -9,7 +9,8 @@
   Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Pass proxy, CA
   and npm config variables through the sanitized `npm ci` environment so the
   morphmcp install works behind a TLS-intercepting proxy (cloud sessions).
-  Secrets are still dropped.
+  Both spellings of ALL_PROXY are supported. The installer selects npm
+  settings by name and excludes npm credential variables, including OTPs.
 
 ## 1.3.4
 

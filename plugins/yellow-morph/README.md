@@ -52,6 +52,10 @@ with ruvector, cost/credit details, and privacy notes.
   shell `MORPH_API_KEY` export is accepted as a fallback.
 - **Network access** to api.morphllm.com (port 443)
 
+Behind a proxy, the installer forwards the uppercase and lowercase forms of
+`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY`. For a custom CA,
+set `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, or `npm_config_cafile`.
+
 ## Privacy
 
 Both tools send code to Morph's API servers (api.morphllm.com). Free/Starter

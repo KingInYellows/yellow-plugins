@@ -1513,6 +1513,15 @@ include prompt injection defenses:
 
 ## Local npm Dependencies
 
+### yellow-morph
+
+The installer runs `npm ci` with an environment allowlist. It forwards HOME,
+PATH, proxy and CA settings, and the npm settings for registry, CA file, proxy,
+HTTPS proxy, proxy exclusions, prefix, user config, and global config.
+Credential variables such as npm tokens and OTPs are excluded. Lifecycle
+scripts can read the forwarded values and any npm configuration files accessible
+to the installing user.
+
 ### yellow-ruvector
 
 Installs `ruvector` into the plugin data dir (not globally), pinned by the
