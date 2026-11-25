@@ -41,7 +41,7 @@ const DESTRUCTIVE_MESSAGE = [
 
 const OPAQUE_MESSAGE = [
   '⛔  The hook cannot check this `git push` for force or delete: it runs through a nested shell, an alias,',
-  '   push plumbing, a `-c` or `GIT_CONFIG_*` override, `--receive-pack`/`--exec`, xargs, or a `$` value decided at runtime.',
+  '   push plumbing, a `-c` or `GIT_CONFIG_*` override, `--receive-pack`/`--exec`, xargs, a process substitution, or a `$` value decided at runtime.',
   '   Run a plain `git push [-u] <remote> <branch>` with literal names, or use `/github-stack:submit`.',
 ].join('\n');
 
@@ -155,7 +155,9 @@ function checkGitPush(camelCaseEnvelope, io = {}) {
   // `GIT_CONFIG_KEY_n`, `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_GLOBAL`), set
   // inline, through `env` or by an earlier `export`. Any of these can turn a
   // plain push into a mirror or force push, so treat the push as unreadable.
-  if (pushes.length > 0 && /GIT_CONFIG/.test(command)) {
+  // A process substitution operand (`-o <(printf x) --force`) is dropped by
+  // the lexer, so the recorded words would shift and hide a flag.
+  if (pushes.length > 0 && (/GIT_CONFIG/.test(command) || /[<>]\(/.test(command))) {
     return { decision: 'deny', message: OPAQUE_MESSAGE };
   }
 
