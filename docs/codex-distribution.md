@@ -35,7 +35,7 @@ and runs the **exposure lint** (below).
 
 ## Codex-enabled plugins
 
-The catalog now selects **ten plugins and exactly 31 skills**. The final
+The catalog now selects **ten plugins and exactly 32 skills**. The final
 installed gate derives this inventory from the catalog and rejects migrated
 commands, unselected skills and undeclared resources.
 
@@ -45,7 +45,7 @@ commands, unselected skills and undeclared resources.
 | yellow-core     | agent-native-architecture, agent-native-audit, plan-status, worktree-inventory | Read-only references/dashboard/native Git inventory                                                                                                                               |
 | yellow-review   | yellow-thermonuclear-review                                                    | Explicit-only structural findings; no edits                                                                                                                                       |
 | yellow-ci       | Existing 8 skills                                                              | CI pilot; diagnosis and runner approval/refusal fixtures; no live SSH                                                                                                             |
-| yellow-docs     | docs-audit                                                                     | Sequential current-checkout audit; findings only                                                                                                                                  |
+| yellow-docs     | docs-audit, technical-diagrams                                                 | Read-only documentation audit and approval-gated diagram revisions                                                                                                                |
 | yellow-debt     | debt-complexity-scan                                                           | Bounded Python-validated local source snapshots; no fixes                                                                                                                         |
 | yellow-research | research-public-repo                                                           | Public DeepWiki only; actual read-only repository Q&A                                                                                                                             |
 | yellow-cursor   | cursor-plan                                                                    | Installed offline CLI dry-run; no remote launch/auth claim                                                                                                                        |

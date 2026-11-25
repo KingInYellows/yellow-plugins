@@ -3,6 +3,7 @@
 const { snakeToCamelEnvelope } = require('./envelope.js');
 const { checkCommitMessage } = require('./policy-check-commit-message.js');
 const { checkGitPush } = require('./policy-check-git-push.js');
+const { readStackInfo } = require('./stack-membership.js');
 
 const HOOK_EVENTS = {
   'check-git-push': 'PreToolUse',
@@ -100,7 +101,8 @@ async function runHook(argv, formatOutput) {
   }
 
   const camelEnvelope = snakeToCamelEnvelope(envelope);
-  const result = policy(camelEnvelope);
+  // Only check-git-push reads the gh-stack catalog (for its sync reminder).
+  const result = policy(camelEnvelope, { readStackInfo });
   formatOutput(hookEvent, result);
 }
 

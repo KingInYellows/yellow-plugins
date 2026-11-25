@@ -13,6 +13,52 @@ and this project adheres to
 
 ---
 
+## [2.1.40] - 2026-11-25
+
+### Changed
+
+- **github-workflow 0.7.0** lets agents run a plain `git push`, including
+  `git push -u origin <branch>`. Its hook still blocks force pushes, `--mirror`
+  and branch deletes, which can break a pull request stacked on the branch, and
+  any push it cannot read in full. Pushing a branch that belongs to a gh-stack
+  stack gets a reminder to run `/github-stack:sync`.
+- **gt-workflow 2.2.1** keeps blocking every raw `git push`; its copy of the
+  shared push detector gains the `analyzeGitPushCommand` export.
+
+### Fixed
+
+- **yellow-core 2.17.3** makes `/setup:all`, `/stack:status` and the
+  stack-provider-router skill probe only the stacked-PR provider the repository
+  uses, so a GitHub-stacks repository never runs `gt`. `/setup:all` and
+  `/statusline:setup` no longer report a plugin left only in the plugin cache as
+  installed.
+
+---
+
+## [2.1.39] - 2026-11-24
+
+### Added
+
+- **yellow-docs 1.5.0** adds the technical-diagrams skill for Claude and Codex.
+  It updates Mermaid, draw.io, and connected canvas diagrams from project
+  evidence while preserving human edits.
+
+### Changed
+
+- **yellow-ruvector 2.1.0** reads cached semantic recall at session start,
+  refreshes it in the background, and records co-edits asynchronously. Replacing
+  a store at the same path invalidates its cached recall.
+- **yellow-ci 1.5.12** reads cached GitHub status at session start and refreshes
+  it in the background.
+
+### Fixed
+
+- **yellow-morph 1.3.5** forwards proxy and CA settings during installation,
+  including uppercase and lowercase proxy variables. Only selected npm
+  configuration variables reach the installer.
+
+---
+
 ## [2.1.38] - 2026-11-19
 
 ### Changed

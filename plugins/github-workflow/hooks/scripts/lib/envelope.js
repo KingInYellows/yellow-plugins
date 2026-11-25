@@ -36,13 +36,25 @@ function snakeToCamelEnvelope(value) {
 
 /**
  * @param {'PreToolUse'|'PostToolUse'} hookEvent
- * @param {{decision: string, message: string|null}} result
+ * @param {{decision: string, message: string|null}} result  `note` (PreToolUse
+ *   only) allows the call and passes `message` to the model.
  */
 function formatClaudeOutput(hookEvent, result) {
   if (hookEvent === 'PreToolUse') {
     if (result.decision === 'deny') {
       process.exitCode = 2;
       process.stderr.write(result.message + '\n');
+      return;
+    }
+    if (result.decision === 'note') {
+      // Allowed with a reminder for the model. No permissionDecision: the
+      // note must not skip the user's own permission rules.
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: result.message },
+        }) + '\n'
+      );
+      return;
     }
     // allow: no output, default exit code 0 — matches check-git-push.sh.
     return;
@@ -75,7 +87,8 @@ function formatCodexOutput(hookEvent, result) {
         }) + '\n'
       );
     }
-    // allow: no output — symmetric with formatClaudeOutput's allow path.
+    // allow and note: no output. Codex has no PreToolUse context field this
+    // adapter writes, so a note is dropped there.
     return;
   }
   if (hookEvent === 'PostToolUse') {

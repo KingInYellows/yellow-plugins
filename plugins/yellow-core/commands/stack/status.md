@@ -141,7 +141,15 @@ PROBE="$ROOT/lib/stack-tooling-probe.js"
 # stack-tooling-probe.js is the single owner of gt/gh readiness — it never
 # fails this call (an unready tool is a normal probe RESULT, not an error),
 # so no `||` fallback is needed here.
-probe_json=$(node "$PROBE" probe --provider both)
+# Probe only the provider this repository uses: the .yellow-stack.yml
+# intent, else the single enabled provider, else both. A GitHub repository
+# never runs gt, and a Graphite one never runs gh extension list.
+probe_target=$(printf '%s' "$plugin_json" | node "$LIB" target \
+  --plugins-file - \
+  --intent-file "$intent_file" \
+  --project-path "$repo_root" 2>/dev/null) || probe_target=both
+case "$probe_target" in graphite | github) ;; *) probe_target=both ;; esac
+probe_json=$(node "$PROBE" probe --provider "$probe_target")
 printf 'tooling_probe:\n%s\n' "$probe_json"
 
 printf '=== classification ===\n'
@@ -232,8 +240,12 @@ untrusted-content fence as `detail` below.
 
 ## Step 3: Report the caveats, do not hide them
 
-Step 1 always probes both `gt` and `gh extension list`, but the `gh`
-probe can resolve to `unknown` (network, or auth-required) instead of
+Step 1 probes only the provider this repository uses (the
+`.yellow-stack.yml` intent, else the single enabled provider) and probes
+both `gt` and `gh extension list` only when that is ambiguous. In
+`CONFLICT` or `CONFIG_MISMATCH` the provider left unprobed is expected; do
+not report it as a failed check. The `gh`
+probe can also resolve to `unknown` (network, or auth-required) instead of
 `yes`/`no`. An `unknown` result is passed to the classifier
 as an unset `--tooling-github` value, which the classifier treats as "not
 checked" rather than "absent" — so `toolingKnown` is not always `true` for

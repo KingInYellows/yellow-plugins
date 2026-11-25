@@ -21,61 +21,189 @@ run_entrypoint() {
 
 # --- check-git-push ---
 
-@test "check-git-push: plain git push is blocked" {
+@test "check-git-push: plain git push is allowed" {
   run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git push origin main"}}'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$stderr" ]
+}
+
+@test "check-git-push: git push -u origin <branch> is allowed" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git add -A && git commit -m \"fix: x\" && git push -u origin feat/x"}}'
+  [ "$status" -eq 0 ]
+  [ -z "$stderr" ]
+}
+
+@test "check-git-push: force push is blocked with the stack-safety message" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git push --force origin main"}}'
   [ "$status" -eq 2 ]
   [ -z "$output" ]
-  [[ "$stderr" == *"Raw \`git push\` is not allowed"* ]]
-  [[ "$stderr" == *"github-stack-submit"* ]]
+  [[ "$stderr" == *"can rewrite or delete a remote branch"* ]]
+  [[ "$stderr" == *"/github-stack:sync"* ]]
 }
 
-@test "check-git-push: git push after a semicolon is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"echo hi; git push"}}'
+@test "check-git-push: every force, mirror and delete form is blocked" {
+  local c
+  for c in 'git push -f' 'git push -uf origin x' 'git push --force-with-lease' \
+    'git push --force-with-lease=main:abc origin main' 'git push --force-if-includes' \
+    'git push --forc' 'git push origin +main' 'git push origin +HEAD:main' \
+    'git push --mirror' 'git push --delete origin x' 'git push -d origin x' \
+    'git push --prune origin' 'git push origin :old' 'git push origin -- +main' \
+    'git push && git push -f' 'timeout 60 git push --force'; do
+    run --separate-stderr run_entrypoint check-git-push "{\"tool_input\":{\"command\":\"$c\"}}"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
+    [[ "$stderr" == *"can rewrite or delete a remote branch"* ]] || { echo "wrong message: $c"; return 1; }
+  done
+}
+
+@test "check-git-push: options that only look destructive are allowed" {
+  local c
+  for c in 'git push --no-force-with-lease origin x' 'git push -o ci.skip origin x' \
+    'git push --push-option=force origin x' 'git push --follow-tags origin x' \
+    'git push origin feat:feat' 'git push --all origin' 'git push --dry-run origin x'; do
+    run --separate-stderr run_entrypoint check-git-push "{\"tool_input\":{\"command\":\"$c\"}}"
+    [ "$status" -eq 0 ] || { echo "blocked: $c"; return 1; }
+  done
+}
+
+@test "check-git-push: a push the hook cannot read in full is blocked" {
+  local c
+  for c in 'git push origin $BRANCH' 'git push origin $(git branch --show-current)' \
+    'git -c remote.origin.mirror=true push' 'git subtree push --prefix x origin y' \
+    'git send-pack origin main' 'echo -f | xargs git push' \
+    'git push -o $OPTS origin main' 'git push --push-option $OPTS origin main' \
+    'git push --repo $R' 'git push -uo $OPTS origin main' \
+    'git push --receive-pack=git-receive-pack origin main' 'git push --exec x origin main' \
+    'git push --receive origin main' \
+    'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.mirror GIT_CONFIG_VALUE_0=true git push origin' \
+    'env GIT_CONFIG_PARAMETERS=x git push origin main' 'export GIT_CONFIG_GLOBAL=/tmp/c; git push' \
+    'git push -o <(printf x) --force origin main' \
+    "git push \$'--\\\\u0066orce' origin main" "git push \$'--\\\\U00000066orce' origin main" \
+    "GIT_ALLOW_PROTOCOL=ext:file git push 'ext::git push --force ../t main' main" \
+    "git push --repo=ext::sh main" "git -c protocol.ext.allow=always push ext::sh main"; do
+    run --separate-stderr run_entrypoint check-git-push "{\"tool_input\":{\"command\":\"$c\"}}"
+    [ "$status" -eq 2 ] || { echo "not blocked: $c"; return 1; }
+    [[ "$stderr" == *"cannot check this"* ]] || { echo "wrong message: $c $stderr"; return 1; }
+  done
+}
+
+@test "check-git-push: a pager that pushes does not hide the outer force push" {
+  run --separate-stderr run_entrypoint check-git-push "$(cat <<'JSON'
+{"tool_input":{"command":"env PAGER='git push' git push --force"}}
+JSON
+)"
   [ "$status" -eq 2 ]
 }
 
-@test "check-git-push: git push inside a subshell is blocked" {
+@test "check-git-push: a plain push inside bash -c is blocked as unreadable" {
+  run --separate-stderr run_entrypoint check-git-push "$(cat <<'JSON'
+{"tool_input":{"command":"bash -c \"git push\""}}
+JSON
+)"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot check this"* ]]
+}
+
+# Builds a repo whose gh-stack catalog lists feat/a and feat/b, on feat/a.
+make_stack_repo() {
+  STACK_REPO="$BATS_TEST_TMPDIR/repo"
+  git init -q -b feat/a "$STACK_REPO"
+  printf '%s' '{"schemaVersion":1,"stacks":[{"trunk":{"branch":"main"},"branches":[{"branch":"feat/a"},{"branch":"feat/b"}]}]}' \
+    >"$STACK_REPO/.git/gh-stack"
+  mkdir -p "$STACK_REPO/sub"
+}
+
+push_in() {
+  run --separate-stderr run_entrypoint check-git-push "{\"tool_input\":{\"command\":\"$1\"},\"cwd\":\"$2\"}"
+}
+
+@test "check-git-push: a plain push of a stacked branch is allowed with a sync reminder" {
+  make_stack_repo
+  push_in 'git push' "$STACK_REPO/sub"
+  [ "$status" -eq 0 ]
+  [ -z "$stderr" ]
+  [[ "$output" == *'"hookEventName":"PreToolUse"'* ]]
+  [[ "$output" == *'feat/a is part of a gh-stack stack'* ]]
+  [[ "$output" == *'/github-stack:sync'* ]]
+  [[ "$output" != *'permissionDecision'* ]]
+
+  push_in 'git push -u origin refs/heads/feat/b' "$STACK_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'feat/b is part of a gh-stack stack'* ]]
+}
+
+@test "check-git-push: a push of a branch outside any stack gets no reminder" {
+  make_stack_repo
+  push_in 'git push -u origin feat/other' "$STACK_REPO"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$stderr" ]
+}
+
+@test "check-git-push: an unreadable gh-stack catalog allows the push without a reminder" {
+  make_stack_repo
+  printf 'not json' >"$STACK_REPO/.git/gh-stack"
+  push_in 'git push' "$STACK_REPO"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "check-git-push: a linked worktree reads the catalog from the common dir" {
+  make_stack_repo
+  git -C "$STACK_REPO" -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m init
+  git -C "$STACK_REPO" worktree add -q -b feat/b-wt "$BATS_TEST_TMPDIR/wt"
+  push_in 'git push origin feat/b' "$BATS_TEST_TMPDIR/wt"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'feat/b is part of a gh-stack stack'* ]]
+}
+
+@test "check-git-push: force push after a semicolon is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"echo hi; git push --force"}}'
+  [ "$status" -eq 2 ]
+}
+
+@test "check-git-push: force push inside a subshell is blocked" {
   run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"$(git push)"}}'
   [ "$status" -eq 2 ]
 }
 
-@test "check-git-push: absolute-path git is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"/usr/bin/git push"}}'
+@test "check-git-push: force push via absolute-path git is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"/usr/bin/git push --force"}}'
   [ "$status" -eq 2 ]
 }
 
-@test "check-git-push: relative-path git is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"./bin/git push"}}'
+@test "check-git-push: force push via relative-path git is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"./bin/git push --force"}}'
   [ "$status" -eq 2 ]
 }
 
-@test "check-git-push: git with -C global option is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git -C repo push"}}'
+@test "check-git-push: force push via git with -C global option is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git -C repo push --force"}}'
   [ "$status" -eq 2 ]
 }
 
-@test "check-git-push: git with --git-dir global option is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --git-dir=/x/.git push"}}'
+@test "check-git-push: force push via git with --git-dir global option is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --git-dir=/x/.git push --force"}}'
   [ "$status" -eq 2 ]
 }
 
-@test "check-git-push: git with space-separated --git-dir value is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --git-dir /repo push origin main"}}'
+@test "check-git-push: force push via git with space-separated --git-dir value is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --git-dir /repo push --force origin main"}}'
   [ "$status" -eq 2 ]
 }
 
-@test "check-git-push: git with space-separated --work-tree value is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --work-tree /repo push"}}'
+@test "check-git-push: force push via git with space-separated --work-tree value is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --work-tree /repo push --force"}}'
   [ "$status" -eq 2 ]
 }
 
-@test "check-git-push: git with space-separated --namespace value is blocked" {
-  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --namespace ns push"}}'
+@test "check-git-push: force push via git with space-separated --namespace value is blocked" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --namespace ns push --force"}}'
   [ "$status" -eq 2 ]
 }
 
-@test "check-git-push: attached --git-dir=value form still blocked (regression)" {
-  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --git-dir=/repo push"}}'
+@test "check-git-push: force push via attached --git-dir=value form still blocked (regression)" {
+  run --separate-stderr run_entrypoint check-git-push '{"tool_input":{"command":"git --git-dir=/repo push --force"}}'
   [ "$status" -eq 2 ]
 }
 
@@ -119,7 +247,7 @@ assert_push_blocked() {
   run --separate-stderr run_entrypoint check-git-push "$1"
   [ "$status" -eq 2 ]
   [ -z "$output" ]
-  [[ "$stderr" == *"Raw \`git push\` is not allowed"* ]]
+  [[ "$stderr" == *"⛔"* ]]
 }
 
 assert_push_allowed() {
@@ -187,13 +315,13 @@ JSON
 
 @test "check-git-push: git -C \"\$(pwd)\" push is blocked (substitution inside the outer command)" {
   assert_push_blocked "$(cat <<'JSON'
-{"tool_input":{"command":"git -C \"$(pwd)\" push"}}
+{"tool_input":{"command":"git -C \"$(pwd)\" push -f"}}
 JSON
 )"
 }
 
 @test "check-git-push: git 2>&1 push is blocked (redirection before the subcommand)" {
-  assert_push_blocked '{"tool_input":{"command":"git 2>&1 push"}}'
+  assert_push_blocked '{"tool_input":{"command":"git 2>&1 push -f"}}'
 }
 
 @test "check-git-push: bash <<EOF | tee is blocked (heredoc bound to the declaring segment)" {
@@ -208,12 +336,12 @@ JSON
 }
 
 @test "check-git-push: { git push; } is blocked (reserved words peeled)" {
-  assert_push_blocked '{"tool_input":{"command":"{ git push; }"}}'
+  assert_push_blocked '{"tool_input":{"command":"{ git push -f; }"}}'
 }
 
 @test "check-git-push: git \$'push' is blocked (ANSI-C quoting)" {
   assert_push_blocked "$(cat <<'JSON'
-{"tool_input":{"command":"git $'push'"}}
+{"tool_input":{"command":"git $'push' -f"}}
 JSON
 )"
 }
@@ -226,7 +354,7 @@ JSON
 }
 
 @test "check-git-push: git -- push is blocked (git treats -- as end of options)" {
-  assert_push_blocked '{"tool_input":{"command":"git -- push"}}'
+  assert_push_blocked '{"tool_input":{"command":"git -- push -f"}}'
 }
 
 @test "check-git-push: bash <(echo git push) is blocked (process substitution as the script)" {
@@ -282,7 +410,7 @@ JSON
 
 @test "check-git-push: cat <<EOF with \$(git push) in the body is blocked (expanding heredoc)" {
   assert_push_blocked "$(cat <<'JSON'
-{"tool_input":{"command":"cat <<EOF\n$(git push)\nEOF"}}
+{"tool_input":{"command":"cat <<EOF\n$(git push -f)\nEOF"}}
 JSON
 )"
 }

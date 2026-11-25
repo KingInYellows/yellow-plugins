@@ -84,18 +84,55 @@ fi
 
 printf '\n=== Plugin Detection ===\n'
 plugin_cache="$CONFIG/plugins/cache"
+# The cache keeps copies of uninstalled plugins and old versions, so only a
+# manifest under the installPath of a plugin `claude plugin list --json`
+# shows enabled gets a segment: user and managed rows, plus project and local
+# rows of this repository. That also pins the marketplace and the installed
+# version. When the list cannot be read, every cached plugin counts (old
+# behaviour) and a warning says so.
+repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+enabled_paths="*"
+if plugin_json=$(claude plugin list --json 2>/dev/null) \
+  && enabled_paths=$(printf '%s' "$plugin_json" | PROJECT_PATH="$repo_top" python3 -c '
+import json, os, sys
+rows = json.load(sys.stdin)
+if not isinstance(rows, list):
+    sys.exit(1)
+project = os.environ.get("PROJECT_PATH", "")
+for r in rows:
+    if not isinstance(r, dict) or r.get("enabled") is not True:
+        continue
+    path = r.get("installPath")
+    if not isinstance(path, str) or not path or "\n" in path:
+        continue
+    if r.get("scope") in ("project", "local") and not (project and r.get("projectPath") == project):
+        continue
+    print(os.path.realpath(path))
+' 2>/dev/null); then
+  printf 'plugin_filter: enabled (claude plugin list --json)\n'
+else
+  enabled_paths="*"
+  printf 'plugin_filter: NONE (claude plugin list --json unavailable; stale cached plugins may get a segment)\n'
+fi
 if [ -d "$plugin_cache" ]; then
-  find "$plugin_cache" -path '*/.claude-plugin/plugin.json' -exec python3 -c "
+  # No `{}` inside the script: GNU find rejects a second `{}` with `-exec +`.
+  find "$plugin_cache" -path '*/.claude-plugin/plugin.json' -exec env ENABLED_PATHS="$enabled_paths" python3 -c "
 import json, sys, os
+enabled = os.environ.get('ENABLED_PATHS', '*')
+roots = None if enabled == '*' else [p for p in enabled.split(chr(10)) if p]
 for path in sys.argv[1:]:
     try:
+        if roots is not None:
+            root = os.path.realpath(os.path.dirname(os.path.dirname(path)))
+            if root not in roots:
+                continue
         d = json.load(open(path))
         name = d.get('name', 'unknown')
-        servers = d.get('mcpServers', {})
+        servers = d.get('mcpServers', dict())
         srv_info = []
         for sname, sconf in servers.items():
             stype = sconf.get('type', 'command')
-            env_keys = list(sconf.get('env', {}).keys())
+            env_keys = list(sconf.get('env', dict()).keys())
             env_str = ','.join(env_keys) if env_keys else '-'
             srv_info.append(f'{sname}({stype},{env_str})')
         print(f'plugin: {name} | servers: {\" \".join(srv_info) if srv_info else \"(none)\"}')
@@ -124,6 +161,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py" status --settings "$C
 - `disableAllHooks: True` → warn: "Your settings have `disableAllHooks: true`.
   The statusline will not appear until you disable that setting."
 - `statusLine:` not `NONE` → note the existing config for Step 4.
+- `plugin_filter: NONE` → tell the user the plugin list could not be read, so
+  a plugin left only in the cache (uninstalled) may still get a segment.
 - `settings_parse: ERROR (JSONC comments detected)` → stop with error:
   "Your settings.json contains JSONC comments (// or /* */). Please remove all
   comments and re-run this command. Claude Code requires pure JSON."

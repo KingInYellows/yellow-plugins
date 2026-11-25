@@ -25,6 +25,7 @@
  * CLI:
  *   node stack-provider-state.js classify [options]
  *   node stack-provider-state.js plan --target <graphite|github> [options]
+ *   node stack-provider-state.js target [options]   (prints graphite|github|both)
  *
  *   --plugins-file <path|->     `claude plugin list --json` output ("-" = stdin)
  *   --intent-file <path>        `.yellow-stack.yml` (absent ⇒ no intent)
@@ -659,6 +660,28 @@ function classifyProviderState({
 }
 
 /**
+ * Which provider's CLI a caller should probe: the `.yellow-stack.yml`
+ * intent when it names a known provider, else the single enabled provider,
+ * else `both`. A repository that chose GitHub must never run `gt` (and the
+ * reverse) just to print a dashboard; when the choice is ambiguous (no
+ * intent and zero or two providers enabled) both are probed so the report
+ * can still show each one's readiness. This only narrows probing — it never
+ * picks an active provider; classifyProviderState stays the single owner of
+ * that.
+ *
+ * @param {{ plugins: Array<object>, intent?: string|null, projectPath?: string|null }} input
+ * @returns {'graphite'|'github'|'both'}
+ */
+function probeTarget({ plugins, intent = null, projectPath = null } = {}) {
+  if (PROVIDERS.some((provider) => provider.id === intent)) {
+    return intent;
+  }
+  const { providers } = summarizeProviders(plugins, { projectPath });
+  const enabled = PROVIDERS.filter((provider) => providers[provider.id].enabled);
+  return enabled.length === 1 ? enabled[0].id : 'both';
+}
+
+/**
  * Build the exact, ordered command plan for switching to `target`.
  *
  * Returns `{ status: 'ok', steps }` or `{ status: 'refused', reason,
@@ -973,8 +996,8 @@ function toolingFromProbeResult(probeJson) {
 function main(argv) {
   const args = parseArgs(argv);
   const mode = args._[0];
-  if (mode !== 'classify' && mode !== 'plan') {
-    console.error('usage: stack-provider-state.js <classify|plan> [options]');
+  if (mode !== 'classify' && mode !== 'plan' && mode !== 'target') {
+    console.error('usage: stack-provider-state.js <classify|plan|target> [options]');
     return 1;
   }
 
@@ -1010,6 +1033,13 @@ function main(argv) {
 
   const projectPath =
     typeof args['project-path'] === 'string' ? args['project-path'] : null;
+
+  if (mode === 'target') {
+    console.log(
+      probeTarget({ plugins, intent: resolvedIntent.provider, projectPath })
+    );
+    return 0;
+  }
 
   if (mode === 'classify') {
     let tooling = {};
@@ -1077,6 +1107,7 @@ module.exports = {
   toolingFromProbeResult,
   summarizeProviders,
   classifyProviderState,
+  probeTarget,
   planProviderSwitch,
   summarizeSwitchOutcome,
 };
