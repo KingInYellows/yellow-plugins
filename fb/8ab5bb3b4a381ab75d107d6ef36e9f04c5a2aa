@@ -1,0 +1,33 @@
+docs/security.md
+  s_6702ff85afbed4::t_a3b28eae54e686 1516-1524
+CHANGELOG.md
+  s_6702ff85afbed4::t_a3b28eae54e686 16-39
+plugins/yellow-morph/lib/install-morphmcp.sh
+  s_6702ff85afbed4::t_a3b28eae54e686 186-187,198-208
+plugins/yellow-morph/CLAUDE.md
+  s_6702ff85afbed4::t_a3b28eae54e686 122-124
+plugins/yellow-morph/CHANGELOG.md
+  s_6702ff85afbed4::t_a3b28eae54e686 12-13
+tests/shell-compat/drivers/yellow-morph--install-morphmcp.sh
+  s_6702ff85afbed4::t_a3b28eae54e686 54-55,60,63
+tests/shell-compat/tier4-libraries.bats
+  s_6702ff85afbed4::t_a3b28eae54e686 198
+plugins/yellow-morph/README.md
+  s_6702ff85afbed4::t_a3b28eae54e686 55-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fb8ab5bb3b4a381ab75d107d6ef36e9f04c5a2aa",
+  "prompts": {},
+  "sessions": {
+    "s_6702ff85afbed4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a210a8-b43e-70b2-8759-7633fd58d023",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
