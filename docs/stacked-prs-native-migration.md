@@ -1,8 +1,9 @@
 # Moving stacked pull requests from Graphite to GitHub
 
-Status as of 2026-11-17. The Graphite subscription is planned to end on
-2026-12-28. This guide makes GitHub's own stacked pull requests the path for new
-work and keeps Graphite usable for stacks that already live there.
+Status as of 2026-11-17, with provider observations added on 2026-11-22. The
+Graphite subscription is planned to end on 2026-12-28. This guide makes GitHub's
+own stacked pull requests the path for new work and keeps Graphite usable for
+stacks that already live there.
 
 Nothing in this guide cancels a subscription, uninstalls an app, removes a
 credential, changes a required check, or merges a pull request. Those are steps
