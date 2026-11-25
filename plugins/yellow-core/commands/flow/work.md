@@ -165,7 +165,10 @@ assurance.
      Verified items are skipped during execution.
    - **Unticked items whose branch exists locally or on origin**
      (`git rev-parse --verify --quiet "refs/heads/<name>"` or
-     `git ls-remote --exit-code --heads origin "<name>"`), in plan order:
+     `git ls-remote --exit-code --heads origin "<name>"`), in plan order.
+     `git ls-remote` exits 2 when the branch is absent; any other non-zero
+     exit means origin could not be read, so stop and report it rather
+     than treat the item as new. For each such item,
      the expected base is `<trunk>` for item 1 and for every parallel item,
      otherwise the previous item's branch. Run
 

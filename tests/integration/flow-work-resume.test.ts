@@ -275,6 +275,22 @@ describe('committed-steps (CLAUDE-384)', () => {
     expect(result.status).toBe('ERROR');
   });
 
+  it('rejects a plan reached through a symlinked directory outside the repo', () => {
+    const outside = join(tmp, 'outside');
+    mkdirSync(outside);
+    writeFileSync(join(outside, 'plan.md'), '# Elsewhere\n\n- [ ] one\n');
+    symlinkSync(outside, join(repo, 'ext'));
+    const result = cli([
+      'committed-steps',
+      '--plan',
+      'ext/plan.md',
+      '--base',
+      'main',
+    ]);
+    expect(result.status).toBe('ERROR');
+    expect(String(result.detail)).toContain('symlink');
+  });
+
   it('rejects a --plan-file with more than one line', () => {
     const planFile = join(tmp, 'plan-arg.txt');
     writeFileSync(planFile, `${PLAN}\nplans/other.md\n`);

@@ -208,6 +208,23 @@ function committedSteps(opts, cwd) {
       detail: `plan is not a regular file: ${plan}`,
     };
   }
+  // A symlinked directory on the way (say `plans` -> elsewhere) would pass
+  // the lexical checks, so compare real paths too.
+  let real;
+  try {
+    real = path.relative(
+      fs.realpathSync(root),
+      fs.realpathSync(path.join(root, plan))
+    );
+  } catch {
+    real = null;
+  }
+  if (real === null || real !== plan.split('/').join(path.sep)) {
+    return {
+      status: 'ERROR',
+      detail: `plan path leaves the repository through a symlink: ${plan}`,
+    };
+  }
   const base = opts.base || defaultBase(cwd);
   if (!base) {
     return {
