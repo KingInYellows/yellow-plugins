@@ -34,6 +34,7 @@ const {
   toolingFromProbeResult,
   summarizeProviders,
   classifyProviderState,
+  probeTarget,
   planProviderSwitch,
   summarizeSwitchOutcome,
 } = provider;
@@ -1074,5 +1075,60 @@ describe('summarizeSwitchOutcome — case 8: enable/disable command failure', ()
     const outcome = summarizeSwitchOutcome(plan, [{ ok: true }]);
     expect(outcome.status).toBe('incomplete');
     expect(outcome.message).toContain('Provider state is unknown');
+  });
+});
+
+describe('probeTarget — which provider CLI a caller probes', () => {
+  const row = (plugin: string, enabled: boolean) => ({
+    id: `${plugin}@yellow-plugins`,
+    scope: 'user',
+    enabled,
+  });
+
+  it('follows a known .yellow-stack.yml intent, even against the runtime', () => {
+    expect(probeTarget({ plugins: [row('github-workflow', true)], intent: 'github' })).toBe('github');
+    expect(probeTarget({ plugins: [row('github-workflow', true)], intent: 'graphite' })).toBe('graphite');
+  });
+
+  it('falls back to the single enabled provider', () => {
+    expect(
+      probeTarget({ plugins: [row('gt-workflow', false), row('github-workflow', true)] })
+    ).toBe('github');
+    expect(probeTarget({ plugins: [row('gt-workflow', true)], intent: 'nope' })).toBe('graphite');
+  });
+
+  it('probes both when nothing or everything is enabled', () => {
+    expect(probeTarget({ plugins: [] })).toBe('both');
+    expect(
+      probeTarget({ plugins: [row('gt-workflow', true), row('github-workflow', true)] })
+    ).toBe('both');
+  });
+
+  it('ignores a project row that belongs to another repository', () => {
+    const foreign = { ...row('gt-workflow', true), scope: 'project', projectPath: '/elsewhere' };
+    expect(probeTarget({ plugins: [foreign], projectPath: PROJECT_PATH })).toBe('both');
+  });
+
+  it('is exposed as the `target` CLI mode', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'probe-target-'));
+    try {
+      const intent = join(dir, '.yellow-stack.yml');
+      writeFileSync(intent, 'provider: github\n');
+      const out = execFileSync(
+        'node',
+        [
+          join(__dirname, '../../plugins/yellow-core/lib/stack-provider-state.js'),
+          'target',
+          '--plugins-file',
+          '-',
+          '--intent-file',
+          intent,
+        ],
+        { input: JSON.stringify([row('gt-workflow', true)]), encoding: 'utf8' }
+      );
+      expect(out.trim()).toBe('github');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
