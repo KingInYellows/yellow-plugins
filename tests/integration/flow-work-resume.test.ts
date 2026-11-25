@@ -205,14 +205,28 @@ describe('committed-steps (CLAUDE-384)', () => {
     ).toEqual([1, 2]);
   });
 
-  it('accepts an absolute plan path and finds the default base', () => {
+  it('finds the default base', () => {
     sh('git', ['checkout', '-q', '-b', 'feat/x']);
     commit(`feat: task\n\nFlow-Work-Step: ${PLAN}#2\n`, 'a.txt');
-    expect(cli(['committed-steps', '--plan', join(repo, PLAN)])).toMatchObject({
+    expect(cli(['committed-steps', '--plan', PLAN])).toMatchObject({
       status: 'OK',
       base: 'main',
       steps: [2],
     });
+  });
+
+  it('rejects absolute and traversal forms before normalising them', () => {
+    for (const plan of [
+      join(repo, PLAN),
+      'plans/../plans/feature.md',
+      './plans/feature.md',
+      'plans//feature.md',
+    ]) {
+      expect(
+        cli(['committed-steps', '--plan', plan, '--base', 'main']).status,
+        plan
+      ).toBe('ERROR');
+    }
   });
 
   it('reads the plan path from --plan-file', () => {

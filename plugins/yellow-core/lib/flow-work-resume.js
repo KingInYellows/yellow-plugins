@@ -99,23 +99,25 @@ function repoRoot(cwd) {
 
 // Repository-relative, forward-slash plan path, so the trailer written on one
 // machine matches the path read on another.
-function normalizePlanPath(plan, root, cwd) {
-  const abs = path.resolve(cwd, plan);
-  const rel = path.relative(root, abs);
-  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) return null;
-  const posix = rel.split(path.sep).join('/');
-  // Allowlist: the same characters the trailer is written with, no leading
-  // hyphen in any component, no `.`/`..` components, a Markdown file.
-  if (!/^[A-Za-z0-9._/-]+$/.test(posix)) return null;
-  if (!posix.endsWith('.md')) return null;
+// Validate the path exactly as supplied, before any normalisation, so an
+// absolute path or a `..`/`.` component is rejected rather than resolved
+// away. The allowlist matches the characters the trailer is written with.
+// Exported for tests.
+function validatePlanPath(plan, root) {
+  if (typeof plan !== 'string' || plan.length === 0) return null;
+  if (!/^[A-Za-z0-9._/-]+$/.test(plan)) return null;
+  if (plan.startsWith('/') || !plan.endsWith('.md')) return null;
+  const parts = plan.split('/');
   if (
-    posix
-      .split('/')
-      .some((c) => c === '' || c === '.' || c === '..' || c.startsWith('-'))
+    parts.some((c) => c === '' || c === '.' || c === '..' || c.startsWith('-'))
   ) {
     return null;
   }
-  return posix;
+  // Containment, checked separately: resolved against the repository root,
+  // it must stay inside it.
+  const rel = path.relative(root, path.resolve(root, plan));
+  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) return null;
+  return plan;
 }
 
 function defaultBase(cwd) {
@@ -184,7 +186,7 @@ function committedSteps(opts, cwd) {
   }
   const root = repoRoot(cwd);
   if (!root) return { status: 'ERROR', detail: 'not inside a git repository' };
-  const plan = normalizePlanPath(raw, root, cwd);
+  const plan = validatePlanPath(raw, root);
   if (!plan) {
     return {
       status: 'ERROR',
@@ -453,6 +455,7 @@ function main(argv) {
 module.exports = {
   TRAILER_KEY,
   stepsFromTrailerValues,
+  validatePlanPath,
   classifyStackItem,
   committedSteps,
   stackItem,
