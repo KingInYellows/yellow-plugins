@@ -1,8 +1,9 @@
 # Moving stacked pull requests from Graphite to GitHub
 
-Status as of 2026-11-17. The Graphite subscription is planned to end on
-2026-12-28. This guide makes GitHub's own stacked pull requests the path for new
-work and keeps Graphite usable for stacks that already live there.
+Status as of 2026-11-17, with provider observations added on 2026-11-22. The
+Graphite subscription is planned to end on 2026-12-28. This guide makes GitHub's
+own stacked pull requests the path for new work and keeps Graphite usable for
+stacks that already live there.
 
 Nothing in this guide cancels a subscription, uninstalls an app, removes a
 credential, changes a required check, or merges a pull request. Those are steps
@@ -92,11 +93,34 @@ deleted.
   the Stacks REST API follow the v0.3.0 source (`internal/github/github.go`) and
   have not been run live
 
-One live lifecycle (submit, restack, sync, partial merge, sync) has been run,
-from a workstation clone that called the adapter directly. No machine has GitHub
-selected as its provider, and the skills themselves have not been run live.
+One live lifecycle (submit, restack, sync, partial merge, sync) was run on
+2026-11-17 from a workstation clone that called the adapter directly. At that
+checkpoint no machine had GitHub selected, and the skills had not been run live.
 Statements about the unverified items below come from GitHub's documentation and
 are marked "documented".
+
+### Provider observations, 2026-11-22
+
+Read-only checks in the `yellow-plugins` WSL checkout on each host found:
+
+| Host                  | Effective provider      | Scope | Installed provider version | GitHub CLI identity |
+| --------------------- | ----------------------- | ----- | -------------------------- | ------------------- |
+| A8 (Ubuntu-24.04)     | GitHub (`READY_GITHUB`) | user  | github-workflow 0.6.0      | KingInYellow18      |
+| Alienware (Ubuntu)    | Graphite enabled        | user  | gt-workflow 2.0.6          | KingInYellow18      |
+| Lenovo (Ubuntu-24.04) | Graphite enabled        | user  | gt-workflow 2.0.8          | KingInYellow18      |
+
+A8 also has official `github/gh-stack` v0.3.0. The installed yellow-core 2.17.2
+classifier confirmed the single enabled provider there; the checkout had no
+recorded intent. These observations are repository-scoped, not a claim that the
+same choice applies to all repositories or native Windows sessions. The other
+two hosts still need Graphite stack inventory and tooling-readiness checks
+before a deliberate local selection. No providers were changed.
+
+At main `b5be57b65130d1486dbc986fdae16b47f1ca714a`, 281 fixture tests in the
+provider state, tooling probe, runtime, runtime shim and operation registry
+suites passed on A8. These checks used separate temporary Git, Claude and gh
+configuration paths and mocked runtime executables; they do not prove live PR
+creation. The dated pilot remains separate evidence of the live lifecycle.
 
 ## Versions
 
