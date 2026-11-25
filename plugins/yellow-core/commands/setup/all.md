@@ -29,6 +29,59 @@ Bash call:
 _gt=$(command -v gt 2>/dev/null || true)
 _gh=$(command -v gh 2>/dev/null || true)
 
+# setup-all-stack-provider:start
+# One `claude plugin list --json` call serves the stack-provider choice
+# below, Installed Plugins and the remote-agent block. Enablement comes only
+# from it: a copy left in ~/.claude/plugins/cache is not an installed plugin.
+repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+_plugin_list_ok=0
+if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+  _plugin_list_ok=1
+else
+  _plugin_list_json=""
+fi
+_enabled_install_path() {
+  printf '%s' "$_plugin_list_json" | PLUGIN_ID="$1" PROJECT_PATH="$repo_top" node -e '
+    const fs = require("fs");
+    let rows;
+    try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = []; }
+    if (!Array.isArray(rows)) rows = [];
+    // Same rule as summarizeProviders (remote-agent-provider-state.js): project
+    // and local rows count only when they belong to the current repository
+    // (PROJECT_PATH is the git toplevel; empty outside a repo, so none count).
+    const projectPath = process.env.PROJECT_PATH || "";
+    const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
+    const candidates = rows
+      .filter((row) =>
+        row && typeof row === "object" &&
+        row.id === process.env.PLUGIN_ID &&
+        row.enabled === true &&
+        typeof row.installPath === "string" && row.installPath.length > 0 &&
+        ((row.scope !== "project" && row.scope !== "local") ||
+          (projectPath.length > 0 && row.projectPath === projectPath))
+      )
+      .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
+    process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");
+  ' 2>/dev/null
+}
+# Which stacked-PR provider's CLI to probe: the .yellow-stack.yml intent,
+# else the single enabled provider, else both (probeTarget in
+# lib/stack-provider-state.js, the rule /stack:status uses). A repository
+# on GitHub stacks never runs gt; a Graphite one never runs
+# `gh extension list`.
+_stack_target=both
+_stack_core=""
+[ "$_plugin_list_ok" -eq 1 ] && _stack_core=$(_enabled_install_path 'yellow-core@yellow-plugins')
+if [ -n "$_stack_core" ] && [ -f "$_stack_core/lib/stack-provider-state.js" ]; then
+  _stack_target=$(printf '%s' "$_plugin_list_json" | node "$_stack_core/lib/stack-provider-state.js" target \
+    --plugins-file - --intent-file "${repo_top:-.}/.yellow-stack.yml" --project-path "$repo_top" 2>/dev/null) \
+    || _stack_target=both
+fi
+case "$_stack_target" in graphite | github) ;; *) _stack_target=both ;; esac
+printf 'stack_probe_target: %s\n' "$_stack_target"
+unset _stack_core
+# setup-all-stack-provider:end
+
 printf '=== Runtime ===\n'
 if command -v node >/dev/null 2>&1; then
   node_ver=$(node --version 2>/dev/null)
@@ -90,20 +143,25 @@ fi
 command -v awk >/dev/null 2>&1 && printf 'awk:                OK\n' || printf 'awk:                NOT FOUND\n'
 command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:           OK\n' || printf 'ast-grep:           NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
-[ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
-# gt-workflow's bundled Graphite MCP server (`gt mcp`) needs gt 1.6.7+.
-if [ -n "$_gt" ]; then
-  _gt_ver=$("$_gt" --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-  if [ -z "$_gt_ver" ]; then
-    printf 'gt_mcp_check:       unknown (could not parse gt --version)\n'
-  elif printf '%s\n' "$_gt_ver" | awk -F. '{ exit !($1 > 1 || ($1 == 1 && ($2 > 6 || ($2 == 6 && $3 >= 7)))) }'; then
-    printf 'gt_mcp_check:       ok\n'
-  else
-    printf 'gt_mcp_check:       too_old (%s < 1.6.7)\n' "$_gt_ver"
-  fi
-  unset _gt_ver
+if [ "$_stack_target" = github ]; then
+  printf 'gt:                 SKIPPED (stack provider is github)\n'
+  printf 'gt_mcp_check:       SKIPPED (stack provider is github)\n'
 else
-  printf 'gt_mcp_check:       SKIPPED (gt not found)\n'
+  [ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
+  # gt-workflow's bundled Graphite MCP server (`gt mcp`) needs gt 1.6.7+.
+  if [ -n "$_gt" ]; then
+    _gt_ver=$("$_gt" --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+    if [ -z "$_gt_ver" ]; then
+      printf 'gt_mcp_check:       unknown (could not parse gt --version)\n'
+    elif printf '%s\n' "$_gt_ver" | awk -F. '{ exit !($1 > 1 || ($1 == 1 && ($2 > 6 || ($2 == 6 && $3 >= 7)))) }'; then
+      printf 'gt_mcp_check:       ok\n'
+    else
+      printf 'gt_mcp_check:       too_old (%s < 1.6.7)\n' "$_gt_ver"
+    fi
+    unset _gt_ver
+  else
+    printf 'gt_mcp_check:       SKIPPED (gt not found)\n'
+  fi
 fi
 # yellow-ruvector installs ruvector into its own plugin data dir (not PATH):
 # ~/.claude/plugins/data/<yellow-ruvector id>/, or the XDG fallback when the
@@ -288,7 +346,6 @@ fi
 
 
 printf '\n=== Repository State ===\n'
-repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
 [ -n "$repo_top" ] && printf 'git_repo:           ok\n' || printf 'git_repo:           NOT A GIT REPOSITORY\n'
 if [ -z "$repo_top" ]; then
   printf 'repo_root:          SKIPPED (not in git repo)\n'
@@ -308,7 +365,9 @@ for cfg in "$HOME/.graphite_user_config" "${XDG_CONFIG_HOME:-$HOME/.config}/grap
   fi
 done
 [ -n "$auth_path" ] && printf 'graphite_auth:      present (%s)\n' "$auth_path" || printf 'graphite_auth:      missing\n'
-if [ -n "$_gt" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if [ "$_stack_target" = github ]; then
+  printf 'gt_trunk:           SKIPPED (stack provider is github)\n'
+elif [ -n "$_gt" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   trunk=$("$_gt" trunk 2>/dev/null || true)
   [ -n "$trunk" ] && printf 'gt_trunk:           %s\n' "$trunk" || printf 'gt_trunk:           UNAVAILABLE\n'
 else
@@ -434,11 +493,18 @@ fi
 printf 'web_signal_count:              %s\n' "$web_signal_count"
 
 printf '\n=== Installed Plugins ===\n'
+# Installed state comes from `claude plugin list --json` (scope rule as in
+# _enabled_install_path): `installed` means enabled for this repository.
+# The plugin cache keeps copies of uninstalled plugins, so it is only a
+# fallback when the CLI list is unavailable, and otherwise only explains a
+# NOT INSTALLED row.
 plugin_cache="$HOME/.claude/plugins/cache"
+cached_plugins=""
+cache_ok=0
 if [ -d "$plugin_cache" ]; then
-  installed_plugins=""
   if command -v python3 >/dev/null 2>&1; then
-    installed_plugins=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
+    cache_ok=1
+    cached_plugins=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
       | xargs -0 python3 -c "
 import json, sys
 for p in sys.argv[1:]:
@@ -446,26 +512,67 @@ for p in sys.argv[1:]:
     except Exception: pass
 " 2>/dev/null | sed '/^$/d' | LC_ALL=C sort -u)
   elif command -v jq >/dev/null 2>&1; then
-    installed_plugins=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
+    cache_ok=1
+    cached_plugins=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
       | xargs -0 -I{} jq -r '.name // empty' {} 2>/dev/null \
       | sed '/^$/d' | LC_ALL=C sort -u)
   fi
-  if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
-    # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-jules yellow-agy yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-goal yellow-claudemod yellow-core; do
-      if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
-        printf '%-22s installed\n' "$p:"
-      else
-        printf '%-22s NOT INSTALLED\n' "$p:"
-      fi
-    done
-    # setup-all-dashboard-plugin-loop:end
+fi
+list_ok=0
+plugin_states=""
+if [ "$_plugin_list_ok" -eq 1 ] && plugin_states=$(printf '%s' "$_plugin_list_json" | PROJECT_PATH="$repo_top" node -e '
+    let rows;
+    try { rows = JSON.parse(require("fs").readFileSync(0, "utf8")); } catch { process.exit(1); }
+    if (!Array.isArray(rows)) process.exit(1);
+    const projectPath = process.env.PROJECT_PATH || "";
+    const state = {};
+    for (const r of rows) {
+      if (!r || typeof r.id !== "string" || !r.id.endsWith("@yellow-plugins")) continue;
+      if ((r.scope === "project" || r.scope === "local") &&
+          !(projectPath.length > 0 && r.projectPath === projectPath)) continue;
+      const name = r.id.slice(0, -"@yellow-plugins".length);
+      if (!/^[a-z0-9-]+$/.test(name)) continue;
+      state[name] = state[name] === "enabled" || r.enabled === true ? "enabled" : "disabled";
+    }
+    for (const [name, st] of Object.entries(state)) process.stdout.write(name + " " + st + "\n");
+  ' 2>/dev/null); then
+  list_ok=1
+fi
+if [ "$list_ok" -eq 1 ] || [ "$cache_ok" -eq 1 ]; then
+  if [ "$list_ok" -eq 1 ]; then
+    printf 'plugin_source: claude plugin list --json\n'
   else
-    printf 'plugin_cache_warning: unable to inspect plugin cache (need python3 or jq)\n'
+    printf 'plugin_source: plugin cache (claude plugin list --json unavailable; a stale cached copy shows as installed)\n'
   fi
+  # setup-all-dashboard-plugin-loop:start
+  for p in gt-workflow github-workflow yellow-ruvector yellow-morph yellow-cursor yellow-devin yellow-jules yellow-agy yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-goal yellow-claudemod yellow-core; do
+    in_cache=0
+    printf '%s\n' "$cached_plugins" | grep -Fxq "$p" && in_cache=1
+    if [ "$list_ok" -eq 1 ]; then
+      st=$(printf '%s\n' "$plugin_states" | awk -v p="$p" '$1 == p { print $2; exit }')
+    elif [ "$in_cache" -eq 1 ]; then
+      st=enabled
+    else
+      st=""
+    fi
+    if [ "$st" = enabled ]; then
+      printf '%-22s installed\n' "$p:"
+    elif [ "$st" = disabled ]; then
+      printf '%-22s NOT ENABLED (installed, disabled for this repository)\n' "$p:"
+    elif [ "$in_cache" -eq 1 ]; then
+      printf '%-22s NOT INSTALLED (stale copy in plugin cache only)\n' "$p:"
+    else
+      printf '%-22s NOT INSTALLED\n' "$p:"
+    fi
+  done
+  # setup-all-dashboard-plugin-loop:end
+  unset in_cache st
+elif [ -d "$plugin_cache" ]; then
+  printf 'plugin_cache_warning: unable to inspect plugin cache (need python3 or jq)\n'
 else
   printf 'plugin_cache: NOT FOUND (cannot detect installed plugins)\n'
 fi
+unset list_ok cache_ok plugin_states cached_plugins
 
 printf '\n=== GitHub CLI Auth ===\n'
 if [ -n "$_gh" ]; then
@@ -481,46 +588,53 @@ printf '\n=== Stacked-PR Provider Tooling ===\n'
 # github/gh-stack is first-party. Matching the bare name would report a
 # lookalike as READY. A stack-named extension from any other owner is
 # WRONG_OWNER (same rule as lib/stack-tooling-probe.js parseExtensionIdentity).
-if [ -n "$_gh" ]; then
-  # Capture the probe's own exit status rather than losing it to the pipe:
-  # a failed `gh extension list` (network, or auth-required) must not be
-  # reported as MISSING, which would tell the user to install an extension
-  # whose state was never read.
-  if _ext_list=$("$_gh" extension list 2>/dev/null); then
-    if printf '%s\n' "$_ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
-      # Minimum is TESTED_GH_STACK_VERSION in lib/stack-tooling-probe.js;
-      # change both together.
-      _ext_ver=$(printf '%s\n' "$_ext_list" | awk '{ own = 0; for (i = 1; i <= NF; i++) if ($i == "github/gh-stack") own = 1; if (own) for (i = 1; i <= NF; i++) if ($i ~ /^v?[0-9]+\.[0-9]+\.[0-9]+/) { sub(/^v/, "", $i); print $i; exit } }')
-      if [ -z "$_ext_ver" ]; then
-        printf 'gh_stack_ext: UNAVAILABLE (github/gh-stack version not reported)\n'
-      # A prerelease of the minimum (0.3.0-rc1) is older than 0.3.0 itself;
-      # build metadata (+...) is dropped first and never counts.
-      elif printf '%s\n' "${_ext_ver%%+*}" | awk -F. '{ v = ($1 + 0) * 1000000 + ($2 + 0) * 1000 + ($3 + 0); exit !(v < 3000 || (v == 3000 && $3 ~ /-/)) }'; then
-        printf 'gh_stack_ext: OUTDATED (github/gh-stack %s, needs 0.3.0+)\n' "$_ext_ver"
+# `_stack_target` comes from the setup-all-stack-provider block; unset
+# (as in tests/setup-all-stack-tooling.bats) means probe.
+if [ "${_stack_target:-both}" = graphite ]; then
+  printf 'gh_stack_ext: SKIPPED (stack provider is graphite)\n'
+  printf 'gh_stack_git: SKIPPED (stack provider is graphite)\n'
+else
+  if [ -n "$_gh" ]; then
+    # Capture the probe's own exit status rather than losing it to the pipe:
+    # a failed `gh extension list` (network, or auth-required) must not be
+    # reported as MISSING, which would tell the user to install an extension
+    # whose state was never read.
+    if _ext_list=$("$_gh" extension list 2>/dev/null); then
+      if printf '%s\n' "$_ext_list" | grep -qE '(^|[[:space:]])github/gh-stack([[:space:]]|$)'; then
+        # Minimum is TESTED_GH_STACK_VERSION in lib/stack-tooling-probe.js;
+        # change both together.
+        _ext_ver=$(printf '%s\n' "$_ext_list" | awk '{ own = 0; for (i = 1; i <= NF; i++) if ($i == "github/gh-stack") own = 1; if (own) for (i = 1; i <= NF; i++) if ($i ~ /^v?[0-9]+\.[0-9]+\.[0-9]+/) { sub(/^v/, "", $i); print $i; exit } }')
+        if [ -z "$_ext_ver" ]; then
+          printf 'gh_stack_ext: UNAVAILABLE (github/gh-stack version not reported)\n'
+        # A prerelease of the minimum (0.3.0-rc1) is older than 0.3.0 itself;
+        # build metadata (+...) is dropped first and never counts.
+        elif printf '%s\n' "${_ext_ver%%+*}" | awk -F. '{ v = ($1 + 0) * 1000000 + ($2 + 0) * 1000 + ($3 + 0); exit !(v < 3000 || (v == 3000 && $3 ~ /-/)) }'; then
+          printf 'gh_stack_ext: OUTDATED (github/gh-stack %s, needs 0.3.0+)\n' "$_ext_ver"
+        else
+          printf 'gh_stack_ext: OK (github/gh-stack %s)\n' "$_ext_ver"
+        fi
+      elif printf '%s\n' "$_ext_list" | awk '{ for (i = 1; i <= NF; i++) if (tolower($i) ~ /(^|\/)(gh-)?stack$/) f = 1 } END { exit !f }'; then
+        printf 'gh_stack_ext: WRONG_OWNER (a stack-named extension that is not github/gh-stack)\n'
       else
-        printf 'gh_stack_ext: OK (github/gh-stack %s)\n' "$_ext_ver"
+        printf 'gh_stack_ext: MISSING\n'
       fi
-    elif printf '%s\n' "$_ext_list" | awk '{ for (i = 1; i <= NF; i++) if (tolower($i) ~ /(^|\/)(gh-)?stack$/) f = 1 } END { exit !f }'; then
-      printf 'gh_stack_ext: WRONG_OWNER (a stack-named extension that is not github/gh-stack)\n'
     else
-      printf 'gh_stack_ext: MISSING\n'
+      printf 'gh_stack_ext: UNAVAILABLE (could not query extensions)\n'
     fi
   else
-    printf 'gh_stack_ext: UNAVAILABLE (could not query extensions)\n'
+    printf 'gh_stack_ext: SKIPPED (gh not found)\n'
   fi
-else
-  printf 'gh_stack_ext: SKIPPED (gh not found)\n'
-fi
-# gh-stack needs Git 2.36+ (MIN_GIT_VERSION in lib/stack-tooling-probe.js;
-# change both together). A git that cannot be run or read is UNAVAILABLE,
-# never OK.
-_stack_git=$(git --version 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+/) { split($i, p, "."); printf "%d.%d.%d", p[1], p[2], p[3]; exit } }')
-if [ -z "$_stack_git" ]; then
-  printf 'gh_stack_git: UNAVAILABLE (git --version could not be run or read)\n'
-elif printf '%s\n' "$_stack_git" | awk -F. '{ exit !(($1 + 0) * 1000000 + ($2 + 0) * 1000 + ($3 + 0) < 2036000) }'; then
-  printf 'gh_stack_git: OUTDATED (git %s, gh-stack needs 2.36+)\n' "$_stack_git"
-else
-  printf 'gh_stack_git: OK (git %s)\n' "$_stack_git"
+  # gh-stack needs Git 2.36+ (MIN_GIT_VERSION in lib/stack-tooling-probe.js;
+  # change both together). A git that cannot be run or read is UNAVAILABLE,
+  # never OK.
+  _stack_git=$(git --version 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+\.[0-9]+/) { split($i, p, "."); printf "%d.%d.%d", p[1], p[2], p[3]; exit } }')
+  if [ -z "$_stack_git" ]; then
+    printf 'gh_stack_git: UNAVAILABLE (git --version could not be run or read)\n'
+  elif printf '%s\n' "$_stack_git" | awk -F. '{ exit !(($1 + 0) * 1000000 + ($2 + 0) * 1000 + ($3 + 0) < 2036000) }'; then
+    printf 'gh_stack_git: OUTDATED (git %s, gh-stack needs 2.36+)\n' "$_stack_git"
+  else
+    printf 'gh_stack_git: OK (git %s)\n' "$_stack_git"
+  fi
 fi
 # setup-all-stack-tooling:end
 
@@ -539,32 +653,8 @@ printf '\n=== Remote-Agent Provider Tooling ===\n'
 _cursor_root=""
 _jules_root=""
 _agy_root=""
-_enabled_install_path() {
-  printf '%s' "$_plugin_list_json" | PLUGIN_ID="$1" PROJECT_PATH="$repo_top" node -e '
-    const fs = require("fs");
-    let rows;
-    try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = []; }
-    if (!Array.isArray(rows)) rows = [];
-    // Same rule as summarizeProviders (remote-agent-provider-state.js): project
-    // and local rows count only when they belong to the current repository
-    // (PROJECT_PATH is the git toplevel; empty outside a repo, so none count).
-    const projectPath = process.env.PROJECT_PATH || "";
-    const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
-    const candidates = rows
-      .filter((row) =>
-        row && typeof row === "object" &&
-        row.id === process.env.PLUGIN_ID &&
-        row.enabled === true &&
-        typeof row.installPath === "string" && row.installPath.length > 0 &&
-        ((row.scope !== "project" && row.scope !== "local") ||
-          (projectPath.length > 0 && row.projectPath === projectPath))
-      )
-      .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
-    process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");
-  ' 2>/dev/null
-}
 _agy_state=unknown
-if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+if [ "$_plugin_list_ok" -eq 1 ]; then
   # enabled | disabled | not_listed; anything that fails to parse stays unknown.
   # Same scope rule as _enabled_install_path: project and local rows count
   # only when they belong to this repository.
@@ -707,7 +797,8 @@ not reconstruct the probes from memory or silently skip them.
 Classify each installed plugin as **READY**, **PARTIAL**, or **NEEDS SETUP**.
 
 If Step 1 printed `plugin_cache: NOT FOUND` OR
-`plugin_cache_warning: unable to inspect plugin cache`, STOP before classifying:
+`plugin_cache_warning: unable to inspect plugin cache` (both only appear when
+`claude plugin list --json` could not be read either), STOP before classifying:
 in both branches no installed-status lines were emitted, so installed state is
 unknown for every plugin — do NOT read the absence of a plugin's line as
 `NOT INSTALLED`. Report the matching cause — "Plugin cache directory not found
@@ -717,11 +808,32 @@ cannot be inspected (need python3 or jq) — install one and re-run /setup:all."
 and stop.
 
 If a plugin shows `NOT INSTALLED` in the Installed Plugins section, classify it
-as **NOT INSTALLED** and skip all other checks for that plugin.
+as **NOT INSTALLED** and skip all other checks for that plugin. A `NOT INSTALLED
+(stale copy in plugin cache only)` row is the same: the plugin is not in
+`claude plugin list`, so never classify it, never offer its setup, and at most
+mention that `/plugin` can clear the leftover copy. If a plugin shows `NOT
+ENABLED`, classify it as **DISABLED**, skip all other checks, and never offer
+its setup; wherever a rule below requires another plugin to be "installed",
+`NOT ENABLED` counts as not installed. If `plugin_source` names the plugin
+cache, say in the summary that installed state may include stale copies
+because `claude plugin list --json` could not be read.
+
+`stack_probe_target` says which stacked-PR provider's CLI Step 1 probed
+(`/stack:status` uses the same rule). When it is `github`, the `gt`,
+`gt_mcp_check` and `gt_trunk` rows read `SKIPPED (stack provider is github)`;
+when it is `graphite`, the `gh_stack_ext` and `gh_stack_git` rows read
+`SKIPPED (stack provider is graphite)`. A skipped row is not a failure: never
+report the other provider as needing setup because of it, and never run `gt`
+or `gh stack` yourself to fill the gap.
 
 <!-- setup-all-classification:start -->
 
 **gt-workflow:**
+
+If `gt` reads `SKIPPED (stack provider is github)`, the repository uses GitHub
+stacks: report **NOT USED** with detail "stack provider is github" and skip the
+rules below. An enabled gt-workflow here is a provider conflict that Step 2.5
+reports; it is not a setup gap.
 
 `/gt-workflow:gt-setup` stops when the repo is not initialised (`graphite_repo` missing OR
 `gt_trunk` unavailable), so both checks are required. `gt_trunk: SKIPPED` (no
@@ -746,6 +858,10 @@ is selected (see the Alternative Provider Groups section below). It is
 classified like any other plugin, but its setup is only ever offered when it is
 the **enabled** provider — a user running Graphite must never be asked to
 configure GitHub stacks as well.
+
+If `gh_stack_ext` reads `SKIPPED (stack provider is graphite)`, report **NOT
+USED** with detail "stack provider is graphite" and skip the rules below, for
+the same reason as gt-workflow above.
 
 - READY: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` OK AND `gh_stack_git` OK
 - PARTIAL: `gh` OK AND `gh_auth` OK AND `gh_stack_ext` OK AND `gh_stack_git` is
@@ -930,8 +1046,11 @@ re-trigger the userConfig prompts."
 
 **yellow-linear:**
 
-- READY: `gt` OK AND `mcp__plugin_yellow-linear_linear__list_teams` is visible
-- PARTIAL: Linear MCP is visible but `gt` is missing
+- READY: the stack provider's CLI is available AND
+  `mcp__plugin_yellow-linear_linear__list_teams` is visible. The CLI is `gh` when
+  `stack_probe_target` is `github`, `gt` when it is `graphite`, and either one
+  when it is `both`
+- PARTIAL: Linear MCP is visible but that CLI is missing
 - NEEDS SETUP: Linear MCP tool is not visible in the current session
 
 **yellow-debt:**
@@ -1088,6 +1207,9 @@ Classify from Step 1's `goal-gen` row (`$GOAL_GEN_BIN` or `goal-gen`,
 - NEEDS SETUP: any other READY condition not met
 <!-- setup-all-classification:end -->
 
+Show **NOT USED** and **DISABLED** rows in the dashboard but leave them out of
+the NEEDS SETUP count and the setup offers.
+
 Display the dashboard in this order:
 
 <!-- setup-all-dashboard-example:start -->
@@ -1222,8 +1344,8 @@ If `yellow-core` is not installed, stop after the summary.
 
 **If 1+ installed plugins are NEEDS SETUP or PARTIAL:**
 
-Count only installed plugins that are not READY. Exclude NOT INSTALLED plugins
-from the count and from selection lists. Also exclude the non-enabled member of
+Count only installed plugins that are not READY. Exclude NOT INSTALLED,
+DISABLED and NOT USED plugins from the count and from selection lists. Also exclude the non-enabled member of
 any alternative provider group (Step 2.5) — it is reported, never offered, and
 must not inflate the "N plugins need attention" count. Use AskUserQuestion:
 

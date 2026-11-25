@@ -84,13 +84,40 @@ fi
 
 printf '\n=== Plugin Detection ===\n'
 plugin_cache="$CONFIG/plugins/cache"
+# The cache keeps copies of uninstalled plugins, so only plugins that
+# `claude plugin list --json` shows enabled in some scope get a segment.
+# When that list cannot be read, every cached plugin counts (old behaviour)
+# and a warning says so.
+enabled_plugins=""
+if enabled_plugins=$(claude plugin list --json 2>/dev/null | python3 -c '
+import json, sys
+rows = json.load(sys.stdin)
+if not isinstance(rows, list):
+    sys.exit(1)
+names = {r["id"].split("@", 1)[0] for r in rows
+         if isinstance(r, dict) and r.get("enabled") is True and isinstance(r.get("id"), str)}
+print(" ".join(sorted(names)))
+' 2>/dev/null); then
+  printf 'plugin_filter: enabled (claude plugin list --json)\n'
+else
+  printf 'plugin_filter: NONE (claude plugin list --json unavailable; stale cached plugins may get a segment)\n'
+  enabled_plugins="*"
+fi
 if [ -d "$plugin_cache" ]; then
-  find "$plugin_cache" -path '*/.claude-plugin/plugin.json' -exec python3 -c "
+  find "$plugin_cache" -path '*/.claude-plugin/plugin.json' -exec env ENABLED_PLUGINS="$enabled_plugins" python3 -c "
 import json, sys, os
+enabled = os.environ.get('ENABLED_PLUGINS', '*')
+allowed = None if enabled == '*' else set(enabled.split())
+seen = set()
 for path in sys.argv[1:]:
     try:
         d = json.load(open(path))
         name = d.get('name', 'unknown')
+        if allowed is not None and name not in allowed:
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
         servers = d.get('mcpServers', {})
         srv_info = []
         for sname, sconf in servers.items():
@@ -124,6 +151,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/lib/statusline-settings.py" status --settings "$C
 - `disableAllHooks: True` → warn: "Your settings have `disableAllHooks: true`.
   The statusline will not appear until you disable that setting."
 - `statusLine:` not `NONE` → note the existing config for Step 4.
+- `plugin_filter: NONE` → tell the user the plugin list could not be read, so
+  a plugin left only in the cache (uninstalled) may still get a segment.
 - `settings_parse: ERROR (JSONC comments detected)` → stop with error:
   "Your settings.json contains JSONC comments (// or /* */). Please remove all
   comments and re-run this command. Claude Code requires pure JSON."
