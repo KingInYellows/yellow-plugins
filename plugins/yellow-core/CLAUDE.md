@@ -53,13 +53,12 @@ it before editing a command, library or the staging pipeline.
   `disallowedTools: [AskUserQuestion]` is load-bearing, enforced by RULE 14)
 - `knowledge-compounder` and `staging-scorer` both gate writes on the
   durable-bar counterfactual (ported from Compound Engineering). The paragraph
-  between the `durable-bar` markers must stay byte-identical in both files;
-  RULE 22 in `validate-agent-authoring.js` enforces it.
+  between the `durable-bar` markers must stay byte-identical in both files; RULE
+  22 in `validate-agent-authoring.js` enforces it.
 - Solution docs may carry an optional single-line `retire_when` (the outside
   change that retires them; `validate-solutions.js` blocks other shapes with
-  SOL-002). `compound-lifecycle` checks it read-only in Step 4a; a met
-  condition bypasses the citation gate, and autofix only marks it
-  `status: stale`.
+  SOL-002). `compound-lifecycle` checks it read-only in Step 4a; a met condition
+  bypasses the citation gate, and autofix only marks it `status: stale`.
 - `knowledge-compounder` grounds each new doc before finishing: it runs
   `scripts/validate-solutions.js --doc <path>` when the script exists, and fixes
   any SOL-003 (cited path, commit or link that does not resolve) or marks the
@@ -79,17 +78,17 @@ it before editing a command, library or the staging pipeline.
   `claude plugin list --json` is UNKNOWN before any library runs; otherwise
   resolves yellow-core via `CLAUDE_PLUGIN_ROOT`, then the first enabled
   `installPath` with the library for this repository (never the open
-  repository's tree), before classify),
-  `/stack:select` (switch provider; never edits settings JSON, never falls back)
+  repository's tree), before classify), `/stack:select` (switch provider; never
+  edits settings JSON, never falls back)
 - `/statusline:setup`, `/setup:all`, `/setup:claude-web`
 - `/worktree:cleanup`, `/worktree:restack` (logic lives in
   `skills/git-worktree/scripts/worktree-restack.sh`; the command holds no `gt` /
   `gh stack` literals). `--abort` / `--continue` touch only recorded worktrees
-  (run, detached entries, github `owner`s; `owners N` tells a run with none
-  from a legacy state). Every refusal it cannot prove safe exits `31` with the
-  state kept and a final `kept: <reason>` token; add a token to `kept()` and
-  the restack.md table together. `status` labels: `on branch`, `detached`,
-  `moved`, `missing`, `replaced`, `owner`, `rebasing`, `busy`, `unreadable`,
+  (run, detached entries, github `owner`s; `owners N` tells a run with none from
+  a legacy state). Every refusal it cannot prove safe exits `31` with the state
+  kept and a final `kept: <reason>` token; add a token to `kept()` and the
+  restack.md table together. `status` labels: `on branch`, `detached`, `moved`,
+  `missing`, `replaced`, `owner`, `rebasing`, `busy`, `unreadable`,
   `not recorded`
 
 ### Skills (22)
@@ -133,8 +132,8 @@ the reference.
 
 - `stack-provider-state.js` — single owner of provider state; carries a
   `capabilityProvider` replica that `validate-provider-groups.js` checks
-  (`ERROR-PROVIDER-006`). Its `target` mode (`probeTarget`) picks which
-  provider CLI `/stack:status`, the router skill and `/setup:all` probe, so a
+  (`ERROR-PROVIDER-006`). Its `target` mode (`probeTarget`) picks which provider
+  CLI `/stack:status`, the router skill and `/setup:all` probe, so a
   GitHub-stacks repository never runs `gt` (and the reverse)
 - `stack-operation-registry.js` — maps the nine neutral stack operations to one
   Graphite and one GitHub implementation or `null`; `/flow:work` and
@@ -147,6 +146,9 @@ the reference.
   readiness change must update both
 - `remote-agent-provider-state.js` — active `remote-agent` provider for
   `/linear:delegate` and `/setup:all` Step 2.5
+- `flow-work-resume.js` — `/flow:work` resume evidence: `Flow-Work-Step` commit
+  trailers for single-branch runs, the item's PR (via `gh`, never `gt`) for
+  stack runs. Read-only; the command applies the repair
 - `run-github-stack-runtime.js` — entry to github-workflow's runtime;
   yellow-review, yellow-debt, yellow-devin and yellow-semgrep ship
   byte-identical copies
@@ -253,8 +255,8 @@ marketplace/plugins/contracts/examples/solutions targets), not inside
 `compound-staging`, `compound-stop-hook`, `context-observer`,
 `credential-status`, `handoff`, `jev-category-eval`, `jev-prefilter`,
 `plan-commands`, `plan-status-parity`, `plan-gate-tier`, `plugin-identity`,
-`setup-all-stack-tooling`, `stack-provider-root`,
-`pre-compact-hook`, `quote-ground`, `repo-profile`, `setup-all-ruvector-probe`,
+`setup-all-stack-tooling`, `stack-provider-root`, `pre-compact-hook`,
+`quote-ground`, `repo-profile`, `setup-all-ruvector-probe`,
 `statusline-template`, `validate-fs`) plus `skills/git-worktree/tests/`
 (`worktree-manager.bats`, `worktree-restack.bats` with stub `gt` / `gh` / `git`
 shims under `tests/mocks/`). Manifest hook budgets: Stop 5s, SessionStart 3s,
@@ -293,12 +295,12 @@ PreCompact 3s (`catalog/plugins/yellow-core.json`).
   plain text, not `{"continue": true}`: Claude Code appends a PreCompact hook's
   stdout to the **main-session** compaction prompt on exit 0 (exit 2 blocks
   compaction). Subagent compactons (`agentContext` set) discard that stdout. It
-  carries the compaction-preservation instruction (plan
-  path + unchecked tasks, modified files, user decisions verbatim, open
-  questions, last failing command, in-flight branch/PR names — every item
-  secret-redacted then fenced as untrusted-content). Synchronous, no jq, well
-  under its 3s timeout. Hook events live in `catalog/plugins/yellow-core.json`
-  and are regenerated into `plugin.json` by `pnpm generate:manifests`. Tests:
+  carries the compaction-preservation instruction (plan path + unchecked tasks,
+  modified files, user decisions verbatim, open questions, last failing command,
+  in-flight branch/PR names — every item secret-redacted then fenced as
+  untrusted-content). Synchronous, no jq, well under its 3s timeout. Hook events
+  live in `catalog/plugins/yellow-core.json` and are regenerated into
+  `plugin.json` by `pnpm generate:manifests`. Tests:
   `tests/pre-compact-hook.bats`.
 - **MEMORY.md migration is manual.** Plugin install does not partition an
   existing MEMORY.md into `## CORE_RULES`/`## USER_PREFERENCES`/
@@ -311,15 +313,15 @@ PreCompact 3s (`catalog/plugins/yellow-core.json`).
   entries. Manually `rm -rf` the staging dir to reclaim disk; the directory is
   inert without the hooks installed.
 
-- **`$ARGUMENTS` word-splitting in `/worktree:restack` (won't-fix).** The
-  "Phase 1: Parse flags" block in `commands/worktree/restack.md` runs in a
-  `bash /dev/fd/3` child and splits `$ARGUMENTS` unquoted (`set -f; set --
-  $ARGUMENTS`), because zsh does not word-split it. The residual concern is
-  that a quoted value with a space, such as `--remote "a b"`, splits into two
-  tokens. It is accepted because no flag takes such a value (remote names
-  cannot hold spaces) and the stray token is rejected as an unexpected
-  argument (exit `2`), so it fails closed. Do not replace the block with a
-  zsh-native parser.
+- **`$ARGUMENTS` word-splitting in `/worktree:restack` (won't-fix).** The "Phase
+  1: Parse flags" block in `commands/worktree/restack.md` runs in a
+  `bash /dev/fd/3` child and splits `$ARGUMENTS` unquoted
+  (`set -f; set -- $ARGUMENTS`), because zsh does not word-split it. The
+  residual concern is that a quoted value with a space, such as
+  `--remote "a b"`, splits into two tokens. It is accepted because no flag takes
+  such a value (remote names cannot hold spaces) and the stray token is rejected
+  as an unexpected argument (exit `2`), so it fails closed. Do not replace the
+  block with a zsh-native parser.
 
 ## Codex compatibility expansion
 
