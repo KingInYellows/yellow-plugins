@@ -186,7 +186,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     },
     {
       "name": "yellow-docs",
-      "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
+      "description": "Documentation audit, generation, and evidence-backed technical diagrams for any repository",
       "version": "1.4.1",
       "author": {
         "name": "KingInYellows"
@@ -792,7 +792,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-docs/.claude-plugin/pl
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-docs",
   "version": "1.4.1",
-  "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
+  "description": "Documentation audit, generation, and evidence-backed technical diagrams for any repository",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"

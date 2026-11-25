@@ -14,7 +14,7 @@ selection, staleness detection, and severity classification.
 ## When to Use
 
 Use when yellow-docs agents need doc generation or audit context. Preloaded
-by doc-auditor, doc-generator, and diagram-architect.
+by doc-auditor and doc-generator.
 
 ## Usage
 
@@ -129,48 +129,10 @@ Primary output is the findings list; the score is a secondary summary metric.
 ```
 ````
 
-## Diagram Type Selection
+## Mermaid diagrams
 
-Select the Mermaid diagram type based on what is being visualized:
-
-| Scenario | Diagram Type | Mermaid Syntax |
-|----------|-------------|----------------|
-| Module dependencies / imports | Flowchart | `flowchart LR` |
-| API call sequences / message exchange | Sequence | `sequenceDiagram` |
-| Class / type hierarchies | Class | `classDiagram` |
-| State machines / workflows | State | `stateDiagram-v2` |
-| Database schemas / entity relationships | ER | `erDiagram` |
-| System architecture (high-level) | Flowchart | `flowchart TB` + subgraphs |
-| Directory / file layout | Mindmap | `mindmap` |
-| Data flow / pipelines | Flowchart | `flowchart LR` |
-| Git branching strategies | Gitgraph | `gitgraph` (if supported) |
-
-### Layout Direction
-
-- `LR` (left-to-right) for process flows, pipelines, data flow
-- `TB` (top-to-bottom) for hierarchies, architectures, org charts
-- Use subgraphs to group related nodes and reduce visual clutter
-
-### Node Limits
-
-- Target: 15–30 nodes for readability
-- Hard limit: 50 for dense graphs (density > 0.3), 100 for sparse
-- Density formula: `density = 2 * edges / (nodes * (nodes - 1))`
-- Mindmap: max 11 level-2 nodes (Mermaid rendering limitation)
-- Max Mermaid text: 50,000 characters
-- Node labels: max 30 characters; abbreviate if needed
-
-### Collapse Strategies (when exceeding limits)
-
-1. **Folder-depth collapse**: Summarize at directory depth N using subgraphs
-2. **Focus mode**: Show selected module + immediate neighbors only
-
-### Styling
-
-- `classDef` for semantic coloring: green=active, gray=deprecated, red=error
-- Keep labels concise (3–5 words)
-- Use `linkStyle` sparingly — only for critical paths
-- Include `accTitle` and `accDescr` for accessibility
+Read the [Mermaid conventions](../technical-diagrams/references/mermaid.md)
+when preparing an embedded diagram.
 
 ## Staleness Detection
 
@@ -229,7 +191,8 @@ mode:
 - Dependency diagrams: `docs/dependencies.md`
 - Directory structure diagrams: `docs/structure.md`
 - READMEs: at project/module root
-- Diagrams: inline in the doc they illustrate
+- Mermaid: inline in the doc it illustrates, or link the existing source
+- Drawings and boards: link the authoritative file or board from the doc
 
 All generated files include provenance comment. Resolve the values first with
 `git rev-parse --short HEAD` and `date -u +%Y-%m-%dT%H:%M:%SZ` (fall back to
