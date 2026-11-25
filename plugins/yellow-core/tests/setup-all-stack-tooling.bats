@@ -148,3 +148,9 @@ CLAUDE
   FAKE_CLAUDE_FAIL=1 provider_target github
   [[ "$output" == *"stack_probe_target: both"* ]]
 }
+
+@test "a stale higher-ranked yellow-core does not hide a current one" {
+  local repo="$BATS_TEST_TMPDIR/repo"
+  provider_target github ",{\"id\":\"yellow-core@yellow-plugins\",\"scope\":\"local\",\"projectPath\":\"$repo\",\"enabled\":true,\"installPath\":\"$BATS_TEST_TMPDIR\"}"
+  [[ "$output" == *"stack_probe_target: github"* ]]
+}

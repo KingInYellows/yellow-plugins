@@ -41,7 +41,7 @@ else
   _plugin_list_json=""
 fi
 _enabled_install_path() {
-  printf '%s' "$_plugin_list_json" | PLUGIN_ID="$1" PROJECT_PATH="$repo_top" node -e '
+  printf '%s' "$_plugin_list_json" | PLUGIN_ID="$1" ALL_PATHS="${2:-}" PROJECT_PATH="$repo_top" node -e '
     const fs = require("fs");
     let rows;
     try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = []; }
@@ -61,7 +61,9 @@ _enabled_install_path() {
           (projectPath.length > 0 && row.projectPath === projectPath))
       )
       .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
-    process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");
+    // A second argument `all` prints every ranked path, one per line.
+    const paths = candidates.map((c) => c.installPath).filter((p) => !p.includes("\n"));
+    process.stdout.write(process.env.ALL_PATHS === "all" ? paths.join("\n") : (paths[0] || ""));
   ' 2>/dev/null
 }
 # Which stacked-PR provider's CLI to probe: the .yellow-stack.yml intent,
@@ -69,17 +71,22 @@ _enabled_install_path() {
 # lib/stack-provider-state.js, the rule /stack:status uses). A repository
 # on GitHub stacks never runs gt; a Graphite one never runs
 # `gh extension list`.
-_stack_target=both
-_stack_core=""
-[ "$_plugin_list_ok" -eq 1 ] && _stack_core=$(_enabled_install_path 'yellow-core@yellow-plugins')
-if [ -n "$_stack_core" ] && [ -f "$_stack_core/lib/stack-provider-state.js" ]; then
-  _stack_target=$(printf '%s' "$_plugin_list_json" | node "$_stack_core/lib/stack-provider-state.js" target \
-    --plugins-file - --intent-file "${repo_top:-.}/.yellow-stack.yml" --project-path "$repo_top" 2>/dev/null) \
-    || _stack_target=both
-fi
+# Every ranked yellow-core install is tried, so a stale higher-ranked copy
+# without the `target` mode does not hide a current lower-ranked one.
+_stack_target=""
+_stack_cores=""
+[ "$_plugin_list_ok" -eq 1 ] && _stack_cores=$(_enabled_install_path 'yellow-core@yellow-plugins' all)
+_stack_target=$(printf '%s\n' "$_stack_cores" | while IFS= read -r _stack_core; do
+  [ -n "$_stack_core" ] && [ -f "$_stack_core/lib/stack-provider-state.js" ] || continue
+  if _t=$(printf '%s' "$_plugin_list_json" | node "$_stack_core/lib/stack-provider-state.js" target \
+      --plugins-file - --intent-file "${repo_top:-.}/.yellow-stack.yml" --project-path "$repo_top" 2>/dev/null); then
+    printf '%s' "$_t"
+    break
+  fi
+done)
 case "$_stack_target" in graphite | github) ;; *) _stack_target=both ;; esac
 printf 'stack_probe_target: %s\n' "$_stack_target"
-unset _stack_core
+unset _stack_cores
 # setup-all-stack-provider:end
 
 printf '=== Runtime ===\n'
@@ -1046,11 +1053,12 @@ re-trigger the userConfig prompts."
 
 **yellow-linear:**
 
-- READY: the stack provider's CLI is available AND
-  `mcp__plugin_yellow-linear_linear__list_teams` is visible. The CLI is `gh` when
-  `stack_probe_target` is `github`, `gt` when it is `graphite`, and either one
-  when it is `both`
-- PARTIAL: Linear MCP is visible but that CLI is missing
+- READY: the stack provider's tooling is ready AND
+  `mcp__plugin_yellow-linear_linear__list_teams` is visible. The tooling is
+  `gh` OK AND `gh_stack_ext` OK when `stack_probe_target` is `github`; `gt` OK
+  when it is `graphite`; and either of those when it is `both`
+- PARTIAL: Linear MCP is visible but that tooling is not ready (branch-driven
+  workflows lose their stack path)
 - NEEDS SETUP: Linear MCP tool is not visible in the current session
 
 **yellow-debt:**
@@ -1327,10 +1335,12 @@ Based on the dashboard classification:
 Display: "No marketplace plugins are installed. Install plugins first, then run
 `/setup:all` again." Stop.
 
-**If all installed plugins are READY:**
+**If all installed plugins are READY** (ignoring DISABLED and NOT USED rows,
+which never need setup):
 
 Display: "All installed plugins are configured." If any plugins are NOT
-INSTALLED, also display: "X plugin(s) not installed: [list]."
+INSTALLED, also display: "X plugin(s) not installed: [list]." If any are
+DISABLED or NOT USED, list them too, with their detail.
 
 If `yellow-core` is installed, use AskUserQuestion with options:
 
