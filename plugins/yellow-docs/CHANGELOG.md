@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0
+
+### Minor Changes
+
+- [#1915](https://github.com/KingInYellows/yellow-plugins/pull/1915)
+  [`67b25e5`](https://github.com/KingInYellows/yellow-plugins/commit/67b25e5e01e8a217ca3e842c03558efda07423dd)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add a
+  technical-diagrams skill for Claude and Codex. Revise Mermaid, draw.io, and
+  connected canvas diagrams from evidence while preserving human edits.
+
 ## 1.4.1
 
 ### Patch Changes

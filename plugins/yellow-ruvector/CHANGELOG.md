@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes
+
+- [#1895](https://github.com/KingInYellows/yellow-plugins/pull/1895)
+  [`ba7d3f0`](https://github.com/KingInYellows/yellow-plugins/commit/ba7d3f0f99cf4b390013b77748d2e068060cb3c9)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Session start
+  no longer waits for a semantic recall (CLAUDE-368). The hook injects the
+  recall a background job saved at the previous session start, then refreshes it
+  in the background: p95 about 90 ms instead of 1.6 s. Only results scoring 0.3
+  or more are injected (`RUVECTOR_RECALL_MIN_SCORE` moves the floor), as plain
+  bullets instead of the CLI's JSON, and the block stays under 2 KB. A project's
+  first session after upgrading injects no recall.
+
+  Co-edit recording writes `.ruvector/coedit.json` in a detached job, so an edit
+  that records a pair returns in about 60 ms instead of 110-120 ms (CLAUDE-372).
+
+### Patch Changes
+
+- [#1904](https://github.com/KingInYellows/yellow-plugins/pull/1904)
+  [`13d3727`](https://github.com/KingInYellows/yellow-plugins/commit/13d3727a762071214eda892e1cca53d84df802e1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Prevent
+  SessionStart from injecting a previous store’s cached memories when a new
+  store occupies the same path. Ordinary writes to the existing store preserve
+  its warm recall. Update the hook documentation and cover detached co-edit
+  updates under contention and timeout.
+
 ## 2.0.7
 
 ### Patch Changes
