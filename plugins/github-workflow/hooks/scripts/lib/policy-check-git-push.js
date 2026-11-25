@@ -15,7 +15,7 @@
  * - deletes: `-d`, `--delete`, `--prune`, a `:branch` refspec
  *
  * A push whose words the detector cannot read in full (nested shell,
- * alias, plumbing, `-c` override, xargs, a `$`/substitution word that could
+ * alias, plumbing, `-c` or `GIT_CONFIG_*` override, xargs, a `$`/substitution word that could
  * expand to a flag or refspec) is denied with its own message. A plain push
  * of a branch listed in the local gh-stack catalog is allowed with a
  * reminder to run `/github-stack:sync` afterwards.
@@ -41,7 +41,7 @@ const DESTRUCTIVE_MESSAGE = [
 
 const OPAQUE_MESSAGE = [
   '⛔  The hook cannot check this `git push` for force or delete: it runs through a nested shell, an alias,',
-  '   push plumbing, a `-c` override, `--receive-pack`/`--exec`, xargs, or a `$` value decided at runtime.',
+  '   push plumbing, a `-c` or `GIT_CONFIG_*` override, `--receive-pack`/`--exec`, xargs, or a `$` value decided at runtime.',
   '   Run a plain `git push [-u] <remote> <branch>` with literal names, or use `/github-stack:submit`.',
 ].join('\n');
 
@@ -150,6 +150,14 @@ function checkGitPush(camelCaseEnvelope, io = {}) {
   const { verdict, pushes } = analyzeGitPushCommand(command);
   if (verdict === 'allow') return { decision: 'allow', message: null };
   if (verdict === 'unverifiable') return { decision: 'deny', message: UNVERIFIABLE_MESSAGE };
+
+  // Git reads `-c`-style config from the environment too (`GIT_CONFIG_COUNT`/
+  // `GIT_CONFIG_KEY_n`, `GIT_CONFIG_PARAMETERS`, `GIT_CONFIG_GLOBAL`), set
+  // inline, through `env` or by an earlier `export`. Any of these can turn a
+  // plain push into a mirror or force push, so treat the push as unreadable.
+  if (pushes.length > 0 && /GIT_CONFIG/.test(command)) {
+    return { decision: 'deny', message: OPAQUE_MESSAGE };
+  }
 
   const classified = pushes.map((p) => (p.opaque ? { kind: 'opaque', refspecs: [] } : classifyPushArgs(p.args)));
   if (classified.length === 0 || classified.some((c) => c.kind === 'opaque')) {

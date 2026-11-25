@@ -84,11 +84,11 @@ dependency):
   `--force-with-lease`, a `+refspec`), `--mirror` and branch deletes (`-d`,
   `--delete`, `--prune`, a `:branch` refspec), because those can rewrite or
   remove a branch that a stacked pull request builds on. A push it cannot read
-  in full (inside `bash -c`, an alias, a `-c` override, xargs, or a `$` value)
-  is blocked too. Pushing a branch listed in the local gh-stack catalog goes
-  through with a reminder to run `/github-stack:sync` afterwards. Detection is
-  tokenised, so path-qualified, `-C`/`--git-dir` and wrapper forms are caught
-  while quoted literals are not.
+  in full (inside `bash -c`, an alias, a `-c` or `GIT_CONFIG_*` override, xargs,
+  or a `$` value) is blocked too. Pushing a branch listed in the local gh-stack
+  catalog goes through with a reminder to run `/github-stack:sync` afterwards.
+  Detection is tokenised, so path-qualified, `-C`/`--git-dir` and wrapper forms
+  are caught while quoted literals are not.
 - `check-commit-message` (PostToolUse) warns on a non-conventional commit
   message.
 
