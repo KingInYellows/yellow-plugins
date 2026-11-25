@@ -110,10 +110,15 @@ map is keyed by set id. Refresh it only from a run without `--case` whose
 
 | Set                        | Recall | Specificity | Held-out acc. | Mean rate (should fire) |
 | -------------------------- | -----: | ----------: | ------------: | ----------------------: |
-| `yellow-core:debugging`    |   0.13 |        1.00 |          0.50 |                    0.13 |
-| `yellow-core:flow-plan`    |   0.25 |        1.00 |          0.67 |                    0.21 |
+| `yellow-core:debugging`    |   1.00 |        1.00 |          1.00 |                    0.96 |
+| `yellow-core:flow-plan`    |   0.75 |        1.00 |          0.83 |                    0.75 |
 | `yellow-review:resolve-pr` |   1.00 |        1.00 |          1.00 |                    1.00 |
 | `yellow-review:review-pr`  |   0.50 |        1.00 |          0.83 |                    0.50 |
 
-No near miss fired its target. The gap is recall: `debugging` and `/flow:plan`
-rarely fire from a natural prompt, which is the R2.4 (CLAUDE-326) target.
+No near miss fired its target. The 2026-11-19 gap was recall: `debugging` (0.13)
+and `/flow:plan` (0.25) rarely fired from a natural prompt. The R2.4
+(CLAUDE-326) rewrite put the trigger condition first and named the neighbours
+each one is not for. Those two keys come from a rerun of just those sets on
+2026-11-25 (Claude Code 2.1.332, Sonnet 5.5, 3 runs, 7.45 USD API-equivalent,
+not a bill, no failed runs); the other rows and the top-level fields are still
+the 2026-11-19 full run.

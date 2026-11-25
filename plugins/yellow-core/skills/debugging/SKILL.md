@@ -1,6 +1,7 @@
 ---
 name: debugging
-description: "Find root causes systematically before fixing — trace the causal chain and form hypotheses with predictions for uncertain links. Use when debugging errors, test failures, stack traces, or when stuck after failed fix attempts. For delegating a stuck investigation to an independent Codex session, use /codex:rescue."
+# prettier-ignore
+description: "Use when the user reports a bug, error, stack trace, crash, or failing or flaky test, or says something stopped working, and asks why, asks you to debug or investigate it, or wants the root cause. Run it before reading code or trying a fix: it traces the causal chain from trigger to symptom and tests hypotheses. Not for explaining concepts, setting up a debugger, or reviewing working code. To hand a stuck investigation to an independent Codex session, use /codex:rescue."
 argument-hint: '[issue reference, error message, test path, or description of broken behavior]'
 user-invocable: true
 ---
