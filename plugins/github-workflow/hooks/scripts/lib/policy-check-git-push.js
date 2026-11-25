@@ -66,6 +66,12 @@ const DESTRUCTIVE_SHORT = new Set(['f', 'd']);
  * @returns {{kind: 'plain'|'destructive'|'opaque', refspecs: string[]}}
  */
 function classifyPushArgs(args) {
+  // `$` or a substitution can expand to a flag or a `+`/`:` refspec. Check
+  // every word up front, including option values the loop below skips
+  // (`-o $OPTS` with OPTS='x --force').
+  if (args.some((w) => w.includes('\u0000') || w.includes('$') || w.includes('`'))) {
+    return { kind: 'opaque', refspecs: [] };
+  }
   const positionals = [];
   let kind = 'plain';
   let i = 0;
@@ -73,8 +79,6 @@ function classifyPushArgs(args) {
   while (i < args.length) {
     const word = args[i];
     i += 1;
-    // `$` or a substitution can expand to a flag or a `+`/`:` refspec.
-    if (word.includes('\u0000') || word.includes('$') || word.includes('`')) return { kind: 'opaque', refspecs: [] };
     if (endOfOptions || word === '-' || !word.startsWith('-')) {
       positionals.push(word);
       continue;
