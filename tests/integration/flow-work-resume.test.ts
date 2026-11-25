@@ -7,7 +7,7 @@
  * call, so every case also proves the check never needs Graphite.
  */
 
-import { execFileSync } from 'child_process';
+import { execFileSync, spawnSync } from 'child_process';
 import {
   chmodSync,
   existsSync,
@@ -263,6 +263,50 @@ describe('committed-steps (CLAUDE-384)', () => {
     expect(existsSync(join(repo, 'PWNED'))).toBe(false);
   });
 
+  it('rejects a symlinked plan file', () => {
+    symlinkSync('feature.md', join(repo, 'plans/link.md'));
+    const result = cli([
+      'committed-steps',
+      '--plan',
+      'plans/link.md',
+      '--base',
+      'main',
+    ]);
+    expect(result.status).toBe('ERROR');
+  });
+
+  it('rejects a --plan-file with more than one line', () => {
+    const planFile = join(tmp, 'plan-arg.txt');
+    writeFileSync(planFile, `${PLAN}\nplans/other.md\n`);
+    const result = cli([
+      'committed-steps',
+      '--plan-file',
+      planFile,
+      '--base',
+      'main',
+    ]);
+    expect(result.status).toBe('ERROR');
+  });
+
+  it('exits 2 on a usage error', () => {
+    const run = spawnSync(process.execPath, [LIB, 'bogus-mode'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { PATH: bin, HOME: tmp },
+    });
+    expect(run.status).toBe(2);
+    const missing = spawnSync(
+      process.execPath,
+      [LIB, 'committed-steps', '--nope', 'x'],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: { PATH: bin, HOME: tmp },
+      }
+    );
+    expect(missing.status).toBe(2);
+  });
+
   it('reports ERROR, not an empty list, when the base cannot be read', () => {
     const result = cli(['committed-steps', '--plan', PLAN, '--base', 'nope']);
     expect(result.status).toBe('ERROR');
@@ -336,6 +380,21 @@ describe('stack-item (CLAUDE-385)', () => {
     expect(log).toContain('pr list --repo me/proj --head feat/one');
   });
 
+  it('an invalid --repo is UNAVAILABLE before gh runs', () => {
+    stubGh([pr()]);
+    const result = cli([
+      'stack-item',
+      '--branch',
+      'feat/one',
+      '--base',
+      'main',
+      '--repo',
+      'me/proj;rm',
+    ]);
+    expect(result.status).toBe('UNAVAILABLE');
+    expect(existsSync(join(tmp, 'gh.log'))).toBe(false);
+  });
+
   it('gh failing is UNAVAILABLE, never NOT_SUBMITTED', () => {
     stubGh([], 4);
     expect(
@@ -394,13 +453,31 @@ describe('classifyStackItem', () => {
     ).toBe('MISMATCH');
   });
 
-  it('a merged PR counts even after the local tip moved', () => {
+  it('a merged PR at the local tip is SUBMITTED', () => {
     expect(
       resume.classifyStackItem({
         ...base,
-        rows: [{ ...row, state: 'MERGED', headRefOid: 'old' }],
+        rows: [{ ...row, state: 'MERGED' }],
       }).status
     ).toBe('SUBMITTED');
+  });
+
+  it('an old merged PR from a reused branch name is MISMATCH, not SUBMITTED', () => {
+    const result = resume.classifyStackItem({
+      ...base,
+      rows: [{ ...row, state: 'MERGED', headRefOid: 'old' }],
+    });
+    expect(result.status).toBe('MISMATCH');
+    expect(result.detail).toContain('reused this branch name');
+  });
+
+  it('a PR without a head SHA is MISMATCH', () => {
+    expect(
+      resume.classifyStackItem({
+        ...base,
+        rows: [{ ...row, headRefOid: undefined }],
+      }).status
+    ).toBe('MISMATCH');
   });
 
   it('no local branch is MISMATCH', () => {

@@ -76,12 +76,15 @@ function validBranchName(name, cwd) {
   return git(['check-ref-format', '--branch', name], cwd).ok;
 }
 
+const KNOWN_FLAGS = new Set(['plan', 'plan-file', 'base', 'branch', 'repo']);
+
 function parseArgs(argv) {
   const opts = {};
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (!arg.startsWith('--')) return { error: `unexpected argument: ${arg}` };
     const key = arg.slice(2);
+    if (!KNOWN_FLAGS.has(key)) return { error: `unknown option: --${key}` };
     const value = argv[i + 1];
     if (value === undefined || value.startsWith('--')) {
       return { error: `missing value for --${key}` };
@@ -309,12 +312,19 @@ function classifyStackItem({ branch, base, rows, localHead }) {
       detail: `PR #${pr.number} exists but there is no local branch ${branch}; fetch it before resuming`,
     };
   }
-  if (pr.state === 'OPEN' && pr.headRefOid && pr.headRefOid !== localHead) {
+  // Both states need the PR head to be the local tip. A merged PR whose head
+  // differs is most likely an earlier use of the same branch name, and
+  // ticking the row would skip an item that was never built.
+  if (pr.headRefOid !== localHead) {
+    const fix =
+      pr.state === 'MERGED'
+        ? 'it may be an older PR that reused this branch name; check it, then tick or rename the item by hand'
+        : 'push or reset the branch before resuming';
     return {
       status: 'MISMATCH',
       pr: summary,
       localHead,
-      detail: `local ${branch} is at ${localHead.slice(0, 12)} but PR #${pr.number} is at ${String(pr.headRefOid).slice(0, 12)}; push or reset the branch before resuming`,
+      detail: `local ${branch} is at ${localHead.slice(0, 12)} but ${pr.state.toLowerCase()} PR #${pr.number} is at ${String(pr.headRefOid || 'unknown').slice(0, 12)}; ${fix}`,
     };
   }
   return { status: 'SUBMITTED', pr: summary, localHead };
