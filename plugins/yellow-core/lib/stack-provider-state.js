@@ -348,6 +348,13 @@ function resolveIntent(filePath) {
  *      DIFFERENT repository. Without filtering, another project's provider
  *      choice is read as this project's.
  *
+ * Scope precedence (local > project > user) is already applied by the CLI:
+ * every row's `enabled` is the effective value for the directory the CLI
+ * ran in, so "any enabled row" equals the folded state. That holds only
+ * when the list was read from the repository root; callers use the
+ * generated `plugin_list_json` helper for that (CLAUDE-392, re-verified
+ * against Claude Code 2.1.332).
+ *
  * @param {Array<object>} plugins - parsed `claude plugin list --json`.
  * @param {{ projectPath?: string|null }} [options]
  */

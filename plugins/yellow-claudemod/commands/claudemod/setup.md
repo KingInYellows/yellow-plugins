@@ -34,13 +34,32 @@ else
   printf 'version:   NOT FOUND (claude not on PATH)\n'
 fi
 
+# >>> generated: plugin-list-json (source: scripts/snippets/plugin-list-json.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# shellcheck shell=bash
+# `claude plugin list --json` folds project/local enable and disable
+# overrides into each row's `enabled` value only for the settings under the
+# CURRENT directory's .claude/. From a subdirectory, a project-scope disable
+# of a user-scope plugin still reads as enabled. Run it from the repository
+# root; an unreachable root is a failed read, never a read from elsewhere.
+# Canonical source: scripts/snippets/plugin-list-json.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
+plugin_list_json() {
+  if [ -n "${1:-}" ]; then
+    (cd -- "$1" >/dev/null 2>&1 && claude plugin list --json)
+  else
+    claude plugin list --json
+  fi
+}
+# <<< generated: plugin-list-json <<<
+
 printf '\n=== Plugin ===\n'
 if command -v claude >/dev/null 2>&1; then
   # Installed is not enough: a disabled plugin's hooks module never loads.
   # Project and local rows count only for this repository, and the most
   # specific applicable scope decides (as /setup:all reads the same list).
   repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
-  state=$(claude plugin list --json 2>/dev/null | PROJECT_PATH="$repo_top" node -e '
+  state=$(plugin_list_json "$repo_top" 2>/dev/null | PROJECT_PATH="$repo_top" node -e '
     let raw = "";
     process.stdin.on("data", (c) => (raw += c));
     process.stdin.on("end", () => {

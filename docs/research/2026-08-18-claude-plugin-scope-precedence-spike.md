@@ -147,6 +147,26 @@ command markdown always invokes `claude plugin list --json` from the
 resolved repo root via `git rev-parse --show-toplevel`, matching every
 probe that showed correct results.
 
+## Addendum (2026-11-25, Claude Code 2.1.332): the directory is the current directory, not the repository root
+
+Re-run with the same isolated method for CLAUDE-392. The fold above uses the
+`.claude/` settings of the CLI's **current directory**, not the git root:
+
+- With `github-workflow` installed at `user` scope and disabled at
+  `project` scope in `REPO_A`, `claude plugin list --json` from `REPO_A`
+  reports `enabled: false`, but from `REPO_A/sub` it reports
+  `enabled: true`.
+- With separate `user` and `project` installs and a `project`-scope
+  disable, every row (the `user` row too) reports the folded value for the
+  querying directory. So the rows are never raw per-scope state, and no
+  consumer needs its own precedence resolver.
+
+The caveat above assumed every caller ran the list from the repository
+root, but none did: each ran it from the Bash tool's current directory. All
+surfaces now use the generated `plugin_list_json` helper
+(`scripts/snippets/plugin-list-json.sh`), which runs the query from
+`git rev-parse --show-toplevel`.
+
 ## Independent confirmation (parallel spike, same session)
 
 A second, independently-run isolated-`CLAUDE_CONFIG_DIR` spike (peer agent

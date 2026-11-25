@@ -253,7 +253,7 @@ marketplace/plugins/contracts/examples/solutions targets), not inside
 `compound-staging`, `compound-stop-hook`, `context-observer`,
 `credential-status`, `handoff`, `jev-category-eval`, `jev-prefilter`,
 `plan-commands`, `plan-status-parity`, `plan-gate-tier`, `plugin-identity`,
-`setup-all-stack-tooling`, `stack-provider-root`,
+`plugin-list-json`, `setup-all-stack-tooling`, `stack-provider-root`,
 `pre-compact-hook`, `quote-ground`, `repo-profile`, `setup-all-ruvector-probe`,
 `statusline-template`, `validate-fs`) plus `skills/git-worktree/tests/`
 (`worktree-manager.bats`, `worktree-restack.bats` with stub `gt` / `gh` / `git`

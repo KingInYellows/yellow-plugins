@@ -50,7 +50,9 @@ const CHECK_MODE = process.argv.slice(2).includes('--check');
 //     install-helpers block byte-for-byte; onboarded as a TARGETS entry.
 // yellow-core-root is the library-path bootstrap shared by /stack:status and
 // stack-provider-router. It cannot be sourced: the block runs before the
-// plugin root is known.
+// plugin root is known. plugin-list-json runs `claude plugin list --json`
+// from the repository root, so project-scope overrides are folded in
+// (CLAUDE-392); every surface that reads the list embeds it.
 const TARGETS = {
   'plugins/yellow-codex/scripts/install-codex.sh': [
     'install-helpers',
@@ -61,10 +63,20 @@ const TARGETS = {
     'install-version-gte',
   ],
   'plugins/yellow-research/scripts/install-ast-grep.sh': ['install-helpers'],
-  'plugins/yellow-core/commands/stack/status.md': ['yellow-core-root'],
+  'plugins/yellow-core/commands/stack/status.md': [
+    'yellow-core-root',
+    'plugin-list-json',
+  ],
   'plugins/yellow-core/skills/stack-provider-router/SKILL.md': [
     'yellow-core-root',
+    'plugin-list-json',
   ],
+  'plugins/yellow-core/skills/stack-provider-guard/SKILL.md': [
+    'plugin-list-json',
+  ],
+  'plugins/yellow-core/commands/setup/all.md': ['plugin-list-json'],
+  'plugins/yellow-core/commands/statusline/setup.md': ['plugin-list-json'],
+  'plugins/yellow-claudemod/commands/claudemod/setup.md': ['plugin-list-json'],
 };
 
 // Cache loaded snippets so a multi-target manifest does not re-read the
