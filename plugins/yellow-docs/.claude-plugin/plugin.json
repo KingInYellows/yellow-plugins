@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-docs",
-  "version": "1.4.1",
-  "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
+  "version": "1.5.0",
+  "description": "Documentation audit, generation, and evidence-backed technical diagrams for any repository",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"

@@ -119,11 +119,9 @@ do not apply.
   `catalog/plugins/yellow-morph.json` and is generated into `plugin.json` by
   `pnpm generate:manifests` — do not add `hooks/hooks.json`.
 - `plugin.json` MCP env sets `DISABLED_TOOLS=github_codebase_search` and
-  `WORKSPACE_MODE=true`; `npm ci` runs under `env -i` so postinstall scripts
-  inherit no secrets. Only HOME, PATH, the proxy and CA variables, and
-  `NPM_CONFIG_*`/`npm_config_*` (minus auth, token and password names) pass
-  through; dropping the CA breaks the install behind a TLS-intercepting proxy
-  (cloud sessions).
+  `WORKSPACE_MODE=true`. The installer passes HOME, PATH, proxy and CA settings
+  and selected npm config names to `npm ci` under `env -i`. Keep the allowlist
+  in `lib/install-morphmcp.sh` narrow because lifecycle scripts inherit it.
 - `tests/shell-compat/` drives the lock and the `npm ci` environment under bash
   and zsh; the wrapper itself has no automated test.
 - **Shell libraries and zsh:** `lib/install-morphmcp.sh` is dual-shell

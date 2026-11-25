@@ -54,6 +54,14 @@ credential is supplied, copied or read. A connected stdio server and
 `authStatus: unsupported` do not prove Graphite account authentication. The
 receipt marks Phase 1 acceptance partial even when these controls pass.
 
+### Technical diagram destinations
+
+The yellow-docs diagram skill uses local rendering for repository artifacts. A
+user-selected collaborative board is an external destination. Review its
+identity and the proposed diagram content with the user before sending or saving
+changes, and omit credentials from labels and previews. Board access comes from
+the host connector.
+
 ### Plugins Without MCP Servers
 
 - **yellow-review** — Ships no MCP server; uses `gh` CLI (GitHub CLI) for
@@ -219,12 +227,24 @@ yellow-ci, gt-workflow, and github-workflow run a dependency-free Node runtime
 | yellow-ci       | SessionStart                          | Check for recent CI failures (Node runtime, cached, 3s budget)                    |
 | yellow-debt     | SessionStart                          | Remind about high/critical debt findings                                          |
 | gt-workflow     | PreToolUse, PostToolUse               | Block `git push`, validate commit messages                                        |
-| github-workflow | PreToolUse, PostToolUse               | Block `git push`, validate commit messages (same Node entrypoint as gt-workflow)  |
+| github-workflow | PreToolUse, PostToolUse               | Block force, mirror, delete and unreadable `git push`; validate commit messages   |
 | yellow-core     | SessionStart, Stop, PreCompact        | Staging-queue drain; transcript-tail capture; compaction-preservation instruction |
 | yellow-morph    | SessionStart                          | Pre-warm `@morphllm/morphmcp` install for fast first tool call                    |
 | yellow-research | SessionStart                          | Pre-warm context7 docs cache; emit `credential-status.json` for `/setup:all`      |
 | yellow-semgrep  | SessionStart                          | Emit `credential-status.json` for `/setup:all`                                    |
 | yellow-review   | SessionStart                          | Report pending review-ledger findings (counts and PR numbers only)                |
+
+**github-workflow `check-git-push`.** Unlike gt-workflow, which blocks every raw
+`git push`, github-workflow allows a plain push and denies only force (`-f`,
+`--force*`, `+refspec`), `--mirror` and deletes (`-d`, `--delete`, `--prune`,
+`:branch`), plus any push it cannot read in full: a nested shell, alias,
+plumbing, `-c`/`--config-env` or `GIT_CONFIG*` override,
+`--receive-pack`/`--exec`, xargs, process substitution, `$'…'` quoting, an
+`ext::`-style remote URL or `GIT_ALLOW_PROTOCOL`, or a `$`/substitution word.
+Its detector is a byte-identical copy of gt-workflow's. The boundary covers the
+command text only: a force or mirror push that repository or user git config
+already sets up (`remote.<name>.mirror`, a `+` refspec in `remote.<name>.push`)
+is outside its protection.
 
 **yellow-ci SessionStart (Node port).** Ported from `session-start.sh` to a
 dependency-free Node runtime (`hooks/scripts/`); byte/semantic parity is gated
@@ -1504,6 +1524,15 @@ include prompt injection defenses:
   paths or JSON
 
 ## Local npm Dependencies
+
+### yellow-morph
+
+The installer runs `npm ci` with an environment allowlist. It forwards HOME,
+PATH, proxy and CA settings, and the npm settings for registry, CA file, proxy,
+HTTPS proxy, proxy exclusions, prefix, user config, and global config.
+Credential variables such as npm tokens and OTPs are excluded. Lifecycle scripts
+can read the forwarded values and any npm configuration files accessible to the
+installing user.
 
 ### yellow-ruvector
 

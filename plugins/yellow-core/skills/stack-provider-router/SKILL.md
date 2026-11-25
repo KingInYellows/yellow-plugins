@@ -161,7 +161,15 @@ PROBE="$ROOT/lib/stack-tooling-probe.js"
 # stack-tooling-probe.js is the single owner of gt/gh readiness (presence,
 # gh auth validity, and github/gh-stack extension identity) — this skill no
 # longer inlines its own copy of that logic.
-probe_json=$(node "$PROBE" probe --provider both)
+# Probe only the provider this repository uses: the .yellow-stack.yml
+# intent, else the single enabled provider, else both. A GitHub repository
+# never runs gt, and a Graphite one never runs gh extension list.
+probe_target=$(printf '%s' "$plugin_json" | node "$LIB" target \
+  --plugins-file - \
+  --intent-file "$intent_file" \
+  --project-path "$repo_root" 2>/dev/null) || probe_target=both
+case "$probe_target" in graphite | github) ;; *) probe_target=both ;; esac
+probe_json=$(node "$PROBE" probe --provider "$probe_target")
 
 printf '%s' "$plugin_json" | node "$LIB" classify \
   --plugins-file - \
@@ -174,6 +182,9 @@ printf '%s' "$plugin_json" | node "$LIB" classify \
 ### Step 2: Route or stop
 
 Read `state` from the JSON.
+
+If `toolingKnown` is `false`, do not dispatch work for any `READY_*` state;
+follow Step 3 instead.
 
 **`READY_GRAPHITE`** — the active provider is `gt-workflow`. Dispatch
 Graphite-owned work there (for example `/gt-workflow:smart-submit`, `/gt-workflow:gt-sync`,
@@ -220,8 +231,11 @@ Then give the one relevant next step:
 
 ### Step 3: Report the tooling caveat honestly
 
-Step 1 always probes both `gt` and `gh extension list`, but the `gh`
-probe can resolve to `unknown` (network, or auth-required) rather than
+Step 1 probes only the provider this repository uses (the
+`.yellow-stack.yml` intent, else the single enabled provider), and both
+only when that is ambiguous; an unprobed provider in `CONFLICT` or
+`CONFIG_MISMATCH` is expected, not a failed check. The `gh`
+probe can also resolve to `unknown` (network, or auth-required) rather than
 `yes`/`no`. The classifier treats that as "not checked" rather than
 "absent", so `toolingKnown` is not always `true` for this skill.
 

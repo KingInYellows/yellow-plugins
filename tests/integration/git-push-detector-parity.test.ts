@@ -15,27 +15,48 @@ import { join } from 'path';
 import { describe, it, expect } from 'vitest';
 
 const ROOT = join(__dirname, '..', '..');
-const GT_DETECTOR = join(ROOT, 'plugins/gt-workflow/hooks/scripts/lib/git-push-detector.js');
-const GH_DETECTOR = join(ROOT, 'plugins/github-workflow/hooks/scripts/lib/git-push-detector.js');
-const FIXTURE_DIR = join(ROOT, 'plugins/gt-workflow/tests/fixtures/hooks/check-git-push');
+const GT_DETECTOR = join(
+  ROOT,
+  'plugins/gt-workflow/hooks/scripts/lib/git-push-detector.js'
+);
+const GH_DETECTOR = join(
+  ROOT,
+  'plugins/github-workflow/hooks/scripts/lib/git-push-detector.js'
+);
+const FIXTURE_DIR = join(
+  ROOT,
+  'plugins/gt-workflow/tests/fixtures/hooks/check-git-push'
+);
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const gt = require(GT_DETECTOR) as {
   commandInvokesGitPush: (c: string) => boolean;
-  classifyGitPushCommand: (c: string) => 'allow' | 'verified-push' | 'unverifiable';
+  classifyGitPushCommand: (
+    c: string
+  ) => 'allow' | 'verified-push' | 'unverifiable';
   MAX_SHELL_DEPTH: number;
   MAX_WRAPPER_PEELS: number;
 };
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const gh = require(GH_DETECTOR) as {
   commandInvokesGitPush: (c: string) => boolean;
-  classifyGitPushCommand: (c: string) => 'allow' | 'verified-push' | 'unverifiable';
+  classifyGitPushCommand: (
+    c: string
+  ) => 'allow' | 'verified-push' | 'unverifiable';
+  analyzeGitPushCommand: (c: string) => {
+    verdict: 'allow' | 'verified-push' | 'unverifiable';
+    pushes: Array<{ args: string[]; opaque: boolean }>;
+  };
   MAX_SHELL_DEPTH: number;
   MAX_WRAPPER_PEELS: number;
 };
 
 /** Every fixture whose stdin carries a string `tool_input.command`, with its golden verdict. */
-function fixtureCorpus(): Array<{ name: string; command: string; expectDeny: boolean }> {
+function fixtureCorpus(): Array<{
+  name: string;
+  command: string;
+  expectDeny: boolean;
+}> {
   const out: Array<{ name: string; command: string; expectDeny: boolean }> = [];
   for (const file of readdirSync(FIXTURE_DIR)) {
     if (!file.endsWith('.stdin')) continue;
@@ -46,9 +67,13 @@ function fixtureCorpus(): Array<{ name: string; command: string; expectDeny: boo
     } catch {
       continue; // malformed-json / missing-jq: not a command corpus entry
     }
-    const command = (parsed as { tool_input?: { command?: unknown } } | null)?.tool_input?.command;
+    const command = (parsed as { tool_input?: { command?: unknown } } | null)
+      ?.tool_input?.command;
     if (typeof command !== 'string') continue;
-    const golden = readFileSync(join(FIXTURE_DIR, `${name}.golden.txt`), 'utf8');
+    const golden = readFileSync(
+      join(FIXTURE_DIR, `${name}.golden.txt`),
+      'utf8'
+    );
     const exitCode = /^EXIT_CODE=(\d+)/m.exec(golden)?.[1];
     out.push({ name, command, expectDeny: exitCode === '2' });
   }
@@ -93,7 +118,7 @@ const DENY = [
   'bash -ec "git push"',
   'zsh -c "git push"',
   "sh -c 'cd x && git push'",
-  "bash -c \"sh -c 'git push'\"",
+  'bash -c "sh -c \'git push\'"',
   'bash <<EOF\ngit push\nEOF',
   'bash <<< "git push"',
   'git push 2>&1',
@@ -211,7 +236,7 @@ const DENY = [
   "printf 'git %s' push | sh",
   "printf 'pu%sh' s | xargs git",
   // pipe linkage across substitutions and into compound bodies
-  "echo 'git push' | bash -s \"$(echo x)\"",
+  'echo \'git push\' | bash -s "$(echo x)"',
   "echo 'git push' | sh $(echo)",
   "echo 'git push' | { :; bash; }",
   "echo 'git push' | (true; sh)",
@@ -293,7 +318,7 @@ const DENY = [
   'setarch -R git push',
   "git -c credential.helper='!git push' fetch",
   'echo "\'push\'" | xargs git',
-  "echo '\"push\"' | xargs git",
+  'echo \'"push"\' | xargs git',
   'ld-musl-x86_64.so.1 /usr/bin/git push',
   'bash <(bash <(bash <(echo git push)))',
   "echo 'git push' | { sh; sh; sh; }",
@@ -328,7 +353,7 @@ const DENY = [
   'git config set alias.p push; git p',
   'git config alias.p "$(x)"',
   "printf 'push refs/heads/main:refs/heads/main\\n\\n' | git remote-https origin https://host/r.git",
-  "{ { { sh; } <<A; } <<B; } <<C\ngit push\nA\ny\nB\nz\nC",
+  '{ { { sh; } <<A; } <<B; } <<C\ngit push\nA\ny\nB\nz\nC',
   // Descriptor scripts (plans/shell-compat-followups.md item 8).
   "bash /dev/fd/3 3<<'T'\ngit push\nT",
   "exec 3<<'X'\ngit push\nX\nbash /dev/fd/3",
@@ -456,9 +481,9 @@ const ALLOW = [
   'git config get core.pager',
   'xargs git <<< status',
   'xargs git < <(echo status)',
-  "sh; cat <<EOF\n$( { true; } <<< \"git push\" )\nEOF",
+  'sh; cat <<EOF\n$( { true; } <<< "git push" )\nEOF',
   "{ sh; } ; <<< 'git push'",
-  "{ { { sh; } <<A; } <<B; } <<C\nx\nA\ny\nB\ngit push\nC",
+  '{ { { sh; } <<A; } <<B; } <<C\nx\nA\ny\nB\ngit push\nC',
   // sixth review pass: config values are data unless git executes the key;
   // reads with a value pattern are not writes; url.*.insteadOf is a rewrite
   "git config user.name 'git push'",
@@ -491,7 +516,9 @@ const ALLOW = [
 
 describe('git-push-detector cross-plugin parity', () => {
   it('both plugin copies are byte-identical', () => {
-    expect(readFileSync(GH_DETECTOR, 'utf8')).toBe(readFileSync(GT_DETECTOR, 'utf8'));
+    expect(readFileSync(GH_DETECTOR, 'utf8')).toBe(
+      readFileSync(GT_DETECTOR, 'utf8')
+    );
   });
 
   it('exports the same recursion and wrapper caps', () => {
@@ -534,13 +561,16 @@ describe('git-push-detector cross-plugin parity', () => {
 
   it('shell nesting deeper than the cap is denied even with no push inside', () => {
     const depth3 = 'bash -c "bash -c \'bash -c \\"echo hi\\"\'"';
-    const depth4 = 'bash -c "bash -c \'bash -c \\"bash -c \\\\\\"echo hi\\\\\\"\\"\'"';
+    const depth4 =
+      'bash -c "bash -c \'bash -c \\"bash -c \\\\\\"echo hi\\\\\\"\\"\'"';
     expect(gt.commandInvokesGitPush(depth3)).toBe(false);
     expect(gt.commandInvokesGitPush(depth4)).toBe(true);
     expect(gh.commandInvokesGitPush(depth4)).toBe(true);
     expect(gt.classifyGitPushCommand(depth4)).toBe('unverifiable');
     expect(gt.classifyGitPushCommand('git push')).toBe('verified-push');
-    expect(gt.classifyGitPushCommand('curl http://x | bash -s')).toBe('unverifiable');
+    expect(gt.classifyGitPushCommand('curl http://x | bash -s')).toBe(
+      'unverifiable'
+    );
     expect(gh.classifyGitPushCommand(depth4)).toBe('unverifiable');
   });
 
@@ -609,7 +639,9 @@ describe('git-push-detector cross-plugin parity', () => {
       gt.commandInvokesGitPush(input);
       expect(performance.now() - start).toBeLessThan(500);
     }
-    expect(process.memoryUsage().rss - rssBefore).toBeLessThan(256 * 1024 * 1024);
+    expect(process.memoryUsage().rss - rssBefore).toBeLessThan(
+      256 * 1024 * 1024
+    );
   });
 
   it('fails closed on an unterminated quote that still wraps a shell command', () => {
@@ -619,7 +651,71 @@ describe('git-push-detector cross-plugin parity', () => {
   });
 
   it('does not throw on non-string input (the policy layer already denied it)', () => {
-    expect(gt.commandInvokesGitPush(undefined as unknown as string)).toBe(false);
-    expect(() => gt.commandInvokesGitPush({} as unknown as string)).not.toThrow();
+    expect(gt.commandInvokesGitPush(undefined as unknown as string)).toBe(
+      false
+    );
+    expect(() =>
+      gt.commandInvokesGitPush({} as unknown as string)
+    ).not.toThrow();
+  });
+
+  // analyzeGitPushCommand (used only by github-workflow's policy) scans the
+  // whole command instead of stopping at the first push. It must deny
+  // exactly what classifyGitPushCommand denies, and every denial it calls a
+  // verified push must carry at least one push record.
+  describe('analyzeGitPushCommand agrees with classifyGitPushCommand', () => {
+    const all = [...DENY, ...ALLOW, ...fixtureCorpus().map((f) => f.command)];
+    for (const command of all) {
+      it(`agrees: ${JSON.stringify(command).slice(0, 120)}`, () => {
+        const classified = gh.classifyGitPushCommand(command);
+        const analyzed = gh.analyzeGitPushCommand(command);
+        expect(analyzed.verdict === 'allow').toBe(classified === 'allow');
+        if (analyzed.verdict === 'verified-push')
+          expect(analyzed.pushes.length).toBeGreaterThan(0);
+      });
+    }
+  });
+
+  describe('analyzeGitPushCommand push records', () => {
+    const cases: Array<[string, Array<{ args: string[]; opaque: boolean }>]> = [
+      ['git push', [{ args: [], opaque: false }]],
+      [
+        'git push -u origin feat/x',
+        [{ args: ['-u', 'origin', 'feat/x'], opaque: false }],
+      ],
+      [
+        'git push && git push --force',
+        [
+          { args: [], opaque: false },
+          { args: ['--force'], opaque: false },
+        ],
+      ],
+      [
+        'sudo timeout 9 /usr/bin/git -C d push -f',
+        [{ args: ['-f'], opaque: false }],
+      ],
+      ['git -c remote.origin.mirror=true push', [{ args: [], opaque: true }]],
+      ['git subtree push --prefix p origin b', [{ args: [], opaque: true }]],
+      ['echo -f | xargs git push', [{ args: [], opaque: true }]],
+    ];
+    for (const [command, pushes] of cases) {
+      it(`records ${command}`, () => {
+        expect(gh.analyzeGitPushCommand(command)).toEqual({
+          verdict: 'verified-push',
+          pushes,
+        });
+      });
+    }
+
+    it('marks a push found only inside a nested shell or pager as opaque', () => {
+      for (const command of [
+        'bash -c "git push"',
+        "env PAGER='git push' git push --force",
+        "git -c core.pager='git push' push -f",
+      ]) {
+        const { pushes } = gh.analyzeGitPushCommand(command);
+        expect(pushes.some((p) => p.opaque)).toBe(true);
+      }
+    });
   });
 });

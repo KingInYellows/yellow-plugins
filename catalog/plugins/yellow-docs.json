@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
+  "description": "Documentation audit, generation, and evidence-backed technical diagrams for any repository",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -22,11 +22,11 @@
         "displayName": "yellow-docs",
         "category": "Developer Tools"
       },
-      "skillAllowlist": ["docs-audit"],
+      "skillAllowlist": ["docs-audit", "technical-diagrams"],
       "componentPaths": {
         "skills": "./codex/skills"
       },
-      "description": "One bounded read-only docs-audit workflow. Other commands, agents, skills and hooks remain excluded."
+      "description": "Audit repository documentation and create or revise editable technical diagrams with user approval."
     }
   }
 }

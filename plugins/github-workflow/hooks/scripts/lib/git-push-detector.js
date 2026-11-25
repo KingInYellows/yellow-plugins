@@ -81,10 +81,26 @@ const MAX_WRAPPER_PEELS = 16;
 // so verified `git push` detections are distinct from fail-closed denials.
 let analysisCtx = null;
 
-/** @returns {true} */
-function denyVerified() {
-  if (analysisCtx) analysisCtx.verifiedPush = true;
+/**
+ * @param {object} [direct] Set only where a push is read straight off its
+ *   own argv: `{ segment, args, opaque }`. analyzeGitPushCommand records it
+ *   so a caller can inspect the push's options and refspecs.
+ * @returns {true}
+ */
+function denyVerified(direct) {
+  if (analysisCtx) {
+    analysisCtx.verifiedPush = true;
+    if (analysisCtx.collect && direct) {
+      analysisCtx.pushes.push({ args: direct.args, opaque: direct.opaque });
+      analysisCtx.directSegment = direct.segment;
+    }
+  }
   return true;
+}
+
+/** Whether analyzeGitPushCommand is collecting every push in the command. */
+function collecting() {
+  return analysisCtx !== null && analysisCtx.collect === true;
 }
 
 /** @returns {true} */
@@ -1340,9 +1356,18 @@ function segmentVerdict(segment, depth, outerStdin) {
   // SUBST.
   const program = programName(argv[i]);
 
-  if (program.startsWith('git-') && PUSH_SUBCOMMANDS.has(program.slice(4))) return denyVerified();
+  if (program.startsWith('git-') && PUSH_SUBCOMMANDS.has(program.slice(4))) {
+    return denyVerified({ segment, args: argv.slice(i + 1), opaque: program !== 'git-push' || viaXargs });
+  }
 
   if (program === 'git') {
+    // A push is read as plain only when no `-c`/`--config-env` override can
+    // change what it does (`-c remote.origin.mirror=true push`) and xargs
+    // supplies none of its words. While collecting, a config value that
+    // pushes does not stop the scan, so the outer push is recorded too.
+    let configured = false;
+    let configPush = false;
+    const pushRecord = (sub, args) => ({ segment, args, opaque: sub !== 'push' || configured || viaXargs });
     i += 1;
     while (i < argv.length) {
       const tok = argv[i];
@@ -1350,22 +1375,28 @@ function segmentVerdict(segment, depth, outerStdin) {
       if (tok === '--') break; // end of options: the next word is the subcommand
       if (tok.includes(SUBST)) return denyUnverifiable(); // `git $(x) push`: subcommand decided at runtime
       if (!tok.startsWith('-')) {
-        if (PUSH_SUBCOMMANDS.has(tok)) return denyVerified();
-        return gitSubcommandInvokesGitPush(tok, argv.slice(i), depth, stdinCtx);
+        if (PUSH_SUBCOMMANDS.has(tok)) return denyVerified(pushRecord(tok, argv.slice(i)));
+        return gitSubcommandInvokesGitPush(tok, argv.slice(i), depth, stdinCtx) || configPush;
       }
+      if (tok === '-c' || tok === '--config-env' || tok.startsWith('--config-env=') || (tok.startsWith('-c') && tok.length > 2)) configured = true;
       if (GIT_OPTION_TAKES_VALUE.has(tok)) {
         // `-c core.pager='git push'`: git runs the value.
-        if (tok === '-c' && i < argv.length && gitConfigInvokesGitPush(argv[i], depth, stdinCtx)) return true;
+        if (tok === '-c' && i < argv.length && gitConfigInvokesGitPush(argv[i], depth, stdinCtx)) {
+          if (!collecting()) return true;
+          configPush = true;
+        }
         i += 1;
       } else if (tok.startsWith('-c') && tok.length > 2 && gitConfigInvokesGitPush(tok.slice(2), depth, stdinCtx)) {
-        return true;
+        if (!collecting()) return true;
+        configPush = true;
       }
     }
     if (i < argv.length) {
       if (argv[i].includes(SUBST)) return denyUnverifiable();
-      if (PUSH_SUBCOMMANDS.has(argv[i])) return denyVerified();
-      return gitSubcommandInvokesGitPush(argv[i], argv.slice(i + 1), depth, stdinCtx);
+      if (PUSH_SUBCOMMANDS.has(argv[i])) return denyVerified(pushRecord(argv[i], argv.slice(i + 1)));
+      return gitSubcommandInvokesGitPush(argv[i], argv.slice(i + 1), depth, stdinCtx) || configPush;
     }
+    if (configPush) return true;
     return viaXargs ? 'stdin-args' : false; // `xargs git -C x`: subcommand still comes from stdin
   }
 
@@ -1518,9 +1549,23 @@ function hasOwnStdin(segment) {
 function commandInvokesGitPushAtDepth(command, depth, outerStdin) {
   if (depth > MAX_SHELL_DEPTH) return denyUnverifiable();
   const segments = lexSegments(command);
+  // While collecting, every segment is scanned so each push is recorded.
+  // A segment that pushes without a push read off its own argv (a nested
+  // shell, an alias, a pager, stdin) records an opaque push.
+  let denied = false;
+  const hit = (segment) => {
+    if (!collecting()) return true;
+    if (analysisCtx.directSegment !== segment) analysisCtx.pushes.push({ args: [], opaque: true });
+    analysisCtx.directSegment = null;
+    denied = true;
+    return false;
+  };
   for (const segment of segments) {
     const verdict = segmentVerdict(segment, depth, outerStdin);
-    if (verdict === true) return true;
+    if (verdict === true) {
+      if (hit(segment)) return true;
+      continue;
+    }
     if (verdict === 'stdin-args') {
       // The decisive words arrive on stdin via xargs: readable only from
       // literal sources (a heredoc, a here-string, a producer behind a pipe
@@ -1528,19 +1573,22 @@ function commandInvokesGitPushAtDepth(command, depth, outerStdin) {
       // from its input, so text containing any is opaque.
       const text = stdinText(segment);
       if (text === null) return denyUnverifiable();
-      if (stdinWordsInvokeGitPush(text)) return denyVerified();
+      if (stdinWordsInvokeGitPush(text)) {
+        denyVerified();
+        if (hit(segment)) return true;
+      }
       continue;
     }
     if (verdict === null) {
       // A shell reading its script from stdin.
       if (hasOwnStdin(segment)) {
-        if (stdinInvokesGitPush(segment, depth)) return true;
-      } else if (outerStdin && hasOwnStdin(outerStdin) && stdinInvokesGitPush(outerStdin, depth)) {
+        if (stdinInvokesGitPush(segment, depth) && hit(segment)) return true;
+      } else if (outerStdin && hasOwnStdin(outerStdin) && stdinInvokesGitPush(outerStdin, depth) && hit(segment)) {
         return true;
       }
     }
   }
-  return false;
+  return denied;
 }
 
 /**
@@ -1575,4 +1623,35 @@ function commandInvokesGitPush(command) {
   return classifyGitPushCommand(command) !== 'allow';
 }
 
-module.exports = { commandInvokesGitPush, classifyGitPushCommand, MAX_SHELL_DEPTH, MAX_WRAPPER_PEELS };
+/**
+ * Like classifyGitPushCommand, but scans the whole command and returns
+ * every push it finds. `args` are the words after `push` (options and
+ * refspecs, already unquoted). `opaque` marks a push whose words this
+ * detector cannot read in full: one inside a nested shell, a heredoc or
+ * another program's operand, an alias or plumbing (`send-pack`,
+ * `subtree push`, remote helpers), a `-c`/`--config-env` override, or
+ * words supplied by xargs. Used by github-workflow's policy, which allows a
+ * plain push and denies force, mirror and delete pushes; gt-workflow only
+ * uses the verdict.
+ *
+ * @param {string} command
+ * @returns {{verdict: 'allow' | 'verified-push' | 'unverifiable', pushes: Array<{args: string[], opaque: boolean}>}}
+ */
+function analyzeGitPushCommand(command) {
+  const ctx = { verifiedPush: false, unverifiable: false, collect: true, pushes: [], directSegment: null };
+  stdinMemo = { script: new Map(), words: new Map(), stdin: new Map(), text: new Map() };
+  analysisCtx = ctx;
+  try {
+    const denied = commandInvokesGitPushAtDepth(String(command), 0, null);
+    if (ctx.unverifiable) return { verdict: 'unverifiable', pushes: ctx.pushes };
+    if (!denied) return { verdict: 'allow', pushes: [] };
+    return { verdict: ctx.verifiedPush ? 'verified-push' : 'unverifiable', pushes: ctx.pushes };
+  } catch {
+    return { verdict: 'unverifiable', pushes: [] };
+  } finally {
+    analysisCtx = null;
+    stdinMemo = null;
+  }
+}
+
+module.exports = { commandInvokesGitPush, classifyGitPushCommand, analyzeGitPushCommand, MAX_SHELL_DEPTH, MAX_WRAPPER_PEELS };
