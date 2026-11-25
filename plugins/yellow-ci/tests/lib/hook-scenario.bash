@@ -4,7 +4,8 @@
 # read NO meaningful stdin — they derive their output from the environment:
 # the presence of .github/workflows in the cwd, the routing-summary cache under
 # $HOME/.cache/yellow-ci/, whether `gh` is available/authenticated, an
-# md5(PWD) result cache (fresh for 10 min, shown up to 1 h), and what
+# md5(PWD) result cache (fresh for 10 min, shown with its age up to 7 days;
+# a git worktree keys on its main checkout), and what
 # `gh run list` returns (`gh` only through refresh-cache.js since
 # CLAUDE-369). So a "fixture" is a named environment scenario, not a stdin
 # payload.

@@ -9,9 +9,9 @@
  *
  * The foreground never touches the network (CLAUDE-369). It reads the
  * routing cache and the last-check result cache only: a result younger than
- * FRESH_TTL_SEC is shown as is; one younger than MAX_STALE_SEC is shown and
- * refreshed; anything older (or no cache) shows the routing summary only and
- * is refreshed. The refresh (`gh auth status` + `gh run list`) runs in a
+ * FRESH_TTL_SEC is shown as is; one younger than MAX_DISPLAY_AGE_SEC is shown
+ * with its age and refreshed (CLAUDE-382); anything older (or no cache) shows
+ * the routing summary only and is refreshed. The refresh (`gh auth status` + `gh run list`) runs in a
  * detached `refresh-cache.js` process (see scheduleRefresh / refreshCache),
  * so the next session start sees the result.
  *
@@ -195,11 +195,13 @@ function sanitizeBranchName(name) {
 // the only way to change the cache's ceiling too.
 const GH_RUN_LIST_LIMIT = 3;
 
-// Result-cache ages (CLAUDE-369). Under FRESH_TTL_SEC a hit is shown with no
-// refresh; up to MAX_STALE_SEC it is shown and refreshed in the background;
-// past that it is not shown at all, only refreshed.
+// Result-cache ages (CLAUDE-369, CLAUDE-382). Under FRESH_TTL_SEC a hit is
+// shown with no refresh; up to MAX_DISPLAY_AGE_SEC it is shown with its age
+// ("as of 3 h ago") and refreshed in the background; past that it is not
+// shown at all, only refreshed. The display limit is a week, not an hour, so
+// someone who starts one session a day still sees CI failures at startup.
 const FRESH_TTL_SEC = 600;
-const MAX_STALE_SEC = 3600;
+const MAX_DISPLAY_AGE_SEC = 7 * 24 * 3600;
 
 // The `gh` calls run only in the detached refresh process, never inside the
 // hook's 3s host budget, so they get generous fixed timeouts instead of a
@@ -252,8 +254,57 @@ function ghRunList(env) {
   return { failed: false, stdout: res.stdout || '' };
 }
 
+// Read a small regular file without following a symlink or blocking on a
+// FIFO (see openNoFollow). Returns null on any failure.
+function readSmallFile(file, maxBytes) {
+  const opened = openNoFollow(file);
+  if (!opened) return null;
+  try {
+    if (!opened.st.isFile() || opened.st.size > maxBytes) return null;
+    const buf = Buffer.alloc(maxBytes);
+    const bytesRead = fs.readSync(opened.fd, buf, 0, maxBytes, 0);
+    return buf.subarray(0, bytesRead).toString('utf8');
+  } catch {
+    return null;
+  } finally {
+    try { fs.closeSync(opened.fd); } catch { /* best effort */ }
+  }
+}
+
+// The directory whose path keys the result cache (CLAUDE-382). `gh run list`
+// reports on the repository, not the checkout, so every git worktree of one
+// repository shares the main checkout's cache: a new worktree shows CI
+// failures on its first session start. A linked worktree's `.git` is a file
+// naming its gitdir, whose `commondir` points at the shared `.git`; the main
+// checkout is that directory's parent. Plain file reads, no `git` process.
+// A main checkout (`.git` directory) or anything unrecognized keys on cwd,
+// so existing caches keep their keys.
+function cacheIdentityDir(cwd) {
+  const text = readSmallFile(path.join(cwd, '.git'), 4096);
+  if (text === null) return cwd;
+  const m = /^gitdir:[ \t]*(.+?)[ \t]*$/m.exec(text);
+  if (!m) return cwd;
+  const gitdir = path.resolve(cwd, m[1]);
+  const commondir = readSmallFile(path.join(gitdir, 'commondir'), 4096);
+  if (commondir === null || !commondir.trim()) return cwd;
+  const common = path.resolve(gitdir, commondir.trim());
+  // A bare repository's worktrees have no main checkout; key on the
+  // repository itself.
+  return path.basename(common) === '.git' ? path.dirname(common) : common;
+}
+
 function cacheKeyFor(cwd) {
-  return crypto.createHash('md5').update(cwd).digest('hex').slice(0, 32);
+  return crypto.createHash('md5').update(cacheIdentityDir(cwd)).digest('hex').slice(0, 32);
+}
+
+// "12 min ago", "3 h ago", "2 days ago": coarse on purpose, the point is to
+// flag a result as old, not to time it.
+function formatAge(ageSec) {
+  const min = Math.floor(ageSec / 60);
+  if (min < 60) return `${min} min ago`;
+  const hours = Math.floor(min / 60);
+  if (hours < 48) return `${hours} h ago`;
+  return `${Math.floor(hours / 24)} days ago`;
 }
 
 // Cache-file size cap (Finding 2a), checked by readFreshOwnedFile against
@@ -284,7 +335,7 @@ const MAX_CACHE_FILE_BYTES = 8192;
 // Read the last-check result cache, refusing anything but a sanely-sized
 // regular file we own (see openNoFollow/ownedByUs above) younger than
 // maxAgeSec. A hit also carries ageSec, so the caller can tell a fresh hit
-// from a stale-but-servable one.
+// from a stale-but-servable one. nowMs is the caller's clock (tests pin it).
 // `{hit: false}` covers "no cache file", "too old", "a symlink" (rejected via
 // O_NOFOLLOW/ELOOP), "owned by someone else", and "larger than any
 // legitimate cache could be" (see MAX_CACHE_FILE_BYTES) — the caller treats
@@ -293,7 +344,7 @@ const MAX_CACHE_FILE_BYTES = 8192;
 // passed every guard but still failed to read (e.g. a transient I/O error):
 // the caller preserves the pre-existing behavior of warning and returning
 // routingSummary only, rather than retrying over the network.
-function readFreshOwnedFile(file, maxAgeSec) {
+function readFreshOwnedFile(file, maxAgeSec, nowMs) {
   const opened = openNoFollow(file);
   if (!opened) return { hit: false };
   try {
@@ -307,7 +358,7 @@ function readFreshOwnedFile(file, maxAgeSec) {
     // via readFileSync would follow the file to whatever size it has grown
     // to by then, regardless of what st.size said a moment ago.
     if (opened.st.size > MAX_CACHE_FILE_BYTES) return { hit: false };
-    const ageSec = Math.floor(Date.now() / 1000) - Math.floor(opened.st.mtimeMs / 1000);
+    const ageSec = Math.floor(nowMs / 1000) - Math.floor(opened.st.mtimeMs / 1000);
     if (ageSec >= maxAgeSec) return { hit: false };
     try {
       const buf = Buffer.alloc(MAX_CACHE_FILE_BYTES);
@@ -352,7 +403,10 @@ function writeCacheAtomic(cacheFile, content, warn) {
 // ---") is never a valid rawBranches entry, because nothing that has
 // already been through fenceReferenceOnly is ever written back into the
 // cache.
-function renderOutput(routingSummary, failureCount, rawBranches) {
+//
+// ageLabel, when set, marks a result that is no longer fresh ("3 h ago"). It
+// is built here from a number, never from cache text.
+function renderOutput(routingSummary, failureCount, rawBranches, ageLabel) {
   const uniqueBranches = [...new Set(
     rawBranches
       .map(sanitizeBranchName)
@@ -364,11 +418,12 @@ function renderOutput(routingSummary, failureCount, rawBranches) {
 
   let output = routingSummary || '';
   if (failureCount > 0) {
+    const prefix = ageLabel ? `[yellow-ci] CI (as of ${ageLabel}):` : '[yellow-ci] CI:';
     const failureMsg = branches
-      ? `[yellow-ci] CI: ${failureCount} recent failure(s) on branch(es) ` +
+      ? `${prefix} ${failureCount} recent failure(s) on branch(es) ` +
         fenceReferenceOnly('ci-branches', branches) +
         ' Use /ci:diagnose to investigate.'
-      : `[yellow-ci] CI: ${failureCount} recent failure(s) detected. Use /ci:diagnose to investigate.`;
+      : `${prefix} ${failureCount} recent failure(s) detected. Use /ci:diagnose to investigate.`;
     output = output ? `${output}\n${failureMsg}` : failureMsg;
   }
   return output;
@@ -455,22 +510,32 @@ function hasWorkflows(cwd) {
 
 // Create the marker exclusively. Reclaim an expired marker once, then let
 // the exclusive open decide which waiting process wins.
+//
+// Returns 'claimed', 'busy' (a live refresh holds it) or 'error' (the data
+// directory cannot be created or written).
 function claimRefreshMarker(dir, marker) {
   try {
     fs.mkdirSync(dir, { recursive: true });
     try {
       fs.closeSync(fs.openSync(marker, 'wx'));
-      return true;
+      return 'claimed';
     } catch (err) {
-      if (err.code !== 'EEXIST') return false;
+      if (err.code !== 'EEXIST') return 'error';
     }
-    // lstat judges a planted symlink as itself.
-    if (Date.now() - fs.lstatSync(marker).mtimeMs < REFRESH_MARKER_MAX_AGE_MS) return false;
+    // lstat judges a planted symlink as itself, and rmSync removes the link,
+    // never its target.
+    if (Date.now() - fs.lstatSync(marker).mtimeMs < REFRESH_MARKER_MAX_AGE_MS) return 'busy';
     fs.rmSync(marker, { force: true });
-    fs.closeSync(fs.openSync(marker, 'wx'));
-    return true;
   } catch {
-    return false;
+    return 'error';
+  }
+  // Two starts can both see the same expired marker. Only one exclusive
+  // open succeeds; the other finds the new marker and stands down.
+  try {
+    fs.closeSync(fs.openSync(marker, 'wx'));
+    return 'claimed';
+  } catch (err) {
+    return err.code === 'EEXIST' ? 'busy' : 'error';
   }
 }
 
@@ -501,12 +566,16 @@ function openRefreshLog(marker) {
 // each launching a refresh; refresh-cache.js removes it when done.
 // YELLOW_CI_NO_BACKGROUND_REFRESH=1 turns the launch off (tests run
 // refresh-cache.js themselves).
-function scheduleRefresh(cwd, env, key) {
-  if (env.YELLOW_CI_NO_BACKGROUND_REFRESH !== '1') {
-    const dir = newCacheDir(env);
-    const marker = path.join(dir, `refresh-${key}`);
-    if (claimRefreshMarker(dir, marker)) launchRefreshWorker(cwd, env, marker);
-  }
+//
+// An unwritable data directory would otherwise disable the refresh, and with
+// it the failure report, without a trace; it gets one stderr line instead.
+function scheduleRefresh(cwd, env, key, warn) {
+  if (env.YELLOW_CI_NO_BACKGROUND_REFRESH === '1') return;
+  const dir = newCacheDir(env);
+  const marker = path.join(dir, `refresh-${key}`);
+  const claim = claimRefreshMarker(dir, marker);
+  if (claim === 'claimed') launchRefreshWorker(cwd, env, marker);
+  else if (claim === 'error') warn(`[yellow-ci] Warning: Cannot start a CI refresh in ${dir}`);
 }
 
 function launchRefreshWorker(cwd, env, marker) {
@@ -535,13 +604,23 @@ function launchRefreshWorker(cwd, env, marker) {
 /**
  * Foreground SessionStart: cache reads only, never the network.
  *
- * @param {{cwd: string, env: NodeJS.ProcessEnv}} ctx
- * @returns {{systemMessage: string, stderr: string[]}}
+ * `now` (ms since the epoch) defaults to the real clock; tests pin it to
+ * check the cache-age boundaries exactly (CLAUDE-381). `refreshWanted` says
+ * whether this start asked for a background refresh, which
+ * YELLOW_CI_NO_BACKGROUND_REFRESH=1 may then have suppressed.
+ *
+ * @param {{cwd: string, env: NodeJS.ProcessEnv, now?: number}} ctx
+ * @returns {{systemMessage: string, stderr: string[], refreshWanted: boolean}}
  */
-function runSessionStart({ cwd, env }) {
+function runSessionStart({ cwd, env, now = Date.now() }) {
   const stderr = [];
   const warn = (line) => stderr.push(line);
-  const done = (systemMessage) => ({ systemMessage: systemMessage || '', stderr });
+  let refreshWanted = false;
+  const refresh = (key) => {
+    refreshWanted = true;
+    scheduleRefresh(cwd, env, key, warn);
+  };
+  const done = (systemMessage) => ({ systemMessage: systemMessage || '', stderr, refreshWanted });
 
   // Early exit for non-CI projects.
   if (!hasWorkflows(cwd)) return done('');
@@ -578,7 +657,7 @@ function runSessionStart({ cwd, env }) {
   // defense-in-depth (it still stops arbitrary-file disclosure via symlink
   // before any of this parsing runs).
   if (readCacheFile === newReadCacheFile) {
-    const cached = readFreshOwnedFile(readCacheFile, MAX_STALE_SEC);
+    const cached = readFreshOwnedFile(readCacheFile, MAX_DISPLAY_AGE_SEC, now);
     if (cached.hit) {
       if (cached.content === null) {
         warn(`[yellow-ci] Warning: Cannot read cache file ${readCacheFile}`);
@@ -586,8 +665,12 @@ function runSessionStart({ cwd, env }) {
       }
       const facts = parseCachedFacts(cached.content);
       if (facts) {
-        if (cached.ageSec >= FRESH_TTL_SEC) scheduleRefresh(cwd, env, key);
-        return done(renderOutput(routingSummary, facts.failureCount, facts.branches));
+        const stale = cached.ageSec >= FRESH_TTL_SEC;
+        if (stale) refresh(key);
+        return done(renderOutput(
+          routingSummary, facts.failureCount, facts.branches,
+          stale ? formatAge(cached.ageSec) : ''
+        ));
       }
       // Malformed or wrong-shape JSON: treat as a miss. Do NOT emit the raw
       // cache bytes and do NOT throw.
@@ -596,7 +679,7 @@ function runSessionStart({ cwd, env }) {
 
   // Miss (no cache, too old, legacy-only, rejected symlink, foreign owner or
   // malformed): show the routing summary now and refresh for the next start.
-  scheduleRefresh(cwd, env, key);
+  refresh(key);
   return done(routingSummary);
 }
 
@@ -623,8 +706,9 @@ function parseRefreshFacts(stdout) {
 /**
  * Background refresh, run by refresh-cache.js in a detached process: checks
  * `gh` auth, fetches recent failed runs and writes the result cache as FACTS.
- * Writes nothing when `gh` is missing, unauthenticated or the call fails, so
- * the next session start refreshes again.
+ * Writes no cache when `gh` is missing, unauthenticated or the call fails, so
+ * the next session start refreshes again; each of those exits logs one line
+ * (CLAUDE-382), which refresh-cache.js sends to refresh-<key>.log.
  *
  * @param {{cwd: string, env: NodeJS.ProcessEnv}} ctx
  * @returns {{stderr: string[]}}
@@ -635,11 +719,20 @@ function refreshCache({ cwd, env }) {
   const done = () => ({ stderr });
 
   if (!hasWorkflows(cwd)) return done();
-  if (!commandExists('gh', env)) return done();
-  if (!ghAuthOk(env)) return done();
+  if (!commandExists('gh', env)) {
+    warn('[yellow-ci] Refresh skipped: gh not found on PATH');
+    return done();
+  }
+  if (!ghAuthOk(env)) {
+    warn('[yellow-ci] Refresh skipped: gh auth status failed (not logged in, expired token, or timeout)');
+    return done();
+  }
 
   const { failed, stdout: failedJson } = ghRunList(env);
-  if (failed) return done();
+  if (failed) {
+    warn('[yellow-ci] Refresh failed: gh run list exited non-zero or timed out');
+    return done();
+  }
 
   const facts = parseRefreshFacts(failedJson);
   if (!facts) {
@@ -663,4 +756,4 @@ function refreshCache({ cwd, env }) {
   return done();
 }
 
-module.exports = { runSessionStart, refreshCache };
+module.exports = { runSessionStart, refreshCache, formatAge, cacheKeyFor };

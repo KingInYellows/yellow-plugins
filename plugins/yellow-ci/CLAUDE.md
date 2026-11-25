@@ -91,13 +91,17 @@ reaches the skill directly), plus the two reference skills:
 
 - `SessionStart` (Node runtime under `hooks/scripts/`) — Detect CI context,
   report recent failures from a result cache. The foreground never calls `gh`:
-  under 10 minutes old the cache is shown as is, up to 1 hour it is shown and
-  refreshed, older or missing it is only refreshed. The refresh
-  (`gh auth status` + `gh run list`) runs in a detached `lib/refresh-cache.js`,
-  guarded by a `refresh-<key>` marker, so the next session start shows it. Its
-  warnings go to `refresh-<key>.log`, overwritten each run. Ported from the
-  original `session-start.sh` to a dependency-free Node runtime shared across
-  hosts (`entrypoint-claude.js` / `entrypoint-codex.js` → `lib/run-hook.js` →
+  under 10 minutes old the cache is shown as is, up to 7 days it is shown with
+  its age ("as of 3 h ago") and refreshed, older or missing it is only
+  refreshed. The cache key is the main checkout's path, so every git worktree of
+  a repository shares one result. The refresh (`gh auth status` + `gh run list`)
+  runs in a detached `lib/refresh-cache.js`, guarded by a `refresh-<key>`
+  marker, so the next session start shows it. Its warnings, including why a
+  refresh was skipped (no `gh`, not logged in, `gh run list` failed), go to
+  `refresh-<key>.log`, overwritten each run. A data directory the hook cannot
+  write prints one stderr warning per session start. Ported from the original
+  `session-start.sh` to a dependency-free Node runtime shared across hosts
+  (`entrypoint-claude.js` / `entrypoint-codex.js` → `lib/run-hook.js` →
   `lib/session-start-core.js`); see "Codex Distribution" below. Carried into the
   Codex manifest. Codex 0.157.0 executes it after exact-definition trust;
   untrusted controls remain idle (see the canonical distribution doc).
