@@ -7,10 +7,16 @@ source of truth. When you add, rename or remove a command, update this page in
 the same PR.
 
 Commands come from `plugins/<name>/commands/**/*.md`. Their slash name is the
-frontmatter `name:`, which matches the path (`commands/review/pr.md` is
-`/review:pr`). Skills listed here have `user-invocable: true`; internal skills
+frontmatter `name:`, which usually follows the directory
+(`commands/review/review-pr.md` is `/review:pr`; `commands/council/council.md`
+is `/council`). Skills listed here have `user-invocable: true`; internal skills
 that only other commands or agents load are omitted. For hooks, MCP servers and
 configuration, see each plugin's `README.md` and `CLAUDE.md`.
+
+Some descriptions still say "Graphite stack" (for example `/review:all` and
+`/review:resolve-stack`), but these commands route through the active stacked-PR
+provider and work with GitHub-native stacks too. Updating that wording is
+tracked in CLAUDE-402.
 
 For how these pieces call each other, see
 [Workflow diagrams](workflow-diagrams.md).

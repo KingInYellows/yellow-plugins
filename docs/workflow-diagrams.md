@@ -47,8 +47,9 @@ flowchart TB
 ```
 
 Quality, delegate and utility plugins (`yellow-composio`, `yellow-morph`,
-`yellow-claudemod`) run on their own commands; the ones that branch or submit
-also go through the router.
+`yellow-claudemod`) run on their own commands. Remote delegates such as
+yellow-cursor's cloud agents open their own pull requests and do not use the
+router.
 
 ## Stacked-PR provider selection
 
@@ -114,9 +115,12 @@ sequenceDiagram
   end
 ```
 
-Both providers also register a `PreToolUse` hook (`check-git-push`) that denies
-raw `git push`, and a `PostToolUse` hook (`check-commit-message`) that warns on
-non-conventional commit messages.
+Both providers also register a `PreToolUse` hook (`check-git-push`) and a
+`PostToolUse` hook (`check-commit-message`) that warns on non-conventional
+commit messages. The push hooks differ: gt-workflow's denies a raw `git push`,
+because a push outside `gt submit` leaves Graphite's metadata stale.
+github-workflow's allows a plain `git push` and denies only pushes that can
+rewrite or delete a branch a stack builds on (force, delete or mirror pushes).
 
 ## Development loop (`/flow:*`)
 
@@ -206,7 +210,9 @@ sequenceDiagram
   Gate->>Risk: tier at default-branch policy
   alt low
     Gate-->>User: ready (no human approval needed)
-  else medium or high
+  else medium or high, review_approval_gate advisory (default)
+    Gate-->>User: ready, listing any missing approval
+  else medium or high, review_approval_gate enforce
     Gate-->>User: ready only with head-SHA approval or a fresh<br/>merge-approved label from an approver login
   end
 ```
