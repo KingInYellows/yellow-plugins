@@ -124,9 +124,11 @@ git add scripts/validate-marketplace.js
 # Commit
 git commit -m "Initialize personal plugin marketplace"
 
-# Push. If a stacked-PR provider plugin is enabled, submit through it instead
+# Push to your GitHub remote (create the repository and add it first:
+# git remote add origin https://github.com/<you>/<repo>.git).
+# If a stacked-PR provider plugin is enabled, submit through it instead
 # (/github-stack:submit, or gt-workflow:smart-submit for Graphite stacks).
-git push
+git push -u origin HEAD
 ```
 
 ## Next Steps

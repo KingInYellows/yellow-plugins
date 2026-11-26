@@ -64,7 +64,7 @@ to provider mapping) and `commands/stack/{status,select}.md`.
 flowchart TD
   Start(["/stack:status or any routed command"]) --> Inputs
   Inputs["Read inputs:<br/>claude plugin list --json (enabled plugins, scope)<br/>.yellow-stack.yml intent<br/>tooling probe for the intended provider only"]
-  Inputs --> M{"Admin-managed scope involved?"}
+  Inputs --> M{"Managed-scope setting conflicts?<br/>(both enabled with one managed, managed plugin<br/>against intent, or managed-disabled but enabled)"}
   M -->|yes| S1[MANAGED_CONFLICT]
   M -->|no| C{"Both providers enabled?"}
   C -->|yes| S2[CONFLICT]
@@ -77,9 +77,10 @@ flowchart TD
   T -->|no| S6[PARTIAL_TOOLING]
   T -->|"yes: gt"| RG[READY_GRAPHITE]
   T -->|"yes: gh + gh-stack >= 0.3.0 + git >= 2.36"| RH[READY_GITHUB]
+  T -->|"unknown: probe inconclusive"| RU["READY_* with toolingKnown false"]
   RG --> GT["gt-workflow skills<br/>gt-setup, smart-submit, gt-sync, ..."]
   RH --> GH["github-workflow commands<br/>/github-stack:submit, /github-stack:sync, ..."]
-  S1 & S2 & S3 & S4 & S5 & S6 --> Stop(["Stop and print detail"])
+  S1 & S2 & S3 & S4 & S5 & S6 & RU --> Stop(["Stop and print detail"])
 ```
 
 Switching providers is `/stack:select`, which shows its plan before acting:
@@ -97,11 +98,19 @@ sequenceDiagram
     State-->>Select: refused with detail
     Select-->>User: stop and explain
   else plan OK
-    State-->>Select: enable/disable command list
+    State-->>Select: ordered command list
     Select-->>User: show exact commands
-    Select->>CLI: enable github-workflow, disable gt-workflow (stop on first failure)
-    Select-->>User: run /reload-plugins
-    Select->>User: offer to write .yellow-stack.yml
+    Select->>User: Apply this provider switch?
+    alt declined
+      Select-->>User: stop, nothing changed
+    else approved
+      Select->>CLI: 1. disable gt-workflow
+      Select->>CLI: 2. install github-workflow (only if missing)
+      Select->>CLI: 3. enable github-workflow
+      Note over Select,CLI: stops at the first failed step, no retry or rollback
+      Select-->>User: run /reload-plugins
+      Select->>User: offer to write .yellow-stack.yml
+    end
   end
 ```
 
@@ -119,13 +128,12 @@ plan.
 flowchart LR
   subgraph large [Large feature]
     Spec["/flow:spec<br/>plans/specs/slug.md"] --> Decompose["/flow:decompose<br/>plans/shells/*.md"]
-    Decompose --> Pick["/flow:pick-next-shell"]
-    Pick --> Expand["/flow:expand-shell"]
+    Decompose --> Pick["/flow:pick-next-shell<br/>runs /flow:expand-shell on the next<br/>unblocked shell, then halts"]
   end
   Brainstorm["/flow:brainstorm<br/>docs/brainstorms/"] --> Plan
   Plan["/flow:plan<br/>research agents, plans/name.md"]
   Plan -.-> Deepen["/flow:deepen-plan<br/>(yellow-research)"]
-  Expand --> Work
+  Pick -->|fresh session| Work
   Plan --> Work
   Deepen -.-> Work
   Work["/flow:work"] --> FReview["/flow:review<br/>plan adherence, scope drift"]
@@ -218,8 +226,8 @@ sequenceDiagram
   participant Start as SessionStart hook
   participant Drain as Background drain (claude -p, haiku)
   participant Docs as docs/solutions/
-  Session->>Stop: session ends
-  Stop->>Ledger: write redacted pending entry
+  Session->>Stop: assistant finishes a response (session may stay open)
+  Stop->>Ledger: write redacted pending entry (transcript tail)
   Note over Ledger: /review:pr also stages learnings
   Session->>Start: next session starts
   Start->>Start: 5+ entries or oldest over 48h, and no review lock?
@@ -262,6 +270,8 @@ flowchart TD
   Main --> VP{"Pending changesets?"}
   VP -->|yes| VersionPR["changesets/action opens<br/>chore: version packages PR<br/>(changeset version + sync-manifests.js)"]
   VersionPR --> Main
-  VP -->|no| Tags["release-tags.sh: name@x.y.z and v-catalog tags"]
+  VP -->|no| TagExists{"Catalog tag already exists?"}
+  TagExists -->|yes| Noop["Nothing to do, no release"]
+  TagExists -->|no| Tags["release-tags.sh: name@x.y.z and v-catalog tags"]
   Tags --> Release["GitHub Release with tarball, SBOM, checksums"]
 ```
