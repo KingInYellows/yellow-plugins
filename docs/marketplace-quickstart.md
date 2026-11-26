@@ -124,8 +124,9 @@ git add scripts/validate-marketplace.js
 # Commit
 git commit -m "Initialize personal plugin marketplace"
 
-# Push via Graphite
-gt submit --no-interactive
+# Push. If a stacked-PR provider plugin is enabled, submit through it instead
+# (/github-stack:submit, or gt-workflow:smart-submit for Graphite stacks).
+git push
 ```
 
 ## Next Steps
@@ -304,7 +305,7 @@ You'll achieve these by following this structure and validation workflow.
   "owner": {
     "name": "your-username"
   },
-  "plugins": [{"name": "example", "source": "./plugins/example"}]
+  "plugins": [{ "name": "example", "source": "./plugins/example" }]
 }
 ```
 
