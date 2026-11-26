@@ -119,8 +119,10 @@ Both providers also register a `PreToolUse` hook (`check-git-push`) and a
 `PostToolUse` hook (`check-commit-message`) that warns on non-conventional
 commit messages. The push hooks differ: gt-workflow's denies a raw `git push`,
 because a push outside `gt submit` leaves Graphite's metadata stale.
-github-workflow's allows a plain `git push` and denies only pushes that can
-rewrite or delete a branch a stack builds on (force, delete or mirror pushes).
+github-workflow's allows a plain `git push` with literal arguments and denies
+pushes that can rewrite or delete a branch a stack builds on (force, delete or
+mirror pushes), plus any push whose target it cannot read, such as a refspec
+held in a shell variable.
 
 ## Development loop (`/flow:*`)
 
@@ -212,8 +214,10 @@ sequenceDiagram
     Gate-->>User: ready (no human approval needed)
   else medium or high, review_approval_gate advisory (default)
     Gate-->>User: ready, listing any missing approval
-  else medium or high, review_approval_gate enforce
+  else medium, review_approval_gate enforce
     Gate-->>User: ready only with head-SHA approval or a fresh<br/>merge-approved label from an approver login
+  else high, review_approval_gate enforce
+    Gate-->>User: unknown at best: also needs a cross-lineage bot review<br/>on the head, and a fresh review cannot be proven yet
   end
 ```
 

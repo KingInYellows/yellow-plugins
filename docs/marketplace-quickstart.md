@@ -126,8 +126,8 @@ git commit -m "Initialize personal plugin marketplace"
 
 # Push to your GitHub remote (create the repository and add it first:
 # git remote add origin https://github.com/<you>/<repo>.git).
-# If a stacked-PR provider plugin is enabled, submit through it instead
-# (/github-stack:submit, or gt-workflow:smart-submit for Graphite stacks).
+# Run this in your own terminal: inside Claude Code, gt-workflow's push hook
+# denies a raw git push.
 git push -u origin HEAD
 ```
 
