@@ -94,7 +94,11 @@ function buildSimpleTarget(blocks: string[]): string {
 function seedAllTargets(tmp: string, focusBlock: string): void {
   // Snippets — canonical content the script will compare against.
   write(tmp, 'scripts/snippets/install-helpers.sh', `${HELPERS_BODY}\n`);
-  write(tmp, 'scripts/snippets/install-version-gte.sh', `${VERSION_GTE_BODY}\n`);
+  write(
+    tmp,
+    'scripts/snippets/install-version-gte.sh',
+    `${VERSION_GTE_BODY}\n`
+  );
   write(tmp, 'scripts/snippets/yellow-core-root.sh', `${ROOT_BODY}\n`);
   write(tmp, 'scripts/snippets/plugin-list-json.sh', `${LIST_BODY}\n`);
 
@@ -157,7 +161,10 @@ describe('sync-shell-snippets.js', () => {
   });
 
   it('--check exits 1 and names the drifted target', () => {
-    seedAllTargets(tmp, generatedBlock('install-helpers', 'readonly TAMPERED=1'));
+    seedAllTargets(
+      tmp,
+      generatedBlock('install-helpers', 'readonly TAMPERED=1')
+    );
     const result = run(tmp, ['--check']);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('drift');
@@ -204,8 +211,22 @@ describe('sync-shell-snippets.js', () => {
     expect(run(tmp, ['--check']).status).toBe(0);
   });
 
+  it('refuses a block whose end sentinel is missing before the next block', () => {
+    seedAllTargets(tmp, generatedBlock('install-helpers', HELPERS_BODY));
+    const target = 'plugins/yellow-linear/commands/linear/delegate.md';
+    const good = generatedBlock('plugin-list-json', LIST_BODY);
+    const begin = good.split('\n')[0];
+    const body = `${begin}\nopen block\n\nkeep me\n\n${good}\n`;
+    write(tmp, target, body);
+    expect(run(tmp).status).toBe(1);
+    expect(readFileSync(join(tmp, target), 'utf8')).toBe(body);
+  });
+
   it('apply mode (no flag) rewrites a drifted block back to canonical content', () => {
-    seedAllTargets(tmp, generatedBlock('install-helpers', 'readonly TAMPERED=1'));
+    seedAllTargets(
+      tmp,
+      generatedBlock('install-helpers', 'readonly TAMPERED=1')
+    );
     const result = run(tmp); // no --check → apply mode
     expect(result.status).toBe(0);
     const after = readFileSync(join(tmp, FOCUS_TARGET), 'utf8');

@@ -185,7 +185,11 @@ On "Cancel", stop. Nothing has run.
 ## Step 5: Execute, in order, stopping at the first failure
 
 Run each step's `command` exactly as printed, one per Bash call, in plan
-order. After each, record success or failure.
+order, from the repository root that Step 3 read the plan from:
+`cd "$(git rev-parse --show-toplevel)" && <command>` (outside a repository,
+run the command alone). A project or local scope write then lands in the
+same `.claude/` that `/stack:status` reads. After each, record success or
+failure.
 
 If a step fails:
 

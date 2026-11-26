@@ -128,7 +128,10 @@ function regenerateBlock(content, name) {
     // documents the sentinel format must not be able to truncate the
     // generated block on the next run (gemini/copilot review #534).
     const endIdx = content.indexOf(end, beginIdx + begin.length);
-    if (endIdx === -1) {
+    const nextBegin = content.indexOf(begin, beginIdx + begin.length);
+    // A begin with no end before the next begin is malformed: pairing it
+    // with a later block's end would delete everything in between.
+    if (endIdx === -1 || (nextBegin !== -1 && nextBegin < endIdx)) {
       replaced = 0;
       break;
     }
@@ -152,7 +155,9 @@ function main() {
   for (const [relPath, snippetNames] of Object.entries(TARGETS)) {
     const absPath = path.join(ROOT, relPath);
     if (!fs.existsSync(absPath)) {
-      console.error(`[sync-shell-snippets] Error: target not found: ${relPath}`);
+      console.error(
+        `[sync-shell-snippets] Error: target not found: ${relPath}`
+      );
       errorCount++;
       continue;
     }
