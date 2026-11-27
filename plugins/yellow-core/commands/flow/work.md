@@ -1009,7 +1009,7 @@ it at a Phase 1b checkpoint.
 
 ## Phase 4: Ship It
 
-**Objective:** Submit work for review via Graphite.
+**Objective:** Submit work for review through the provider resolved in Phase 1 step 4.
 
 **Stack mode:** In stack mode, each item was already submitted during Phase 1b
 step 5. Phase 4 becomes a summary phase:

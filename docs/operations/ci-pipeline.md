@@ -91,61 +91,46 @@ pending queue and are never automatically cancelled.
 
 ## Job Dependency Graph
 
-The validation workflow orchestrates 9 jobs with strategic dependencies to
-optimize for both parallelism and critical path execution:
+The validation workflow (`.github/workflows/validate-schemas.yml`) runs 21
+jobs. Jobs with no `needs` start in parallel; arrows show `needs` edges.
+`ci-status` is the required gate (`CI Status Summary`). Jobs marked "not
+gated" are not among its dependencies.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     CRITICAL PATH (≤60s)                        │
-│                                                                 │
-│  validate-schemas (matrix: 4 targets, parallel execution)      │
-│  ├── marketplace   (validates .claude-plugin/marketplace.json)  │
-│  ├── plugins       (validates all plugins/**/plugin.json)       │
-│  ├── contracts     (validates api/cli-contracts/*.json)         │
-│  └── examples      (validates examples/*.json)                  │
-│                                                                 │
-│  Timeout: 2 minutes per target                                 │
-│  Metrics: yellow_plugins_ci_duration_seconds{stage=            │
-│           "schema_validation", target="..."}                    │
-└─────────────────────────────────────────────────────────────────┘
-                                  │
-                  ┌───────────────┴───────────────┬────────────────┐
-                  │                               │                │
-                  ↓                               ↓                ↓
-    ┌──────────────────────────┐   ┌──────────────────┐  ┌─────────────────┐
-    │ lint-and-typecheck       │   │ contract-drift   │  │ security-audit  │
-    │                          │   │                  │  │                 │
-    │ Timeout: 3 min           │   │ Timeout: 3 min   │  │ Timeout: 5 min  │
-    │ Depends: none            │   │ Depends: validate│  │ Depends: none   │
-    │ (parallel)               │   │          -schemas│  │ (parallel)      │
-    └────────────┬─────────────┘   └──────────────────┘  └─────────────────┘
-                 │
-                 ↓
-    ┌──────────────────────────┐
-    │ unit-tests               │
-    │                          │
-    │ Timeout: 5 min           │
-    │ Depends: lint-typecheck  │
-    └────────────┬─────────────┘
-                 │
-                 ↓
-    ┌──────────────────────────┐
-    │ integration-tests        │
-    │                          │
-    │ Timeout: 8 min           │
-    │ Depends: unit-tests      │
-    └────────────┬─────────────┘
-                 │
-      ┌──────────┴──────────┬─────────────────┬────────────────┐
-      │                     │                 │                │
-      ↓                     ↓                 ↓                ↓
-┌──────────────┐  ┌──────────────┐  ┌────────────────┐  ┌────────────┐
-│ build        │  │ report-      │  │ ci-status      │  │            │
-│ (main only)  │  │ metrics      │  │ (final gate)   │  │            │
-│              │  │              │  │                │  │            │
-│ Timeout: 5m  │  │ Always runs  │  │ Always runs    │  │            │
-│ Depends: all │  │ Depends: all │  │ Depends: all   │  │            │
-└──────────────┘  └──────────────┘  └────────────────┘  └────────────┘
+No dependencies (start immediately)
+├── validate-schemas            matrix: marketplace, plugins, contracts,
+│                               examples, solutions, authoring, plans,
+│                               codex, cursor, generated, shell-compat
+├── lint-and-typecheck
+├── security-audit
+├── validate-versions
+├── changeset-check
+├── eval-offline
+├── claude-plugin-validate
+├── codex-install-verification  matrix: ubuntu-latest, windows-latest (not gated)
+└── validate-solutions-advisory (not gated)
+
+validate-schemas
+├──→ contract-drift
+├──→ plugin-shell-tests
+├──→ plugin-shell-tests-advisory (not gated)
+├──→ yellow-review-shell-tests   matrix: shard 1-4
+├──→ ruvector-shell-tests        (not gated)
+└──→ shell-compat-tests
+
+lint-and-typecheck ──→ unit-tests ──→ integration-tests
+
+validate-schemas + lint-and-typecheck + unit-tests ──→ build ──→ goal-engine-compat
+
+report-metrics   needs: validate-schemas, validate-versions, lint-and-typecheck,
+                 unit-tests, integration-tests, contract-drift, security-audit,
+                 build, changeset-check, plugin-shell-tests
+
+ci-status        needs: validate-schemas, validate-versions, lint-and-typecheck,
+(required gate)  unit-tests, integration-tests, contract-drift, security-audit,
+                 build, changeset-check, plugin-shell-tests,
+                 yellow-review-shell-tests, shell-compat-tests,
+                 goal-engine-compat, eval-offline, claude-plugin-validate
 ```
 
 **Job Execution Characteristics:**

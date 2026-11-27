@@ -206,7 +206,8 @@ follow Step 3 instead.
 
 **`READY_GRAPHITE`** — the active provider is `gt-workflow`. Dispatch
 Graphite-owned work there (for example `/gt-workflow:smart-submit`, `/gt-workflow:gt-sync`,
-`/gt-workflow:gt-stack-plan`).
+`/gt-workflow:gt-stack-plan`; `/flow:plan` sends stack decomposition there
+only on this state and to yellow-core's `stack-decompose` otherwise).
 
 **`READY_GITHUB`** — the active provider is `github-workflow`. Dispatch
 GitHub-owned work to its `github-stack:*` command surface (for example
