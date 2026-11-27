@@ -94,14 +94,18 @@ reaches the skill directly), plus the two reference skills:
   under 10 minutes old the cache is shown as is, up to 7 days it is shown with
   its age ("as of 3 h ago") and refreshed, older or missing it is only
   refreshed. The cache key is the main checkout's path, so every git worktree of
-  a repository shares one result. The refresh (`gh auth status` + `gh run list`)
-  runs in a detached `lib/refresh-cache.js`, guarded by a `refresh-<key>`
-  marker, so the next session start shows it. Its warnings, including why a
-  refresh was skipped (no `gh`, not logged in, `gh run list` failed), go to
-  `refresh-<key>.log`, overwritten each run. A data directory the hook cannot
-  write prints one stderr warning per session start. Ported from the original
-  `session-start.sh` to a dependency-free Node runtime shared across hosts
-  (`entrypoint-claude.js` / `entrypoint-codex.js` → `lib/run-hook.js` →
+  a repository shares one result. A worktree's `.git` file counts only when its
+  gitdir's back-pointer names that checkout; a `--separate-git-dir` checkout
+  keys on its git dir; a set `GH_REPO` is part of the key; and the cache stores
+  an md5 of the `origin` URL, so a different repository re-cloned at the same
+  path does not show the old one's result. The refresh (`gh auth status` +
+  `gh run list`) runs in a detached `lib/refresh-cache.js`, guarded by a
+  `refresh-<key>` marker, so the next session start shows it. Its warnings,
+  including why a refresh was skipped (no `gh`, not logged in, `gh run list`
+  failed), go to `refresh-<key>.log`, overwritten each run. A data directory the
+  hook cannot write prints one stderr warning per session start. Ported from the
+  original `session-start.sh` to a dependency-free Node runtime shared across
+  hosts (`entrypoint-claude.js` / `entrypoint-codex.js` → `lib/run-hook.js` →
   `lib/session-start-core.js`); see "Codex Distribution" below. Carried into the
   Codex manifest. Codex 0.157.0 executes it after exact-definition trust;
   untrusted controls remain idle (see the canonical distribution doc).
