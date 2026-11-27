@@ -648,9 +648,11 @@ Schema migrations if applicable.
    - Decompose into stacked PRs: invoke `skill: "stack-provider-router"` and
      read `state` and `toolingKnown`. On `READY_GRAPHITE` with `toolingKnown`
      true, invoke `skill: "gt-workflow:gt-stack-plan"` (it also applies the `.graphite.yml`
-     branch prefix). In every other case, invoke `skill: "stack-decompose"`;
-     decomposition is plan-only and runs no provider command, so it needs no
-     ready provider. Pass the plan file path as args either way.
+     branch prefix). In every other state, including the router's stop
+     states, do not stop: invoke `skill: "stack-decompose"`. Here the router
+     only classifies; decomposition is plan-only and runs no provider command,
+     so it needs no ready provider, and `/flow:work` enforces the provider
+     later. Pass the plan file path as args either way.
    - Create GitHub issue: `gh issue create --title "..." --body-file plans/<name>.md`
    - Simplify: Rewrite plan with simpler template
    - Something else: Ask for clarification
