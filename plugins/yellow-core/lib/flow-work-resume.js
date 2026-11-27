@@ -371,6 +371,17 @@ function classifyStackItem({
     // The branch was deleted after the merge (sync prune, auto-delete). Tick
     // the item only when this checkout built the PR head; otherwise it may
     // be an older PR that reused the branch name.
+    // Only a merge into trunk lets the next item restack on trunk. A PR
+    // merged into its parent branch leaves its code off trunk.
+    const intoTrunk = pr.baseRefName === (trunk || base);
+    if (!intoTrunk) {
+      return {
+        status: 'MISMATCH',
+        localBranch,
+        pr: summary,
+        detail: `merged PR #${pr.number} was merged into ${pr.baseRefName}, not trunk, and ${branch} is gone; check where its code landed, then tick the row by hand`,
+      };
+    }
     if (typeof pr.headRefOid === 'string' && inReflog(pr.headRefOid)) {
       return {
         status: 'SUBMITTED',

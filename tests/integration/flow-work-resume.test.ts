@@ -560,6 +560,21 @@ describe('stack-item (CLAUDE-385)', () => {
     });
   });
 
+  it('a deleted branch whose PR merged into its parent, not trunk, is MISMATCH', () => {
+    stubGh([deleteFeatOne({ state: 'MERGED', baseRefName: 'feat/zero' })]);
+    const result = cli([
+      'stack-item',
+      '--branch',
+      'feat/one',
+      '--base',
+      'feat/zero',
+      '--trunk',
+      'main',
+    ]);
+    expect(result).toMatchObject({ status: 'MISMATCH', localBranch: false });
+    expect(String(result.detail)).toContain('not trunk');
+  });
+
   it('a merged PR this checkout never built is MISMATCH when its branch is gone (CLAUDE-399)', () => {
     stubGh([deleteFeatOne({ state: 'MERGED', headRefOid: 'a'.repeat(40) })]);
     const result = cli([
