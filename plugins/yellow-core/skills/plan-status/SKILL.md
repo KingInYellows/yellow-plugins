@@ -1,6 +1,7 @@
 ---
 name: plan-status
-description: 'Show a per-file checkbox progress dashboard of plans/ (open) and plans/complete/ (archived) plan documents. Use when reviewing which plans are ready to archive or checking work-in-flight at a glance.'
+# prettier-ignore
+description: "Use when a workflow needs per-file checkbox progress for plans/ (open) and plans/complete/ (archived), such as which plans are ready to archive."
 user-invocable: false
 ---
 

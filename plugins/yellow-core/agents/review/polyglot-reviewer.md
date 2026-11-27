@@ -1,6 +1,7 @@
 ---
 name: polyglot-reviewer
-description: "Language-idiomatic code reviewer for TypeScript, Python, Rust, and Go. Ensures code follows language-specific best practices, idioms, and conventions. Use when reviewing code in multi-language codebases or checking language-specific patterns."
+# prettier-ignore
+description: "Use when reviewing TypeScript, Python, Rust or Go for language idioms and conventions, especially in multi-language codebases."
 model: sonnet
 effort: medium
 background: true

@@ -1,6 +1,7 @@
 ---
 name: flow:expand-shell
-description: Expand one shell from plans/shells/ into a concrete checkbox plan in plans/, verifying Consumes against the live codebase, then deleting the shell only after approval. Run /flow:work on the resulting plan next.
+# prettier-ignore
+description: "Use when turning one shell from plans/shells/ into a checkbox plan in plans/. Verifies its Consumes against the live code and deletes the shell only after approval; run /flow:work next."
 argument-hint: '[shell path]'
 allowed-tools:
   - Bash

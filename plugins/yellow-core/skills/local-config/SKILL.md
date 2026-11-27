@@ -1,6 +1,7 @@
 ---
 name: local-config
-description: "Defines the yellow-plugins.local.md per-project config file schema. Use when authoring commands that should accept per-project overrides for review pipeline behavior, reviewer set narrowing, depth controls, or focus-area filtering."
+# prettier-ignore
+description: "Use when authoring a command that accepts per-project overrides from yellow-plugins.local.md (reviewer set, depth, focus areas). Defines that file's schema."
 user-invocable: false
 ---
 

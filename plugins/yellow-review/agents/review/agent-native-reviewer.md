@@ -1,6 +1,7 @@
 ---
 name: agent-native-reviewer
-description: "Reviews code to ensure agent-native parity — any action a user can take, an agent can also take. Reviews UI/agent action parity, context parity, shared workspace patterns, primitive-vs-workflow tool design, and dynamic context injection in system prompts. Use when reviewing PRs that introduce or modify UI features, agent tool definitions, system prompts, or LLM-integration scaffolding."
+# prettier-ignore
+description: "Use when a PR adds or changes UI features, agent tool definitions, system prompts or LLM scaffolding. Checks that an agent can take every action and see every context a user can (shared workspace, primitives over workflows, dynamic context)."
 model: sonnet
 effort: medium
 background: true

@@ -1,6 +1,7 @@
 ---
 name: stack-traversal
-description: "Internal reference for the bottom-up Graphite stack-traversal procedure shared by /review:all and /review:resolve-stack. Use when a yellow-review command needs to walk a Graphite stack PR by PR in dependency order."
+# prettier-ignore
+description: "Use when a yellow-review command must walk a stack PR by PR, bottom-up in dependency order. Internal procedure shared by /review:all and /review:resolve-stack."
 user-invocable: false
 ---
 

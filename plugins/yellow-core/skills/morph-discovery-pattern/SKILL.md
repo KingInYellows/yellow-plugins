@@ -1,6 +1,7 @@
 ---
 name: morph-discovery-pattern
-description: "Morph discovery + fallback pattern — discover edit_file and warpgrep at runtime via ToolSearch, prefer them for large edits and intent-based search, silently fall back to Edit/Grep when yellow-morph is missing. Use when authoring agents that edit files or run semantic searches."
+# prettier-ignore
+description: "Use when authoring an agent that edits files or searches code: discover morph's edit_file and warpgrep via ToolSearch, prefer them for large edits and intent search, and fall back silently to Edit and Grep when yellow-morph is absent."
 user-invocable: false
 ---
 

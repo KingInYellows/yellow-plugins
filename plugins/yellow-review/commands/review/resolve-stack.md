@@ -1,7 +1,7 @@
 ---
 name: review:resolve-stack
 # prettier-ignore
-description: "Walk a Graphite stack bottom-up and run /review:resolve on every open PR fully autonomously — no prompts, pushing and restacking as it goes. Use when you have unresolved reviewer comments across a multi-PR stack and want them all addressed in one unattended pass."
+description: "Use when unresolved review comments span a multi-PR stack and should all be addressed in one unattended pass. Walks the stack bottom-up, running /review:resolve on each open PR and pushing and restacking without prompts."
 argument-hint: ''
 allowed-tools:
   - Bash

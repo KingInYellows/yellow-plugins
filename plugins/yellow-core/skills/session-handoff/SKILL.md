@@ -1,6 +1,7 @@
 ---
 name: session-handoff
-description: "Write a validated session-handoff note at plans/handoff/<YYYY-MM-DD>-<slug>.md, or resume from an explicitly named one after a read-only preflight. Use when the user says \"create a handoff\", \"save session state\", \"handoff before compact\", \"pick up where we left off\", or names a plans/handoff/ file to resume, or to check remaining context mid-task via handoff.sh context. Shell code measures repository, worktree, HEAD, dirty fingerprint and source session into the note; the narrative is model-authored reference data. Not the shell halt pattern — /flow:pick-next-shell halts by design after writing its expansion artifact and needs no handoff; use this for free-form session state only."
+# prettier-ignore
+description: "Use when the user says \"create a handoff\", \"save session state\", \"handoff before compact\" or \"pick up where we left off\", names a plans/handoff/ file to resume, or wants remaining context checked (handoff.sh context). Writes a validated note to plans/handoff/<YYYY-MM-DD>-<slug>.md, or resumes one after a read-only preflight. Not needed after /flow:pick-next-shell, which halts by design."
 user-invocable: true
 ---
 

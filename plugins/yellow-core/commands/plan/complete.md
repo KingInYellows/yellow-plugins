@@ -1,6 +1,7 @@
 ---
 name: plan:complete
-description: 'Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies merged-PR evidence via file-commit provenance (with a commit-subject fallback for merge-queue PRs), then a strict slug match, then a loose token-coverage fallback. Use when a plan is fully shipped and ready to move from plans/ to plans/complete/.'
+# prettier-ignore
+description: "Use when a plan in plans/ is fully shipped and should move to plans/complete/. Refuses while task boxes are unchecked or no merged PR is found (file-commit provenance, then commit-subject, slug and token-coverage fallbacks)."
 argument-hint: '<plan-filename>'
 allowed-tools:
   - Bash

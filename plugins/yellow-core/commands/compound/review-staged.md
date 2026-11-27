@@ -1,6 +1,7 @@
 ---
 name: compound:review-staged
-description: Manually drain the compound-staging ledger ahead of the SessionStart auto-drain threshold. Use when you want to flush pending session-transcript entries to docs/solutions/ + MEMORY.md right now (e.g., before context window cycles) without waiting for count >= 5 or oldest > 48h.
+# prettier-ignore
+description: "Use when pending compound-staging entries should go to docs/solutions/ and MEMORY.md now, without waiting for the SessionStart auto-drain (5 entries or 48 h). Drains the ledger by hand."
 argument-hint: ''
 allowed-tools:
   - Bash

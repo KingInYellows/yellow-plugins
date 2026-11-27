@@ -1,6 +1,7 @@
 ---
 name: brainstorming
-description: Reference guide for iterative brainstorm dialogues — question techniques, YAGNI, approach exploration, and research escalation. Use when running /flow:brainstorm or authoring brainstorm-style agents.
+# prettier-ignore
+description: "Use when running /flow:brainstorm or authoring brainstorm-style agents. Reference for question techniques, YAGNI, approach exploration and research escalation."
 user-invocable: false
 ---
 

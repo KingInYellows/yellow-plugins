@@ -1,6 +1,7 @@
 ---
 name: statusline:setup
-description: "Generate and install an adaptive Python statusline for yellow-plugins. Auto-detects installed plugins and their MCP servers, previews the result, and writes to ${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json on confirmation; `observer enable|disable [--yes]` and `observer status` manage the opt-in context observer alone. Use when setting up or refreshing the yellow statusline, or turning the context observer on or off; re-run after installing new plugins."
+# prettier-ignore
+description: "Use when setting up or refreshing the yellow-plugins statusline (re-run after installing plugins), or turning the context observer on or off with `observer enable|disable [--yes]` or `observer status`. Detects installed plugins and MCP servers, previews, and writes settings.json only on confirmation."
 argument-hint: '[observer [enable|disable [--yes] | status]]'
 allowed-tools:
   - Bash

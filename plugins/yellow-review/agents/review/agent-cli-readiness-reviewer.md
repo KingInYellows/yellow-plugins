@@ -1,6 +1,7 @@
 ---
 name: agent-cli-readiness-reviewer
-description: "Reviews CLI source code, plans, or specs for AI agent readiness using a 7-principle severity-based rubric (Blocker / Friction / Optimization). Distinguishes whether a CLI is merely usable by agents or genuinely optimized for them: non-interactive defaults, structured output, actionable errors, safe retries, bounded output, composability, and pipeline-friendly behavior. Use when reviewing PRs that touch CLI command surface, argument parsers, output formatters, or design documents proposing a CLI."
+# prettier-ignore
+description: "Use when reviewing CLI source, a plan or a spec for how well agents can drive the CLI. Rates 7 principles (non-interactive defaults, structured output, actionable errors, safe retries, bounded output, composability, pipelines) as Blocker, Friction or Optimization."
 model: opus
 effort: high
 background: true

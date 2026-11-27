@@ -1,6 +1,7 @@
 ---
 name: flow:decompose
-description: Decompose a spec from plans/specs/ into dependency-ordered shell files in plans/shells/, enforcing R-id coverage and depends_on traceability. Run /flow:pick-next-shell next to start implementing.
+# prettier-ignore
+description: "Use when a spec in plans/specs/ is ready to split into work. Writes dependency-ordered shells to plans/shells/ with R-id coverage and depends_on traceability; run /flow:pick-next-shell next."
 argument-hint: '[spec path or slug]'
 allowed-tools:
   - Bash

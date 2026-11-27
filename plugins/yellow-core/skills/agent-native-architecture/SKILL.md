@@ -1,6 +1,7 @@
 ---
 name: agent-native-architecture
-description: "Reference for agent-native architecture principles: action parity, context parity, shared workspace, primitives over workflows, and dynamic context injection. Use when authoring agent integrations or designing tool surfaces."
+# prettier-ignore
+description: "Use when designing agent integrations or tool surfaces. Reference for action parity, context parity, shared workspace, primitives over workflows and dynamic context injection."
 user-invocable: false
 ---
 

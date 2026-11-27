@@ -1,6 +1,7 @@
 ---
 name: review:setup
-description: "Validate review command prerequisites and optional yellow-core integration. Use when first installing the plugin or when review commands fail before analysis begins."
+# prettier-ignore
+description: "Use when first installing yellow-review, or when review commands fail before analysis starts. Checks prerequisites and the optional yellow-core integration."
 argument-hint: ''
 allowed-tools:
   - Bash

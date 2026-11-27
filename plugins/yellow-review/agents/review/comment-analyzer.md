@@ -1,6 +1,7 @@
 ---
 name: comment-analyzer
-description: "Conditional code-review persona, selected when the diff contains doc-comment markers (/**, triple-quoted docstrings, doc annotations) or modifies .md documentation. Verifies comments accurately reflect the code they describe and flags comment rot."
+# prettier-ignore
+description: "Use when a diff adds doc comments (/**, docstrings, doc annotations) or edits .md docs; review:pr selects it. Checks comments match the code and flags comment rot."
 model: haiku
 effort: medium
 background: true

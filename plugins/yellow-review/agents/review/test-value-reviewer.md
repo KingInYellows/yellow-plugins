@@ -1,7 +1,7 @@
 ---
 name: test-value-reviewer
 # prettier-ignore
-description: "Simplify-pass persona that finds tests which cost maintenance without protecting anything: false-confidence, implementation-coupled, duplicate, test-only-seam and restated-inventory tests. Use when /flow:work's simplify pass dispatches it on a branch diff that adds or changes tests; review:pr does not select it."
+description: "Use when /flow:work's simplify pass dispatches it on a branch diff that adds or changes tests; review:pr does not select it. Finds tests that cost upkeep but protect nothing: false-confidence, implementation-coupled, duplicate, test-only-seam, restated-inventory."
 model: sonnet
 effort: medium
 background: true

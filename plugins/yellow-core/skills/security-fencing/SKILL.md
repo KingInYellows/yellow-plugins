@@ -1,6 +1,7 @@
 ---
 name: security-fencing
-description: "Canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files). Use when authoring an agent that reads untrusted input — copy the appropriate variant verbatim into the agent body; only pure output-only agents (no file reading, no untrusted input) are exempt."
+# prettier-ignore
+description: "Use when authoring an agent that reads untrusted input (source code, CI logs, workflow files, PR comments): copy the matching prompt-injection hardening block verbatim into its body. Only output-only agents that read nothing untrusted are exempt."
 user-invocable: false
 ---
 

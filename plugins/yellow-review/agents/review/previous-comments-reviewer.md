@@ -1,7 +1,7 @@
 ---
 name: previous-comments-reviewer
 # prettier-ignore
-description: "Conditional code-review persona that checks earlier review feedback on the PR was actually addressed, including threads marked resolved. Use when /review:pr reviews a PR that already has reviews or comments; review:pr selects it automatically and never on a PR without prior feedback."
+description: "Use when /review:pr reviews a PR that already has reviews or comments; selected automatically, never on a PR without prior feedback. Checks that earlier feedback was addressed, including threads marked resolved."
 model: sonnet
 effort: medium
 background: true

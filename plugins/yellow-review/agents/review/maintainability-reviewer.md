@@ -1,6 +1,7 @@
 ---
 name: maintainability-reviewer
-description: "Always-on code-review persona. Reviews code for premature abstraction, unnecessary indirection, dead code, coupling between unrelated modules, and naming that obscures intent. Use when reviewing any PR — selected automatically by review:pr alongside the other always-on personas."
+# prettier-ignore
+description: "Use on every PR (always-on in review:pr). Flags premature abstraction, needless indirection, dead code, coupling between unrelated modules and names that hide intent."
 model: sonnet
 effort: medium
 experimental:

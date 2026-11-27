@@ -1,6 +1,7 @@
 ---
 name: pr-comment-resolver
-description: "Implements a single coherent fix for a cluster of related PR review comments (same file region). Use when spawned in parallel by /review:resolve to reconcile a cluster of unresolved review threads by reading the file region, understanding each comment, and applying one consolidated edit. It also proposes a per-thread disposition (fixed, addressed, oos, disagree or unclear) in THREAD lines and has no shell."
+# prettier-ignore
+description: "Use when /review:resolve spawns it for one cluster of related review threads in the same file region. Reads the region, applies one consolidated fix, and returns a THREAD line per thread (fixed, addressed, oos, disagree or unclear); it has no shell."
 model: sonnet
 effort: medium
 background: true

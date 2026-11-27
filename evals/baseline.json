@@ -580,9 +580,9 @@
           "split": "train",
           "q": "Can you do a thorough code review of PR #42 in this repo?",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-review--review-pr--p02",
@@ -602,9 +602,9 @@
           "split": "train",
           "q": "Please review https://github.com/acme/widgets/pull/731 and post what you find.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-review--review-pr--p04",
@@ -613,9 +613,9 @@
           "split": "train",
           "q": "I just opened a PR from my branch feature/rate-limit. Give it a proper review.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-review--review-pr--p05",
@@ -635,9 +635,9 @@
           "split": "heldout",
           "q": "Look over pull request #2290 for bugs, security problems and test gaps.",
           "runs": 3,
-          "fired": 1,
-          "rate": 0.3333333333333333,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-review--review-pr--p07",
@@ -646,8 +646,8 @@
           "split": "heldout",
           "q": "Before my teammate approves it, can you review PR 57 end to end?",
           "runs": 3,
-          "fired": 2,
-          "rate": 0.6666666666666666,
+          "fired": 3,
+          "rate": 1,
           "pass": true
         },
         {
@@ -750,12 +750,12 @@
           "pass": true
         }
       ],
-      "recall": 0.5,
+      "recall": 1,
       "precision": 1,
       "specificity": 1,
-      "accuracy": 0.75,
-      "heldoutAccuracy": 0.8333333333333334,
-      "meanTriggerRatePositive": 0.5,
+      "accuracy": 1,
+      "heldoutAccuracy": 1,
+      "meanTriggerRatePositive": 1,
       "meanTriggerRateNegative": 0
     }
   }

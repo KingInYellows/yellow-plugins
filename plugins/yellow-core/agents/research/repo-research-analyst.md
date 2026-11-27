@@ -1,6 +1,7 @@
 ---
 name: repo-research-analyst
-description: "Expert repository research analyst. Analyzes repository structure, documentation, conventions, and implementation patterns. Use when exploring unfamiliar codebases or auditing existing projects."
+# prettier-ignore
+description: "Use when exploring an unfamiliar codebase or auditing a project: structure, docs, conventions and implementation patterns."
 model: sonnet
 effort: medium
 background: true

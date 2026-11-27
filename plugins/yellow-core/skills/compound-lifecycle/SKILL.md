@@ -1,6 +1,7 @@
 ---
 name: compound-lifecycle
-description: "Audit, refresh, and consolidate `docs/solutions/` to keep the institutional knowledge catalog from rotting. Use when a `docs/solutions/` sweep is needed or after `knowledge-compounder` flags an older entry as superseded."
+# prettier-ignore
+description: "Use when docs/solutions/ needs a sweep, or knowledge-compounder flags an older entry as superseded. Audits, refreshes and consolidates entries so the catalog does not rot."
 user-invocable: true
 ---
 

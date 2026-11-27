@@ -1,6 +1,7 @@
 ---
 name: stack:select
-description: 'Select the active stacked-PR provider (graphite or github) at user, project, or local scope — shows the exact commands first, enables one provider, disables the other, and refuses managed-scope conflicts. Use when choosing or switching stacked-PR providers.'
+# prettier-ignore
+description: "Use when choosing or switching the stacked-PR provider (graphite or github) at user, project or local scope. Shows the commands first, enables one provider, disables the other, and refuses managed-scope conflicts."
 argument-hint: '[graphite|github] [--scope user|project|local]'
 allowed-tools:
   - Bash

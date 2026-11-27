@@ -1,6 +1,7 @@
 ---
 name: plugin-contract-reviewer
-description: "Conditional code-review persona, selected when the diff touches plugin manifest fields (plugin.json), agent/command/skill frontmatter, MCP tool registrations, hook contracts, or any other surface a downstream installation depends on. Reviews for breaking changes to the plugin's public surface — subagent_type renames, command/skill name renames, MCP tool name changes, plugin.json schema field changes, hook output contract changes, frontmatter field renames. Use when reviewing PRs touching `plugins/*/.claude-plugin/plugin.json`, `plugins/*/agents/**/*.md`, `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`, or `plugins/*/hooks/`."
+# prettier-ignore
+description: "Use when a diff touches a plugin's public surface: plugin.json, agent, command or skill frontmatter, MCP tool registrations or hooks/. Conditional persona that flags breaking renames and contract changes (subagent_type, command and skill names, MCP tool names, manifest fields, hook output)."
 model: sonnet
 effort: medium
 background: true
