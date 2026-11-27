@@ -1,6 +1,7 @@
 ---
 name: flow:plan
-description: Transform feature descriptions into structured implementation plans
+# prettier-ignore
+description: "Use when the user asks for an implementation plan, a step-by-step or phased plan, or a task breakdown for a feature before code is written (plan it, don't implement yet). Researches the codebase and writes a plan to plans/ for /flow:work. Not for exploring options (/flow:brainstorm), a requirements spec (/flow:spec), or executing an existing plan (/flow:work)."
 argument-hint: '[feature description] [--non-interactive]'
 allowed-tools:
   - Bash

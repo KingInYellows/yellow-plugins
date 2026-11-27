@@ -19,9 +19,9 @@
           "split": "train",
           "q": "My test suite started failing after the last merge with `TypeError: Cannot read properties of undefined (reading 'id')` in user.service.ts. Help me find out why.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-core--debugging--p02",
@@ -41,9 +41,9 @@
           "split": "train",
           "q": "Here's a stack trace from production:\n\nKeyError: 'tenant_id'\n  File \"app/billing.py\", line 88, in charge\n\nWhat's causing it?",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-core--debugging--p04",
@@ -52,9 +52,9 @@
           "split": "train",
           "q": "The login endpoint returns 500 only when the password contains a quote character. Debug it.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-core--debugging--p05",
@@ -63,9 +63,9 @@
           "split": "train",
           "q": "Our nightly job silently stopped writing rows last Tuesday. Investigate why before anyone changes code.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-core--debugging--p06",
@@ -74,9 +74,9 @@
           "split": "heldout",
           "q": "go test ./... panics with 'concurrent map writes' in the cache package. Track down the cause.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 2,
+          "rate": 0.6666666666666666,
+          "pass": true
         },
         {
           "name": "yellow-core--debugging--p07",
@@ -85,9 +85,9 @@
           "split": "heldout",
           "q": "After upgrading React the form stopped submitting and there's no error in the console. I'm stuck, help me figure out what's going on.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-core--debugging--p08",
@@ -96,9 +96,9 @@
           "split": "heldout",
           "q": "Issue #512 says CSV exports drop the last row. Find the root cause.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-core--debugging--n09",
@@ -189,12 +189,12 @@
           "pass": true
         }
       ],
-      "recall": 0.125,
+      "recall": 1,
       "precision": 1,
       "specificity": 1,
-      "accuracy": 0.5625,
-      "heldoutAccuracy": 0.5,
-      "meanTriggerRatePositive": 0.125,
+      "accuracy": 1,
+      "heldoutAccuracy": 1,
+      "meanTriggerRatePositive": 0.9583333333333334,
       "meanTriggerRateNegative": 0
     },
     "yellow-core:flow-plan": {
@@ -206,9 +206,9 @@
           "split": "train",
           "q": "I want to add rate limiting to our public REST API. Before writing any code, put together an implementation plan I can review.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-core--flow-plan--p02",
@@ -228,8 +228,8 @@
           "split": "train",
           "q": "Plan out how we'd add OAuth login with GitHub to the app. Don't implement it yet.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
+          "fired": 1,
+          "rate": 0.3333333333333333,
           "pass": false
         },
         {
@@ -239,9 +239,9 @@
           "split": "train",
           "q": "Write an implementation plan for migrating our job queue from cron scripts to a proper worker.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-core--flow-plan--p05",
@@ -250,9 +250,9 @@
           "split": "train",
           "q": "We need dark mode in the settings page. Make a step-by-step plan for building it.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 2,
+          "rate": 0.6666666666666666,
+          "pass": true
         },
         {
           "name": "yellow-core--flow-plan--p06",
@@ -261,9 +261,9 @@
           "split": "heldout",
           "q": "Create a plan document for adding audit logging to every admin action.",
           "runs": 3,
-          "fired": 0,
-          "rate": 0,
-          "pass": false
+          "fired": 3,
+          "rate": 1,
+          "pass": true
         },
         {
           "name": "yellow-core--flow-plan--p07",
@@ -272,8 +272,8 @@
           "split": "heldout",
           "q": "Here's the feature: webhook retries with exponential backoff. Draft the implementation plan.",
           "runs": 3,
-          "fired": 2,
-          "rate": 0.6666666666666666,
+          "fired": 3,
+          "rate": 1,
           "pass": true
         },
         {
@@ -376,12 +376,12 @@
           "pass": true
         }
       ],
-      "recall": 0.25,
+      "recall": 0.75,
       "precision": 1,
       "specificity": 1,
-      "accuracy": 0.625,
-      "heldoutAccuracy": 0.6666666666666666,
-      "meanTriggerRatePositive": 0.20833333333333331,
+      "accuracy": 0.875,
+      "heldoutAccuracy": 0.8333333333333334,
+      "meanTriggerRatePositive": 0.75,
       "meanTriggerRateNegative": 0
     },
     "yellow-review:resolve-pr": {
