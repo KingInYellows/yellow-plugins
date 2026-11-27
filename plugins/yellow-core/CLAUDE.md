@@ -139,6 +139,11 @@ the reference.
 - `stack-operation-registry.js` — maps the nine neutral stack operations to one
   Graphite and one GitHub implementation or `null`; `/flow:work` and
   `worktree-restack.sh` derive from it in prose, so change all together
+- Every shell block that reads `claude plugin list --json` uses the generated
+  `plugin_list_json "$repo_root"` helper (`scripts/snippets/plugin-list-json.sh`):
+  the CLI applies project and local overrides only for its current directory,
+  so the query runs from the git root. A direct call fails
+  `tests/integration/plugin-list-json-usage.test.ts`
 - `stack-tooling-probe.js` — provider CLI readiness. GitHub is ready only with
   an authenticated `gh`, the official `github/gh-stack` at 0.3.0 or newer (a
   prerelease of 0.3.0 is older) and git 2.36+; an unversioned gh-stack or an
@@ -256,7 +261,7 @@ marketplace/plugins/contracts/examples/solutions targets), not inside
 `compound-staging`, `compound-stop-hook`, `context-observer`,
 `credential-status`, `handoff`, `jev-category-eval`, `jev-prefilter`,
 `plan-commands`, `plan-status-parity`, `plan-gate-tier`, `plugin-identity`,
-`setup-all-stack-tooling`, `stack-provider-root`,
+`plugin-list-json`, `setup-all-stack-tooling`, `stack-provider-root`,
 `pre-compact-hook`, `quote-ground`, `repo-profile`, `setup-all-ruvector-probe`,
 `statusline-template`, `validate-fs`) plus `skills/git-worktree/tests/`
 (`worktree-manager.bats`, `worktree-restack.bats` with stub `gt` / `gh` / `git`

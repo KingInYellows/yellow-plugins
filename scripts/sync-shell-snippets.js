@@ -50,7 +50,9 @@ const CHECK_MODE = process.argv.slice(2).includes('--check');
 //     install-helpers block byte-for-byte; onboarded as a TARGETS entry.
 // yellow-core-root is the library-path bootstrap shared by /stack:status and
 // stack-provider-router. It cannot be sourced: the block runs before the
-// plugin root is known.
+// plugin root is known. plugin-list-json runs `claude plugin list --json`
+// from the repository root, so project-scope overrides are folded in
+// (CLAUDE-392); every surface that reads the list embeds it.
 const TARGETS = {
   'plugins/yellow-codex/scripts/install-codex.sh': [
     'install-helpers',
@@ -61,10 +63,24 @@ const TARGETS = {
     'install-version-gte',
   ],
   'plugins/yellow-research/scripts/install-ast-grep.sh': ['install-helpers'],
-  'plugins/yellow-core/commands/stack/status.md': ['yellow-core-root'],
+  'plugins/yellow-core/commands/stack/status.md': [
+    'yellow-core-root',
+    'plugin-list-json',
+  ],
   'plugins/yellow-core/skills/stack-provider-router/SKILL.md': [
     'yellow-core-root',
+    'plugin-list-json',
   ],
+  'plugins/yellow-core/skills/stack-provider-guard/SKILL.md': [
+    'plugin-list-json',
+  ],
+  'plugins/yellow-core/commands/setup/all.md': ['plugin-list-json'],
+  'plugins/yellow-core/commands/statusline/setup.md': ['plugin-list-json'],
+  'plugins/yellow-core/commands/stack/select.md': ['plugin-list-json'],
+  'plugins/yellow-claudemod/commands/claudemod/setup.md': ['plugin-list-json'],
+  'plugins/yellow-linear/commands/linear/setup.md': ['plugin-list-json'],
+  // Four separate bash fences, one generated block in each.
+  'plugins/yellow-linear/commands/linear/delegate.md': ['plugin-list-json'],
 };
 
 // Cache loaded snippets so a multi-target manifest does not re-read the
@@ -90,30 +106,46 @@ function loadSnippet(name) {
 }
 
 /**
- * Replace the body of the `<name>` generated block in `content`. Returns
- * the new content, or throws if the sentinel pair is missing.
+ * Replace the body of every `<name>` generated block in `content` (a file
+ * with several separate bash fences carries one block per fence). Returns
+ * the new content, or throws if no well-formed sentinel pair exists.
  */
 function regenerateBlock(content, name) {
   const begin = `# >>> generated: ${name} (source: scripts/snippets/${name}.sh) >>>`;
   const end = `# <<< generated: ${name} <<<`;
-  const beginIdx = content.indexOf(begin);
-  // Anchor the end search after the begin marker — a snippet body that
-  // documents the sentinel format must not be able to truncate the
-  // generated block on the next run (gemini/copilot review #534).
-  const endSearchFrom = beginIdx === -1 ? 0 : beginIdx + begin.length;
-  const endIdx = content.indexOf(end, endSearchFrom);
-  if (beginIdx === -1 || endIdx === -1 || endIdx < beginIdx) {
-    throw new Error(
-      `missing or malformed sentinel block for "${name}" ` +
-        `(expected "${begin}" ... "${end}")`
-    );
-  }
   const block =
     `${begin}\n` +
     '# DO NOT EDIT — regenerate with: pnpm generate:snippets\n' +
     `${loadSnippet(name)}\n` +
     end;
-  return content.slice(0, beginIdx) + block + content.slice(endIdx + end.length);
+  let out = '';
+  let cursor = 0;
+  let replaced = 0;
+  for (;;) {
+    const beginIdx = content.indexOf(begin, cursor);
+    if (beginIdx === -1) break;
+    // Anchor the end search after the begin marker — a snippet body that
+    // documents the sentinel format must not be able to truncate the
+    // generated block on the next run (gemini/copilot review #534).
+    const endIdx = content.indexOf(end, beginIdx + begin.length);
+    const nextBegin = content.indexOf(begin, beginIdx + begin.length);
+    // A begin with no end before the next begin is malformed: pairing it
+    // with a later block's end would delete everything in between.
+    if (endIdx === -1 || (nextBegin !== -1 && nextBegin < endIdx)) {
+      replaced = 0;
+      break;
+    }
+    out += content.slice(cursor, beginIdx) + block;
+    cursor = endIdx + end.length;
+    replaced++;
+  }
+  if (replaced === 0) {
+    throw new Error(
+      `missing or malformed sentinel block for "${name}" ` +
+        `(expected "${begin}" ... "${end}")`
+    );
+  }
+  return out + content.slice(cursor);
 }
 
 function main() {
@@ -123,7 +155,9 @@ function main() {
   for (const [relPath, snippetNames] of Object.entries(TARGETS)) {
     const absPath = path.join(ROOT, relPath);
     if (!fs.existsSync(absPath)) {
-      console.error(`[sync-shell-snippets] Error: target not found: ${relPath}`);
+      console.error(
+        `[sync-shell-snippets] Error: target not found: ${relPath}`
+      );
       errorCount++;
       continue;
     }

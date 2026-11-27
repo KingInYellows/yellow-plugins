@@ -79,12 +79,31 @@ if [ ! -f "$LIB" ]; then
   exit 0
 fi
 
+# >>> generated: plugin-list-json (source: scripts/snippets/plugin-list-json.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# shellcheck shell=bash
+# `claude plugin list --json` folds project/local enable and disable
+# overrides into each row's `enabled` value only for the settings under the
+# CURRENT directory's .claude/. From a subdirectory, a project-scope disable
+# of a user-scope plugin still reads as enabled. Run it from the repository
+# root; an unreachable root is a failed read, never a read from elsewhere.
+# Canonical source: scripts/snippets/plugin-list-json.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
+plugin_list_json() {
+  if [ -n "${1:-}" ]; then
+    (cd -- "$1" >/dev/null 2>&1 && claude plugin list --json)
+  else
+    claude plugin list --json
+  fi
+}
+# <<< generated: plugin-list-json <<<
+
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
 
 # TARGET_PROVIDER / TARGET_SCOPE come from Step 1 and are already validated
 # against the fixed sets {graphite,github} / {user,project,local}. Substitute
 # the validated values here — never raw argument text.
-if ! plugin_json=$(claude plugin list --json 2>/dev/null); then
+if ! plugin_json=$(plugin_list_json "$repo_root" 2>/dev/null); then
   printf 'stack_provider_error: `claude plugin list --json` failed — refusing to plan a switch\n'
   exit 0
 fi
@@ -166,7 +185,11 @@ On "Cancel", stop. Nothing has run.
 ## Step 5: Execute, in order, stopping at the first failure
 
 Run each step's `command` exactly as printed, one per Bash call, in plan
-order. After each, record success or failure.
+order, from the repository root that Step 3 read the plan from:
+`cd "$(git rev-parse --show-toplevel)" && <command>` (outside a repository,
+run the command alone). A project or local scope write then lands in the
+same `.claude/` that `/stack:status` reads. After each, record success or
+failure.
 
 If a step fails:
 

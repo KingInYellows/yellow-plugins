@@ -156,7 +156,26 @@ resolve_plugin_root() {
   printf '%s' "$root"
 }
 
-if ! _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+# >>> generated: plugin-list-json (source: scripts/snippets/plugin-list-json.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# shellcheck shell=bash
+# `claude plugin list --json` folds project/local enable and disable
+# overrides into each row's `enabled` value only for the settings under the
+# CURRENT directory's .claude/. From a subdirectory, a project-scope disable
+# of a user-scope plugin still reads as enabled. Run it from the repository
+# root; an unreachable root is a failed read, never a read from elsewhere.
+# Canonical source: scripts/snippets/plugin-list-json.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
+plugin_list_json() {
+  if [ -n "${1:-}" ]; then
+    (cd -- "$1" >/dev/null 2>&1 && claude plugin list --json)
+  else
+    claude plugin list --json
+  fi
+}
+# <<< generated: plugin-list-json <<<
+
+if ! _plugin_list_json=$(plugin_list_json "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null); then
   printf 'remote_agent_error: `claude plugin list --json` failed — provider state is UNKNOWN\n'
   exit 0
 fi
@@ -560,7 +579,26 @@ resolve_plugin_root() {
   printf '%s' "$root"
 }
 
-if ! _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+# >>> generated: plugin-list-json (source: scripts/snippets/plugin-list-json.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# shellcheck shell=bash
+# `claude plugin list --json` folds project/local enable and disable
+# overrides into each row's `enabled` value only for the settings under the
+# CURRENT directory's .claude/. From a subdirectory, a project-scope disable
+# of a user-scope plugin still reads as enabled. Run it from the repository
+# root; an unreachable root is a failed read, never a read from elsewhere.
+# Canonical source: scripts/snippets/plugin-list-json.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
+plugin_list_json() {
+  if [ -n "${1:-}" ]; then
+    (cd -- "$1" >/dev/null 2>&1 && claude plugin list --json)
+  else
+    claude plugin list --json
+  fi
+}
+# <<< generated: plugin-list-json <<<
+
+if ! _plugin_list_json=$(plugin_list_json "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null); then
   printf 'ERROR: claude plugin list --json failed — cannot resolve yellow-cursor install path.\n' >&2
   exit 1
 fi
@@ -766,7 +804,26 @@ resolve_plugin_root() {
   printf '%s' "$root"
 }
 
-if ! _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+# >>> generated: plugin-list-json (source: scripts/snippets/plugin-list-json.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# shellcheck shell=bash
+# `claude plugin list --json` folds project/local enable and disable
+# overrides into each row's `enabled` value only for the settings under the
+# CURRENT directory's .claude/. From a subdirectory, a project-scope disable
+# of a user-scope plugin still reads as enabled. Run it from the repository
+# root; an unreachable root is a failed read, never a read from elsewhere.
+# Canonical source: scripts/snippets/plugin-list-json.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
+plugin_list_json() {
+  if [ -n "${1:-}" ]; then
+    (cd -- "$1" >/dev/null 2>&1 && claude plugin list --json)
+  else
+    claude plugin list --json
+  fi
+}
+# <<< generated: plugin-list-json <<<
+
+if ! _plugin_list_json=$(plugin_list_json "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null); then
   printf 'ERROR: claude plugin list --json failed — cannot resolve the yellow-jules install path.\n' >&2
   exit 1
 fi
@@ -1109,7 +1166,26 @@ resolve_plugin_root() {
   printf '%s' "$root"
 }
 
-if ! _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+# >>> generated: plugin-list-json (source: scripts/snippets/plugin-list-json.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# shellcheck shell=bash
+# `claude plugin list --json` folds project/local enable and disable
+# overrides into each row's `enabled` value only for the settings under the
+# CURRENT directory's .claude/. From a subdirectory, a project-scope disable
+# of a user-scope plugin still reads as enabled. Run it from the repository
+# root; an unreachable root is a failed read, never a read from elsewhere.
+# Canonical source: scripts/snippets/plugin-list-json.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
+plugin_list_json() {
+  if [ -n "${1:-}" ]; then
+    (cd -- "$1" >/dev/null 2>&1 && claude plugin list --json)
+  else
+    claude plugin list --json
+  fi
+}
+# <<< generated: plugin-list-json <<<
+
+if ! _plugin_list_json=$(plugin_list_json "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null); then
   printf 'ERROR: claude plugin list --json failed — cannot resolve the yellow-agy install path.\n' >&2
   exit 1
 fi

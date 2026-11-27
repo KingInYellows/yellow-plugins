@@ -33,9 +33,27 @@ _gh=$(command -v gh 2>/dev/null || true)
 # One `claude plugin list --json` call serves the stack-provider choice
 # below, Installed Plugins and the remote-agent block. Enablement comes only
 # from it: a copy left in ~/.claude/plugins/cache is not an installed plugin.
+# >>> generated: plugin-list-json (source: scripts/snippets/plugin-list-json.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# shellcheck shell=bash
+# `claude plugin list --json` folds project/local enable and disable
+# overrides into each row's `enabled` value only for the settings under the
+# CURRENT directory's .claude/. From a subdirectory, a project-scope disable
+# of a user-scope plugin still reads as enabled. Run it from the repository
+# root; an unreachable root is a failed read, never a read from elsewhere.
+# Canonical source: scripts/snippets/plugin-list-json.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
+plugin_list_json() {
+  if [ -n "${1:-}" ]; then
+    (cd -- "$1" >/dev/null 2>&1 && claude plugin list --json)
+  else
+    claude plugin list --json
+  fi
+}
+# <<< generated: plugin-list-json <<<
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
 _plugin_list_ok=0
-if _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+if _plugin_list_json=$(plugin_list_json "$repo_top" 2>/dev/null); then
   _plugin_list_ok=1
 else
   _plugin_list_json=""

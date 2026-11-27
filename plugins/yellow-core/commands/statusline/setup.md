@@ -90,9 +90,27 @@ plugin_cache="$CONFIG/plugins/cache"
 # rows of this repository. That also pins the marketplace and the installed
 # version. When the list cannot be read, every cached plugin counts (old
 # behaviour) and a warning says so.
+# >>> generated: plugin-list-json (source: scripts/snippets/plugin-list-json.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# shellcheck shell=bash
+# `claude plugin list --json` folds project/local enable and disable
+# overrides into each row's `enabled` value only for the settings under the
+# CURRENT directory's .claude/. From a subdirectory, a project-scope disable
+# of a user-scope plugin still reads as enabled. Run it from the repository
+# root; an unreachable root is a failed read, never a read from elsewhere.
+# Canonical source: scripts/snippets/plugin-list-json.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
+plugin_list_json() {
+  if [ -n "${1:-}" ]; then
+    (cd -- "$1" >/dev/null 2>&1 && claude plugin list --json)
+  else
+    claude plugin list --json
+  fi
+}
+# <<< generated: plugin-list-json <<<
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
 enabled_paths="*"
-if plugin_json=$(claude plugin list --json 2>/dev/null) \
+if plugin_json=$(plugin_list_json "$repo_top" 2>/dev/null) \
   && enabled_paths=$(printf '%s' "$plugin_json" | PROJECT_PATH="$repo_top" python3 -c '
 import json, os, sys
 rows = json.load(sys.stdin)

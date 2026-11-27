@@ -80,6 +80,7 @@ function generatedBlock(name: string, body: string): string {
 const HELPERS_BODY = `readonly RED='\\033[0;31m'\nerror() { printf '%s\\n' "$1" >&2; exit 1; }`;
 const VERSION_GTE_BODY = `version_gte() { [ "$1" = "$2" ]; }`;
 const ROOT_BODY = `resolve_yellow_core_root() { printf '%s' "$1"; }`;
+const LIST_BODY = `plugin_list_json() { claude plugin list --json; }`;
 
 // Match the script's TARGETS manifest exactly so the per-target loop
 // finds every entry. Focus drift tests on the ast-grep target (single
@@ -93,8 +94,13 @@ function buildSimpleTarget(blocks: string[]): string {
 function seedAllTargets(tmp: string, focusBlock: string): void {
   // Snippets — canonical content the script will compare against.
   write(tmp, 'scripts/snippets/install-helpers.sh', `${HELPERS_BODY}\n`);
-  write(tmp, 'scripts/snippets/install-version-gte.sh', `${VERSION_GTE_BODY}\n`);
+  write(
+    tmp,
+    'scripts/snippets/install-version-gte.sh',
+    `${VERSION_GTE_BODY}\n`
+  );
   write(tmp, 'scripts/snippets/yellow-core-root.sh', `${ROOT_BODY}\n`);
+  write(tmp, 'scripts/snippets/plugin-list-json.sh', `${LIST_BODY}\n`);
 
   const helpersBlock = generatedBlock('install-helpers', HELPERS_BODY);
   const versionBlock = generatedBlock('install-version-gte', VERSION_GTE_BODY);
@@ -113,12 +119,28 @@ function seedAllTargets(tmp: string, focusBlock: string): void {
   // can drift it without touching the other targets.
   write(tmp, FOCUS_TARGET, buildSimpleTarget([focusBlock]));
   const rootBlock = generatedBlock('yellow-core-root', ROOT_BODY);
-  write(tmp, 'plugins/yellow-core/commands/stack/status.md', rootBlock + '\n');
+  const listBlock = generatedBlock('plugin-list-json', LIST_BODY);
+  write(
+    tmp,
+    'plugins/yellow-core/commands/stack/status.md',
+    `${rootBlock}\n${listBlock}\n`
+  );
   write(
     tmp,
     'plugins/yellow-core/skills/stack-provider-router/SKILL.md',
-    rootBlock + '\n'
+    `${rootBlock}\n${listBlock}\n`
   );
+  for (const target of [
+    'plugins/yellow-core/skills/stack-provider-guard/SKILL.md',
+    'plugins/yellow-core/commands/setup/all.md',
+    'plugins/yellow-core/commands/statusline/setup.md',
+    'plugins/yellow-core/commands/stack/select.md',
+    'plugins/yellow-claudemod/commands/claudemod/setup.md',
+    'plugins/yellow-linear/commands/linear/setup.md',
+    'plugins/yellow-linear/commands/linear/delegate.md',
+  ]) {
+    write(tmp, target, `${listBlock}\n`);
+  }
 }
 
 describe('sync-shell-snippets.js', () => {
@@ -139,7 +161,10 @@ describe('sync-shell-snippets.js', () => {
   });
 
   it('--check exits 1 and names the drifted target', () => {
-    seedAllTargets(tmp, generatedBlock('install-helpers', 'readonly TAMPERED=1'));
+    seedAllTargets(
+      tmp,
+      generatedBlock('install-helpers', 'readonly TAMPERED=1')
+    );
     const result = run(tmp, ['--check']);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('drift');
@@ -172,8 +197,36 @@ describe('sync-shell-snippets.js', () => {
     expect(errorLines.length).toBeGreaterThanOrEqual(3);
   });
 
+  it('rewrites every block of a snippet in a multi-fence target', () => {
+    seedAllTargets(tmp, generatedBlock('install-helpers', HELPERS_BODY));
+    const target = 'plugins/yellow-linear/commands/linear/delegate.md';
+    const stale = generatedBlock('plugin-list-json', 'readonly TAMPERED=1');
+    write(tmp, target, `${stale}\n\nmiddle\n\n${stale}\n`);
+    expect(run(tmp, ['--check']).status).toBe(1);
+    expect(run(tmp).status).toBe(0);
+    const after = readFileSync(join(tmp, target), 'utf8');
+    expect(after).not.toContain('TAMPERED');
+    expect(after.split(LIST_BODY)).toHaveLength(3);
+    expect(after).toContain('middle');
+    expect(run(tmp, ['--check']).status).toBe(0);
+  });
+
+  it('refuses a block whose end sentinel is missing before the next block', () => {
+    seedAllTargets(tmp, generatedBlock('install-helpers', HELPERS_BODY));
+    const target = 'plugins/yellow-linear/commands/linear/delegate.md';
+    const good = generatedBlock('plugin-list-json', LIST_BODY);
+    const begin = good.split('\n')[0];
+    const body = `${begin}\nopen block\n\nkeep me\n\n${good}\n`;
+    write(tmp, target, body);
+    expect(run(tmp).status).toBe(1);
+    expect(readFileSync(join(tmp, target), 'utf8')).toBe(body);
+  });
+
   it('apply mode (no flag) rewrites a drifted block back to canonical content', () => {
-    seedAllTargets(tmp, generatedBlock('install-helpers', 'readonly TAMPERED=1'));
+    seedAllTargets(
+      tmp,
+      generatedBlock('install-helpers', 'readonly TAMPERED=1')
+    );
     const result = run(tmp); // no --check → apply mode
     expect(result.status).toBe(0);
     const after = readFileSync(join(tmp, FOCUS_TARGET), 'utf8');
