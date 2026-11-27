@@ -195,7 +195,11 @@ assurance.
      - `SUBMITTED` — the item's PR matches this repository, head branch,
        stack base and local tip, or (with `branchDeleted: true`) the PR
        merged, its branch was deleted, and this checkout built its head
-       commit. Tick its row as
+       commit. For an unticked row with `branchDeleted: true`, first ask
+       via AskUserQuestion: "Merged PR #<pr.number> uses item N's branch
+       name. Is it this item's work? Mark done, or rebuild it?" The reflog
+       cannot tell this plan's PR from an older one that reused the name.
+       On "rebuild", leave the row unticked. Otherwise tick its row as
        `- [x] N. <name> (completed YYYY-MM-DD, reconciled from PR #<pr.number>)`
        with the Edit tool and read it back. Phase 1b skips the item: no
        second branch creation, commit or submit.
