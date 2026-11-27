@@ -1,7 +1,7 @@
 ---
 name: stack:status
 # prettier-ignore
-description: "Use before any branch or PR mutation, to check which stacked-PR provider (Graphite or GitHub) is active, or to diagnose why a stack workflow refused to run. Reports one state, such as READY_GRAPHITE, READY_GITHUB, UNSELECTED or CONFLICT."
+description: "Use when checking which stacked-PR provider (Graphite or GitHub) is active, or diagnosing why a stack workflow refused to run. Reports one state, such as READY_GRAPHITE, READY_GITHUB, UNSELECTED or CONFLICT."
 argument-hint: ''
 allowed-tools:
   - Bash

@@ -1,7 +1,7 @@
 ---
 name: statusline:setup
 # prettier-ignore
-description: "Use when setting up or refreshing the yellow-plugins statusline (re-run after installing plugins), or turning the context observer on or off with `observer enable|disable [--yes]` or `observer status`. Detects installed plugins and MCP servers, previews, and writes settings.json only on confirmation."
+description: "Use when setting up or refreshing the yellow-plugins statusline (re-run after installing plugins), or turning the context observer on or off with `observer enable|disable [--yes]` or `observer status`. Detects installed plugins and MCP servers, previews, and asks before writing settings.json unless `--yes` is given."
 argument-hint: '[observer [enable|disable [--yes] | status]]'
 allowed-tools:
   - Bash
