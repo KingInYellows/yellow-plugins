@@ -78,6 +78,9 @@ SCRIPTS_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../hooks/scripts" && pwd)"
 
 setup() {
   load lib/hook-scenario.bash
+  # The cache key folds GH_REPO in; a value from the caller's shell would
+  # change every seeded key.
+  unset GH_REPO
 }
 
 golden_exit_code() { awk -F= '/^EXIT_CODE=/{print $2; exit}' "$1"; }
