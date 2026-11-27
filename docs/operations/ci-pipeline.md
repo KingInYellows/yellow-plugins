@@ -144,7 +144,7 @@ ci-status        needs: validate-schemas, validate-versions, lint-and-typecheck,
 | lint-and-typecheck             | Parallel                | ❌ Independent        | 3 min   | ~45s             | <180s      |
 | unit-tests                     | Sequential              | ⚠️ Depends on lint    | 5 min   | ~90s             | <300s      |
 | integration-tests              | Sequential              | ⚠️ Depends on unit    | 8 min   | ~120s            | <480s      |
-| contract-drift                 | Parallel                | ❌ Independent        | 3 min   | ~20s             | <180s      |
+| contract-drift                 | Sequential              | ⚠️ Depends on schemas | 3 min   | ~20s             | <180s      |
 | security-audit                 | Parallel                | ❌ Independent        | 5 min   | ~40s             | <300s      |
 | build                          | Conditional (main only) | ⚠️ Depends on all     | 5 min   | ~60s             | <300s      |
 | report-metrics                 | Always                  | ❌ Aggregation        | -       | ~10s             | -          |
@@ -153,7 +153,8 @@ ci-status        needs: validate-schemas, validate-versions, lint-and-typecheck,
 **Total Pipeline Duration:**
 
 - **Wall-clock time (parallel):** ~4 minutes (typical), <5 minutes (SLO)
-- **Sequential critical path:** lint → unit → integration → build
+- **Sequential paths:** lint → unit → integration, and validate-schemas +
+  lint → unit → build → goal-engine-compat
 - **Parallelized:** validate-schemas, contract-drift, security-audit run
   concurrently with lint chain
 

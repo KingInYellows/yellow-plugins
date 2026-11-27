@@ -102,8 +102,9 @@ have one responsibility.
 Branch names use lowercase letters, digits, `/`, `-` and `_` only. `/flow:work`
 rejects anything else before it reaches a command.
 
-Show the plan as a base-to-tip tree, one node per branch with its commit type,
-one-line description, scope, rough size, and `Depends on`. Then ask with
+Show the plan as a base-to-tip tree rooted at the trunk from Step 1, one node
+per branch with its commit type, one-line description, scope, rough size, and
+`Depends on`, so the user can correct the trunk before saving. Then ask with
 `AskUserQuestion`: "Save to plan (Recommended)", "Adjust the plan", or "Cancel".
 Write nothing unless the user picks save.
 
@@ -142,7 +143,8 @@ Write this block, one `###` item per branch, numbered from 1 at the base:
 - `stack-topology` is `linear` when each item depends on the one before it,
   `parallel` when every item depends on `(none)`, and `mixed` otherwise.
   `/flow:work` runs only `linear` and `parallel`, so for a mixed graph tell the
-  user and offer to reorder it into one of those before writing `mixed`.
+  user and go back to Step 2 to reorder it into one of those. Never write
+  `mixed`; if the user does not want it reordered, write nothing.
 
 If the plan already has a `## Stack Decomposition` section, replace it: Read the
 file, take the text from `## Stack Decomposition` up to the next `## ` heading

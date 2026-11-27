@@ -646,9 +646,9 @@ Schema migrations if applicable.
    - `/flow:work`: `skill: "flow:work"`, args: plan file path
    - `/flow:deepen-plan`: `skill: "flow:deepen-plan"`, args: plan file path (requires yellow-research)
    - Decompose into stacked PRs: invoke `skill: "stack-provider-router"` and
-     read `state`. On `READY_GRAPHITE`, invoke
-     `skill: "gt-workflow:gt-stack-plan"` (it also applies the `.graphite.yml`
-     branch prefix). On any other state, invoke `skill: "stack-decompose"`;
+     read `state` and `toolingKnown`. On `READY_GRAPHITE` with `toolingKnown`
+     true, invoke `skill: "gt-workflow:gt-stack-plan"` (it also applies the `.graphite.yml`
+     branch prefix). In every other case, invoke `skill: "stack-decompose"`;
      decomposition is plan-only and runs no provider command, so it needs no
      ready provider. Pass the plan file path as args either way.
    - Create GitHub issue: `gh issue create --title "..." --body-file plans/<name>.md`

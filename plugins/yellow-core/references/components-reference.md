@@ -429,9 +429,9 @@ contract is also in the README's "Quote grounding" section.
 - **gt-workflow** — `/flow:work` delegates to `/smart-submit` for commit+submit
   and supports stack-aware execution when a `## Stack Decomposition` section
   exists in the plan (produced by `/gt-stack-plan` or yellow-core's
-  `stack-decompose`). Without gt-workflow, falls
-  back to committing and submitting via the active stacked-PR provider and stack
-  features are unavailable.
+  `stack-decompose`). Stack execution does not need gt-workflow: without it,
+  `/flow:work` commits and submits through the active stacked-PR provider in
+  place of `/smart-submit`.
 - **yellow-codex** — `/flow:work` offers Codex rescue (`codex-executor`) when
   tests fail during stack execution. Without yellow-codex, the rescue option is
   silently omitted.
