@@ -35,6 +35,8 @@ jobs:
 
       - name: Run Claude Code
         id: claude
+        # Pinned by hand with claude-code-review.yml (Dependabot ignores this
+        # action; see .github/dependabot.yml). Bump both pins together.
         uses: anthropics/claude-code-action@6fed3ca145920b639991cb756090506e1bcaf515 # v1.0.245
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

@@ -11,12 +11,15 @@ updates:
     schedule:
       interval: monthly
     # claude-code-action is bumped by hand: the token-hardening comments in
-    # claude-code-review.yml are written against its pin.
+    # claude-code-review.yml are written against its pin. The ignore also
+    # covers claude.yml, so bump the pin in both workflows together.
     ignore:
       - dependency-name: anthropics/claude-code-action
+    # Minor and patch bumps share one PR; a major bump opens its own.
     groups:
       actions:
         patterns: ['*']
+        update-types: [minor, patch]
     commit-message:
       prefix: chore
       include: scope

@@ -215,7 +215,7 @@ Category 2 — Missing directory (N):
   /tmp/devin-session-abc/yellow-plugins (admin entry only)
 
 Category 3 — Detached HEAD (N):
-  /mnt/c/Users/<username>/.codex/worktrees/92b3/yellow-plugins (HEAD: abc1234)
+  /mnt/c/Users/<user>/.codex/worktrees/92b3/yellow-plugins (HEAD: abc1234)
 
 Category 4 — Branch merged (N):
   .worktrees/feat-auth-flow (branch: feat/auth-flow, merged)
