@@ -60,7 +60,7 @@ function resolveCacheReadPath(env, filename) {
 // Open `file` refusing to follow a trailing symlink: O_NOFOLLOW where the
 // platform supports it (a no-op OR elsewhere, e.g. Windows — `X | undefined`
 // reduces to `X`). Both cache files this module reads
-// (routing-summary.txt and last-check-<md5(cwd)>) live at a predictable
+// (routing-summary.txt and last-check-<cacheKeyFor>) live at a predictable
 // filename inside a user-writable directory (see newCacheDir), so without
 // this a local process could plant a symlink to an arbitrary file the
 // current uid can read (e.g. an SSH key) and have its bytes spliced into
@@ -271,30 +271,99 @@ function readSmallFile(file, maxBytes) {
   }
 }
 
-// The directory whose path keys the result cache (CLAUDE-382). `gh run list`
-// reports on the repository, not the checkout, so every git worktree of one
-// repository shares the main checkout's cache: a new worktree shows CI
-// failures on its first session start. A linked worktree's `.git` is a file
-// naming its gitdir, whose `commondir` points at the shared `.git`; the main
-// checkout is that directory's parent. Plain file reads, no `git` process.
-// A main checkout (`.git` directory) or anything unrecognized keys on cwd,
-// so existing caches keep their keys.
-function cacheIdentityDir(cwd) {
-  const text = readSmallFile(path.join(cwd, '.git'), 4096);
-  if (text === null) return cwd;
+// The directory whose path keys the result cache (CLAUDE-382), and the git
+// directory holding the repository's config. `gh run list` reports on the
+// repository, not the checkout, so every git worktree of one repository
+// shares one cache: a new worktree shows CI failures on its first session
+// start. Plain file reads, no `git` process.
+//
+// - `.git` directory: a main checkout; keys on cwd.
+// - `.git` file naming a gitdir with a `commondir`: a linked worktree. The
+//   gitdir must sit in a `worktrees/` directory and its `gitdir` back-pointer
+//   must name this checkout's `.git` file, or the file is not trusted and the
+//   checkout keys on cwd (CLAUDE-400). Keys on the main checkout (the common
+//   dir's parent), or on the common dir for a bare repository.
+// - `.git` file naming a gitdir with no `commondir`: a main checkout made
+//   with `--separate-git-dir`. Keys on that gitdir, which is also the common
+//   dir its linked worktrees resolve to, so they share one cache.
+// - Anything unrecognized keys on cwd, so existing caches keep their keys.
+function resolveGitDirs(cwd) {
+  const dotGit = path.join(cwd, '.git');
+  const fallback = (gitDir) => ({ identity: cwd, gitDir });
+  const text = readSmallFile(dotGit, 4096);
+  if (text === null) {
+    let isDir = false;
+    try { isDir = fs.lstatSync(dotGit).isDirectory(); } catch { /* none */ }
+    return fallback(isDir ? dotGit : null);
+  }
   const m = /^gitdir:[ \t]*(.+?)[ \t]*$/m.exec(text);
-  if (!m) return cwd;
+  if (!m) return fallback(null);
   const gitdir = path.resolve(cwd, m[1]);
   const commondir = readSmallFile(path.join(gitdir, 'commondir'), 4096);
-  if (commondir === null || !commondir.trim()) return cwd;
+  if (commondir === null || !commondir.trim()) {
+    if (readSmallFile(path.join(gitdir, 'HEAD'), 4096) === null) return fallback(null);
+    const id = path.basename(gitdir) === '.git' ? path.dirname(gitdir) : gitdir;
+    return { identity: id, gitDir: gitdir };
+  }
+  if (path.basename(path.dirname(gitdir)) !== 'worktrees') return fallback(null);
+  const back = readSmallFile(path.join(gitdir, 'gitdir'), 4096);
+  if (back === null || !samePath(path.resolve(gitdir, back.trim()), dotGit)) {
+    return fallback(null);
+  }
   const common = path.resolve(gitdir, commondir.trim());
   // A bare repository's worktrees have no main checkout; key on the
   // repository itself.
-  return path.basename(common) === '.git' ? path.dirname(common) : common;
+  const id = path.basename(common) === '.git' ? path.dirname(common) : common;
+  return { identity: id, gitDir: common };
 }
 
-function cacheKeyFor(cwd) {
-  return crypto.createHash('md5').update(cacheIdentityDir(cwd)).digest('hex').slice(0, 32);
+// Compare two paths through their real locations when both exist, so a
+// symlinked parent (macOS /var -> /private/var) does not break the match.
+function samePath(a, b) {
+  if (a === b) return true;
+  try {
+    return fs.realpathSync(a) === fs.realpathSync(b);
+  } catch {
+    return false;
+  }
+}
+
+function cacheIdentityDir(cwd) {
+  return resolveGitDirs(cwd).identity;
+}
+
+// GH_REPO points `gh` at another repository, so it is part of the key; an
+// unset GH_REPO keeps the key the bare identity path, as before.
+function cacheKeyFor(cwd, env = {}) {
+  const ghRepo = typeof env.GH_REPO === 'string' ? env.GH_REPO : '';
+  const material = ghRepo ? `${cacheIdentityDir(cwd)}\0GH_REPO=${ghRepo}` : cacheIdentityDir(cwd);
+  return crypto.createHash('md5').update(material).digest('hex').slice(0, 32);
+}
+
+// md5 of the `origin` URL in the repository's git config, or null. Stored in
+// the cache facts, so a different repository re-cloned at the same path
+// does not show the old one's failures (CLAUDE-400). Hashed, so a URL that
+// carries credentials never lands in the cache file.
+function originFingerprint(cwd) {
+  const { gitDir } = resolveGitDirs(cwd);
+  if (!gitDir) return null;
+  const config = readSmallFile(path.join(gitDir, 'config'), 65536);
+  if (config === null) return null;
+  let inOrigin = false;
+  for (const raw of config.split(/\r?\n/)) {
+    const line = raw.trim();
+    const section = /^\[\s*([^\]\s"]+)(?:\s+"([^"]*)")?\s*\]/.exec(line);
+    if (section) {
+      inOrigin = section[1].toLowerCase() === 'remote' && section[2] === 'origin';
+      continue;
+    }
+    if (!inOrigin) continue;
+    const kv = /^url\s*=\s*(.*)$/i.exec(line);
+    if (kv && kv[1]) {
+      return crypto.createHash('md5').update(kv[1].trim()).digest('hex').slice(0, 32);
+    }
+  }
+  return null;
 }
 
 // "12 min ago", "3 h ago", "2 days ago": coarse on purpose, the point is to
@@ -497,7 +566,12 @@ function parseCachedFacts(content) {
   ) {
     return null;
   }
-  return { failureCount: parsed.failureCount, branches: parsed.branches };
+  if (parsed.remote !== undefined && !/^[0-9a-f]{32}$/.test(parsed.remote)) return null;
+  return {
+    failureCount: parsed.failureCount,
+    branches: parsed.branches,
+    remote: parsed.remote,
+  };
 }
 
 function hasWorkflows(cwd) {
@@ -523,9 +597,19 @@ function claimRefreshMarker(dir, marker) {
       if (err.code !== 'EEXIST') return 'error';
     }
     // lstat judges a planted symlink as itself, and rmSync removes the link,
-    // never its target.
-    if (Date.now() - fs.lstatSync(marker).mtimeMs < REFRESH_MARKER_MAX_AGE_MS) return 'busy';
-    fs.rmSync(marker, { force: true });
+    // never its target. A refresh that finished since the EEXIST has removed
+    // its marker: ENOENT is not an error, just a retry of the create below
+    // (CLAUDE-400).
+    let st = null;
+    try {
+      st = fs.lstatSync(marker);
+    } catch (err) {
+      if (err.code !== 'ENOENT') return 'error';
+    }
+    if (st) {
+      if (Date.now() - st.mtimeMs < REFRESH_MARKER_MAX_AGE_MS) return 'busy';
+      fs.rmSync(marker, { force: true });
+    }
   } catch {
     return 'error';
   }
@@ -632,7 +716,7 @@ function runSessionStart({ cwd, env, now = Date.now() }) {
     return done(routingSummary);
   }
 
-  const key = cacheKeyFor(cwd);
+  const key = cacheKeyFor(cwd, env);
   const cacheFileName = `last-check-${key}`;
   const newReadCacheFile = path.join(newCacheDir(env), cacheFileName);
   const readCacheFile = resolveCacheReadPath(env, cacheFileName);
@@ -643,7 +727,7 @@ function runSessionStart({ cwd, env, now = Date.now() }) {
   // legacy-only hit is treated as a miss and refreshed.
   //
   // "Written exclusively by this runtime" does NOT mean "safe to trust
-  // blindly": the filename is predictable (md5 of cwd) inside a
+  // blindly": the filename is predictable (see cacheKeyFor) inside a
   // user-writable directory, so another local process running as the SAME
   // uid can still plant a file at that exact path — ownership alone cannot
   // distinguish "we wrote this" from "another same-uid process wrote this".
@@ -664,7 +748,9 @@ function runSessionStart({ cwd, env, now = Date.now() }) {
         return done(routingSummary);
       }
       const facts = parseCachedFacts(cached.content);
-      if (facts) {
+      // A cache written for another origin (a different repository re-cloned
+      // at this path) is a miss. Caches from before the field have none.
+      if (facts && (facts.remote === undefined || facts.remote === originFingerprint(cwd))) {
         const stale = cached.ageSec >= FRESH_TTL_SEC;
         if (stale) refresh(key);
         return done(renderOutput(
@@ -744,9 +830,10 @@ function refreshCache({ cwd, env }) {
   const writeCacheDir = newCacheDir(env);
   try {
     fs.mkdirSync(writeCacheDir, { recursive: true });
-    const cacheContent = JSON.stringify(facts);
+    const remote = originFingerprint(cwd);
+    const cacheContent = JSON.stringify(remote ? { ...facts, remote } : facts);
     writeCacheAtomic(
-      path.join(writeCacheDir, `last-check-${cacheKeyFor(cwd)}`),
+      path.join(writeCacheDir, `last-check-${cacheKeyFor(cwd, env)}`),
       cacheContent,
       warn
     );
@@ -756,4 +843,11 @@ function refreshCache({ cwd, env }) {
   return done();
 }
 
-module.exports = { runSessionStart, refreshCache, formatAge, cacheKeyFor };
+module.exports = {
+  runSessionStart,
+  refreshCache,
+  formatAge,
+  cacheKeyFor,
+  originFingerprint,
+  claimRefreshMarker,
+};
