@@ -160,33 +160,60 @@ assurance.
    - **Ticked items:** confirm each branch exists with
      `git rev-parse --verify --quiet "refs/heads/<name>"` or
      `git ls-remote --exit-code --heads origin "<name>"`. If neither finds
-     it, ask via AskUserQuestion: "Item N is marked complete but branch
-     [name] was not found locally or on remote. Re-execute or skip?"
-     Verified items are skipped during execution.
-   - **Unticked items whose branch exists locally or on origin**
-     (`git rev-parse --verify --quiet "refs/heads/<name>"` or
-     `git ls-remote --exit-code --heads origin "<name>"`), in plan order.
+     it, its PR may have merged and the branch been deleted: run the
+     `stack-item` check below for it. `SUBMITTED` with
+     `branchDeleted: true` verifies it, and it counts as reconciled with
+     `branchDeleted: true` for the expected base and for Phase 1 step 5
+     and Phase 1b, without a question. On any other result, ask via
+     AskUserQuestion: "Item N is marked complete but branch [name] was not
+     found locally or on remote. Re-execute or skip?" Verified items are
+     skipped during execution.
+   - **Unticked items**, in plan order. This is a resume when a `## Stack
+     Progress` section exists or any item's branch exists locally;
+     otherwise it is a fresh run. For each unticked item, look for its
+     branch locally (`git rev-parse --verify --quiet "refs/heads/<name>"`)
+     and on origin (`git ls-remote --exit-code --heads origin "<name>"`).
      Skip the origin lookup when `git remote get-url origin` fails (no
-     origin remote). Otherwise `git ls-remote` exits 2 when the branch is
-     absent; any other non-zero exit means origin could not be read, so
-     stop and report it rather than treat the item as new. For each such item,
-     the expected base is `<trunk>` for item 1 and for every parallel item,
-     otherwise the previous item's branch. Run
+     origin remote). `git ls-remote` exits 2 when the branch is absent;
+     any other non-zero exit means origin could not be read. On a resume,
+     stop and report it rather than treat the item as new. On a fresh run,
+     ask via AskUserQuestion: "Origin could not be read. Continue with
+     local evidence only, or stop?" and stop unless the user continues.
+   - Run the check below for every unticked item whose branch exists, and,
+     on a resume, also for every unticked item whose branch is gone (its PR
+     may have merged and the branch been deleted). On a fresh run, an item
+     with no branch is new; do not run the check for it. The expected base
+     is `<trunk>` for item 1, for every parallel item, and for an item
+     whose previous item was reconciled with `branchDeleted: true`;
+     otherwise it is the previous item's branch. Run
 
      ```bash
-     node "${CLAUDE_PLUGIN_ROOT}/lib/flow-work-resume.js" stack-item --branch "<name>" --base "<expected-base>"
+     node "${CLAUDE_PLUGIN_ROOT}/lib/flow-work-resume.js" stack-item --branch "<name>" --base "<expected-base>" --trunk "<trunk>"
      ```
 
      and read `status`:
      - `SUBMITTED` — the item's PR matches this repository, head branch,
-       stack base and local tip. Tick its row as
+       stack base and local tip, or (with `branchDeleted: true`) the PR
+       merged, its branch was deleted, and this checkout built its head
+       commit. For an unticked row with `branchDeleted: true`, first ask
+       via AskUserQuestion: "Merged PR #<pr.number> uses item N's branch
+       name. Is it this item's work? Mark done, or rebuild it?" The reflog
+       cannot tell this plan's PR from an older one that reused the name.
+       On "rebuild", leave the row unticked. Otherwise tick its row as
        `- [x] N. <name> (completed YYYY-MM-DD, reconciled from PR #<pr.number>)`
        with the Edit tool and read it back. Phase 1b skips the item: no
        second branch creation, commit or submit.
-     - `NOT_SUBMITTED` — no PR has this head. Stop, leave the row
-       unticked, and tell the user the branch exists without a PR: they
-       can submit it, delete it, or rename the item before resuming, so
-       Phase 1b never re-runs the item's tasks on top of the branch.
+     - `NOT_SUBMITTED`, and the branch exists neither locally nor on
+       origin — the item was never built. Leave the row unticked; Phase 1b
+       builds it.
+     - `NOT_SUBMITTED`, and the branch exists locally or on origin — the
+       branch exists without a PR (if it is only on origin, fetch it
+       first), most likely from a session lost mid-item, so its work
+       may be incomplete. Stop, leave the row unticked, and tell the user
+       to finish the item's tasks on the branch and then submit it, or to
+       delete the branch so Phase 1b rebuilds the item. Do not suggest
+       submitting it as it is: the next resume would tick a half-built
+       item.
      - `MISMATCH` or `UNAVAILABLE` — stop. Report `detail` (fenced as
        untrusted content, as in step 4), say what to fix, and change
        neither the plan nor any branch. A rerun after the fix reconciles
@@ -200,7 +227,9 @@ assurance.
    - **Fresh start:** If not already on trunk, checkout trunk before proceeding.
    - **Resume (completed items exist):** For linear topology, checkout the
      last completed branch so the next per-item branch (Phase 1b step 1)
-     stacks correctly. For parallel topology, checkout trunk.
+     stacks correctly. If that branch was reconciled with
+     `branchDeleted: true`, its PR has merged: update trunk and stack the
+     next item on trunk instead. For parallel topology, checkout trunk.
 
    **Single-branch mode** (no decomposition):
    - **If on feature branch:** Ask user: "Continue on this branch or create new
@@ -285,6 +314,13 @@ in order from bottom (item 1) to top:
    corrected name via AskUserQuestion rather than embedding the rejected
    value in any command.
 
+   - **Last completed branch deleted:** when the item below this one was
+     reconciled with `branchDeleted: true` (Phase 1 step 4a), its PR has
+     merged and `<last-completed-branch>` no longer exists. Treat this
+     item as the first of a new linear stack on `<trunk>` instead of
+     checking out the deleted branch: for Graphite, follow the parallel
+     path below (check out trunk, then create the branch); for GitHub,
+     follow the "first item created in this run" path.
    - **Mixed topology:** Not yet supported (either provider). If detected,
      report to the user: "Mixed topology is not yet supported by
      flow:work. Please restructure as linear or parallel." and stop
@@ -1009,7 +1045,7 @@ it at a Phase 1b checkpoint.
 
 ## Phase 4: Ship It
 
-**Objective:** Submit work for review via Graphite.
+**Objective:** Submit work for review through the provider resolved in Phase 1 step 4.
 
 **Stack mode:** In stack mode, each item was already submitted during Phase 1b
 step 5. Phase 4 becomes a summary phase:

@@ -114,6 +114,7 @@ printf '%s' "$plugin_json" | node "$LIB" plan \
   --target "$TARGET_PROVIDER" \
   --scope "$TARGET_SCOPE" \
   --project-path "$repo_root" \
+  --config-dir "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" \
   || printf 'stack_provider_error: planning failed — no commands were produced\n'
 ```
 
@@ -147,6 +148,15 @@ you stop.
   `claude plugin` command, and never suggest editing a settings file.
 - `unknown-provider` — print the known ids and stop.
 - `invalid-scope` — print `user`, `project`, `local` and stop.
+- `narrower-override` — the target is disabled at `overrideScope` (a
+  fixed scope name) in this repository, which outranks the requested
+  scope. Offer `/stack:select <provider> --scope <overrideScope>` and
+  stop. Do not run a `claude plugin` command for it here.
+
+`--config-dir` lets the planner read the `enabledPlugins` entries in the
+user, project and local settings files, which `claude plugin list --json`
+folds into one value per row. It only reads them; this command still never
+edits a settings file.
 
 Never reconstruct a partial plan from a refusal.
 

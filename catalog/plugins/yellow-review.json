@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
+  "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review through the enabled stacked-PR provider (GitHub-native stacks or Graphite).",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"

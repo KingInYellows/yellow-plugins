@@ -92,7 +92,7 @@ it before editing a command, library or the staging pipeline.
   `moved`, `missing`, `replaced`, `owner`, `rebasing`, `busy`, `unreadable`,
   `not recorded`
 
-### Skills (22)
+### Skills (23)
 
 Reference and workflow skills: `agent-native-architecture`,
 `agent-native-audit`, `brainstorming`, `compound-lifecycle`,
@@ -100,8 +100,8 @@ Reference and workflow skills: `agent-native-architecture`,
 `mcp-health-probe`, `mcp-integration-patterns`, `memory-recall-pattern`,
 `memory-remember-pattern`, `morph-discovery-pattern`, `multi-host-fleet`,
 `optimize`, `plan-status`, `security-fencing`, `session-handoff`,
-`session-history`, `stack-provider-guard`, `stack-provider-router`. Descriptions
-are in the reference.
+`session-history`, `stack-decompose`, `stack-provider-guard`,
+`stack-provider-router`. Descriptions are in the reference.
 
 ### Codex Distribution
 
@@ -261,8 +261,9 @@ marketplace/plugins/contracts/examples/solutions targets), not inside
 `compound-staging`, `compound-stop-hook`, `context-observer`,
 `credential-status`, `handoff`, `jev-category-eval`, `jev-prefilter`,
 `plan-commands`, `plan-status-parity`, `plan-gate-tier`, `plugin-identity`,
-`plugin-list-json`, `setup-all-stack-tooling`, `stack-provider-root`,
-`pre-compact-hook`, `quote-ground`, `repo-profile`, `setup-all-ruvector-probe`,
+`plugin-list-json`, `setup-all-installed-plugins`, `setup-all-stack-tooling`,
+`stack-provider-root`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
+`setup-all-ruvector-probe`,
 `statusline-template`, `validate-fs`) plus `skills/git-worktree/tests/`
 (`worktree-manager.bats`, `worktree-restack.bats` with stub `gt` / `gh` / `git`
 shims under `tests/mocks/`). Manifest hook budgets: Stop 5s, SessionStart 3s,
