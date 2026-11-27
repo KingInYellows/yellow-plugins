@@ -1,7 +1,7 @@
 # Codex compatibility: Phases 2–5 acceptance
 
 Completed October 6, 2026 in the existing detached WSL worktree:
-`/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04`.
+`/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04`.
 Base revision: `cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0`. Changes remain
 uncommitted; changesets are present and unapplied. No blocker remains within the
 authorized local implementation and acceptance scope.

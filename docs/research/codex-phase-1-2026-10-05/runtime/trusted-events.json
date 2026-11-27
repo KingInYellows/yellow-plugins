@@ -3,7 +3,7 @@
     "method": "remoteControl/status/changed",
     "params": {
       "status": "disabled",
-      "serverName": "A8",
+      "serverName": "host-a",
       "installationId": "c41259b4-013e-4684-97cf-054406efd799",
       "environmentId": null
     },

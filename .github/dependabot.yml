@@ -1,0 +1,31 @@
+# Dependabot version updates. Security updates are switched on separately in
+# the repository's Code security settings.
+#
+# Plugin lockfiles under plugins/*/ are pinned on purpose (supply-chain
+# guarantee, docs/upstream-pins.md) and are not listed here. Security
+# updates, if switched on in settings, can still open PRs for them.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # claude-code-action is bumped by hand: the token-hardening comments in
+    # claude-code-review.yml are written against its pin.
+    ignore:
+      - dependency-name: anthropics/claude-code-action
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: chore
+      include: scope
+
+  # npm: security updates only. Version-update PRs are off (limit 0) because
+  # the pnpm workspace includes plugins/*, whose exact pins and Changesets
+  # gate would make routine bump PRs fail. Security PRs still open.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 0

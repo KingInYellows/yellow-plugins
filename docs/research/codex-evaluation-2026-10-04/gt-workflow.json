@@ -7,8 +7,8 @@
   "createdAt": "2026-10-05T00:49:50.166Z",
   "target": {
     "kind": "plugin",
-    "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow",
-    "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
+    "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow",
+    "entryPath": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
     "name": "gt-workflow",
     "relativePath": "plugins/gt-workflow"
   },
@@ -376,79 +376,79 @@
       "components": [
         {
           "label": "plugin-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
           "tokens": 40,
           "note": "Plugin marketplace summary"
         },
         {
           "label": "default-prompts",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
           "tokens": 0,
           "note": "Starter prompts visible in the UI"
         },
         {
           "label": "audit-review-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/audit-review/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/audit-review/SKILL.md",
           "tokens": 50,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "gt-amend-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-amend/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-amend/SKILL.md",
           "tokens": 75,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "gt-cleanup-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md",
           "tokens": 68,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "gt-merge-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-merge/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-merge/SKILL.md",
           "tokens": 49,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "gt-nav-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-nav/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-nav/SKILL.md",
           "tokens": 67,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "gt-setup-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-setup/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-setup/SKILL.md",
           "tokens": 44,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "gt-stack-plan-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md",
           "tokens": 33,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "gt-sync-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-sync/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-sync/SKILL.md",
           "tokens": 72,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "smart-submit-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/smart-submit/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/smart-submit/SKILL.md",
           "tokens": 90,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "stack-decomposition-format-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-decomposition-format/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-decomposition-format/SKILL.md",
           "tokens": 51,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "stack-plan-style-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md",
           "tokens": 47,
           "note": "Skill trigger description exposed through the plugin"
         }
@@ -465,73 +465,73 @@
       "components": [
         {
           "label": "plugin-manifest",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
           "tokens": 107,
           "note": "Manifest load cost"
         },
         {
           "label": "audit-review-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/audit-review/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/audit-review/SKILL.md",
           "tokens": 1194,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "gt-amend-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-amend/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-amend/SKILL.md",
           "tokens": 1926,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "gt-cleanup-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md",
           "tokens": 3127,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "gt-merge-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-merge/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-merge/SKILL.md",
           "tokens": 576,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "gt-nav-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-nav/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-nav/SKILL.md",
           "tokens": 717,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "gt-setup-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-setup/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-setup/SKILL.md",
           "tokens": 4678,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "gt-stack-plan-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md",
           "tokens": 2415,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "gt-sync-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-sync/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-sync/SKILL.md",
           "tokens": 996,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "smart-submit-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/smart-submit/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/smart-submit/SKILL.md",
           "tokens": 2646,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "stack-decomposition-format-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-decomposition-format/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-decomposition-format/SKILL.md",
           "tokens": 1302,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "stack-plan-style-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md",
           "tokens": 396,
           "note": "Implicit skill invocation cost ceiling"
         }
@@ -548,577 +548,577 @@
       "components": [
         {
           "label": ".claude-plugin/plugin.json",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.claude-plugin/plugin.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.claude-plugin/plugin.json",
           "tokens": 382,
           "note": "Deferred supporting file"
         },
         {
           "label": ".mcp.json",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.mcp.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.mcp.json",
           "tokens": 17,
           "note": "Deferred supporting file"
         },
         {
           "label": "CHANGELOG.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/CHANGELOG.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/CHANGELOG.md",
           "tokens": 7863,
           "note": "Deferred supporting file"
         },
         {
           "label": "CLAUDE.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/CLAUDE.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/CLAUDE.md",
           "tokens": 4838,
           "note": "Deferred supporting file"
         },
         {
           "label": "README.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/README.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/README.md",
           "tokens": 1333,
           "note": "Deferred supporting file"
         },
         {
           "label": "codex/skills/gt-cleanup/references/actionable-categories.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/actionable-categories.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/actionable-categories.md",
           "tokens": 1156,
           "note": "Deferred supporting file"
         },
         {
           "label": "codex/skills/gt-cleanup/references/pr-status-lookups.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/pr-status-lookups.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/pr-status-lookups.md",
           "tokens": 1092,
           "note": "Deferred supporting file"
         },
         {
           "label": "codex/skills/gt-cleanup/references/worktree-cleanup-offer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/worktree-cleanup-offer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/worktree-cleanup-offer.md",
           "tokens": 407,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/gt-amend.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-amend.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-amend.md",
           "tokens": 215,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/gt-cleanup.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-cleanup.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-cleanup.md",
           "tokens": 232,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/gt-merge.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-merge.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-merge.md",
           "tokens": 123,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/gt-nav.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-nav.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-nav.md",
           "tokens": 185,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/gt-setup.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-setup.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-setup.md",
           "tokens": 150,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/gt-stack-plan.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-stack-plan.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-stack-plan.md",
           "tokens": 197,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/gt-sync.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-sync.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-sync.md",
           "tokens": 188,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/smart-submit.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/smart-submit.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/smart-submit.md",
           "tokens": 267,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/codex-hooks.json",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/codex-hooks.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/codex-hooks.json",
           "tokens": 215,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/entrypoint-claude.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/entrypoint-claude.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/entrypoint-claude.js",
           "tokens": 159,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/entrypoint-codex.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/entrypoint-codex.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/entrypoint-codex.js",
           "tokens": 117,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/lib/envelope.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/envelope.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/envelope.js",
           "tokens": 762,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/lib/git-push-detector.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/git-push-detector.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/git-push-detector.js",
           "tokens": 17280,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/lib/policy-check-commit-message.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/policy-check-commit-message.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/policy-check-commit-message.js",
           "tokens": 831,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/lib/policy-check-git-push.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js",
           "tokens": 727,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/lib/run-hook.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/run-hook.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/run-hook.js",
           "tokens": 1017,
           "note": "Deferred supporting file"
         },
         {
           "label": "output-styles/stack-decomposition.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/output-styles/stack-decomposition.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/output-styles/stack-decomposition.md",
           "tokens": 1125,
           "note": "Deferred supporting file"
         },
         {
           "label": "output-styles/stack-plan.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/output-styles/stack-plan.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/output-styles/stack-plan.md",
           "tokens": 225,
           "note": "Deferred supporting file"
         },
         {
           "label": "package.json",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/package.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/package.json",
           "tokens": 46,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/audit-review/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/audit-review/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/audit-review/SKILL.md",
           "tokens": 1200,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/gt-amend/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-amend/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-amend/SKILL.md",
           "tokens": 1932,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/gt-cleanup/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/SKILL.md",
           "tokens": 3133,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/gt-cleanup/references/actionable-categories.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/actionable-categories.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/actionable-categories.md",
           "tokens": 1156,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/gt-cleanup/references/pr-status-lookups.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/pr-status-lookups.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/pr-status-lookups.md",
           "tokens": 1092,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/gt-cleanup/references/worktree-cleanup-offer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/worktree-cleanup-offer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/worktree-cleanup-offer.md",
           "tokens": 407,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/gt-merge/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-merge/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-merge/SKILL.md",
           "tokens": 582,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/gt-nav/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-nav/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-nav/SKILL.md",
           "tokens": 723,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/gt-setup/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-setup/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-setup/SKILL.md",
           "tokens": 4684,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/gt-stack-plan/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-stack-plan/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-stack-plan/SKILL.md",
           "tokens": 2421,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/gt-sync/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-sync/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-sync/SKILL.md",
           "tokens": 1002,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/smart-submit/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/smart-submit/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/smart-submit/SKILL.md",
           "tokens": 2652,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/stack-decomposition-format/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/stack-decomposition-format/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/stack-decomposition-format/SKILL.md",
           "tokens": 1308,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/stack-plan-style/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/stack-plan-style/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/stack-plan-style/SKILL.md",
           "tokens": 402,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/gt-cleanup/branches-mixed.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/gt-cleanup/branches-mixed.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/gt-cleanup/branches-mixed.txt",
           "tokens": 113,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-commit-message/codex-tool-response-nonzero-exit-skip.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/codex-tool-response-nonzero-exit-skip.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/codex-tool-response-nonzero-exit-skip.golden.txt",
           "tokens": 16,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-commit-message/conventional-allow-silent.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/conventional-allow-silent.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/conventional-allow-silent.golden.txt",
           "tokens": 16,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-commit-message/double-quoted-m.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/double-quoted-m.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/double-quoted-m.golden.txt",
           "tokens": 16,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-commit-message/missing-exit-code-validates.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/missing-exit-code-validates.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/missing-exit-code-validates.golden.txt",
           "tokens": 52,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-commit-message/multi-m-first-only.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/multi-m-first-only.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/multi-m-first-only.golden.txt",
           "tokens": 16,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-commit-message/non-conventional-warn.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/non-conventional-warn.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/non-conventional-warn.golden.txt",
           "tokens": 52,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-commit-message/nonzero-exit-skip.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/nonzero-exit-skip.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/nonzero-exit-skip.golden.txt",
           "tokens": 16,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-commit-message/null-envelope.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/null-envelope.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/null-envelope.golden.txt",
           "tokens": 15,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-commit-message/single-quoted-m.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/single-quoted-m.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/single-quoted-m.golden.txt",
           "tokens": 16,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/allowed-non-push.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/allowed-non-push.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/allowed-non-push.golden.txt",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/ansi-c-quoted-subcommand.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/ansi-c-quoted-subcommand.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/ansi-c-quoted-subcommand.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/bash-c-string.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/bash-c-string.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/bash-c-string.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/brace-expansion-subcommand.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/brace-expansion-subcommand.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/brace-expansion-subcommand.golden.txt",
           "tokens": 46,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/case-glob-pattern.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/case-glob-pattern.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/case-glob-pattern.golden.txt",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/cat-passthrough-pipe.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/cat-passthrough-pipe.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/cat-passthrough-pipe.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/end-of-options-then-push.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/end-of-options-then-push.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/end-of-options-then-push.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/fd-script-without-source.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/fd-script-without-source.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/fd-script-without-source.golden.txt",
           "tokens": 46,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/git-config-pager-value.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-config-pager-value.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-config-pager-value.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/git-rebase-exec.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-rebase-exec.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-rebase-exec.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/git-submodule-foreach.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-submodule-foreach.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-submodule-foreach.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/git-subtree-push.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-subtree-push.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-subtree-push.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/global-option-C-status.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C-status.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C-status.golden.txt",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/global-option-C.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/global-option-c.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-c.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-c.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/global-option-git-dir.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-git-dir.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-git-dir.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/group-piped-into-shell.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/group-piped-into-shell.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/group-piped-into-shell.golden.txt",
           "tokens": 46,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/gt-submit.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/gt-submit.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/gt-submit.golden.txt",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/heredoc-expanding-substitution.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-expanding-substitution.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-expanding-substitution.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/heredoc-literal.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-literal.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-literal.golden.txt",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/heredoc-quoted-delimiter-substitution.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-quoted-delimiter-substitution.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-quoted-delimiter-substitution.golden.txt",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/heredoc-shell-piped.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-shell-piped.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-shell-piped.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/malformed-json.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/malformed-json.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/malformed-json.golden.txt",
           "tokens": 26,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/metachar-and.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-and.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-and.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/metachar-semicolon.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-semicolon.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-semicolon.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/metachar-subshell.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-subshell.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-subshell.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/missing-jq.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/missing-jq.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/missing-jq.golden.txt",
           "tokens": 42,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/multi-line-non-push.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/multi-line-non-push.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/multi-line-non-push.golden.txt",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/nested-shell-depth-2.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-2.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-2.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.golden.txt",
           "tokens": 46,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/non-string-command.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/non-string-command.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/non-string-command.golden.txt",
           "tokens": 31,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/null-envelope.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/null-envelope.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/null-envelope.golden.txt",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/path-qualified-git.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/path-qualified-git.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/path-qualified-git.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/piped-literal-script.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/piped-literal-script.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/piped-literal-script.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/plain-block.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/plain-block.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/plain-block.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/process-substitution-script.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/process-substitution-script.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/process-substitution-script.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/quoted-literal.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/quoted-literal.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/quoted-literal.golden.txt",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/real-host-envelope.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/real-host-envelope.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/real-host-envelope.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/redirection-before-subcommand.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/redirection-before-subcommand.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/redirection-before-subcommand.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/reserved-word-group.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/reserved-word-group.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/reserved-word-group.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/root-level-command-ignored.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/root-level-command-ignored.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/root-level-command-ignored.golden.txt",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/sh-c-chain.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sh-c-chain.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sh-c-chain.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/stdin-inherited-two-shells-down.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/stdin-inherited-two-shells-down.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/stdin-inherited-two-shells-down.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/substitution-in-option-value.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/substitution-in-option-value.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/substitution-in-option-value.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/hooks/check-git-push/sudo-shell-string.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sudo-shell-string.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sudo-shell-string.golden.txt",
           "tokens": 65,
           "note": "Deferred supporting file"
         }
@@ -1148,7 +1148,7 @@
       "status": "fail",
       "message": "plugin.json is missing the required `author` field.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add `author` to plugin.json."
@@ -1163,7 +1163,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `shortDescription`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.shortDescription to plugin.json."
@@ -1178,7 +1178,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `longDescription`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.longDescription to plugin.json."
@@ -1193,7 +1193,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `developerName`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.developerName to plugin.json."
@@ -1208,7 +1208,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `capabilities`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.capabilities to plugin.json."
@@ -1223,7 +1223,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `websiteURL`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.websiteURL to plugin.json."
@@ -1238,7 +1238,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `privacyPolicyURL`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.privacyPolicyURL to plugin.json."
@@ -1253,7 +1253,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `termsOfServiceURL`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.termsOfServiceURL to plugin.json."
@@ -1268,7 +1268,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `defaultPrompt`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.defaultPrompt to plugin.json."
@@ -2086,79 +2086,79 @@
             "components": [
               {
                 "label": "plugin-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
                 "tokens": 40,
                 "note": "Plugin marketplace summary"
               },
               {
                 "label": "default-prompts",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
                 "tokens": 0,
                 "note": "Starter prompts visible in the UI"
               },
               {
                 "label": "audit-review-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/audit-review/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/audit-review/SKILL.md",
                 "tokens": 50,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "gt-amend-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-amend/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-amend/SKILL.md",
                 "tokens": 75,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "gt-cleanup-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md",
                 "tokens": 68,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "gt-merge-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-merge/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-merge/SKILL.md",
                 "tokens": 49,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "gt-nav-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-nav/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-nav/SKILL.md",
                 "tokens": 67,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "gt-setup-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-setup/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-setup/SKILL.md",
                 "tokens": 44,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "gt-stack-plan-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md",
                 "tokens": 33,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "gt-sync-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-sync/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-sync/SKILL.md",
                 "tokens": 72,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "smart-submit-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/smart-submit/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/smart-submit/SKILL.md",
                 "tokens": 90,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "stack-decomposition-format-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-decomposition-format/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-decomposition-format/SKILL.md",
                 "tokens": 51,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "stack-plan-style-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md",
                 "tokens": 47,
                 "note": "Skill trigger description exposed through the plugin"
               }
@@ -2175,73 +2175,73 @@
             "components": [
               {
                 "label": "plugin-manifest",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
                 "tokens": 107,
                 "note": "Manifest load cost"
               },
               {
                 "label": "audit-review-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/audit-review/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/audit-review/SKILL.md",
                 "tokens": 1194,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "gt-amend-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-amend/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-amend/SKILL.md",
                 "tokens": 1926,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "gt-cleanup-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md",
                 "tokens": 3127,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "gt-merge-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-merge/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-merge/SKILL.md",
                 "tokens": 576,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "gt-nav-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-nav/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-nav/SKILL.md",
                 "tokens": 717,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "gt-setup-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-setup/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-setup/SKILL.md",
                 "tokens": 4678,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "gt-stack-plan-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md",
                 "tokens": 2415,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "gt-sync-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-sync/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-sync/SKILL.md",
                 "tokens": 996,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "smart-submit-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/smart-submit/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/smart-submit/SKILL.md",
                 "tokens": 2646,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "stack-decomposition-format-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-decomposition-format/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-decomposition-format/SKILL.md",
                 "tokens": 1302,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "stack-plan-style-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md",
                 "tokens": 396,
                 "note": "Implicit skill invocation cost ceiling"
               }
@@ -2258,577 +2258,577 @@
             "components": [
               {
                 "label": ".claude-plugin/plugin.json",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.claude-plugin/plugin.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.claude-plugin/plugin.json",
                 "tokens": 382,
                 "note": "Deferred supporting file"
               },
               {
                 "label": ".mcp.json",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.mcp.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.mcp.json",
                 "tokens": 17,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "CHANGELOG.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/CHANGELOG.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/CHANGELOG.md",
                 "tokens": 7863,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "CLAUDE.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/CLAUDE.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/CLAUDE.md",
                 "tokens": 4838,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "README.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/README.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/README.md",
                 "tokens": 1333,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "codex/skills/gt-cleanup/references/actionable-categories.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/actionable-categories.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/actionable-categories.md",
                 "tokens": 1156,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "codex/skills/gt-cleanup/references/pr-status-lookups.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/pr-status-lookups.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/pr-status-lookups.md",
                 "tokens": 1092,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "codex/skills/gt-cleanup/references/worktree-cleanup-offer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/worktree-cleanup-offer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/codex/skills/gt-cleanup/references/worktree-cleanup-offer.md",
                 "tokens": 407,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/gt-amend.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-amend.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-amend.md",
                 "tokens": 215,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/gt-cleanup.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-cleanup.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-cleanup.md",
                 "tokens": 232,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/gt-merge.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-merge.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-merge.md",
                 "tokens": 123,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/gt-nav.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-nav.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-nav.md",
                 "tokens": 185,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/gt-setup.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-setup.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-setup.md",
                 "tokens": 150,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/gt-stack-plan.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-stack-plan.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-stack-plan.md",
                 "tokens": 197,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/gt-sync.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-sync.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/gt-sync.md",
                 "tokens": 188,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/smart-submit.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/smart-submit.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/commands/smart-submit.md",
                 "tokens": 267,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/codex-hooks.json",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/codex-hooks.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/codex-hooks.json",
                 "tokens": 215,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/entrypoint-claude.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/entrypoint-claude.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/entrypoint-claude.js",
                 "tokens": 159,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/entrypoint-codex.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/entrypoint-codex.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/entrypoint-codex.js",
                 "tokens": 117,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/lib/envelope.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/envelope.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/envelope.js",
                 "tokens": 762,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/lib/git-push-detector.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/git-push-detector.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/git-push-detector.js",
                 "tokens": 17280,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/lib/policy-check-commit-message.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/policy-check-commit-message.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/policy-check-commit-message.js",
                 "tokens": 831,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/lib/policy-check-git-push.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js",
                 "tokens": 727,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/lib/run-hook.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/run-hook.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/hooks/scripts/lib/run-hook.js",
                 "tokens": 1017,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "output-styles/stack-decomposition.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/output-styles/stack-decomposition.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/output-styles/stack-decomposition.md",
                 "tokens": 1125,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "output-styles/stack-plan.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/output-styles/stack-plan.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/output-styles/stack-plan.md",
                 "tokens": 225,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "package.json",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/package.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/package.json",
                 "tokens": 46,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/audit-review/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/audit-review/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/audit-review/SKILL.md",
                 "tokens": 1200,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/gt-amend/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-amend/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-amend/SKILL.md",
                 "tokens": 1932,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/gt-cleanup/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/SKILL.md",
                 "tokens": 3133,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/gt-cleanup/references/actionable-categories.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/actionable-categories.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/actionable-categories.md",
                 "tokens": 1156,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/gt-cleanup/references/pr-status-lookups.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/pr-status-lookups.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/pr-status-lookups.md",
                 "tokens": 1092,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/gt-cleanup/references/worktree-cleanup-offer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/worktree-cleanup-offer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-cleanup/references/worktree-cleanup-offer.md",
                 "tokens": 407,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/gt-merge/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-merge/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-merge/SKILL.md",
                 "tokens": 582,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/gt-nav/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-nav/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-nav/SKILL.md",
                 "tokens": 723,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/gt-setup/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-setup/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-setup/SKILL.md",
                 "tokens": 4684,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/gt-stack-plan/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-stack-plan/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-stack-plan/SKILL.md",
                 "tokens": 2421,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/gt-sync/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-sync/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/gt-sync/SKILL.md",
                 "tokens": 1002,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/smart-submit/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/smart-submit/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/smart-submit/SKILL.md",
                 "tokens": 2652,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/stack-decomposition-format/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/stack-decomposition-format/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/stack-decomposition-format/SKILL.md",
                 "tokens": 1308,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/stack-plan-style/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/stack-plan-style/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/skills/stack-plan-style/SKILL.md",
                 "tokens": 402,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/gt-cleanup/branches-mixed.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/gt-cleanup/branches-mixed.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/gt-cleanup/branches-mixed.txt",
                 "tokens": 113,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-commit-message/codex-tool-response-nonzero-exit-skip.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/codex-tool-response-nonzero-exit-skip.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/codex-tool-response-nonzero-exit-skip.golden.txt",
                 "tokens": 16,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-commit-message/conventional-allow-silent.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/conventional-allow-silent.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/conventional-allow-silent.golden.txt",
                 "tokens": 16,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-commit-message/double-quoted-m.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/double-quoted-m.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/double-quoted-m.golden.txt",
                 "tokens": 16,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-commit-message/missing-exit-code-validates.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/missing-exit-code-validates.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/missing-exit-code-validates.golden.txt",
                 "tokens": 52,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-commit-message/multi-m-first-only.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/multi-m-first-only.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/multi-m-first-only.golden.txt",
                 "tokens": 16,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-commit-message/non-conventional-warn.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/non-conventional-warn.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/non-conventional-warn.golden.txt",
                 "tokens": 52,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-commit-message/nonzero-exit-skip.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/nonzero-exit-skip.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/nonzero-exit-skip.golden.txt",
                 "tokens": 16,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-commit-message/null-envelope.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/null-envelope.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/null-envelope.golden.txt",
                 "tokens": 15,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-commit-message/single-quoted-m.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/single-quoted-m.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/single-quoted-m.golden.txt",
                 "tokens": 16,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/allowed-non-push.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/allowed-non-push.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/allowed-non-push.golden.txt",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/ansi-c-quoted-subcommand.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/ansi-c-quoted-subcommand.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/ansi-c-quoted-subcommand.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/bash-c-string.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/bash-c-string.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/bash-c-string.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/brace-expansion-subcommand.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/brace-expansion-subcommand.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/brace-expansion-subcommand.golden.txt",
                 "tokens": 46,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/case-glob-pattern.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/case-glob-pattern.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/case-glob-pattern.golden.txt",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/cat-passthrough-pipe.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/cat-passthrough-pipe.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/cat-passthrough-pipe.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/end-of-options-then-push.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/end-of-options-then-push.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/end-of-options-then-push.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/fd-script-without-source.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/fd-script-without-source.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/fd-script-without-source.golden.txt",
                 "tokens": 46,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/git-config-pager-value.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-config-pager-value.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-config-pager-value.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/git-rebase-exec.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-rebase-exec.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-rebase-exec.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/git-submodule-foreach.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-submodule-foreach.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-submodule-foreach.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/git-subtree-push.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-subtree-push.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/git-subtree-push.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/global-option-C-status.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C-status.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C-status.golden.txt",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/global-option-C.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-C.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/global-option-c.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-c.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-c.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/global-option-git-dir.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-git-dir.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/global-option-git-dir.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/group-piped-into-shell.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/group-piped-into-shell.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/group-piped-into-shell.golden.txt",
                 "tokens": 46,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/gt-submit.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/gt-submit.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/gt-submit.golden.txt",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/heredoc-expanding-substitution.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-expanding-substitution.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-expanding-substitution.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/heredoc-literal.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-literal.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-literal.golden.txt",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/heredoc-quoted-delimiter-substitution.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-quoted-delimiter-substitution.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-quoted-delimiter-substitution.golden.txt",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/heredoc-shell-piped.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-shell-piped.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/heredoc-shell-piped.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/malformed-json.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/malformed-json.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/malformed-json.golden.txt",
                 "tokens": 26,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/metachar-and.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-and.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-and.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/metachar-semicolon.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-semicolon.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-semicolon.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/metachar-subshell.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-subshell.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/metachar-subshell.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/missing-jq.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/missing-jq.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/missing-jq.golden.txt",
                 "tokens": 42,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/multi-line-non-push.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/multi-line-non-push.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/multi-line-non-push.golden.txt",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/nested-shell-depth-2.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-2.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-2.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.golden.txt",
                 "tokens": 46,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/non-string-command.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/non-string-command.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/non-string-command.golden.txt",
                 "tokens": 31,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/null-envelope.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/null-envelope.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/null-envelope.golden.txt",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/path-qualified-git.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/path-qualified-git.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/path-qualified-git.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/piped-literal-script.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/piped-literal-script.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/piped-literal-script.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/plain-block.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/plain-block.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/plain-block.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/process-substitution-script.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/process-substitution-script.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/process-substitution-script.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/quoted-literal.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/quoted-literal.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/quoted-literal.golden.txt",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/real-host-envelope.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/real-host-envelope.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/real-host-envelope.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/redirection-before-subcommand.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/redirection-before-subcommand.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/redirection-before-subcommand.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/reserved-word-group.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/reserved-word-group.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/reserved-word-group.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/root-level-command-ignored.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/root-level-command-ignored.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/root-level-command-ignored.golden.txt",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/sh-c-chain.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sh-c-chain.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sh-c-chain.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/stdin-inherited-two-shells-down.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/stdin-inherited-two-shells-down.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/stdin-inherited-two-shells-down.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/substitution-in-option-value.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/substitution-in-option-value.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/substitution-in-option-value.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/hooks/check-git-push/sudo-shell-string.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sudo-shell-string.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/tests/fixtures/hooks/check-git-push/sudo-shell-string.golden.txt",
                 "tokens": 65,
                 "note": "Deferred supporting file"
               }
@@ -2991,8 +2991,8 @@
     "createdAt": "2026-10-05T00:49:54.368Z",
     "target": {
       "kind": "plugin",
-      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow",
-      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
+      "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow",
+      "entryPath": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
       "name": "gt-workflow",
       "relativePath": "plugins/gt-workflow"
     },
@@ -3249,8 +3249,8 @@
     "title": "Improve gt-workflow",
     "target": {
       "kind": "plugin",
-      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow",
-      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
+      "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow",
+      "entryPath": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
       "name": "gt-workflow",
       "relativePath": "plugins/gt-workflow"
     },
@@ -3327,8 +3327,8 @@
     "createdAt": "2026-10-05T00:49:54.371Z",
     "target": {
       "kind": "plugin",
-      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow",
-      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
+      "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow",
+      "entryPath": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow/.codex-plugin/plugin.json",
       "name": "gt-workflow",
       "relativePath": "plugins/gt-workflow"
     },

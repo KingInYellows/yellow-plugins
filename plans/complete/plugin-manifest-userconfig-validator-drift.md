@@ -98,7 +98,7 @@ For each entry, add `"type": "string"` and `"title": "<label>"` immediately abov
 
 ### Phase 5: Memory + CLAUDE.md updates
 
-- [-] 5.1: (unverified — the auto-memory MEMORY.md is outside the repo) Update auto-memory file `.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md` "Plugin Manifest Validation" section with one-line entry pointing to the new solutions doc
+- [-] 5.1: (unverified — the auto-memory MEMORY.md is outside the repo) Update auto-memory file `.claude/projects/-home-<user>-projects-yellow-plugins/memory/MEMORY.md` "Plugin Manifest Validation" section with one-line entry pointing to the new solutions doc
 - [x] 5.2: No `plugins/<name>/CLAUDE.md` updates needed — the plugin docs reference `userConfig` in narrative form, not field-by-field, so no stale references to fix.
 
 ### Phase 6: Validation, changeset, submit

@@ -7,8 +7,8 @@
   "createdAt": "2026-10-05T00:49:57.756Z",
   "target": {
     "kind": "plugin",
-    "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core",
-    "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
+    "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core",
+    "entryPath": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
     "name": "yellow-core",
     "relativePath": "plugins/yellow-core"
   },
@@ -377,31 +377,31 @@
       "components": [
         {
           "label": "plugin-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
           "tokens": 56,
           "note": "Plugin marketplace summary"
         },
         {
           "label": "default-prompts",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
           "tokens": 0,
           "note": "Starter prompts visible in the UI"
         },
         {
           "label": "agent-native-architecture-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-architecture/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-architecture/SKILL.md",
           "tokens": 56,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "agent-native-audit-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-audit/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-audit/SKILL.md",
           "tokens": 63,
           "note": "Skill trigger description exposed through the plugin"
         },
         {
           "label": "plan-status-description",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/plan-status/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/plan-status/SKILL.md",
           "tokens": 50,
           "note": "Skill trigger description exposed through the plugin"
         }
@@ -418,25 +418,25 @@
       "components": [
         {
           "label": "plugin-manifest",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
           "tokens": 103,
           "note": "Manifest load cost"
         },
         {
           "label": "agent-native-architecture-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-architecture/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-architecture/SKILL.md",
           "tokens": 1369,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "agent-native-audit-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-audit/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-audit/SKILL.md",
           "tokens": 1485,
           "note": "Implicit skill invocation cost ceiling"
         },
         {
           "label": "plan-status-skill-file",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/plan-status/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/plan-status/SKILL.md",
           "tokens": 772,
           "note": "Implicit skill invocation cost ceiling"
         }
@@ -453,709 +453,709 @@
       "components": [
         {
           "label": ".claude-plugin/plugin.json",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.claude-plugin/plugin.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.claude-plugin/plugin.json",
           "tokens": 355,
           "note": "Deferred supporting file"
         },
         {
           "label": "CHANGELOG.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/CHANGELOG.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/CHANGELOG.md",
           "tokens": 56223,
           "note": "Deferred supporting file"
         },
         {
           "label": "CLAUDE.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/CLAUDE.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/CLAUDE.md",
           "tokens": 8175,
           "note": "Deferred supporting file"
         },
         {
           "label": "README.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/README.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/README.md",
           "tokens": 3596,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/research/best-practices-researcher.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/best-practices-researcher.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/best-practices-researcher.md",
           "tokens": 4043,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/research/git-history-analyzer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/git-history-analyzer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/git-history-analyzer.md",
           "tokens": 2293,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/research/learnings-researcher.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/learnings-researcher.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/learnings-researcher.md",
           "tokens": 3133,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/research/repo-research-analyst.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/repo-research-analyst.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/repo-research-analyst.md",
           "tokens": 2425,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/review/architecture-strategist.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/architecture-strategist.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/architecture-strategist.md",
           "tokens": 1399,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/review/code-simplicity-reviewer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/code-simplicity-reviewer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/code-simplicity-reviewer.md",
           "tokens": 1395,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/review/pattern-recognition-specialist.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/pattern-recognition-specialist.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/pattern-recognition-specialist.md",
           "tokens": 1491,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/review/performance-oracle.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/performance-oracle.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/performance-oracle.md",
           "tokens": 1567,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/review/performance-reviewer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/performance-reviewer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/performance-reviewer.md",
           "tokens": 1579,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/review/polyglot-reviewer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/polyglot-reviewer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/polyglot-reviewer.md",
           "tokens": 1301,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/review/security-lens.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-lens.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-lens.md",
           "tokens": 1255,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/review/security-reviewer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-reviewer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-reviewer.md",
           "tokens": 1828,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/review/security-sentinel.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-sentinel.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-sentinel.md",
           "tokens": 2050,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/review/test-coverage-analyst.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/test-coverage-analyst.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/test-coverage-analyst.md",
           "tokens": 1402,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/workflow/brainstorm-orchestrator.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md",
           "tokens": 2112,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/workflow/knowledge-compounder.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/knowledge-compounder.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/knowledge-compounder.md",
           "tokens": 6477,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/workflow/session-historian.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/session-historian.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/session-historian.md",
           "tokens": 4373,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/workflow/spec-flow-analyzer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/spec-flow-analyzer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/spec-flow-analyzer.md",
           "tokens": 1458,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/workflow/staging-promoter.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-promoter.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-promoter.md",
           "tokens": 4550,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/workflow/staging-reviewer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-reviewer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-reviewer.md",
           "tokens": 6148,
           "note": "Deferred supporting file"
         },
         {
           "label": "agents/workflow/staging-scorer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-scorer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-scorer.md",
           "tokens": 2240,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/compound/review-staged.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/compound/review-staged.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/compound/review-staged.md",
           "tokens": 3694,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/flow/brainstorm.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/brainstorm.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/brainstorm.md",
           "tokens": 573,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/flow/compound.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/compound.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/compound.md",
           "tokens": 2207,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/flow/decompose.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/decompose.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/decompose.md",
           "tokens": 1944,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/flow/expand-shell.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/expand-shell.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/expand-shell.md",
           "tokens": 1676,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/flow/pick-next-shell.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/pick-next-shell.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/pick-next-shell.md",
           "tokens": 1732,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/flow/plan.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/plan.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/plan.md",
           "tokens": 5414,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/flow/review.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/review.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/review.md",
           "tokens": 5151,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/flow/spec.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/spec.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/spec.md",
           "tokens": 1651,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/flow/work.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/work.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/work.md",
           "tokens": 11998,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/plan/complete.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/plan/complete.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/plan/complete.md",
           "tokens": 7294,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/plan/status.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/plan/status.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/plan/status.md",
           "tokens": 210,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/setup/all.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/setup/all.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/setup/all.md",
           "tokens": 13066,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/setup/claude-web.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/setup/claude-web.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/setup/claude-web.md",
           "tokens": 8035,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/stack/select.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/stack/select.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/stack/select.md",
           "tokens": 2767,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/stack/status.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/stack/status.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/stack/status.md",
           "tokens": 1924,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/statusline/setup.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/statusline/setup.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/statusline/setup.md",
           "tokens": 4810,
           "note": "Deferred supporting file"
         },
         {
           "label": "commands/worktree/cleanup.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/worktree/cleanup.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/worktree/cleanup.md",
           "tokens": 5237,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/_stop-capture-subshell.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/_stop-capture-subshell.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/_stop-capture-subshell.sh",
           "tokens": 827,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/pre-compact.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/pre-compact.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/pre-compact.sh",
           "tokens": 522,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/session-start.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/session-start.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/session-start.sh",
           "tokens": 4490,
           "note": "Deferred supporting file"
         },
         {
           "label": "hooks/scripts/stop.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/stop.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/stop.sh",
           "tokens": 705,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/compound-staging.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/compound-staging.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/compound-staging.sh",
           "tokens": 2895,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/context-observer.py",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/context-observer.py",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/context-observer.py",
           "tokens": 4306,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/context-observer.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/context-observer.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/context-observer.sh",
           "tokens": 2248,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/credential-status.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/credential-status.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/credential-status.sh",
           "tokens": 2360,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/plugin-identity.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/plugin-identity.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/plugin-identity.sh",
           "tokens": 1146,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/remote-agent-provider-state.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/remote-agent-provider-state.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/remote-agent-provider-state.js",
           "tokens": 3408,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/repo-profile.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/repo-profile.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/repo-profile.sh",
           "tokens": 2105,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/stack-operation-registry.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-operation-registry.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-operation-registry.js",
           "tokens": 2015,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/stack-provider-state.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-provider-state.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-provider-state.js",
           "tokens": 10212,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/stack-tooling-probe.js",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-tooling-probe.js",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-tooling-probe.js",
           "tokens": 3223,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/statusline-settings.py",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/statusline-settings.py",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/statusline-settings.py",
           "tokens": 7538,
           "note": "Deferred supporting file"
         },
         {
           "label": "lib/validate-fs.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/validate-fs.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/validate-fs.sh",
           "tokens": 1832,
           "note": "Deferred supporting file"
         },
         {
           "label": "package.json",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/package.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/package.json",
           "tokens": 68,
           "note": "Deferred supporting file"
         },
         {
           "label": "references/flow-work/graphite-command-reference.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/flow-work/graphite-command-reference.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/flow-work/graphite-command-reference.md",
           "tokens": 123,
           "note": "Deferred supporting file"
         },
         {
           "label": "references/knowledge-compounder/concepts-vocabulary.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/knowledge-compounder/concepts-vocabulary.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/knowledge-compounder/concepts-vocabulary.md",
           "tokens": 765,
           "note": "Deferred supporting file"
         },
         {
           "label": "references/setup-all/credential-status-and-version-drift.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md",
           "tokens": 1624,
           "note": "Deferred supporting file"
         },
         {
           "label": "references/statusline-setup/context-observer.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/statusline-setup/context-observer.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/statusline-setup/context-observer.md",
           "tokens": 1800,
           "note": "Deferred supporting file"
         },
         {
           "label": "references/statusline-setup/statusline-template.py",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/statusline-setup/statusline-template.py",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/statusline-setup/statusline-template.py",
           "tokens": 1670,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/agent-native-architecture/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/agent-native-architecture/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/agent-native-architecture/SKILL.md",
           "tokens": 1375,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/agent-native-audit/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/agent-native-audit/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/agent-native-audit/SKILL.md",
           "tokens": 1491,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/brainstorming/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/brainstorming/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/brainstorming/SKILL.md",
           "tokens": 1422,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/compound-lifecycle/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/SKILL.md",
           "tokens": 3339,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/compound-lifecycle/references/design-rationale.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/design-rationale.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/design-rationale.md",
           "tokens": 344,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/compound-lifecycle/references/report-template.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/report-template.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/report-template.md",
           "tokens": 302,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/compound-lifecycle/references/scoring-and-clustering.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/scoring-and-clustering.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/scoring-and-clustering.md",
           "tokens": 1137,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/create-agent-skills/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/SKILL.md",
           "tokens": 3398,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/create-agent-skills/references/quick-reference.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/references/quick-reference.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/references/quick-reference.md",
           "tokens": 522,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/create-agent-skills/references/subagent-failure-convention.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md",
           "tokens": 2019,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/debugging/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/debugging/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/debugging/SKILL.md",
           "tokens": 6654,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/git-worktree/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/SKILL.md",
           "tokens": 3092,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/git-worktree/scripts/worktree-manager.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/scripts/worktree-manager.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/scripts/worktree-manager.sh",
           "tokens": 3849,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/git-worktree/troubleshooting.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/troubleshooting.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/troubleshooting.md",
           "tokens": 547,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/ideation/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/ideation/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/ideation/SKILL.md",
           "tokens": 4126,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/local-config/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/local-config/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/local-config/SKILL.md",
           "tokens": 4347,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/mcp-health-probe/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/mcp-health-probe/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/mcp-health-probe/SKILL.md",
           "tokens": 1982,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/mcp-integration-patterns/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md",
           "tokens": 3114,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/memory-recall-pattern/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/memory-recall-pattern/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/memory-recall-pattern/SKILL.md",
           "tokens": 2005,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/memory-remember-pattern/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/memory-remember-pattern/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/memory-remember-pattern/SKILL.md",
           "tokens": 1840,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/morph-discovery-pattern/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/morph-discovery-pattern/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/morph-discovery-pattern/SKILL.md",
           "tokens": 664,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/multi-host-fleet/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/multi-host-fleet/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/multi-host-fleet/SKILL.md",
           "tokens": 2109,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/optimize/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/SKILL.md",
           "tokens": 3526,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/optimize/references/design-rationale.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/design-rationale.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/design-rationale.md",
           "tokens": 708,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/optimize/references/failure-modes.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/failure-modes.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/failure-modes.md",
           "tokens": 317,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/optimize/references/judge-protocol.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/judge-protocol.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/judge-protocol.md",
           "tokens": 1188,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/optimize/references/pagination-layouts.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/pagination-layouts.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/pagination-layouts.md",
           "tokens": 381,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/optimize/schema.yaml",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/schema.yaml",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/schema.yaml",
           "tokens": 1925,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/plan-status/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/plan-status/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/plan-status/SKILL.md",
           "tokens": 778,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/security-fencing/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/security-fencing/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/security-fencing/SKILL.md",
           "tokens": 2033,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/session-handoff/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-handoff/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-handoff/SKILL.md",
           "tokens": 2613,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/session-handoff/scripts/handoff.sh",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-handoff/scripts/handoff.sh",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-handoff/scripts/handoff.sh",
           "tokens": 8952,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/session-history/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-history/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-history/SKILL.md",
           "tokens": 3194,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/stack-provider-guard/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/stack-provider-guard/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/stack-provider-guard/SKILL.md",
           "tokens": 1371,
           "note": "Deferred supporting file"
         },
         {
           "label": "skills/stack-provider-router/SKILL.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/stack-provider-router/SKILL.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/stack-provider-router/SKILL.md",
           "tokens": 1531,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/handoff/archived-plan.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/archived-plan.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/archived-plan.md",
           "tokens": 25,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/handoff/diff-body.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/diff-body.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/diff-body.txt",
           "tokens": 20,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/handoff/injection-body.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/injection-body.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/injection-body.txt",
           "tokens": 62,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/handoff/legacy-note.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/legacy-note.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/legacy-note.md",
           "tokens": 91,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/handoff/v2-note.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/v2-note.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/v2-note.md",
           "tokens": 56,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/plan-status/empty.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/empty.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/empty.golden.txt",
           "tokens": 26,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/plan-status/mixed.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed.golden.txt",
           "tokens": 160,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/plan-status/mixed/plans/a-partial.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/a-partial.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/a-partial.md",
           "tokens": 16,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/plan-status/mixed/plans/b-complete.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/b-complete.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/b-complete.md",
           "tokens": 14,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/plan-status/mixed/plans/c-fresh.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/c-fresh.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/c-fresh.md",
           "tokens": 10,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/plan-status/mixed/plans/complete/z-archived.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/complete/z-archived.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/complete/z-archived.md",
           "tokens": 11,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/plan-status/zero-task.golden.txt",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/zero-task.golden.txt",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/zero-task.golden.txt",
           "tokens": 68,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/plan-status/zero-task/plans/prose-only.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/zero-task/plans/prose-only.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/zero-task/plans/prose-only.md",
           "tokens": 17,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/statusline/2.1.284/README.md",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/README.md",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/README.md",
           "tokens": 424,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/statusline/2.1.284/malformed.json",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/malformed.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/malformed.json",
           "tokens": 205,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/statusline/2.1.284/mid-session.json",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/mid-session.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/mid-session.json",
           "tokens": 410,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/statusline/2.1.284/missing-session.json",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/missing-session.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/missing-session.json",
           "tokens": 397,
           "note": "Deferred supporting file"
         },
         {
           "label": "tests/fixtures/statusline/2.1.284/startup-null.json",
-          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/startup-null.json",
+          "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/startup-null.json",
           "tokens": 251,
           "note": "Deferred supporting file"
         }
@@ -1185,7 +1185,7 @@
       "status": "fail",
       "message": "plugin.json is missing the required `author` field.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add `author` to plugin.json."
@@ -1200,7 +1200,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `shortDescription`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.shortDescription to plugin.json."
@@ -1215,7 +1215,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `longDescription`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.longDescription to plugin.json."
@@ -1230,7 +1230,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `developerName`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.developerName to plugin.json."
@@ -1245,7 +1245,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `capabilities`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.capabilities to plugin.json."
@@ -1260,7 +1260,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `websiteURL`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.websiteURL to plugin.json."
@@ -1275,7 +1275,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `privacyPolicyURL`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.privacyPolicyURL to plugin.json."
@@ -1290,7 +1290,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `termsOfServiceURL`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.termsOfServiceURL to plugin.json."
@@ -1305,7 +1305,7 @@
       "status": "fail",
       "message": "plugin.json interface is missing `defaultPrompt`.",
       "evidence": [
-        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
+        "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json"
       ],
       "remediation": [
         "Add interface.defaultPrompt to plugin.json."
@@ -1720,31 +1720,31 @@
             "components": [
               {
                 "label": "plugin-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
                 "tokens": 56,
                 "note": "Plugin marketplace summary"
               },
               {
                 "label": "default-prompts",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
                 "tokens": 0,
                 "note": "Starter prompts visible in the UI"
               },
               {
                 "label": "agent-native-architecture-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-architecture/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-architecture/SKILL.md",
                 "tokens": 56,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "agent-native-audit-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-audit/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-audit/SKILL.md",
                 "tokens": 63,
                 "note": "Skill trigger description exposed through the plugin"
               },
               {
                 "label": "plan-status-description",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/plan-status/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/plan-status/SKILL.md",
                 "tokens": 50,
                 "note": "Skill trigger description exposed through the plugin"
               }
@@ -1761,25 +1761,25 @@
             "components": [
               {
                 "label": "plugin-manifest",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
                 "tokens": 103,
                 "note": "Manifest load cost"
               },
               {
                 "label": "agent-native-architecture-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-architecture/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-architecture/SKILL.md",
                 "tokens": 1369,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "agent-native-audit-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-audit/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/agent-native-audit/SKILL.md",
                 "tokens": 1485,
                 "note": "Implicit skill invocation cost ceiling"
               },
               {
                 "label": "plan-status-skill-file",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/plan-status/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/codex/skills/plan-status/SKILL.md",
                 "tokens": 772,
                 "note": "Implicit skill invocation cost ceiling"
               }
@@ -1796,709 +1796,709 @@
             "components": [
               {
                 "label": ".claude-plugin/plugin.json",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.claude-plugin/plugin.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.claude-plugin/plugin.json",
                 "tokens": 355,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "CHANGELOG.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/CHANGELOG.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/CHANGELOG.md",
                 "tokens": 56223,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "CLAUDE.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/CLAUDE.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/CLAUDE.md",
                 "tokens": 8175,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "README.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/README.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/README.md",
                 "tokens": 3596,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/research/best-practices-researcher.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/best-practices-researcher.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/best-practices-researcher.md",
                 "tokens": 4043,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/research/git-history-analyzer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/git-history-analyzer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/git-history-analyzer.md",
                 "tokens": 2293,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/research/learnings-researcher.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/learnings-researcher.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/learnings-researcher.md",
                 "tokens": 3133,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/research/repo-research-analyst.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/repo-research-analyst.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/research/repo-research-analyst.md",
                 "tokens": 2425,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/review/architecture-strategist.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/architecture-strategist.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/architecture-strategist.md",
                 "tokens": 1399,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/review/code-simplicity-reviewer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/code-simplicity-reviewer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/code-simplicity-reviewer.md",
                 "tokens": 1395,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/review/pattern-recognition-specialist.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/pattern-recognition-specialist.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/pattern-recognition-specialist.md",
                 "tokens": 1491,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/review/performance-oracle.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/performance-oracle.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/performance-oracle.md",
                 "tokens": 1567,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/review/performance-reviewer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/performance-reviewer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/performance-reviewer.md",
                 "tokens": 1579,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/review/polyglot-reviewer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/polyglot-reviewer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/polyglot-reviewer.md",
                 "tokens": 1301,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/review/security-lens.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-lens.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-lens.md",
                 "tokens": 1255,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/review/security-reviewer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-reviewer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-reviewer.md",
                 "tokens": 1828,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/review/security-sentinel.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-sentinel.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/security-sentinel.md",
                 "tokens": 2050,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/review/test-coverage-analyst.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/test-coverage-analyst.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/review/test-coverage-analyst.md",
                 "tokens": 1402,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/workflow/brainstorm-orchestrator.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md",
                 "tokens": 2112,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/workflow/knowledge-compounder.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/knowledge-compounder.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/knowledge-compounder.md",
                 "tokens": 6477,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/workflow/session-historian.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/session-historian.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/session-historian.md",
                 "tokens": 4373,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/workflow/spec-flow-analyzer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/spec-flow-analyzer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/spec-flow-analyzer.md",
                 "tokens": 1458,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/workflow/staging-promoter.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-promoter.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-promoter.md",
                 "tokens": 4550,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/workflow/staging-reviewer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-reviewer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-reviewer.md",
                 "tokens": 6148,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "agents/workflow/staging-scorer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-scorer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/agents/workflow/staging-scorer.md",
                 "tokens": 2240,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/compound/review-staged.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/compound/review-staged.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/compound/review-staged.md",
                 "tokens": 3694,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/flow/brainstorm.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/brainstorm.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/brainstorm.md",
                 "tokens": 573,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/flow/compound.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/compound.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/compound.md",
                 "tokens": 2207,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/flow/decompose.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/decompose.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/decompose.md",
                 "tokens": 1944,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/flow/expand-shell.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/expand-shell.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/expand-shell.md",
                 "tokens": 1676,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/flow/pick-next-shell.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/pick-next-shell.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/pick-next-shell.md",
                 "tokens": 1732,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/flow/plan.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/plan.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/plan.md",
                 "tokens": 5414,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/flow/review.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/review.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/review.md",
                 "tokens": 5151,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/flow/spec.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/spec.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/spec.md",
                 "tokens": 1651,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/flow/work.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/work.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/flow/work.md",
                 "tokens": 11998,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/plan/complete.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/plan/complete.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/plan/complete.md",
                 "tokens": 7294,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/plan/status.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/plan/status.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/plan/status.md",
                 "tokens": 210,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/setup/all.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/setup/all.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/setup/all.md",
                 "tokens": 13066,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/setup/claude-web.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/setup/claude-web.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/setup/claude-web.md",
                 "tokens": 8035,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/stack/select.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/stack/select.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/stack/select.md",
                 "tokens": 2767,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/stack/status.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/stack/status.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/stack/status.md",
                 "tokens": 1924,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/statusline/setup.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/statusline/setup.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/statusline/setup.md",
                 "tokens": 4810,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "commands/worktree/cleanup.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/worktree/cleanup.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/commands/worktree/cleanup.md",
                 "tokens": 5237,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/_stop-capture-subshell.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/_stop-capture-subshell.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/_stop-capture-subshell.sh",
                 "tokens": 827,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/pre-compact.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/pre-compact.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/pre-compact.sh",
                 "tokens": 522,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/session-start.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/session-start.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/session-start.sh",
                 "tokens": 4490,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "hooks/scripts/stop.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/stop.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/hooks/scripts/stop.sh",
                 "tokens": 705,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/compound-staging.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/compound-staging.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/compound-staging.sh",
                 "tokens": 2895,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/context-observer.py",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/context-observer.py",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/context-observer.py",
                 "tokens": 4306,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/context-observer.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/context-observer.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/context-observer.sh",
                 "tokens": 2248,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/credential-status.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/credential-status.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/credential-status.sh",
                 "tokens": 2360,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/plugin-identity.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/plugin-identity.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/plugin-identity.sh",
                 "tokens": 1146,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/remote-agent-provider-state.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/remote-agent-provider-state.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/remote-agent-provider-state.js",
                 "tokens": 3408,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/repo-profile.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/repo-profile.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/repo-profile.sh",
                 "tokens": 2105,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/stack-operation-registry.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-operation-registry.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-operation-registry.js",
                 "tokens": 2015,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/stack-provider-state.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-provider-state.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-provider-state.js",
                 "tokens": 10212,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/stack-tooling-probe.js",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-tooling-probe.js",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/stack-tooling-probe.js",
                 "tokens": 3223,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/statusline-settings.py",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/statusline-settings.py",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/statusline-settings.py",
                 "tokens": 7538,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "lib/validate-fs.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/validate-fs.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/lib/validate-fs.sh",
                 "tokens": 1832,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "package.json",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/package.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/package.json",
                 "tokens": 68,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "references/flow-work/graphite-command-reference.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/flow-work/graphite-command-reference.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/flow-work/graphite-command-reference.md",
                 "tokens": 123,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "references/knowledge-compounder/concepts-vocabulary.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/knowledge-compounder/concepts-vocabulary.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/knowledge-compounder/concepts-vocabulary.md",
                 "tokens": 765,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "references/setup-all/credential-status-and-version-drift.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md",
                 "tokens": 1624,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "references/statusline-setup/context-observer.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/statusline-setup/context-observer.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/statusline-setup/context-observer.md",
                 "tokens": 1800,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "references/statusline-setup/statusline-template.py",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/statusline-setup/statusline-template.py",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/references/statusline-setup/statusline-template.py",
                 "tokens": 1670,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/agent-native-architecture/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/agent-native-architecture/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/agent-native-architecture/SKILL.md",
                 "tokens": 1375,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/agent-native-audit/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/agent-native-audit/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/agent-native-audit/SKILL.md",
                 "tokens": 1491,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/brainstorming/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/brainstorming/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/brainstorming/SKILL.md",
                 "tokens": 1422,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/compound-lifecycle/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/SKILL.md",
                 "tokens": 3339,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/compound-lifecycle/references/design-rationale.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/design-rationale.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/design-rationale.md",
                 "tokens": 344,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/compound-lifecycle/references/report-template.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/report-template.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/report-template.md",
                 "tokens": 302,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/compound-lifecycle/references/scoring-and-clustering.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/scoring-and-clustering.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/compound-lifecycle/references/scoring-and-clustering.md",
                 "tokens": 1137,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/create-agent-skills/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/SKILL.md",
                 "tokens": 3398,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/create-agent-skills/references/quick-reference.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/references/quick-reference.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/references/quick-reference.md",
                 "tokens": 522,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/create-agent-skills/references/subagent-failure-convention.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md",
                 "tokens": 2019,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/debugging/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/debugging/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/debugging/SKILL.md",
                 "tokens": 6654,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/git-worktree/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/SKILL.md",
                 "tokens": 3092,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/git-worktree/scripts/worktree-manager.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/scripts/worktree-manager.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/scripts/worktree-manager.sh",
                 "tokens": 3849,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/git-worktree/troubleshooting.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/troubleshooting.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/git-worktree/troubleshooting.md",
                 "tokens": 547,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/ideation/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/ideation/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/ideation/SKILL.md",
                 "tokens": 4126,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/local-config/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/local-config/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/local-config/SKILL.md",
                 "tokens": 4347,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/mcp-health-probe/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/mcp-health-probe/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/mcp-health-probe/SKILL.md",
                 "tokens": 1982,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/mcp-integration-patterns/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md",
                 "tokens": 3114,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/memory-recall-pattern/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/memory-recall-pattern/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/memory-recall-pattern/SKILL.md",
                 "tokens": 2005,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/memory-remember-pattern/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/memory-remember-pattern/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/memory-remember-pattern/SKILL.md",
                 "tokens": 1840,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/morph-discovery-pattern/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/morph-discovery-pattern/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/morph-discovery-pattern/SKILL.md",
                 "tokens": 664,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/multi-host-fleet/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/multi-host-fleet/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/multi-host-fleet/SKILL.md",
                 "tokens": 2109,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/optimize/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/SKILL.md",
                 "tokens": 3526,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/optimize/references/design-rationale.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/design-rationale.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/design-rationale.md",
                 "tokens": 708,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/optimize/references/failure-modes.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/failure-modes.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/failure-modes.md",
                 "tokens": 317,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/optimize/references/judge-protocol.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/judge-protocol.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/judge-protocol.md",
                 "tokens": 1188,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/optimize/references/pagination-layouts.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/pagination-layouts.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/references/pagination-layouts.md",
                 "tokens": 381,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/optimize/schema.yaml",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/schema.yaml",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/optimize/schema.yaml",
                 "tokens": 1925,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/plan-status/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/plan-status/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/plan-status/SKILL.md",
                 "tokens": 778,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/security-fencing/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/security-fencing/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/security-fencing/SKILL.md",
                 "tokens": 2033,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/session-handoff/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-handoff/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-handoff/SKILL.md",
                 "tokens": 2613,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/session-handoff/scripts/handoff.sh",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-handoff/scripts/handoff.sh",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-handoff/scripts/handoff.sh",
                 "tokens": 8952,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/session-history/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-history/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/session-history/SKILL.md",
                 "tokens": 3194,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/stack-provider-guard/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/stack-provider-guard/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/stack-provider-guard/SKILL.md",
                 "tokens": 1371,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "skills/stack-provider-router/SKILL.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/stack-provider-router/SKILL.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/skills/stack-provider-router/SKILL.md",
                 "tokens": 1531,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/handoff/archived-plan.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/archived-plan.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/archived-plan.md",
                 "tokens": 25,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/handoff/diff-body.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/diff-body.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/diff-body.txt",
                 "tokens": 20,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/handoff/injection-body.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/injection-body.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/injection-body.txt",
                 "tokens": 62,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/handoff/legacy-note.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/legacy-note.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/legacy-note.md",
                 "tokens": 91,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/handoff/v2-note.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/v2-note.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/handoff/v2-note.md",
                 "tokens": 56,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/plan-status/empty.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/empty.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/empty.golden.txt",
                 "tokens": 26,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/plan-status/mixed.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed.golden.txt",
                 "tokens": 160,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/plan-status/mixed/plans/a-partial.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/a-partial.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/a-partial.md",
                 "tokens": 16,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/plan-status/mixed/plans/b-complete.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/b-complete.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/b-complete.md",
                 "tokens": 14,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/plan-status/mixed/plans/c-fresh.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/c-fresh.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/c-fresh.md",
                 "tokens": 10,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/plan-status/mixed/plans/complete/z-archived.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/complete/z-archived.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/complete/z-archived.md",
                 "tokens": 11,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/plan-status/zero-task.golden.txt",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/zero-task.golden.txt",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/zero-task.golden.txt",
                 "tokens": 68,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/plan-status/zero-task/plans/prose-only.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/zero-task/plans/prose-only.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/plan-status/zero-task/plans/prose-only.md",
                 "tokens": 17,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/statusline/2.1.284/README.md",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/README.md",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/README.md",
                 "tokens": 424,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/statusline/2.1.284/malformed.json",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/malformed.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/malformed.json",
                 "tokens": 205,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/statusline/2.1.284/mid-session.json",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/mid-session.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/mid-session.json",
                 "tokens": 410,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/statusline/2.1.284/missing-session.json",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/missing-session.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/missing-session.json",
                 "tokens": 397,
                 "note": "Deferred supporting file"
               },
               {
                 "label": "tests/fixtures/statusline/2.1.284/startup-null.json",
-                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/startup-null.json",
+                "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/tests/fixtures/statusline/2.1.284/startup-null.json",
                 "tokens": 251,
                 "note": "Deferred supporting file"
               }
@@ -2716,8 +2716,8 @@
     "createdAt": "2026-10-05T00:50:00.107Z",
     "target": {
       "kind": "plugin",
-      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core",
-      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
+      "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core",
+      "entryPath": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
       "name": "yellow-core",
       "relativePath": "plugins/yellow-core"
     },
@@ -3014,8 +3014,8 @@
     "title": "Improve yellow-core",
     "target": {
       "kind": "plugin",
-      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core",
-      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
+      "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core",
+      "entryPath": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
       "name": "yellow-core",
       "relativePath": "plugins/yellow-core"
     },
@@ -3105,8 +3105,8 @@
     "createdAt": "2026-10-05T00:50:00.109Z",
     "target": {
       "kind": "plugin",
-      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core",
-      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
+      "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core",
+      "entryPath": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core/.codex-plugin/plugin.json",
       "name": "yellow-core",
       "relativePath": "plugins/yellow-core"
     },

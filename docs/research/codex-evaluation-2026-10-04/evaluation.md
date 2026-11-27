@@ -20,10 +20,10 @@ Implementation sequence:
 ## Scope and evidence
 
 - Original checkout:
-  `/home/kinginyellow/workspaces/yellow-harness_workspace/yellow-plugins`, clean
+  `/home/<user>/workspaces/yellow-harness_workspace/yellow-plugins`, clean
   on `main` at `136afa03eb943407c11dff8c56d4a7fd6fe4a28b`.
 - Evaluation worktree:
-  `/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04`.
+  `/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04`.
 - Evaluation base: latest fetched `origin/main`,
   `cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0`; original checkout is six commits
   behind.
@@ -35,7 +35,7 @@ Implementation sequence:
   reused, zero downloaded, no tracked lockfile change.
 - Plugin Eval: user-invoked plugin version 0.1.2, whose package declares tool
   version 0.1.0. CLI ran under WSL Node from the installed tool files under
-  `/mnt/c/Users/YellowKing/.codex/plugins/cache/openai-curated-remote/plugin-eval/0.1.2/`.
+  `/mnt/c/Users/<user>/.codex/plugins/cache/openai-curated-remote/plugin-eval/0.1.2/`.
 - Static evaluation used `start`, `analyze`, and `report` for each enabled
   plugin. The monorepo root is a marketplace, not a single Codex plugin.
 - No model-driven benchmarks, authenticated MCP calls, hook trust changes,

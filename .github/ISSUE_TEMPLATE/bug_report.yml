@@ -1,0 +1,23 @@
+name: Bug report
+description: A plugin, command, hook or validator does not work as documented.
+labels: [bug]
+body:
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin and version
+      placeholder: yellow-core 2.17.2
+    validations:
+      required: true
+  - type: input
+    id: claude-code
+    attributes:
+      label: Claude Code version and OS
+      placeholder: 2.1.300 on Ubuntu 24.04 (WSL2)
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Steps to reproduce, what you expected, and what you saw. Remove tokens and private paths from any logs.
+    validations:
+      required: true

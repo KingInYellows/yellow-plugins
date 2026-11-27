@@ -192,7 +192,7 @@ Key decisions:
 
 - [x] 1.1: Recover the variant B criteria text and the `category`
   instructions string from
-  `/tmp/claude-1000/-home-kinginyellow--herdr-worktrees-yellow-plugins-jev/aa7eb31c-5ab9-4d4d-b856-60b1dd2ceb0f/scratchpad/exp/variant_b.py`
+  `/tmp/claude-1000/-home-<user>--herdr-worktrees-yellow-plugins-jev/aa7eb31c-5ab9-4d4d-b856-60b1dd2ceb0f/scratchpad/exp/variant_b.py`
   and `run_ts.py` (the `q()` `category` entry). If the scratchpad is gone,
   copy the text from this plan's References section.
 - [x] 1.2: Create `plugins/yellow-core/lib/jev-category-criteria.json`. Store
