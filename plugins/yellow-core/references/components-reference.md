@@ -167,7 +167,7 @@ pipeline.
   work lives in `skills/git-worktree/scripts/worktree-restack.sh`; the command
   holds no `gt` / `gh stack` literals
 
-## Skills (22)
+## Skills (23)
 
 - `agent-native-architecture` — reference for the five agent-native architecture
   principles (action parity, context parity, shared workspace, primitives over
@@ -245,6 +245,10 @@ pipeline.
 - `session-history` — cross-vendor session-history user surface — dispatches the
   `session-historian` agent against Claude Code + Devin + Codex backends with
   availability detection and graceful degradation per backend
+- `stack-decompose` — provider-neutral producer of a plan's
+  `## Stack Decomposition` section, in the same format as gt-workflow's
+  `gt-stack-plan`. `/flow:plan` Phase 5 uses it whenever the router state is
+  not `READY_GRAPHITE`; it creates no branches and runs no provider command
 - `stack-provider-guard` — the four invariants that keep the provider model
   single-provider: exactly one enabled, managed scope fails closed, never edit
   settings JSON, never fall back. Consulted by `/stack:select` before it
@@ -430,9 +434,10 @@ contract is also in the README's "Quote grounding" section.
 
 - **gt-workflow** — `/flow:work` delegates to `/smart-submit` for commit+submit
   and supports stack-aware execution when a `## Stack Decomposition` section
-  exists in the plan (produced by `/gt-stack-plan`). Without gt-workflow, falls
-  back to committing and submitting via the active stacked-PR provider and stack
-  features are unavailable.
+  exists in the plan (produced by `/gt-stack-plan` or yellow-core's
+  `stack-decompose`). Stack execution does not need gt-workflow: without it,
+  `/flow:work` commits and submits through the active stacked-PR provider in
+  place of `/smart-submit`.
 - **yellow-codex** — `/flow:work` offers Codex rescue (`codex-executor`) when
   tests fail during stack execution. Without yellow-codex, the rescue option is
   silently omitted.

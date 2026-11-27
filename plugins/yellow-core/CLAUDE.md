@@ -92,7 +92,7 @@ it before editing a command, library or the staging pipeline.
   `moved`, `missing`, `replaced`, `owner`, `rebasing`, `busy`, `unreadable`,
   `not recorded`
 
-### Skills (22)
+### Skills (23)
 
 Reference and workflow skills: `agent-native-architecture`,
 `agent-native-audit`, `brainstorming`, `compound-lifecycle`,
@@ -100,8 +100,8 @@ Reference and workflow skills: `agent-native-architecture`,
 `mcp-health-probe`, `mcp-integration-patterns`, `memory-recall-pattern`,
 `memory-remember-pattern`, `morph-discovery-pattern`, `multi-host-fleet`,
 `optimize`, `plan-status`, `security-fencing`, `session-handoff`,
-`session-history`, `stack-provider-guard`, `stack-provider-router`. Descriptions
-are in the reference.
+`session-history`, `stack-decompose`, `stack-provider-guard`,
+`stack-provider-router`. Descriptions are in the reference.
 
 ### Codex Distribution
 

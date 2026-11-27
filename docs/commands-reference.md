@@ -13,11 +13,6 @@ is `/council`). Skills listed here have `user-invocable: true`; internal skills
 that only other commands or agents load are omitted. For hooks, MCP servers and
 configuration, see each plugin's `README.md` and `CLAUDE.md`.
 
-Some descriptions still say "Graphite stack" (for example `/review:all` and
-`/review:resolve-stack`), but these commands route through the active stacked-PR
-provider and work with GitHub-native stacks too. Updating that wording is
-tracked in CLAUDE-402.
-
 For how these pieces call each other, see
 [Workflow diagrams](workflow-diagrams.md).
 
@@ -221,17 +216,18 @@ Details: [plugins/yellow-agy/README.md](../plugins/yellow-agy/README.md)
 ## yellow-review
 
 Multi-agent PR review with adaptive agent selection, parallel comment
-resolution, and sequential stack review. Graphite-native workflow.
+resolution, and sequential stack review through the enabled stacked-PR provider
+(GitHub-native stacks or Graphite).
 
 Details: [plugins/yellow-review/README.md](../plugins/yellow-review/README.md)
 
 | Command                 | What it does                                                                                                                                                                                                          |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/review:all`           | Sequential review of multiple PRs — your Graphite stack, all open PRs, or a single PR.                                                                                                                                |
+| `/review:all`           | Sequential review of multiple PRs — your stack, all open PRs, or a single PR.                                                                                                                                         |
 | `/review:merge-ready`   | Read-only merge gate for one PR: unresolved review threads (outdated included), CHANGES_REQUESTED reviewers, conversation-resolution enforcement, CI, pending P0-P2 ledger findings and the risk-tier human approval. |
 | `/review:pr`            | Adaptive multi-agent review of a single PR with a tiered persona pipeline, learnings pre-pass, and confidence-rubric aggregation.                                                                                     |
 | `/review:resolve`       | Parallel resolution of unresolved PR review comments with actionability filtering and same-region clustering.                                                                                                         |
-| `/review:resolve-stack` | Walk a Graphite stack bottom-up and run /review:resolve on every open PR fully autonomously — no prompts, pushing and restacking as it goes.                                                                          |
+| `/review:resolve-stack` | Walk a stacked-PR stack bottom-up and run /review:resolve on every open PR fully autonomously — no prompts, pushing and restacking as it goes.                                                                        |
 | `/review:setup`         | Validate review command prerequisites and optional yellow-core integration.                                                                                                                                           |
 | `/review:sweep`         | Run /review:pr then /review:resolve on the same PR in one unattended pass — no gates, no per-step prompts.                                                                                                            |
 | `/review:sweep-all`     | Run /review:sweep on every open non-draft PR authored by the current user, sequentially, with one upfront confirmation.                                                                                               |
