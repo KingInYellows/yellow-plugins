@@ -124,8 +124,11 @@ git add scripts/validate-marketplace.js
 # Commit
 git commit -m "Initialize personal plugin marketplace"
 
-# Push via Graphite
-gt submit --no-interactive
+# Push to your GitHub remote (create the repository and add it first:
+# git remote add origin https://github.com/<you>/<repo>.git).
+# Run this in your own terminal: inside Claude Code, gt-workflow's push hook
+# denies a raw git push.
+git push -u origin HEAD
 ```
 
 ## Next Steps
@@ -304,7 +307,7 @@ You'll achieve these by following this structure and validation workflow.
   "owner": {
     "name": "your-username"
   },
-  "plugins": [{"name": "example", "source": "./plugins/example"}]
+  "plugins": [{ "name": "example", "source": "./plugins/example" }]
 }
 ```
 
