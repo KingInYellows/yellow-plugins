@@ -85,6 +85,7 @@ printf '%s' "$plugin_json" | node "$LIB" plan \
   --target "$TARGET_PROVIDER" \
   --scope "$TARGET_SCOPE" \
   --project-path "$repo_root" \
+  --config-dir "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" \
   || printf 'stack_provider_error: planning failed — no commands were produced\n'
 ```
 
