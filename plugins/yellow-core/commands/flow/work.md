@@ -160,9 +160,14 @@ assurance.
    - **Ticked items:** confirm each branch exists with
      `git rev-parse --verify --quiet "refs/heads/<name>"` or
      `git ls-remote --exit-code --heads origin "<name>"`. If neither finds
-     it, ask via AskUserQuestion: "Item N is marked complete but branch
-     [name] was not found locally or on remote. Re-execute or skip?"
-     Verified items are skipped during execution.
+     it, its PR may have merged and the branch been deleted: run the
+     `stack-item` check below for it. `SUBMITTED` with
+     `branchDeleted: true` verifies it, and it counts as reconciled with
+     `branchDeleted: true` for the expected base and for Phase 1 step 5
+     and Phase 1b, without a question. On any other result, ask via
+     AskUserQuestion: "Item N is marked complete but branch [name] was not
+     found locally or on remote. Re-execute or skip?" Verified items are
+     skipped during execution.
    - **Unticked items**, in plan order. This is a resume when a `## Stack
      Progress` section exists or any item's branch exists locally;
      otherwise it is a fresh run. For each unticked item, look for its
@@ -194,10 +199,12 @@ assurance.
        `- [x] N. <name> (completed YYYY-MM-DD, reconciled from PR #<pr.number>)`
        with the Edit tool and read it back. Phase 1b skips the item: no
        second branch creation, commit or submit.
-     - `NOT_SUBMITTED` with `localBranch: false` — the item was never
-       built. Leave the row unticked; Phase 1b builds it.
-     - `NOT_SUBMITTED` with `localBranch: true` — the branch exists
-       without a PR, most likely from a session lost mid-item, so its work
+     - `NOT_SUBMITTED`, and the branch exists neither locally nor on
+       origin — the item was never built. Leave the row unticked; Phase 1b
+       builds it.
+     - `NOT_SUBMITTED`, and the branch exists locally or on origin — the
+       branch exists without a PR (if it is only on origin, fetch it
+       first), most likely from a session lost mid-item, so its work
        may be incomplete. Stop, leave the row unticked, and tell the user
        to finish the item's tasks on the branch and then submit it, or to
        delete the branch so Phase 1b rebuilds the item. Do not suggest
