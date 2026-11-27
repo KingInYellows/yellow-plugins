@@ -17,14 +17,19 @@
  *     a similar subject (or the same words in its body) is never evidence.
  *     -> {"status":"OK","plan":"plans/x.md","base":"origin/main","steps":[1]}
  *
- *   stack-item --branch <name> --base <expected-base> [--repo <owner/name>]
+ *   stack-item --branch <name> --base <expected-base> [--trunk <trunk>]
+ *              [--repo <owner/name>]
  *     Stack runs. Phase 1b submits an item and then writes `## Stack
  *     Progress`; a session lost in between leaves a submitted item
  *     unticked. This mode looks for the item's pull request with `gh` and
  *     checks it against the intended repository, head branch, stack base and
  *     local branch tip. It never runs `gt`: the same check serves Graphite
  *     and GitHub-native stacks, and works before or without Graphite.
- *     -> {"status":"SUBMITTED"|"NOT_SUBMITTED"|"MISMATCH"|"UNAVAILABLE", ...}
+ *     It also answers for an item whose branch is gone (deleted after its PR
+ *     merged): a merged PR whose head commit this checkout's HEAD reflog
+ *     holds is SUBMITTED with `branchDeleted: true`.
+ *     -> {"status":"SUBMITTED"|"NOT_SUBMITTED"|"MISMATCH"|"UNAVAILABLE",
+ *         "localBranch": true|false, ...}
  *
  * HARD RULES:
  *   - Never mutates anything: no git writes, no plan edits, no gh writes.
@@ -76,7 +81,14 @@ function validBranchName(name, cwd) {
   return git(['check-ref-format', '--branch', name], cwd).ok;
 }
 
-const KNOWN_FLAGS = new Set(['plan', 'plan-file', 'base', 'branch', 'repo']);
+const KNOWN_FLAGS = new Set([
+  'plan',
+  'plan-file',
+  'base',
+  'branch',
+  'trunk',
+  'repo',
+]);
 
 function parseArgs(argv) {
   const opts = {};
@@ -285,10 +297,24 @@ function committedSteps(opts, cwd) {
 
 /**
  * Decide an item's state from `gh pr list` rows. Pure; exported for tests.
+ *
  * `localHead` is the local branch tip SHA, or null when there is no local
- * branch.
+ * branch. `trunk` is the stack trunk: GitHub retargets a stacked PR to the
+ * trunk once the PR below it merges, so a MERGED PR may target either the
+ * planned base or the trunk. `inReflog(sha)` says whether this checkout's
+ * HEAD reflog holds a commit; it is the evidence that a merged PR whose
+ * branch was deleted was built here and is not an older PR that reused the
+ * branch name.
  */
-function classifyStackItem({ branch, base, rows, localHead }) {
+function classifyStackItem({
+  branch,
+  base,
+  trunk = null,
+  rows,
+  localHead,
+  inReflog = () => false,
+}) {
+  const localBranch = Boolean(localHead);
   const own = rows.filter(
     (r) => r && r.isCrossRepository !== true && r.headRefName === branch
   );
@@ -297,12 +323,16 @@ function classifyStackItem({ branch, base, rows, localHead }) {
   if (live.length === 0) {
     return {
       status: 'NOT_SUBMITTED',
-      detail: `no open or merged pull request has head ${branch}`,
+      localBranch,
+      detail: localBranch
+        ? `no open or merged pull request has head ${branch}`
+        : `no branch ${branch} and no open or merged pull request for it; the item has not been built`,
     };
   }
   if (live.length > 1) {
     return {
       status: 'MISMATCH',
+      localBranch,
       prs: live.map((r) => ({ number: r.number, url: r.url, state: r.state })),
       detail: `${live.length} pull requests have head ${branch}; check which one belongs to this plan`,
     };
@@ -315,18 +345,45 @@ function classifyStackItem({ branch, base, rows, localHead }) {
     base: pr.baseRefName,
     headOid: pr.headRefOid,
   };
-  if (pr.baseRefName !== base) {
+  const baseOk =
+    pr.baseRefName === base ||
+    (pr.state === 'MERGED' &&
+      typeof trunk === 'string' &&
+      trunk.length > 0 &&
+      pr.baseRefName === trunk);
+  if (!baseOk) {
     return {
       status: 'MISMATCH',
+      localBranch,
       pr: summary,
       detail: `PR #${pr.number} targets ${pr.baseRefName}, but the plan stacks ${branch} on ${base}`,
     };
   }
   if (!localHead) {
+    if (pr.state !== 'MERGED') {
+      return {
+        status: 'MISMATCH',
+        localBranch,
+        pr: summary,
+        detail: `PR #${pr.number} is open but there is no local branch ${branch}; fetch it before resuming`,
+      };
+    }
+    // The branch was deleted after the merge (sync prune, auto-delete). Tick
+    // the item only when this checkout built the PR head; otherwise it may
+    // be an older PR that reused the branch name.
+    if (typeof pr.headRefOid === 'string' && inReflog(pr.headRefOid)) {
+      return {
+        status: 'SUBMITTED',
+        localBranch,
+        branchDeleted: true,
+        pr: summary,
+      };
+    }
     return {
       status: 'MISMATCH',
+      localBranch,
       pr: summary,
-      detail: `PR #${pr.number} exists but there is no local branch ${branch}; fetch it before resuming`,
+      detail: `merged PR #${pr.number} has head ${branch}, but the branch is gone and this checkout never had its head commit ${String(pr.headRefOid || 'unknown').slice(0, 12)}; if it is this item, tick the row by hand, otherwise rename the item`,
     };
   }
   // Both states need the PR head to be the local tip. A merged PR whose head
@@ -339,12 +396,26 @@ function classifyStackItem({ branch, base, rows, localHead }) {
         : 'push or reset the branch before resuming';
     return {
       status: 'MISMATCH',
+      localBranch,
       pr: summary,
       localHead,
       detail: `local ${branch} is at ${localHead.slice(0, 12)} but ${pr.state.toLowerCase()} PR #${pr.number} is at ${String(pr.headRefOid || 'unknown').slice(0, 12)}; ${fix}`,
     };
   }
-  return { status: 'SUBMITTED', pr: summary, localHead };
+  return { status: 'SUBMITTED', localBranch, pr: summary, localHead };
+}
+
+// SHAs in this checkout's HEAD reflog. Read lazily: only a merged PR with no
+// local branch needs it.
+function headReflog(cwd) {
+  let shas = null;
+  return (sha) => {
+    if (shas === null) {
+      const log = git(['reflog', 'show', '--format=%H', 'HEAD', '--'], cwd);
+      shas = new Set(log.ok ? log.stdout.split('\n').map((l) => l.trim()) : []);
+    }
+    return /^[0-9a-f]{40,64}$/.test(sha) && shas.has(sha);
+  };
 }
 
 function stackItem(opts, cwd) {
@@ -360,6 +431,7 @@ function stackItem(opts, cwd) {
   for (const [label, name] of [
     ['branch', branch],
     ['base', base],
+    ...(opts.trunk ? [['trunk', opts.trunk]] : []),
   ]) {
     if (!validBranchName(name, cwd)) {
       return {
@@ -456,7 +528,14 @@ function stackItem(opts, cwd) {
     repo,
     branch,
     base,
-    ...classifyStackItem({ branch, base, rows, localHead }),
+    ...classifyStackItem({
+      branch,
+      base,
+      trunk: opts.trunk || null,
+      rows,
+      localHead,
+      inReflog: headReflog(cwd),
+    }),
   };
 }
 
@@ -466,7 +545,7 @@ function main(argv) {
   if (parsed.error || (mode !== 'committed-steps' && mode !== 'stack-item')) {
     process.stderr.write(
       `${parsed.error ? `${parsed.error}\n` : ''}usage: flow-work-resume.js committed-steps --plan-file <file holding the plan path> [--base <ref>]\n` +
-        '       flow-work-resume.js stack-item --branch <name> --base <expected-base> [--repo <owner/name>]\n'
+        '       flow-work-resume.js stack-item --branch <name> --base <expected-base> [--trunk <trunk>] [--repo <owner/name>]\n'
     );
     return 2;
   }

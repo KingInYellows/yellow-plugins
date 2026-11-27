@@ -93,6 +93,22 @@ cat "$GH_FIXTURE"
   chmodSync(join(bin, 'gh'), 0o755);
 }
 
+// Like stubGh, but `gh pr list` prints `body` verbatim and `gh repo view`
+// can be made to fail.
+function stubGhRaw(body: string, repoViewOk = true): void {
+  writeFileSync(join(tmp, 'gh.json'), body);
+  const script = `#!/bin/sh
+printf '%s\\n' "$*" >> "$GH_LOG"
+if [ "$1" = repo ]; then
+  if [ ${repoViewOk ? 1 : 0} -eq 1 ]; then printf 'owner/repo\\n'; exit 0; fi
+  echo 'no git remotes found' >&2; exit 1
+fi
+cat "$GH_FIXTURE"
+`;
+  writeFileSync(join(bin, 'gh'), script);
+  chmodSync(join(bin, 'gh'), 0o755);
+}
+
 function stubGt(): void {
   writeFileSync(
     join(bin, 'gt'),
@@ -116,6 +132,16 @@ function pr(over: Record<string, unknown> = {}): Record<string, unknown> {
     isCrossRepository: false,
     ...over,
   };
+}
+
+// The PR row for feat/one, built before the branch is deleted.
+function deleteFeatOne(
+  over: Record<string, unknown> = {}
+): Record<string, unknown> {
+  const row = pr(over);
+  sh('git', ['checkout', '-q', 'main']);
+  sh('git', ['branch', '-q', '-D', 'feat/one']);
+  return row;
 }
 
 beforeEach(() => {
@@ -323,6 +349,36 @@ describe('committed-steps (CLAUDE-384)', () => {
     expect(missing.status).toBe(2);
   });
 
+  it('reports ERROR when HEAD and the base share no history (CLAUDE-399)', () => {
+    sh('git', ['checkout', '-q', '--orphan', 'unrelated']);
+    commit(`feat: task one\n\nFlow-Work-Step: ${PLAN}#1\n`, 'a.txt');
+    const result = cli(['committed-steps', '--plan', PLAN, '--base', 'main']);
+    expect(result.status).toBe('ERROR');
+    expect(String(result.detail)).toContain('no merge base');
+    expect(result.steps).toBeUndefined();
+  });
+
+  it('an unborn HEAD has no committed steps (CLAUDE-399)', () => {
+    sh('git', ['checkout', '-q', '--orphan', 'fresh']);
+    const result = cli(['committed-steps', '--plan', PLAN, '--base', 'main']);
+    expect(result).toMatchObject({ status: 'OK', steps: [] });
+  });
+
+  it('falls back to a local master when there is no origin or main (CLAUDE-399)', () => {
+    sh('git', ['branch', '-m', 'main', 'master']);
+    sh('git', ['checkout', '-q', '-b', 'feat/x']);
+    commit(`feat: task\n\nFlow-Work-Step: ${PLAN}#1\n`, 'a.txt');
+    const result = cli(['committed-steps', '--plan', PLAN]);
+    expect(result).toMatchObject({ status: 'OK', base: 'master', steps: [1] });
+  });
+
+  it('reports ERROR when no trunk ref can be found (CLAUDE-399)', () => {
+    sh('git', ['branch', '-m', 'main', 'trunk']);
+    const result = cli(['committed-steps', '--plan', PLAN]);
+    expect(result.status).toBe('ERROR');
+    expect(String(result.detail)).toContain('no trunk ref found');
+  });
+
   it('reports ERROR, not an empty list, when the base cannot be read', () => {
     const result = cli(['committed-steps', '--plan', PLAN, '--base', 'nope']);
     expect(result.status).toBe('ERROR');
@@ -422,6 +478,140 @@ describe('stack-item (CLAUDE-385)', () => {
     expect(
       cli(['stack-item', '--branch', 'feat/one', '--base', 'main']).status
     ).toBe('UNAVAILABLE');
+  });
+
+  it('missing --branch or --base is UNAVAILABLE (CLAUDE-399)', () => {
+    stubGh([pr()]);
+    expect(cli(['stack-item', '--branch', 'feat/one']).status).toBe(
+      'UNAVAILABLE'
+    );
+    expect(existsSync(join(tmp, 'gh.log'))).toBe(false);
+  });
+
+  it('an invalid --base or --trunk is UNAVAILABLE before gh runs (CLAUDE-399)', () => {
+    stubGh([pr()]);
+    for (const args of [
+      ['--base', 'main;id'],
+      ['--base', 'main', '--trunk', 'ma in'],
+    ]) {
+      expect(cli(['stack-item', '--branch', 'feat/one', ...args]).status).toBe(
+        'UNAVAILABLE'
+      );
+    }
+    expect(existsSync(join(tmp, 'gh.log'))).toBe(false);
+  });
+
+  it('gh repo view failing without --repo is UNAVAILABLE (CLAUDE-399)', () => {
+    stubGhRaw(JSON.stringify([pr()]), false);
+    const result = cli([
+      'stack-item',
+      '--branch',
+      'feat/one',
+      '--base',
+      'main',
+    ]);
+    expect(result.status).toBe('UNAVAILABLE');
+    expect(String(result.detail)).toContain('could not resolve the repository');
+  });
+
+  it('unreadable or non-array gh JSON is UNAVAILABLE (CLAUDE-399)', () => {
+    for (const body of ['not json', '{"number":41}']) {
+      stubGhRaw(body);
+      const result = cli([
+        'stack-item',
+        '--branch',
+        'feat/one',
+        '--base',
+        'main',
+      ]);
+      expect(result.status).toBe('UNAVAILABLE');
+      expect(String(result.detail)).toContain('unreadable JSON');
+    }
+  });
+
+  it('an open PR with no local branch is MISMATCH through the CLI (CLAUDE-399)', () => {
+    stubGh([deleteFeatOne()]);
+    const result = cli([
+      'stack-item',
+      '--branch',
+      'feat/one',
+      '--base',
+      'main',
+    ]);
+    expect(result).toMatchObject({ status: 'MISMATCH', localBranch: false });
+  });
+
+  it('a merged PR whose branch was deleted is SUBMITTED, so resume does not rebuild it (CLAUDE-399)', () => {
+    stubGh([deleteFeatOne({ state: 'MERGED' })]);
+    const result = cli([
+      'stack-item',
+      '--branch',
+      'feat/one',
+      '--base',
+      'main',
+      '--trunk',
+      'main',
+    ]);
+    expect(result).toMatchObject({
+      status: 'SUBMITTED',
+      localBranch: false,
+      branchDeleted: true,
+      pr: { number: 41 },
+    });
+  });
+
+  it('a merged PR this checkout never built is MISMATCH when its branch is gone (CLAUDE-399)', () => {
+    stubGh([deleteFeatOne({ state: 'MERGED', headRefOid: 'a'.repeat(40) })]);
+    const result = cli([
+      'stack-item',
+      '--branch',
+      'feat/one',
+      '--base',
+      'main',
+    ]);
+    expect(result.status).toBe('MISMATCH');
+    expect(String(result.detail)).toContain('tick the row by hand');
+  });
+
+  it('no branch and no PR is NOT_SUBMITTED with localBranch false (CLAUDE-399)', () => {
+    deleteFeatOne();
+    stubGh([]);
+    expect(
+      cli(['stack-item', '--branch', 'feat/one', '--base', 'main'])
+    ).toMatchObject({ status: 'NOT_SUBMITTED', localBranch: false });
+  });
+
+  it('a merged PR retargeted to trunk matches only when --trunk names it (CLAUDE-399)', () => {
+    stubGh([pr({ state: 'MERGED' })]);
+    expect(
+      cli(['stack-item', '--branch', 'feat/one', '--base', 'feat/zero']).status
+    ).toBe('MISMATCH');
+    expect(
+      cli([
+        'stack-item',
+        '--branch',
+        'feat/one',
+        '--base',
+        'feat/zero',
+        '--trunk',
+        'main',
+      ]).status
+    ).toBe('SUBMITTED');
+  });
+
+  it('an open PR retargeted to trunk is still MISMATCH (CLAUDE-399)', () => {
+    stubGh([pr()]);
+    expect(
+      cli([
+        'stack-item',
+        '--branch',
+        'feat/one',
+        '--base',
+        'feat/zero',
+        '--trunk',
+        'main',
+      ]).status
+    ).toBe('MISMATCH');
   });
 
   it('rejects a branch name with shell metacharacters before any lookup', () => {

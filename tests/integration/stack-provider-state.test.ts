@@ -36,6 +36,7 @@ const {
   classifyProviderState,
   probeTarget,
   planProviderSwitch,
+  readScopeSettings,
   summarizeSwitchOutcome,
 } = provider;
 
@@ -1127,6 +1128,174 @@ describe('probeTarget — which provider CLI a caller probes', () => {
         { input: JSON.stringify([row('gt-workflow', true)]), encoding: 'utf8' }
       );
       expect(out.trim()).toBe('github');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('planProviderSwitch — settings the folded list hides (CLAUDE-398)', () => {
+  // `claude plugin list --json` folds a project disable into the user row:
+  // both rows below read enabled:false whatever the user setting is.
+  const folded = [
+    { id: 'gt-workflow@yellow-plugins', scope: 'user', enabled: false },
+    { id: 'github-workflow@yellow-plugins', scope: 'user', enabled: false },
+  ];
+  const GT = 'gt-workflow@yellow-plugins';
+  const GH = 'github-workflow@yellow-plugins';
+  const commands = (plan: { steps: Array<{ command: string }> }) =>
+    plan.steps.map((step) => step.command);
+
+  it('refuses a user-scope enable that a project-scope disable would override', () => {
+    const plan = planProviderSwitch({
+      plugins: folded,
+      target: 'github',
+      scope: 'user',
+      projectPath: PROJECT_PATH,
+      settings: { user: { [GH]: true }, project: { [GH]: false }, local: {} },
+    });
+    expect(plan.status).toBe('refused');
+    expect(plan.reason).toBe('narrower-override');
+    expect(plan.overrideScope).toBe('project');
+    expect(plan.steps).toEqual([]);
+  });
+
+  it('names the narrowest disabling scope, and lets a narrower enable win', () => {
+    const local = planProviderSwitch({
+      plugins: folded,
+      target: 'github',
+      scope: 'project',
+      projectPath: PROJECT_PATH,
+      settings: { user: {}, project: { [GH]: true }, local: { [GH]: false } },
+    });
+    expect(local.reason).toBe('narrower-override');
+    expect(local.overrideScope).toBe('local');
+
+    const enabledLocally = planProviderSwitch({
+      plugins: folded,
+      target: 'github',
+      scope: 'user',
+      projectPath: PROJECT_PATH,
+      settings: { user: {}, project: { [GH]: false }, local: { [GH]: true } },
+    });
+    expect(enabledLocally.status).toBe('ok');
+  });
+
+  it('a rerun at the overriding scope plans the enable there', () => {
+    const plan = planProviderSwitch({
+      plugins: folded,
+      target: 'github',
+      scope: 'project',
+      projectPath: PROJECT_PATH,
+      settings: { user: { [GH]: true }, project: { [GH]: false }, local: {} },
+    });
+    expect(plan.status).toBe('ok');
+    expect(commands(plan)).toContain(
+      'claude plugin enable github-workflow@yellow-plugins --scope project'
+    );
+  });
+
+  it('disables the other provider at user scope when only the settings show it on there', () => {
+    // Planned from a repository that disables gt-workflow at project scope:
+    // the list says off, but it is on at user scope for every other repo.
+    const plan = planProviderSwitch({
+      plugins: folded,
+      target: 'github',
+      scope: 'user',
+      projectPath: PROJECT_PATH,
+      settings: { user: { [GT]: true }, project: { [GT]: false }, local: {} },
+    });
+    expect(plan.status).toBe('ok');
+    expect(commands(plan)).toEqual([
+      'claude plugin disable gt-workflow@yellow-plugins --scope user',
+      'claude plugin enable github-workflow@yellow-plugins --scope user',
+    ]);
+  });
+
+  it('never disables an uninstalled provider from a stale settings entry', () => {
+    const plan = planProviderSwitch({
+      plugins: [folded[1]],
+      target: 'github',
+      scope: 'user',
+      projectPath: PROJECT_PATH,
+      settings: { user: { [GT]: true }, project: {}, local: {} },
+    });
+    expect(commands(plan)).toEqual([
+      'claude plugin enable github-workflow@yellow-plugins --scope user',
+    ]);
+  });
+
+  it('without settings, plans from the list alone as before', () => {
+    const plan = planProviderSwitch({
+      plugins: folded,
+      target: 'github',
+      scope: 'user',
+      projectPath: PROJECT_PATH,
+    });
+    expect(plan.status).toBe('ok');
+    expect(commands(plan)).toEqual([
+      'claude plugin enable github-workflow@yellow-plugins --scope user',
+    ]);
+  });
+
+  it('readScopeSettings keeps booleans only and fails soft', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'scope-settings-'));
+    try {
+      const config = join(dir, 'config');
+      const project = join(dir, 'repo');
+      mkdirSync(config);
+      mkdirSync(join(project, '.claude'), { recursive: true });
+      writeFileSync(
+        join(config, 'settings.json'),
+        JSON.stringify({ enabledPlugins: { [GT]: true, [GH]: 'yes' } })
+      );
+      writeFileSync(join(project, '.claude', 'settings.json'), '{not json');
+      symlinkSync(
+        join(config, 'settings.json'),
+        join(project, '.claude', 'settings.local.json')
+      );
+      expect(readScopeSettings({ projectPath: project, configDir: config })).toEqual({
+        user: { [GT]: true },
+        project: {},
+        local: {},
+      });
+      expect(readScopeSettings({})).toEqual({ user: {}, project: {}, local: {} });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('the plan CLI reads settings only with --config-dir', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'scope-settings-cli-'));
+    try {
+      const project = join(dir, 'repo');
+      mkdirSync(join(project, '.claude'), { recursive: true });
+      writeFileSync(
+        join(project, '.claude', 'settings.json'),
+        JSON.stringify({ enabledPlugins: { [GH]: false } })
+      );
+      const run = (extra: string[]) =>
+        JSON.parse(
+          execFileSync(
+            process.execPath,
+            [
+              join(__dirname, '../../plugins/yellow-core/lib/stack-provider-state.js'),
+              'plan',
+              '--plugins-file',
+              '-',
+              '--target',
+              'github',
+              '--scope',
+              'user',
+              '--project-path',
+              project,
+              ...extra,
+            ],
+            { input: JSON.stringify(folded), encoding: 'utf8' }
+          )
+        );
+      expect(run([]).status).toBe('ok');
+      expect(run(['--config-dir', join(dir, 'none')]).reason).toBe('narrower-override');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

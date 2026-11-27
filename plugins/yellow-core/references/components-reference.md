@@ -264,9 +264,13 @@ than sourced:
   `.yellow-stack.yml` intent into the eight `/stack:status` states, and builds
   (never executes) the ordered `claude plugin` command plan for a provider
   switch. Dependency-free CJS with a small CLI
-  (`node lib/stack-provider-state.js classify|plan`). It ships a replica of the
-  catalog's `capabilityProvider` table because an installed plugin cannot read
-  `catalog/` at runtime; `scripts/validate-provider-groups.js` fails CI
+  (`node lib/stack-provider-state.js classify|plan`). With `--config-dir`,
+  `plan` also reads the `enabledPlugins` entries of the user, project and local
+  settings files (read-only), because the CLI list folds them into one value per
+  row; a target disabled at a narrower scope than the requested one is refused
+  as `narrower-override`. It ships a replica of the catalog's
+  `capabilityProvider` table because an installed plugin cannot read `catalog/`
+  at runtime; `scripts/validate-provider-groups.js` fails CI
   (`ERROR-PROVIDER-006`) when that replica drifts. Fixture coverage at
   `tests/integration/stack-provider-state.test.ts`
 - `stack-operation-registry.js` — maps each of the nine neutral stack operations
@@ -298,9 +302,11 @@ than sourced:
   `committed-steps` lists the plan steps whose `Flow-Work-Step: <plan>#<N>`
   commit trailer is on the branch since trunk (Phase 2 step 0 ticks them);
   `stack-item` checks an unticked stack item's pull request with `gh` against
-  the repository, head, stack base and local tip (Phase 1 step 4a). It never
-  runs `gt`, and an unreadable answer is `UNAVAILABLE` / `ERROR`, never "no
-  evidence". Verified by `tests/integration/flow-work-resume.test.ts`
+  the repository, head, stack base and local tip (Phase 1 step 4a). A merged PR
+  whose branch was deleted is `SUBMITTED` with `branchDeleted: true` only when
+  the PR head is in this checkout's HEAD reflog. It never runs `gt`, and an
+  unreadable answer is `UNAVAILABLE` / `ERROR`, never "no evidence". Verified by
+  `tests/integration/flow-work-resume.test.ts`
 - `run-github-stack-runtime.js` — how commands call github-workflow's
   `lib/github-stack-runtime.js`:
   `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" <op> ...`. Finds

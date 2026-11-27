@@ -103,6 +103,7 @@ by convention. Never reconstruct a partial plan from a refusal:
 | `managed-conflict` | Name the managed plugin; the fix is with whoever controls managed settings | Do not emit any `claude plugin` command; do not suggest editing settings files |
 | `unknown-provider` | List the known ids (`graphite`, `github`) | Do not guess the closest match |
 | `invalid-scope` | List `user`, `project`, `local` | Do not silently fall back to `user` |
+| `narrower-override` | Name `overrideScope` and offer a rerun at that scope | Do not enable at the requested scope anyway |
 
 ### Step 3: Enforce the confirmation contract
 
