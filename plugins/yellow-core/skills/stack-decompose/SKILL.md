@@ -39,6 +39,10 @@ case "$plan" in
 esac
 printf '%s' "$plan" | grep -qE '^[A-Za-z0-9._/-]+\.md$' \
   || { printf '[stack-decompose] Error: unsafe plan path\n' >&2; exit 1; }
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate-fs.sh" \
+  || { printf '[stack-decompose] Error: validate-fs.sh not loaded\n' >&2; exit 1; }
+validate_file_path "$plan" \
+  || { printf '[stack-decompose] Error: plan path leaves the repository\n' >&2; exit 1; }
 [ -f "$plan" ] || { printf '[stack-decompose] Error: %s not found\n' "$plan" >&2; exit 1; }
 printf 'plan=%s\n' "$plan"
 ```
