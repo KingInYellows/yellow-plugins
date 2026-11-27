@@ -1,6 +1,7 @@
 ---
 name: multi-host-fleet
-description: Multi-host plugin credential and config reference for yellow-plugins. Use when setting up a new workstation, configuring CI/devcontainer, replicating credentials across a fleet, or wiring a secrets manager. Documents the canonical shell env var names for every credential-bearing plugin.
+# prettier-ignore
+description: "Use when setting up a new workstation, CI or devcontainer, replicating plugin credentials across machines, or wiring a secrets manager. Lists the canonical env var name for every credential-bearing yellow plugin."
 user-invocable: true
 ---
 

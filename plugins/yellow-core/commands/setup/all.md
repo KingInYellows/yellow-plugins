@@ -1,7 +1,7 @@
 ---
 name: setup:all
 # prettier-ignore
-description: "Run setup for all installed marketplace plugins. Checks local prerequisites, MCP visibility, environment variables, and plugin status, then offers interactive setup for plugins that need it."
+description: "Use after installing marketplace plugins or when one reports missing setup. Checks prerequisites, MCP visibility, env vars and plugin status, then offers setup for each plugin that needs it."
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -30,9 +30,6 @@ _gt=$(command -v gt 2>/dev/null || true)
 _gh=$(command -v gh 2>/dev/null || true)
 
 # setup-all-stack-provider:start
-# One `claude plugin list --json` call serves the stack-provider choice
-# below, Installed Plugins and the remote-agent block. Enablement comes only
-# from it: a copy left in ~/.claude/plugins/cache is not an installed plugin.
 # >>> generated: plugin-list-json (source: scripts/snippets/plugin-list-json.sh) >>>
 # DO NOT EDIT — regenerate with: pnpm generate:snippets
 # shellcheck shell=bash
@@ -51,6 +48,9 @@ plugin_list_json() {
   fi
 }
 # <<< generated: plugin-list-json <<<
+# One `claude plugin list --json` call serves the stack-provider choice
+# below, Installed Plugins and the remote-agent block. Enablement comes only
+# from it: a copy left in ~/.claude/plugins/cache is not an installed plugin.
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
 _plugin_list_ok=0
 if _plugin_list_json=$(plugin_list_json "$repo_top" 2>/dev/null); then
@@ -180,6 +180,7 @@ fi
 command -v awk >/dev/null 2>&1 && printf 'awk:                OK\n' || printf 'awk:                NOT FOUND\n'
 command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:           OK\n' || printf 'ast-grep:           NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
+# setup-all-gt-probe:start
 if [ "$_stack_target" = github ]; then
   printf 'gt:                 SKIPPED (stack provider is github)\n'
   printf 'gt_mcp_check:       SKIPPED (stack provider is github)\n'
@@ -200,6 +201,7 @@ else
     printf 'gt_mcp_check:       SKIPPED (gt not found)\n'
   fi
 fi
+# setup-all-gt-probe:end
 # yellow-ruvector installs ruvector into its own plugin data dir (not PATH):
 # ~/.claude/plugins/data/<yellow-ruvector id>/, or the XDG fallback when the
 # host does not set CLAUDE_PLUGIN_DATA. Count a dir only where the launcher
@@ -530,6 +532,7 @@ fi
 printf 'web_signal_count:              %s\n' "$web_signal_count"
 
 printf '\n=== Installed Plugins ===\n'
+# setup-all-installed-plugins:start
 # Installed state comes from `claude plugin list --json` (scope rule as in
 # _enabled_install_path): `installed` means enabled for this repository.
 # The plugin cache keeps copies of uninstalled plugins, so it is only a
@@ -563,14 +566,19 @@ if [ "$_plugin_list_ok" -eq 1 ] && plugin_states=$(printf '%s' "$_plugin_list_js
     if (!Array.isArray(rows)) process.exit(1);
     const projectPath = process.env.PROJECT_PATH || "";
     const state = {};
+    const foreign = new Set();
     for (const r of rows) {
       if (!r || typeof r.id !== "string" || !r.id.endsWith("@yellow-plugins")) continue;
-      if ((r.scope === "project" || r.scope === "local") &&
-          !(projectPath.length > 0 && r.projectPath === projectPath)) continue;
       const name = r.id.slice(0, -"@yellow-plugins".length);
       if (!/^[a-z0-9-]+$/.test(name)) continue;
+      if ((r.scope === "project" || r.scope === "local") &&
+          !(projectPath.length > 0 && r.projectPath === projectPath)) {
+        foreign.add(name);
+        continue;
+      }
       state[name] = state[name] === "enabled" || r.enabled === true ? "enabled" : "disabled";
     }
+    for (const name of foreign) if (!(name in state)) state[name] = "foreign";
     for (const [name, st] of Object.entries(state)) process.stdout.write(name + " " + st + "\n");
   ' 2>/dev/null); then
   list_ok=1
@@ -596,6 +604,8 @@ if [ "$list_ok" -eq 1 ] || [ "$cache_ok" -eq 1 ]; then
       printf '%-22s installed\n' "$p:"
     elif [ "$st" = disabled ]; then
       printf '%-22s NOT ENABLED (installed, disabled for this repository)\n' "$p:"
+    elif [ "$st" = foreign ]; then
+      printf '%-22s NOT INSTALLED (installed for another project)\n' "$p:"
     elif [ "$in_cache" -eq 1 ]; then
       printf '%-22s NOT INSTALLED (stale copy in plugin cache only)\n' "$p:"
     else
@@ -610,6 +620,7 @@ else
   printf 'plugin_cache: NOT FOUND (cannot detect installed plugins)\n'
 fi
 unset list_ok cache_ok plugin_states cached_plugins
+# setup-all-installed-plugins:end
 
 printf '\n=== GitHub CLI Auth ===\n'
 if [ -n "$_gh" ]; then
@@ -848,7 +859,10 @@ If a plugin shows `NOT INSTALLED` in the Installed Plugins section, classify it
 as **NOT INSTALLED** and skip all other checks for that plugin. A `NOT INSTALLED
 (stale copy in plugin cache only)` row is the same: the plugin is not in
 `claude plugin list`, so never classify it, never offer its setup, and at most
-mention that `/plugin` can clear the leftover copy. If a plugin shows `NOT
+mention that `/plugin` can clear the leftover copy. `NOT INSTALLED
+(installed for another project)` is also not installed here, but the cached
+copy belongs to a project- or local-scope install in another repository:
+never suggest clearing it, which would break that repository. If a plugin shows `NOT
 ENABLED`, classify it as **DISABLED**, skip all other checks, and never offer
 its setup; wherever a rule below requires another plugin to be "installed",
 `NOT ENABLED` counts as not installed. If `plugin_source` names the plugin

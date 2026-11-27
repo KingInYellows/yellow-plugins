@@ -1,6 +1,7 @@
 ---
 name: spec-flow-analyzer
-description: "User experience flow analyst and requirements engineer. Examines specifications through the lens of the end user. Use when reviewing requirements, identifying gaps in specifications, or validating user journey completeness."
+# prettier-ignore
+description: "Use when reviewing requirements or a spec from the end user's view: missing flows, gaps and incomplete user journeys."
 model: sonnet
 effort: medium
 background: true

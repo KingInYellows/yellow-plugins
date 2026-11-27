@@ -1,6 +1,7 @@
 ---
 name: mcp-health-probe
-description: "Canonical MCP server health classification (OFFLINE / DEGRADED / HEALTHY plus PRESENT (untested) refinement) for `/<plugin>:status` commands. Use when authoring a status command that needs to distinguish 'MCP never started' from 'MCP running but upstream API degraded'."
+# prettier-ignore
+description: "Use when authoring a /<plugin>:status command that must tell 'MCP never started' from 'MCP running but upstream degraded'. Canonical OFFLINE / DEGRADED / HEALTHY classification, plus PRESENT (untested)."
 user-invocable: false
 ---
 

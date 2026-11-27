@@ -1,7 +1,7 @@
 ---
 name: review-gate-verifier
 # prettier-ignore
-description: "Read-only verifier for one review finding. Use when the review-gate workflow's Vote phase needs a confirmed, refuted or unverifiable verdict on a finding, with a file:line citation; it reads code and never edits, runs commands or delegates."
+description: "Use when the review-gate workflow's Vote phase needs a confirmed, refuted or unverifiable verdict on one finding, with a file:line citation. Read-only: never edits, runs commands or delegates."
 model: opus
 effort: medium
 background: true

@@ -1,6 +1,7 @@
 ---
 name: reliability-reviewer
-description: "Conditional code-review persona, selected when the diff touches error handling, retries, circuit breakers, timeouts, health checks, background jobs, or async handlers. Use when reviewing any PR with I/O, async, or production-reliability-relevant code — review:pr selects this automatically based on diff content."
+# prettier-ignore
+description: "Use when a diff has I/O calls, async code, queues, jobs, retries, timeouts or external service calls; review:pr selects it from the diff. Reviews error handling, retries, circuit breakers and health checks for production reliability."
 model: sonnet
 effort: medium
 background: true

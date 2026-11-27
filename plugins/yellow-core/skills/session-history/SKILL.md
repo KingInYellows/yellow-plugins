@@ -1,6 +1,7 @@
 ---
 name: session-history
-description: "Search prior sessions across Claude Code, Devin, and Codex for the same problem or topic. Use when the current session cannot see prior context — after agent compaction, session boundary, or when reconstructing a multi-session decision trail. This searches raw prior-session transcripts; for distilled learnings, use ruvector recall (/ruvector:memory)."
+# prettier-ignore
+description: "Use when the user asks what was tried or decided in earlier sessions, or context was lost to compaction or a session boundary. Searches raw Claude Code, Devin and Codex transcripts for the same topic. For distilled learnings, use ruvector recall (/ruvector:memory)."
 argument-hint: '[query — topic, decision phrase, error string, or "last N days" time range]'
 user-invocable: true
 ---

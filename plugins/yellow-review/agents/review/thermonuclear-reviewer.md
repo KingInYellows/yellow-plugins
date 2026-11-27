@@ -1,6 +1,7 @@
 ---
 name: thermonuclear-reviewer
-description: "Opt-in structural-quality review persona, never auto-selected — a repository enables it by naming it in `reviewer_set.include` in `yellow-plugins.local.md`. Use when a change set needs an unusually strict architecture pass: code-judo restructurings, spaghetti-condition growth, weak type and module boundaries, misplaced ownership, and file-size threshold crossings."
+# prettier-ignore
+description: "Use only when a repository names it in `reviewer_set.include` in `yellow-plugins.local.md`; never auto-selected. Unusually strict structural pass: code-judo restructuring, spaghetti conditions, weak type and module boundaries, misplaced ownership, file-size thresholds."
 model: opus
 effort: xhigh
 background: true

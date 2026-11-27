@@ -1,7 +1,7 @@
 ---
 name: review:triage
 # prettier-ignore
-description: 'Triage the review-findings ledger of one PR: re-verify every residual finding against the PR head, then fix, dismiss, restore or skip each one. Use when a sweep summary or the session-start notice reports pending review findings; --non-interactive and --prune are the unattended modes /review:sweep and /review:sweep-all call.'
+description: "Use when a sweep summary or the session-start notice reports pending review findings for a PR. Re-verifies each residual finding against the PR head, then fixes, dismisses, restores or skips it; --non-interactive and --prune are the unattended modes the sweeps call."
 argument-hint: '[PR# | URL | branch] [--non-interactive] | --prune <PR#>'
 allowed-tools:
   - Bash

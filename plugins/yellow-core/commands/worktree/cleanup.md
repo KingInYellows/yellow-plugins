@@ -1,6 +1,7 @@
 ---
 name: worktree:cleanup
-description: 'Scan git worktrees, evaluate staleness, and remove stale worktrees with safeguards'
+# prettier-ignore
+description: "Use when removing stale Git worktrees: scans them, rates staleness and removes them with safeguards."
 argument-hint: '[--dry-run]'
 allowed-tools:
   - Bash

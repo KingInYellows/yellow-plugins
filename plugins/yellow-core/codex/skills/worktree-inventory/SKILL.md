@@ -1,6 +1,6 @@
 ---
 name: worktree-inventory
-description: List existing Git worktrees and their branch, detached, lock and prune status without changing the repository. Use when inspecting worktree locations or diagnosing isolation.
+description: Use when inspecting worktree locations or diagnosing isolation. Lists Git worktrees with branch, detached, lock and prune status, read-only.
 ---
 
 # Worktree Inventory

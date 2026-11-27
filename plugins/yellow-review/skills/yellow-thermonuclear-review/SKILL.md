@@ -1,6 +1,7 @@
 ---
 name: yellow-thermonuclear-review
-description: "Opt-in structural maintainability rubric adapted from Cursor's thermo-nuclear code-quality review. Use only when explicitly asked for a thermonuclear review, a code-judo simplification pass, spaghetti-growth analysis, giant-file review, or an unusually strict architecture-quality audit; never apply it automatically to an ordinary review."
+# prettier-ignore
+description: "Use only when explicitly asked for a thermonuclear review, a code-judo simplification, a spaghetti-growth or giant-file review, or an unusually strict architecture audit; never on an ordinary review. Structural rubric adapted from Cursor's thermo-nuclear review."
 user-invocable: false
 ---
 

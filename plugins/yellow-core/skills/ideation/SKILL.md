@@ -1,6 +1,7 @@
 ---
 name: ideation
-description: "Generate 3 grounded approaches to a soft problem, then hand the chosen one off to `brainstorm-orchestrator`. Use when the problem statement is still vague or `/flow:brainstorm` narrows too quickly."
+# prettier-ignore
+description: "Use when a problem is still vague or /flow:brainstorm narrows too fast. Generates 3 grounded approaches and hands the chosen one to brainstorm-orchestrator."
 argument-hint: '[problem statement; append --strict-warrant or --no-strict-warrant to override domain default]'
 user-invocable: true
 ---

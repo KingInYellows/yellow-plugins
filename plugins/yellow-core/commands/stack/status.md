@@ -1,6 +1,7 @@
 ---
 name: stack:status
-description: 'Report which stacked-PR provider is active and classify the state as UNSELECTED, READY_GRAPHITE, READY_GITHUB, CONFLICT, CONFIG_MISMATCH, CONFIG_INVALID, MANAGED_CONFLICT, or PARTIAL_TOOLING. Use when checking which provider is in effect or diagnosing why a stack workflow refused to run.'
+# prettier-ignore
+description: "Use when checking which stacked-PR provider (Graphite or GitHub) is active, or diagnosing why a stack workflow refused to run. Reports one state, such as READY_GRAPHITE, READY_GITHUB, UNSELECTED or CONFLICT."
 argument-hint: ''
 allowed-tools:
   - Bash

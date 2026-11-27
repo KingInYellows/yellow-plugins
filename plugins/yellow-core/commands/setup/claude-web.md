@@ -1,6 +1,7 @@
 ---
 name: setup:claude-web
-description: "Prepare a repository for Claude Code Web: audit and scaffold .claude/settings.json, scripts/install_pkgs.sh bootstrap, .gitattributes, .gitignore, and .github/workflows/claude.yml. Use when first enabling cloud sessions, after adding MCP servers, or when cloud sessions fail to find expected tools."
+# prettier-ignore
+description: "Use when first enabling Claude Code Web cloud sessions for a repo, after adding MCP servers, or when cloud sessions cannot find expected tools. Audits and scaffolds .claude/settings.json, scripts/install_pkgs.sh, .gitattributes, .gitignore and the claude.yml workflow."
 argument-hint: ''
 allowed-tools:
   - Bash

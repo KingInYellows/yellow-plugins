@@ -1,6 +1,7 @@
 ---
 name: performance-oracle
-description: "Performance bottleneck analysis specialist. Identifies algorithmic complexity issues, database query problems (N+1), memory management concerns, caching opportunities, and network optimization. Use when reviewing code for performance issues or optimizing hot paths."
+# prettier-ignore
+description: "Use when reviewing code for performance problems or optimizing a hot path. Finds algorithmic complexity, N+1 queries, memory issues, and caching and network opportunities."
 model: opus
 effort: high
 background: true

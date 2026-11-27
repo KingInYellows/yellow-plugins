@@ -1,6 +1,7 @@
 ---
 name: project-standards-reviewer
-description: "Always-on code-review persona. Audits changes against the project's own CLAUDE.md and AGENTS.md standards — frontmatter rules, reference inclusion, naming conventions, cross-platform portability, and tool-selection policies. Use when reviewing any PR — selected automatically by review:pr alongside the other always-on personas; complements project-compliance-reviewer (general convention adherence)."
+# prettier-ignore
+description: "Use on every PR (always-on in review:pr). Audits against the project's CLAUDE.md and AGENTS.md standards: frontmatter rules, reference inclusion, naming, cross-platform portability and tool-selection policy. General convention adherence belongs to project-compliance-reviewer."
 model: haiku
 effort: medium
 experimental:

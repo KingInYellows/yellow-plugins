@@ -1,7 +1,7 @@
 ---
 name: comment-reviewer
 # prettier-ignore
-description: "Simplify-pass persona that finds code comments to delete and code to reshape so a comment is no longer needed, in .js, .ts, .sh, .bats and .py files only. Use when /flow:work's simplify pass dispatches it on a branch diff that adds or changes code comments; review:pr does not select it."
+description: "Use when /flow:work's simplify pass dispatches it on a branch diff that changes code comments in .js, .ts, .sh, .bats or .py files; review:pr does not select it. Finds comments to delete and code to reshape so a comment is unneeded."
 model: haiku
 effort: medium
 background: true

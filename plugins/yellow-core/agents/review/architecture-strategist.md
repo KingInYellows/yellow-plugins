@@ -1,6 +1,7 @@
 ---
 name: architecture-strategist
-description: "Architectural compliance reviewer evaluating SOLID principles, component boundaries, coupling/cohesion, dependency direction, and API contract stability. Use when reviewing architectural decisions or assessing design quality of new features."
+# prettier-ignore
+description: "Use when reviewing architectural decisions or the design of a new feature: SOLID, component boundaries, coupling and cohesion, dependency direction and API contract stability."
 model: opus
 effort: high
 background: true

@@ -1,7 +1,7 @@
 ---
 name: review:resolve
 # prettier-ignore
-description: "Parallel resolution of unresolved PR review comments with actionability filtering and same-region clustering. Drops non-actionable threads (LGTM, nit:, 👍, thanks) before dispatch and consolidates threads on the same file region into a single resolver task. It replies to and resolves threads, files follow-up issues, commits and pushes fixes, and ends with a Resolve: line. Use when you want to address all pending review feedback on a PR by spawning parallel resolver agents."
+description: "Use when the user wants the review comments or unresolved threads on one PR addressed: fixes them with parallel resolver agents, replies to and resolves threads, files follow-ups, commits and pushes, and ends with a Resolve: line. Not for reviewing code (/review:pr), a whole stack (/review:resolve-stack) or review plus resolve in one pass (/review:sweep)."
 argument-hint: '[PR#] [--non-interactive]'
 allowed-tools:
   - Bash

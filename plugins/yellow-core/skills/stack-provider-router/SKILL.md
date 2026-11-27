@@ -1,6 +1,7 @@
 ---
 name: stack-provider-router
-description: 'Resolve which stacked-PR provider is active and route provider-specific work to it, or refuse when the state is ambiguous. Use when a workflow needs to know whether Graphite or GitHub native stacks is in effect before running a stack operation.'
+# prettier-ignore
+description: "Use when a workflow must know whether Graphite or GitHub native stacks is active before a stack operation. Routes provider-specific work to the active provider, or refuses when the state is ambiguous."
 user-invocable: false
 ---
 
@@ -206,7 +207,8 @@ follow Step 3 instead.
 
 **`READY_GRAPHITE`** — the active provider is `gt-workflow`. Dispatch
 Graphite-owned work there (for example `/gt-workflow:smart-submit`, `/gt-workflow:gt-sync`,
-`/gt-workflow:gt-stack-plan`).
+`/gt-workflow:gt-stack-plan`; `/flow:plan` sends stack decomposition there
+only on this state and to yellow-core's `stack-decompose` otherwise).
 
 **`READY_GITHUB`** — the active provider is `github-workflow`. Dispatch
 GitHub-owned work to its `github-stack:*` command surface (for example

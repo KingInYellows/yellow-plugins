@@ -1,6 +1,7 @@
 ---
 name: code-simplicity-reviewer
-description: "YAGNI enforcement and simplification analysis (pre-fix pass). Use when running full review passes to ensure code is minimal, removing unnecessary abstractions, premature optimizations, and unused features. For post-fix simplification, see code-simplifier (yellow-review)."
+# prettier-ignore
+description: "Use when a review pass before fixes should check that code is minimal: needless abstractions, premature optimization, unused features (YAGNI). After fixes, use code-simplifier (yellow-review)."
 model: sonnet
 effort: medium
 background: true

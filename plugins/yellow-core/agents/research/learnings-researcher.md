@@ -1,7 +1,7 @@
 ---
 name: learnings-researcher
 # prettier-ignore
-description: "Searches docs/solutions/ (and rule packs, when /flow:plan passes them) for past learnings relevant to a PR diff or planning context, returning a fenced advisory block of distilled findings. Use when running /review:pr, /review:all, or /docs:review — surfaces prior bugs, architecture patterns, design decisions, and conventions so institutional knowledge carries forward into the current work."
+description: "Use when /review:pr, /review:all, /docs:review or /flow:plan needs past learnings for a diff or plan. Searches docs/solutions/ (and rule packs that /flow:plan passes) and returns a fenced advisory block of prior bugs, patterns, decisions and conventions."
 model: haiku
 effort: low
 tools:

@@ -113,12 +113,18 @@ map is keyed by set id. Refresh it only from a run without `--case` whose
 | `yellow-core:debugging`    |   1.00 |        1.00 |          1.00 |                    0.96 |
 | `yellow-core:flow-plan`    |   0.75 |        1.00 |          0.83 |                    0.75 |
 | `yellow-review:resolve-pr` |   1.00 |        1.00 |          1.00 |                    1.00 |
-| `yellow-review:review-pr`  |   0.50 |        1.00 |          0.83 |                    0.50 |
+| `yellow-review:review-pr`  |   1.00 |        1.00 |          1.00 |                    1.00 |
 
 No near miss fired its target. The 2026-11-19 gap was recall: `debugging` (0.13)
 and `/flow:plan` (0.25) rarely fired from a natural prompt. The R2.4
 (CLAUDE-326) rewrite put the trigger condition first and named the neighbours
 each one is not for. Those two keys come from a rerun of just those sets on
 2026-11-25 (Claude Code 2.1.332, Sonnet 5.5, 3 runs, 7.45 USD API-equivalent,
-not a bill, no failed runs); the other rows and the top-level fields are still
-the 2026-11-19 full run.
+not a bill, no failed runs); the two `yellow-review` keys come from a rerun of
+just those sets on 2026-11-27 after the second R2.4 slice rewrote most
+yellow-core and yellow-review descriptions (Claude Code 2.1.332, Sonnet 5.5, 3
+runs, 14.05 USD API-equivalent, not a bill, 151 s, no failed runs): `review-pr`
+recall 0.50 to 1.00, and `resolve-pr` held at 1.00 with a shorter description.
+The new `review-pr` description paraphrases held-out query p06 (bugs, security,
+test gaps), so its held-out score is not independent; replace p06 before the
+next rerun (CLAUDE-406). The top-level fields are still the 2026-11-19 full run.

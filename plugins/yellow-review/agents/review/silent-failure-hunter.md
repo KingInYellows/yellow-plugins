@@ -1,6 +1,7 @@
 ---
 name: silent-failure-hunter
-description: "Conditional code-review persona, selected when the diff contains try-catch blocks, error handling, fallback logic, or any code that could suppress errors. Ensures failures are visible and actionable."
+# prettier-ignore
+description: "Use when a diff has try/catch blocks, error handling, fallbacks or other code that could swallow errors; review:pr selects it. Makes sure failures stay visible and actionable."
 model: sonnet
 effort: medium
 background: true

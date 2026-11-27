@@ -1,6 +1,7 @@
 ---
 name: mcp-integration-patterns
-description: "Shared patterns for ruvector recall/remember and morph discovery integration (the ruvector protocol constants are a replica of yellow-ruvector's canonical memory-query skill). Use when authoring commands or agents that should leverage institutional memory and advanced editing tools."
+# prettier-ignore
+description: "Use when authoring a command or agent that should use ruvector memory (recall, remember) or morph editing tools. Shared integration patterns; its ruvector constants replicate yellow-ruvector's memory-query skill."
 user-invocable: false
 ---
 

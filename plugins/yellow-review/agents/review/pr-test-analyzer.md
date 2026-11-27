@@ -1,6 +1,7 @@
 ---
 name: pr-test-analyzer
-description: "Conditional code-review persona, selected when the diff includes test files or adds testable business logic. Verifies tests cover critical paths, edge cases, and failure modes."
+# prettier-ignore
+description: "Use when a diff includes tests or adds testable business logic; review:pr selects it. Checks tests cover critical paths, edge cases and failure modes."
 model: sonnet
 effort: medium
 background: true

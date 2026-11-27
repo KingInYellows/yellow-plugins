@@ -1,6 +1,7 @@
 ---
 name: session-historian
-description: "Cross-vendor session historian. Searches prior sessions across Claude Code (local JSONL), Devin (REST API via MCP), and Codex (local directory-per-session) for the same problem or topic, returns timestamped per-vendor results merged by relevance, with secret redaction. Use when the dispatching skill or workflow needs to surface prior decisions or attempted approaches that the current session cannot see — typically dispatched by /yellow-core:session-history."
+# prettier-ignore
+description: "Use when a workflow, usually /yellow-core:session-history, needs prior decisions or attempted approaches the current session cannot see. Searches past Claude Code, Devin and Codex sessions for the same problem and returns timestamped, redacted results merged by relevance."
 model: sonnet
 effort: medium
 memory: project
