@@ -1,6 +1,7 @@
 ---
 name: optimize
-description: "Run a metric-driven optimization pass: parallel candidate variants scored against an LLM-as-judge analytic rubric. Use when comparing approaches against a measurable goal — anywhere 'better' can be expressed as a per-criterion rubric. For session-level plan-adherence and scope-drift review, use /flow:review instead."
+# prettier-ignore
+description: "Use when comparing candidate approaches against a measurable goal: runs parallel variants and scores them with an LLM-as-judge per-criterion rubric. For plan adherence and scope drift, use /flow:review."
 argument-hint: '[path to optimization spec YAML, or describe the optimization goal to scaffold one interactively]'
 user-invocable: true
 ---

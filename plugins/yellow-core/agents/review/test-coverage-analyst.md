@@ -1,6 +1,7 @@
 ---
 name: test-coverage-analyst
-description: "Test quality and coverage analysis specialist for full test suite audits. Evaluates test structure, naming conventions, edge case coverage, mock usage, and assertion quality. Use when auditing test suites, identifying coverage gaps, or improving test strategy. For PR-scoped test analysis, use pr-test-analyzer (yellow-review) instead."
+# prettier-ignore
+description: "Use when auditing a whole test suite for coverage gaps, edge cases, mock use, assertion quality, naming and structure, or when improving test strategy. For tests in one PR, use pr-test-analyzer (yellow-review)."
 model: sonnet
 effort: medium
 background: true

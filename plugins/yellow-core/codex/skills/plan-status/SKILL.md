@@ -1,6 +1,6 @@
 ---
 name: plan-status
-description: Show a per-file checkbox progress dashboard of plans/ (open) and plans/complete/ (archived) plan documents. Use when reviewing which plans are ready to archive or checking work-in-flight at a glance.
+description: Use when checking which plans are ready to archive or what work is in flight. Shows per-file checkbox progress for plans/ (open) and plans/complete/ (archived).
 ---
 
 ## What It Does

@@ -1,6 +1,7 @@
 ---
 name: correctness-reviewer
-description: "Always-on code-review persona. Reviews code for logic errors, edge cases, state-management bugs, error propagation failures, and intent-vs-implementation mismatches. Use when reviewing any PR — selected automatically by review:pr alongside the other always-on personas."
+# prettier-ignore
+description: "Use on every PR (always-on in review:pr). Flags logic errors, edge cases, state bugs, broken error propagation and intent-vs-implementation mismatches."
 model: sonnet
 effort: medium
 experimental:

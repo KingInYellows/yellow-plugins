@@ -1,7 +1,7 @@
 ---
 name: setup:all
 # prettier-ignore
-description: "Run setup for all installed marketplace plugins. Checks local prerequisites, MCP visibility, environment variables, and plugin status, then offers interactive setup for plugins that need it."
+description: "Use after installing marketplace plugins or when one reports missing setup. Checks prerequisites, MCP visibility, env vars and plugin status, then offers setup for each plugin that needs it."
 argument-hint: ''
 allowed-tools:
   - Bash

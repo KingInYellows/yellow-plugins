@@ -1,6 +1,7 @@
 ---
 name: brainstorm-orchestrator
-description: 'Iterative brainstorm dialogue — questions, research, approaches, doc write. Input: feature topic or empty string. Output: docs/brainstorms/<date>-<topic>-brainstorm.md. Use when running /flow:brainstorm.'
+# prettier-ignore
+description: "Use when running /flow:brainstorm. Iterative dialogue (questions, research, approaches) on a topic, written to docs/brainstorms/<date>-<topic>-brainstorm.md."
 model: sonnet
 effort: high
 memory: project

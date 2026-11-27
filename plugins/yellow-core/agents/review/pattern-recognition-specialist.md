@@ -1,6 +1,7 @@
 ---
 name: pattern-recognition-specialist
-description: "Code pattern analysis specialist detecting anti-patterns, naming convention violations, duplication, and inconsistency across codebases. Use when reviewing PRs that introduce new patterns, new directories, new file type conventions, checking codebase consistency, or when changes touch agents/*.md, commands/*.md, skills/*/SKILL.md, or plugin.json files (plugin authoring convention checks)."
+# prettier-ignore
+description: "Use when a PR introduces new patterns, directories or file conventions, or touches agents/*.md, commands/*.md, skills/*/SKILL.md or plugin.json. Finds anti-patterns, naming drift, duplication and inconsistency, including plugin-authoring conventions."
 model: sonnet
 effort: medium
 background: true

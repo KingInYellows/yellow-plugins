@@ -1,6 +1,7 @@
 ---
 name: review:pr
-description: 'Adaptive multi-agent review of a single PR with a tiered persona pipeline, learnings pre-pass, and confidence-rubric aggregation. Use when you want comprehensive code review with automatic agent selection based on PR size and content.'
+# prettier-ignore
+description: "Use when the user asks you to review a pull request (by number, URL or branch), to do a code review of a PR, or to check a PR for bugs, security issues or test gaps. Runs an adaptive multi-agent review that picks reviewers from the diff and ranks findings by confidence. Not for addressing existing comments (/review:resolve), a whole stack (/review:all) or a merge-readiness check (/review:merge-ready)."
 argument-hint: '[PR# | URL | branch] [--non-interactive] [--report-only]'
 allowed-tools:
   - Bash

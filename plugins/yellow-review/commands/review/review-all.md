@@ -1,6 +1,7 @@
 ---
 name: review:all
-description: 'Sequential review of multiple PRs — your stack, all open PRs, or a single PR. Use when you want to review an entire stack in dependency order or batch-review all your open PRs.'
+# prettier-ignore
+description: "Use when reviewing a whole stack in dependency order, or batch-reviewing all your open PRs. Reviews several PRs one after another: your stack, all open PRs, or one PR."
 argument-hint: '[scope: stack|all|PR#]'
 allowed-tools:
   - Bash

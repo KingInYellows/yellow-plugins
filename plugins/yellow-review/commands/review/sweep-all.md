@@ -1,7 +1,7 @@
 ---
 name: review:sweep-all
 # prettier-ignore
-description: 'Run /review:sweep on every open non-draft PR authored by the current user, sequentially, with one upfront confirmation. Use when you want to clear review + resolve backlog across all your open PRs in one batch.'
+description: "Use when /review:sweep should run on every open non-draft PR the current user authored, one after another, after a single confirmation."
 argument-hint: ''
 allowed-tools:
   - Bash

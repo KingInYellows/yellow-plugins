@@ -1,6 +1,7 @@
 ---
 name: best-practices-researcher
-description: "Technology researcher specializing in discovering and synthesizing best practices from authoritative sources. Use when implementing new features, evaluating libraries, or establishing architectural patterns."
+# prettier-ignore
+description: "Use when implementing a new feature, evaluating libraries or setting architectural patterns. Finds and synthesizes best practices from authoritative sources."
 model: sonnet
 effort: medium
 background: true

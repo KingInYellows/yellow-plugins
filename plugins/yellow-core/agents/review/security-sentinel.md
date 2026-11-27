@@ -1,6 +1,7 @@
 ---
 name: security-sentinel
-description: "Active security vulnerability audit specialist (OWASP top 10, injection attacks, XSS, hardcoded secrets, auth/authz flaws). Use when auditing code for exploitable issues or reviewing changes that touch auth, input handling, or data access. For security tech debt (not active vulnerabilities), use security-debt-scanner (yellow-debt)."
+# prettier-ignore
+description: "Use when auditing code for exploitable vulnerabilities (OWASP top 10, injection, XSS, hardcoded secrets, auth/authz flaws) or reviewing changes to auth, input handling or data access. For security tech debt, use security-debt-scanner (yellow-debt)."
 model: opus
 effort: high
 background: true

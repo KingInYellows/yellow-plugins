@@ -1,6 +1,7 @@
 ---
 name: staging-scorer
-description: Score a session-transcript excerpt for compounding salience and return structured JSON with category, candidate text, priority, and tags. Use when invoked by staging-reviewer during a background drain; emits SKIP for trivial content rather than promoting low-priority entries.
+# prettier-ignore
+description: "Use when staging-reviewer, during a background drain, needs a session-transcript excerpt scored for compounding salience. Returns JSON (category, candidate text, priority, tags), or SKIP for trivial content."
 model: haiku
 effort: low
 tools:

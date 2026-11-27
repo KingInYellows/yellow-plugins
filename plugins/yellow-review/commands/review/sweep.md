@@ -1,7 +1,7 @@
 ---
 name: review:sweep
 # prettier-ignore
-description: 'Run /review:pr then /review:resolve on the same PR in one unattended pass — no gates, no per-step prompts. Use when you want both an AI review pass and cleanup of any open bot or human reviewer comment threads without manually re-invoking on the same PR number.'
+description: "Use when one PR should get an AI review and then have its open bot or human review threads resolved, in a single unattended pass. Runs /review:pr then /review:resolve on the same PR with no prompts."
 argument-hint: '[PR# | URL | branch]'
 allowed-tools:
   - Bash

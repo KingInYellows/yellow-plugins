@@ -1,6 +1,7 @@
 ---
 name: git-worktree
-description: "Git worktree management for isolated parallel development, and restacking a stack whose branches live in separate worktrees. Use when reviewing PRs in isolation, working on multiple features simultaneously, when workflows offer worktree option, or when a restack fails with already used by worktree."
+# prettier-ignore
+description: "Use when reviewing a PR in isolation, working on several features at once, a workflow offers a worktree, or a restack fails with \"already used by worktree\". Creates and manages Git worktrees, including restacks across them."
 argument-hint: '[create|list|switch|cleanup] <name>'
 user-invocable: true
 ---

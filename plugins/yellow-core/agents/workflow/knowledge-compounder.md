@@ -1,6 +1,7 @@
 ---
 name: knowledge-compounder
-description: 'Extract and document recently solved engineering problems using parallel subagents. Use when spawned by /flow:compound to capture solutions, or after /review:pr to compound review findings into docs/solutions/ and MEMORY.md.'
+# prettier-ignore
+description: "Use when /flow:compound, or a finished /review:pr, has solved problems worth recording. Documents them in docs/solutions/ and MEMORY.md using parallel subagents."
 model: sonnet
 effort: medium
 memory: project

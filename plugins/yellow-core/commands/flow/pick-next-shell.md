@@ -1,6 +1,7 @@
 ---
 name: flow:pick-next-shell
-description: Pick the lowest-numbered shell whose dependencies are archived in plans/complete/, expand it via /flow:expand-shell, capture learnings, and halt for a fresh /flow:work session. Reports deadlocks and the terminal state explicitly.
+# prettier-ignore
+description: "Use when starting the next shell from plans/shells/. Picks the lowest-numbered shell whose dependencies are archived in plans/complete/, expands it via /flow:expand-shell, records learnings, and halts for a fresh /flow:work session; reports deadlocks."
 argument-hint: ''
 allowed-tools:
   - Bash

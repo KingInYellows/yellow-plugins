@@ -1,6 +1,7 @@
 ---
 name: memory-recall-pattern
-description: "Recall-Before-Act pattern for ruvector — query past learnings via hooks_recall at workflow start. Use when authoring commands or agents that should seed a workflow with relevant institutional memory before executing."
+# prettier-ignore
+description: "Use when authoring a command or agent that should start from relevant institutional memory. Recall-Before-Act pattern: query ruvector via hooks_recall at workflow start."
 user-invocable: false
 ---
 

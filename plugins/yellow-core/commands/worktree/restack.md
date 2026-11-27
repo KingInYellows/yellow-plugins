@@ -1,6 +1,7 @@
 ---
 name: worktree:restack
-description: 'Restack a stack whose branches live in separate worktrees (use when a restack fails with "already used by worktree"), then restore every worktree; pauses on conflicts and resumes with --continue or --abort'
+# prettier-ignore
+description: "Use when a restack fails with \"already used by worktree\" because stack branches live in separate worktrees. Restacks, restores every worktree, and pauses on conflicts (--continue or --abort)."
 argument-hint: '[--continue | --abort | --status] [--submit] [--remote <name>] [--yes]'
 allowed-tools:
   - Bash

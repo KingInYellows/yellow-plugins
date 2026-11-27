@@ -1,6 +1,7 @@
 ---
 name: staging-promoter
-description: Promote a vetted compound-staging entry to docs/solutions/<category>/<slug>.md and append a one-line index entry to MEMORY.md's Session Notes section. Use when invoked by staging-reviewer with a fully-vetted entry; never asks for confirmation (frontmatter-enforced).
+# prettier-ignore
+description: "Use when staging-reviewer hands over a fully vetted compound-staging entry. Writes docs/solutions/<category>/<slug>.md and appends a one-line index entry to MEMORY.md's Session Notes; never asks for confirmation."
 model: haiku
 effort: medium
 memory: project

@@ -1,6 +1,7 @@
 ---
 name: stack-provider-guard
-description: 'Enforce the stacked-PR provider invariants before any provider-changing action — exactly one enabled, managed scopes fail closed, no direct settings edits, no silent fallback. Use when validating a proposed provider switch or auditing current provider state.'
+# prettier-ignore
+description: "Use when validating a proposed stacked-PR provider switch or auditing provider state. Enforces the invariants: exactly one enabled, managed scopes fail closed, no direct settings edits, no silent fallback."
 user-invocable: false
 ---
 

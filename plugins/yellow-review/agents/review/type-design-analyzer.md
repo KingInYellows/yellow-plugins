@@ -1,6 +1,7 @@
 ---
 name: type-design-analyzer
-description: "Conditional code-review persona, selected when the diff introduces or modifies type definitions (interfaces, classes, structs, enums, models) in TypeScript, Python, Rust, or Go. Ensures strong invariants and proper encapsulation."
+# prettier-ignore
+description: "Use when a diff adds or changes type definitions (interfaces, classes, structs, enums, models) in TypeScript, Python, Rust or Go; review:pr selects it. Checks invariants and encapsulation."
 model: sonnet
 effort: medium
 background: true

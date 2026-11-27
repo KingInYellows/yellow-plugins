@@ -1,7 +1,7 @@
 ---
 name: review:merge-ready
 # prettier-ignore
-description: 'Read-only merge gate for one PR: unresolved review threads (outdated included), CHANGES_REQUESTED reviewers, conversation-resolution enforcement, CI, pending P0-P2 ledger findings and the risk-tier human approval. Use before merging; it never writes to GitHub and adds no ledger records.'
+description: "Use before merging one PR, or when asked whether it is ready to merge. Read-only gate: unresolved threads (outdated included), CHANGES_REQUESTED, conversation resolution, CI, pending P0-P2 ledger findings and the risk-tier human approval. Never writes."
 argument-hint: '[PR# | URL | branch]'
 allowed-tools:
   - Bash
