@@ -48,6 +48,7 @@
 'use strict';
 
 const { readFileSync, lstatSync } = require('fs');
+const { join } = require('path');
 
 /**
  * Canonical provider table for the `stacked-pr` capability group.
@@ -689,6 +690,51 @@ function probeTarget({ plugins, intent = null, projectPath = null } = {}) {
 }
 
 /**
+ * Read the `enabledPlugins` maps that decide each scope, so the planner can
+ * see what `claude plugin list --json` folds away. The CLI reports ONE
+ * effective `enabled` per row (spike finding #3): a user-scope row of a
+ * plugin that the repository disables at project scope reads
+ * `enabled: false`, so the list alone cannot tell "off at user scope" from
+ * "on at user scope, off here". That gap let `/stack:select --scope user`
+ * enable the target at user scope while the project disable kept it off
+ * (CLAUDE-398), and skip the user-scope disable of the other provider,
+ * leaving both enabled in every other repository.
+ *
+ * Read-only and fail-soft: a missing, unreadable, symlinked or malformed
+ * file yields an empty map for that scope, which is exactly the old
+ * list-only behavior. Only boolean values are kept.
+ *
+ * @param {{ projectPath?: string|null, configDir?: string|null }} input
+ * @returns {{ user: object, project: object, local: object }}
+ */
+function readScopeSettings({ projectPath = null, configDir = null } = {}) {
+  const read = (file) => {
+    try {
+      if (!lstatSync(file).isFile()) return {};
+      const parsed = JSON.parse(readFileSync(file, 'utf8'));
+      const map = parsed && typeof parsed === 'object' ? parsed.enabledPlugins : null;
+      if (!map || typeof map !== 'object' || Array.isArray(map)) return {};
+      const out = {};
+      for (const [key, value] of Object.entries(map)) {
+        if (typeof value === 'boolean') out[key] = value;
+      }
+      return out;
+    } catch {
+      return {};
+    }
+  };
+  const hasProject = typeof projectPath === 'string' && projectPath.length > 0;
+  const hasConfig = typeof configDir === 'string' && configDir.length > 0;
+  return {
+    user: hasConfig ? read(join(configDir, 'settings.json')) : {},
+    project: hasProject ? read(join(projectPath, '.claude', 'settings.json')) : {},
+    local: hasProject
+      ? read(join(projectPath, '.claude', 'settings.local.json'))
+      : {},
+  };
+}
+
+/**
  * Build the exact, ordered command plan for switching to `target`.
  *
  * Returns `{ status: 'ok', steps }` or `{ status: 'refused', reason,
@@ -702,7 +748,11 @@ function probeTarget({ plugins, intent = null, projectPath = null } = {}) {
  *   scope?: string,
  *   projectPath?: string|null,
  *   marketplace?: string,
+ *   settings?: { user?: object, project?: object, local?: object }|null,
  * }} input
+ *
+ * `settings` is `readScopeSettings` output. Without it the plan is built
+ * from the folded list alone, as before.
  */
 function planProviderSwitch({
   plugins,
@@ -710,6 +760,7 @@ function planProviderSwitch({
   scope = 'user',
   projectPath = null,
   marketplace = DEFAULT_MARKETPLACE,
+  settings = null,
 } = {}) {
   const base = {
     group: PROVIDER_GROUP,
@@ -767,6 +818,38 @@ function planProviderSwitch({
     };
   }
 
+  const scopeSetting = (id, at) => {
+    const map = settings && settings[at];
+    const value =
+      map && typeof map === 'object'
+        ? map[`${providers[id].plugin}@${DEFAULT_MARKETPLACE}`]
+        : undefined;
+    return typeof value === 'boolean' ? value : undefined;
+  };
+
+  // A narrower scope that disables the target wins over an enable at
+  // `scope` (local > project > user), so the plan would finish "ok" with
+  // the target still off in this repository. Refuse and name the scope
+  // rather than rewrite a settings file the user did not choose; a rerun
+  // at that scope emits the enable there.
+  const narrower = WRITABLE_SCOPES.filter(
+    (candidate) => SCOPE_TIER[candidate] > SCOPE_TIER[scope]
+  ).sort((a, b) => SCOPE_TIER[b] - SCOPE_TIER[a]);
+  for (const candidate of narrower) {
+    const value = scopeSetting(target, candidate);
+    if (value === undefined) continue;
+    if (value === false) {
+      return {
+        ...base,
+        status: 'refused',
+        reason: 'narrower-override',
+        overrideScope: candidate,
+        detail: `${targetEntry.plugin} is disabled at ${candidate} scope in this repository, which overrides ${scope} scope, so enabling it at ${scope} scope would leave it disabled here. Re-run /stack:select ${target} --scope ${candidate}, or remove the ${candidate}-scope entry first.`,
+      };
+    }
+    break; // The narrowest explicit setting enables it; nothing to fix.
+  }
+
   const steps = [];
   const targetMarketplace = targetEntry.marketplaces[0] || marketplace;
   const targetRef = `${targetEntry.plugin}@${targetMarketplace}`;
@@ -796,7 +879,20 @@ function planProviderSwitch({
     // Raw, unsanitized scopes: refusing on a malformed value here is the
     // security control, so it must see the actual CLI output, not the
     // "unknown" placeholder `enabledScopes` substitutes for display.
-    for (const otherScope of [...new Set(other.enabledScopesRaw)]) {
+    // The settings files add scopes the folded list hides: an other
+    // provider on at user scope but off here reads `enabled: false`, yet a
+    // user-scope switch must still turn it off at user scope, or it stays
+    // on in every other repository next to the target.
+    // Only for an installed provider: a stale entry for an uninstalled
+    // plugin would emit a disable the CLI rejects mid-plan.
+    const fromSettings = other.installed
+      ? WRITABLE_SCOPES.filter(
+          (candidate) => scopeSetting(other.id, candidate) === true
+        )
+      : [];
+    for (const otherScope of [
+      ...new Set([...other.enabledScopesRaw, ...fromSettings]),
+    ]) {
       if (otherScope === 'managed') {
         // Unreachable: the managed pre-check above already refused. Kept as
         // a fail-closed backstop so a future edit to the pre-check cannot
@@ -1092,6 +1188,12 @@ function main(argv) {
     target: typeof args.target === 'string' ? args.target : '',
     scope: typeof args.scope === 'string' ? args.scope : 'user',
     projectPath,
+    // Opt-in: only a caller that names the user config dir gets settings
+    // reads, so fixture runs never see the real ~/.claude.
+    settings:
+      typeof args['config-dir'] === 'string'
+        ? readScopeSettings({ projectPath, configDir: args['config-dir'] })
+        : null,
   });
   console.log(JSON.stringify(plan, null, 2));
   return 0;
@@ -1116,5 +1218,6 @@ module.exports = {
   classifyProviderState,
   probeTarget,
   planProviderSwitch,
+  readScopeSettings,
   summarizeSwitchOutcome,
 };
