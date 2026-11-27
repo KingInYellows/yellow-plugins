@@ -256,7 +256,7 @@ pipeline.
 
 ## Shared Libraries
 
-`lib/` also carries five Node modules and three Python scripts, invoked rather
+`lib/` also carries six Node modules and three Python scripts, invoked rather
 than sourced:
 
 - `stack-provider-state.js` — the single owner of stacked-PR provider state.
@@ -294,6 +294,13 @@ than sourced:
   (yellow-cursor, yellow-devin, or yellow-jules) is active for
   `/linear:delegate` and `/setup:all` Step 2.5; a smaller sibling of
   `stack-provider-state.js` with no intent file and no switch plan
+- `flow-work-resume.js` — read-only resume evidence for `/flow:work`.
+  `committed-steps` lists the plan steps whose `Flow-Work-Step: <plan>#<N>`
+  commit trailer is on the branch since trunk (Phase 2 step 0 ticks them);
+  `stack-item` checks an unticked stack item's pull request with `gh` against
+  the repository, head, stack base and local tip (Phase 1 step 4a). It never
+  runs `gt`, and an unreadable answer is `UNAVAILABLE` / `ERROR`, never "no
+  evidence". Verified by `tests/integration/flow-work-resume.test.ts`
 - `run-github-stack-runtime.js` — how commands call github-workflow's
   `lib/github-stack-runtime.js`:
   `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" <op> ...`. Finds

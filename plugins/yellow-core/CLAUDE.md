@@ -152,6 +152,9 @@ the reference.
   readiness change must update both
 - `remote-agent-provider-state.js` — active `remote-agent` provider for
   `/linear:delegate` and `/setup:all` Step 2.5
+- `flow-work-resume.js` — `/flow:work` resume evidence: `Flow-Work-Step`
+  commit trailers for single-branch runs, the item's PR (via `gh`, never `gt`)
+  for stack runs. Read-only; the command applies the repair
 - `run-github-stack-runtime.js` — entry to github-workflow's runtime;
   yellow-review, yellow-debt, yellow-devin and yellow-semgrep ship
   byte-identical copies

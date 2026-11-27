@@ -5,3 +5,4 @@ EXIT_CODE=0
   "continue": true
 }
 --- STDERR ---
+[yellow-ci] Refresh failed: gh run list exited non-zero or timed out
