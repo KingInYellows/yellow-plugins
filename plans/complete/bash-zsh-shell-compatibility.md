@@ -156,7 +156,7 @@ mutation, and use only the enabled provider.
     547/594/610), and have that validator import them so there is one
     implementation.
   - **Prototype:**
-    `/tmp/claude-1000/-home-kinginyellow--herdr-worktrees-yellow-plugins-zsh-compatibility/2c9a3151-c782-4681-a8fa-8f3faec1c7ed/scratchpad/extract.js`
+    `/tmp/claude-1000/-home-<user>--herdr-worktrees-yellow-plugins-zsh-compatibility/2c9a3151-c782-4681-a8fa-8f3faec1c7ed/scratchpad/extract.js`
     (876 blocks found).
 - [x] 1.2: Add `scripts/validate-shell-compat.js`, the static lint.
   - Copy the skeleton from `scripts/validate-provider-neutral-commands.js`

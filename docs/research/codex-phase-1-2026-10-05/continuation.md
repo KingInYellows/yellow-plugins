@@ -3,7 +3,7 @@
 Phase 1 is COMPLETE. No prerequisite or validation blocker remains.
 
 Canonical WSL worktree:
- /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04
+ /home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04
 Base: cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0. All changes remain uncommitted.
 Preserve the dirty isolated worktree, other checkouts and older recovery notes.
 

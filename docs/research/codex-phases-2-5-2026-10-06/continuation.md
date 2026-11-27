@@ -5,7 +5,7 @@ blocked. Use report.md and acceptance-audit.json in this directory as the final
 evidence; historical October 5 receipts remain unchanged.
 
 Canonical worktree:
-`/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04`.
+`/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04`.
 Base `cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0`; detached, dirty and
 uncommitted. Do not copy, replace or reset this worktree. Run repository tools
 through Ubuntu-24.04 WSL using Node 22.22.0 / pnpm 8.15.0.

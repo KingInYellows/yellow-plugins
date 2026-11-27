@@ -21,7 +21,7 @@
       ],
       "exitCode": 0,
       "log": "/tmp/yellow-completion-check-1.log",
-      "tail": "\n> yellow-plugins-root@2.1.16 validate:versions /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/validate-versions.js\n\n[validate-versions] OK: 20 plugins \u2014 all versions in sync\n"
+      "tail": "\n> yellow-plugins-root@2.1.16 validate:versions /home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/validate-versions.js\n\n[validate-versions] OK: 20 plugins \u2014 all versions in sync\n"
     },
     {
       "command": [
@@ -30,7 +30,7 @@
       ],
       "exitCode": 0,
       "log": "/tmp/yellow-completion-check-2.log",
-      "tail": "\n> yellow-plugins-root@2.1.16 validate:generated /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/generate-manifests.js --check\n\n[generate-manifests] All 85 generated files match catalog/ sources\n"
+      "tail": "\n> yellow-plugins-root@2.1.16 validate:generated /home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/generate-manifests.js --check\n\n[generate-manifests] All 85 generated files match catalog/ sources\n"
     },
     {
       "command": [
@@ -39,7 +39,7 @@
       ],
       "exitCode": 0,
       "log": "/tmp/yellow-completion-check-3.log",
-      "tail": "\n> yellow-plugins-root@2.1.16 validate:solutions /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/validate-solutions.js\n\n\n[validate-solutions] checked 2 file(s); 0 error(s)\n"
+      "tail": "\n> yellow-plugins-root@2.1.16 validate:solutions /home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/validate-solutions.js\n\n\n[validate-solutions] checked 2 file(s); 0 error(s)\n"
     },
     {
       "command": [

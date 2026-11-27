@@ -9,11 +9,11 @@
       "enabled": true,
       "source": {
         "source": "local",
-        "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow"
+        "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/gt-workflow"
       },
       "marketplaceSource": {
         "sourceType": "local",
-        "source": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04"
+        "source": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04"
       },
       "installPolicy": "AVAILABLE",
       "authPolicy": "ON_INSTALL"
@@ -27,11 +27,11 @@
       "enabled": true,
       "source": {
         "source": "local",
-        "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core"
+        "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-core"
       },
       "marketplaceSource": {
         "sourceType": "local",
-        "source": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04"
+        "source": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04"
       },
       "installPolicy": "AVAILABLE",
       "authPolicy": "ON_INSTALL"
@@ -45,11 +45,11 @@
       "enabled": true,
       "source": {
         "source": "local",
-        "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review"
+        "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review"
       },
       "marketplaceSource": {
         "sourceType": "local",
-        "source": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04"
+        "source": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04"
       },
       "installPolicy": "AVAILABLE",
       "authPolicy": "ON_INSTALL"
@@ -63,11 +63,11 @@
       "enabled": true,
       "source": {
         "source": "local",
-        "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci"
+        "path": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci"
       },
       "marketplaceSource": {
         "sourceType": "local",
-        "source": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04"
+        "source": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04"
       },
       "installPolicy": "AVAILABLE",
       "authPolicy": "ON_INSTALL"

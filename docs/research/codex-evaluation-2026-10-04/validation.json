@@ -2,7 +2,7 @@
   "date": "2026-10-04",
   "timezone": "America/Chicago",
   "sourceRevision": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
-  "worktree": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04",
+  "worktree": "/home/<user>/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04",
   "branchState": "detached HEAD",
   "runtime": {
     "node": "22.22.0",

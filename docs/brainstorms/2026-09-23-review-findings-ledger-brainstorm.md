@@ -49,7 +49,7 @@ normalized lines) and reuses the original `finding_id`, so an edited anchor or a
 slightly varied recurrence still folds under the same key.
 
 Confirmed today (`git rev-parse --git-common-dir` inside this worktree resolves
-to `/home/kinginyellow/workspaces/yellow-harness_workspace/yellow-plugins/.git`,
+to `/home/<user>/workspaces/yellow-harness_workspace/yellow-plugins/.git`,
 the shared clone's git dir, not a per-worktree path):
 
 - **Location & format:**
