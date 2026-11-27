@@ -558,6 +558,25 @@ git_init_commit() {
   b=$(GH_REPO=owner/b core_key)
   [ "$a" != "$b" ]
   [ "$a" != "$(hook_cache_key "$dir")" ]
+  local other; other="$(cd "$(mktemp -d "$BATS_TEST_TMPDIR/ghrepo-XXXXXX")" && pwd -P)"
+  [ "$a" != "$(cd "$other" && GH_REPO=owner/a core_key)" ]
+}
+
+@test "SessionStart: origin fingerprint ignores credentials in the remote URL" {
+  command -v git >/dev/null || skip "git not installed"
+  local plain creds
+  plain="$(mktemp -d "$BATS_TEST_TMPDIR/fp-XXXXXX")"
+  creds="$(mktemp -d "$BATS_TEST_TMPDIR/fp-XXXXXX")"
+  git -C "$plain" init -q
+  git -C "$plain" remote add origin https://github.com/owner/repo.git
+  git -C "$creds" init -q
+  git -C "$creds" remote add origin https://user:s3cret@github.com/owner/repo.git
+  local fp='process.stdout.write(String(require(process.argv[1]).originFingerprint(process.argv[2])))'
+  run node -e "$fp" "$SCRIPTS_DIR/lib/session-start-core.js" "$plain"
+  local want="$output"
+  [ "${#want}" -eq 32 ]
+  run node -e "$fp" "$SCRIPTS_DIR/lib/session-start-core.js" "$creds"
+  [ "$output" = "$want" ]
 }
 
 @test "SessionStart: a cache written for another origin is not shown after a re-clone" {

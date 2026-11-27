@@ -360,7 +360,10 @@ function originFingerprint(cwd) {
     if (!inOrigin) continue;
     const kv = /^url\s*=\s*(.*)$/i.exec(line);
     if (kv && kv[1]) {
-      return crypto.createHash('md5').update(kv[1].trim()).digest('hex').slice(0, 32);
+      // Drop URL user-info so a token or password in the remote URL never
+      // reaches the cache file, even hashed.
+      const url = kv[1].trim().replace(/^([a-z][a-z0-9+.-]*:\/\/)[^@/]*@/i, '$1');
+      return crypto.createHash('md5').update(url).digest('hex').slice(0, 32);
     }
   }
   return null;
