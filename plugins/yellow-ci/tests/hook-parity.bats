@@ -78,6 +78,9 @@ SCRIPTS_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../hooks/scripts" && pwd)"
 
 setup() {
   load lib/hook-scenario.bash
+  # The cache key folds GH_REPO in; a value from the caller's shell would
+  # change every seeded key.
+  unset GH_REPO
 }
 
 golden_exit_code() { awk -F= '/^EXIT_CODE=/{print $2; exit}' "$1"; }
@@ -504,4 +507,135 @@ age_link() {
   run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
   [ "$status" -eq 0 ]
   [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+}
+
+# CLAUDE-400: cache-key and marker edge cases from the #1932 review.
+core_key() {
+  node -e 'process.stdout.write(require(process.argv[1]).cacheKeyFor(process.cwd(), process.env))' "$SCRIPTS_DIR/lib/session-start-core.js"
+}
+
+git_init_commit() {
+  git -C "$1" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m init
+}
+
+@test "SessionStart: a worktree .git file whose back-pointer names another checkout keys on cwd" {
+  command -v git >/dev/null || skip "git not installed"
+  local sandbox; sandbox="$(cd "$(mktemp -d "$BATS_TEST_TMPDIR/bp-XXXXXX")" && pwd -P)"
+  git init -q "$sandbox/main"
+  git_init_commit "$sandbox/main"
+  git -C "$sandbox/main" worktree add -q "$sandbox/wt"
+  # A copy of the worktree's .git file elsewhere points at the same gitdir,
+  # but that gitdir's back-pointer names $sandbox/wt, not the copy.
+  mkdir -p "$sandbox/fake"
+  cp "$sandbox/wt/.git" "$sandbox/fake/.git"
+  cd "$sandbox/fake"
+  run core_key
+  [ "$output" = "$(hook_cache_key "$sandbox/fake")" ]
+  cd "$sandbox/wt"
+  run core_key
+  [ "$output" = "$(hook_cache_key "$sandbox/main")" ]
+}
+
+@test "SessionStart: a --separate-git-dir checkout and its worktree share one cache key" {
+  command -v git >/dev/null || skip "git not installed"
+  local sandbox; sandbox="$(cd "$(mktemp -d "$BATS_TEST_TMPDIR/sep-XXXXXX")" && pwd -P)"
+  git init -q --separate-git-dir "$sandbox/store.git" "$sandbox/main"
+  git_init_commit "$sandbox/main"
+  git -C "$sandbox/main" worktree add -q "$sandbox/wt"
+  cd "$sandbox/main"
+  run core_key
+  local main_key="$output"
+  [ "$main_key" = "$(hook_cache_key "$sandbox/store.git")" ]
+  cd "$sandbox/wt"
+  run core_key
+  [ "$output" = "$main_key" ]
+}
+
+@test "SessionStart: GH_REPO is part of the cache key; unset keeps the old key" {
+  local dir; dir="$(cd "$(mktemp -d "$BATS_TEST_TMPDIR/ghrepo-XXXXXX")" && pwd -P)"
+  cd "$dir"
+  run env -u GH_REPO node -e 'process.stdout.write(require(process.argv[1]).cacheKeyFor(process.cwd(), process.env))' "$SCRIPTS_DIR/lib/session-start-core.js"
+  [ "$output" = "$(hook_cache_key "$dir")" ]
+  local a b
+  a=$(GH_REPO=owner/a core_key)
+  b=$(GH_REPO=owner/b core_key)
+  [ "$a" != "$b" ]
+  [ "$a" != "$(hook_cache_key "$dir")" ]
+  local other; other="$(cd "$(mktemp -d "$BATS_TEST_TMPDIR/ghrepo-XXXXXX")" && pwd -P)"
+  [ "$a" != "$(cd "$other" && GH_REPO=owner/a core_key)" ]
+}
+
+@test "SessionStart: origin fingerprint ignores credentials in the remote URL" {
+  command -v git >/dev/null || skip "git not installed"
+  local plain creds
+  plain="$(mktemp -d "$BATS_TEST_TMPDIR/fp-XXXXXX")"
+  creds="$(mktemp -d "$BATS_TEST_TMPDIR/fp-XXXXXX")"
+  git -C "$plain" init -q
+  git -C "$plain" remote add origin https://github.com/owner/repo.git
+  git -C "$creds" init -q
+  git -C "$creds" remote add origin https://user:s3cret@github.com/owner/repo.git
+  local fp='process.stdout.write(String(require(process.argv[1]).originFingerprint(process.argv[2])))'
+  run node -e "$fp" "$SCRIPTS_DIR/lib/session-start-core.js" "$plain"
+  local want="$output"
+  [ "${#want}" -eq 32 ]
+  run node -e "$fp" "$SCRIPTS_DIR/lib/session-start-core.js" "$creds"
+  [ "$output" = "$want" ]
+}
+
+@test "SessionStart: a cache written for another origin is not shown after a re-clone" {
+  command -v git >/dev/null || skip "git not installed"
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/reclone-XXXXXX")"
+  hook_scenario_setup cache-hit "$sandbox"
+  local work="$HOOK_SCENARIO_WORKDIR"
+  git -C "$work" init -q
+  git -C "$work" remote add origin https://github.com/owner/new.git
+  cd "$work"
+  local key; key=$(hook_cache_key "$work")
+  local cache="$HOME/.local/share/yellow-ci/last-check-$key"
+  local old new
+  old=$(hook_cache_key https://github.com/owner/old.git)
+  new=$(node -e 'process.stdout.write(require(process.argv[1]).originFingerprint(process.cwd()))' "$SCRIPTS_DIR/lib/session-start-core.js")
+  [ "$new" = "$(hook_cache_key https://github.com/owner/new.git)" ]
+
+  printf '{"failureCount":1,"branches":["cached-branch"],"remote":"%s"}' "$old" >"$cache"
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" != *"cached-branch"* ]]
+
+  printf '{"failureCount":1,"branches":["cached-branch"],"remote":"%s"}' "$new" >"$cache"
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+}
+
+@test "SessionStart: a refresh marker removed between EEXIST and lstat is claimed, not an error" {
+  local dir; dir="$(mktemp -d "$BATS_TEST_TMPDIR/race-XXXXXX")"
+  run node -e '
+    const fs = require("fs");
+    const core = require(process.argv[1]);
+    const marker = process.argv[2] + "/refresh-x";
+    const real = fs.openSync;
+    let first = true;
+    // The first exclusive create sees a marker that a finishing refresh
+    // removes before the lstat: the marker never exists on disk here.
+    fs.openSync = (...args) => {
+      if (first && args[1] === "wx") {
+        first = false;
+        const err = new Error("exists");
+        err.code = "EEXIST";
+        throw err;
+      }
+      return real(...args);
+    };
+    process.stdout.write(core.claimRefreshMarker(process.argv[2], marker));
+  ' "$SCRIPTS_DIR/lib/session-start-core.js" "$dir"
+  [ "$output" = "claimed" ]
+  [ -f "$dir/refresh-x" ]
+}
+
+@test "SessionStart: formatAge rounds down into min, h and days" {
+  run node -e '
+    const { formatAge } = require(process.argv[1]);
+    process.stdout.write([59, 600, 3599, 3600, 172799, 172800].map(formatAge).join("|"));
+  ' "$SCRIPTS_DIR/lib/session-start-core.js"
+  [ "$output" = "0 min ago|10 min ago|59 min ago|1 h ago|47 h ago|2 days ago" ]
 }
