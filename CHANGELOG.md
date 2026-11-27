@@ -13,6 +13,32 @@ and this project adheres to
 
 ---
 
+## [2.1.42] - 2026-11-27
+
+### Fixed
+
+- **yellow-core 2.17.4** makes `/flow:work` resume without Graphite and without
+  redoing finished work. The stack progress check runs after the provider router
+  and uses only git and `gh`, so an item that was submitted before its
+  `## Stack Progress` row was written is matched to its pull request and ticked
+  instead of being submitted again. Single-branch step commits carry a
+  `Flow-Work-Step` trailer, so a step committed before its checkbox was ticked
+  is recognised on resume. The `debugging` skill and `/flow:plan` descriptions
+  are rewritten trigger-first so they fire from natural prompts.
+- **yellow-core 2.17.4, yellow-linear 2.3.3 and yellow-claudemod 0.1.4** read
+  `claude plugin list --json` from the repository root in `/stack:status`,
+  `/stack:select`, the stack-provider router and guard, `/setup:all`,
+  `/statusline:setup`, `/claudemod:setup`, `/linear:setup` and
+  `/linear:delegate`. From a subdirectory, a project-level disable of a
+  user-level plugin used to read as enabled.
+- **yellow-ci 1.5.13** shows a cached CI result at session start for up to 7
+  days with its age ("as of 3 h ago") instead of hiding it after 1 hour. Git
+  worktrees share their main checkout's cache, the background refresh logs why
+  it skipped or failed, and an unwritable data directory prints a warning
+  instead of silently disabling the refresh.
+
+---
+
 ## [2.1.41] - 2026-11-25
 
 ### Fixed
