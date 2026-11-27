@@ -1,7 +1,7 @@
 ---
 name: cli-readiness-reviewer
 # prettier-ignore
-description: "Use when a diff touches CLI commands, argument parsing, flag handlers, output formatters or interactive prompts; review:pr selects it. Reviews how well the CLI serves autonomous agents, not only humans."
+description: "Use when reviewing CLI commands, argument parsing, flag handlers, output formatters or interactive prompts for how well they serve autonomous agents, not only humans. review:pr selects it for plugin-authoring paths (plugin.json, agents, commands, skills, hooks)."
 model: sonnet
 effort: medium
 background: true

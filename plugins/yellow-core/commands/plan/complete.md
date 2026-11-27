@@ -1,7 +1,7 @@
 ---
 name: plan:complete
 # prettier-ignore
-description: "Use when a plan in plans/ is fully shipped and should move to plans/complete/. Refuses while task boxes are unchecked; checks for a merged PR (file-commit provenance, then commit-subject, slug and token fallbacks) and asks for a PR number when only a loose match is found."
+description: "Use when a plan in plans/ is fully shipped and should move to plans/complete/. Refuses while task boxes are unchecked, then looks for a merged PR (file-commit provenance, then commit-subject, slug and token fallbacks) and asks the user when the match is ambiguous."
 argument-hint: '<plan-filename>'
 allowed-tools:
   - Bash
