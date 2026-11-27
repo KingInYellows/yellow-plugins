@@ -99,8 +99,9 @@ have one responsibility.
 - **No Linear issues:** layer the work: types and schema, core logic, data
   layer, API, UI, then tests (or tests alongside each layer).
 
-Branch names use lowercase letters, digits, `/`, `-` and `_` only. `/flow:work`
-rejects anything else before it reaches a command.
+Branch names use lowercase letters, digits, `/`, `-` and `_`, except the Linear
+issue ID, which keeps its uppercase key so `/flow:work` can link the issue. No
+spaces, quotes or shell metacharacters.
 
 Show the plan as a base-to-tip tree rooted at the trunk from Step 1, one node
 per branch with its commit type, one-line description, scope, rough size, and
