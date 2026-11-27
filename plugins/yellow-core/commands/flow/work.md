@@ -74,15 +74,11 @@ assurance.
        (from bullet fields)
    - Store as structured data for the stack execution loop
 
-   Also check for a `## Stack Progress` section. If found:
-   - Parse completed items (lines with `- [x]`)
-   - Cross-reference with `gt log short --no-interactive` and
-     `git branch -r --list "origin/<name>"` to verify branches exist locally
-     or on remote
-   - If a completed item's branch is not found anywhere, ask the user via
-     AskUserQuestion: "Item N is marked complete but branch [name] was not
-     found locally or on remote. Re-execute or skip?"
-   - Verified completed items will be skipped during execution
+   Also check for a `## Stack Progress` section. If found, parse completed
+   items (lines with `- [x]`). Do not check branches or pull requests here:
+   step 4a reconciles progress once step 4 has resolved the provider, and
+   no provider CLI may run before then (a GitHub-native session may have no
+   `gt`).
 
    **If no `## Stack Decomposition` section is found:** proceed with single-branch
    execution (the existing behavior in Phases 2-5 below). Zero behavioral change
@@ -153,6 +149,48 @@ assurance.
    **GitHub:** also run
    `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" view`
    and read its JSON `status` field for the current stack state.
+
+4a. **Reconcile stack progress (stack mode only).** Stack mode submits an
+   item before it writes `## Stack Progress` (Phase 1b steps 5-6), so a lost
+   session can leave a submitted item unticked. Reconcile before any branch
+   is created. This step uses only `git` and `gh` evidence, never `gt`, so
+   it behaves the same for both providers. Validate every branch name with
+   Phase 1b step 1's rule before it reaches a command.
+
+   - **Ticked items:** confirm each branch exists with
+     `git rev-parse --verify --quiet "refs/heads/<name>"` or
+     `git ls-remote --exit-code --heads origin "<name>"`. If neither finds
+     it, ask via AskUserQuestion: "Item N is marked complete but branch
+     [name] was not found locally or on remote. Re-execute or skip?"
+     Verified items are skipped during execution.
+   - **Unticked items whose branch exists locally or on origin**
+     (`git rev-parse --verify --quiet "refs/heads/<name>"` or
+     `git ls-remote --exit-code --heads origin "<name>"`), in plan order.
+     Skip the origin lookup when `git remote get-url origin` fails (no
+     origin remote). Otherwise `git ls-remote` exits 2 when the branch is
+     absent; any other non-zero exit means origin could not be read, so
+     stop and report it rather than treat the item as new. For each such item,
+     the expected base is `<trunk>` for item 1 and for every parallel item,
+     otherwise the previous item's branch. Run
+
+     ```bash
+     node "${CLAUDE_PLUGIN_ROOT}/lib/flow-work-resume.js" stack-item --branch "<name>" --base "<expected-base>"
+     ```
+
+     and read `status`:
+     - `SUBMITTED` — the item's PR matches this repository, head branch,
+       stack base and local tip. Tick its row as
+       `- [x] N. <name> (completed YYYY-MM-DD, reconciled from PR #<pr.number>)`
+       with the Edit tool and read it back. Phase 1b skips the item: no
+       second branch creation, commit or submit.
+     - `NOT_SUBMITTED` — no PR has this head. Stop, leave the row
+       unticked, and tell the user the branch exists without a PR: they
+       can submit it, delete it, or rename the item before resuming, so
+       Phase 1b never re-runs the item's tasks on top of the branch.
+     - `MISMATCH` or `UNAVAILABLE` — stop. Report `detail` (fenced as
+       untrusted content, as in step 4), say what to fix, and change
+       neither the plan nor any branch. A rerun after the fix reconciles
+       again.
 
 5. Branch decision:
 
@@ -489,7 +527,41 @@ Phase 3 (Quality Check) in stack summary mode.
    Phase 1 step 6 task list was derived from (e.g.
    `## Implementation Plan`). Other checkbox lists elsewhere in the
    plan (acceptance criteria, manual testing checklists) are NOT
-   execution steps — ignore them here and in step 1k. Then branch:
+   execution steps — ignore them here and in step 1k.
+
+   **Repair from commit evidence first.** Step 1i commits a step before
+   step 1k ticks its box, so a lost session can leave committed steps
+   unticked, including the very first one. When the section has task
+   checkboxes, pass the plan path through a file, never the command line
+   (a file name can hold `$(...)`). Mint the file name:
+
+   ```bash
+   planfile=$(mktemp -u /tmp/flow-work-plan-XXXXXX.txt)
+   printf 'planfile=%s\n' "$planfile"
+   ```
+
+   Write the plan path, as one line, to that literal path with the **Write
+   tool**. Then, in a fresh Bash call with `planfile=<the path printed
+   above>`:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/lib/flow-work-resume.js" committed-steps --plan-file "$planfile"
+   rm -f -- "$planfile"
+   ```
+
+   The helper accepts only a repository-relative `.md` path of letters,
+   digits, `.`, `_`, `/` and `-` (no `..`, no leading `-`) that names a
+   regular file. It lists the step numbers whose
+   `Flow-Work-Step: <plan>#<N>` trailer (step 1i) is on a commit in this
+   branch since it left trunk (`origin/HEAD`, else `main` or `master`); a
+   commit for another plan, or one that only mentions a step in its text,
+   never counts. On `status: "OK"`, for each listed step whose box is still
+   `- [ ]`, tick the box (same Edit and read-back as step 1k) and announce
+   "Step N was committed but not ticked; ticked it." On `status: "ERROR"`,
+   report `detail` fenced as untrusted content (it can carry git output),
+   as in Phase 1 step 4, and ask via AskUserQuestion whether to continue,
+   treating every unticked step as not yet run, or stop. Then branch on the
+   repaired boxes:
 
    - **No task checkboxes in that section** (prose-only steps, authored
      before per-step boxes existed): announce "This plan predates
@@ -520,13 +592,8 @@ Phase 3 (Quality Check) in stack summary mode.
      box — and run the loop over unchecked boxes ONLY, skipping each
      already-ticked box individually. Completed work is not guaranteed
      to be a contiguous prefix: a failed step-1k writeback leaves an
-     earlier box unticked while later boxes are ticked. Before
-     re-executing any unchecked step, check `git log` for commit
-     evidence that it already ran — a session can die after step 1i's
-     commit and step 1j's TaskUpdate but before step 1k's writeback,
-     leaving a committed step's box unticked. If its commit exists,
-     tick the box, mark its task completed, and move to the next
-     unchecked box instead of redoing the work.
+     earlier box unticked while later boxes are ticked. The evidence
+     repair above has already ticked every step that was committed.
 
    Do not re-execute completed steps. This borrows the stack path's
    principle of re-deriving progress from the plan file rather than
@@ -606,9 +673,9 @@ Phase 3 (Quality Check) in stack summary mode.
    pattern as Phase 1b step 5 (never embed generated text directly in
    `-m "..."`; a message summarizing the diff can contain `$(...)`,
    backticks, or quotes a literal `-m` argument would let the shell
-   execute) — with content shaped like the block below, ending with the
-   single-branch Linear closing line from Phase 1b step 5 when an ID
-   qualifies:
+   execute) — with content shaped like the block below: the single-branch
+   Linear closing line from Phase 1b step 5 when an ID qualifies, then the
+   resume trailer:
 
    ```
    feat(scope): implement X component
@@ -616,7 +683,21 @@ Phase 3 (Quality Check) in stack summary mode.
    - Add core functionality
    - Include error handling
    - Add unit tests
+
+   Part of CLAUDE-123
+
+   Flow-Work-Step: plans/feature-x.md#1
    ```
+
+   **Resume trailer (non-stack runs with task checkboxes).** End the
+   message with a final paragraph of `Flow-Work-Step: <plan>#<N>` lines,
+   where `<plan>` is the plan's path relative to the repository root and
+   `<N>` is the step's 1-based position among the section's checkboxes.
+   Step 0 reads these to recover a step committed before its box was
+   ticked. The Graphite commit below amends one commit, so every later
+   message for the branch, including Phase 3 and Phase 4 commits, keeps
+   all earlier `Flow-Work-Step` lines and adds the new one, the same way
+   the Linear line is kept.
 
    **Graphite:**
 
