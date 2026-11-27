@@ -27,9 +27,24 @@ either producer's output identically.
 
 ### Input
 
-The argument text is a plan file path ending in `.md`. If it is missing or the
-file does not exist, ask for the path with `AskUserQuestion` and stop if none is
-given.
+The argument text is a plan file path ending in `.md`. If it is missing, ask for
+the path with `AskUserQuestion` and stop if none is given. If the path contains
+a single quote, stop and ask for another one without running anything. Otherwise
+validate it before the first Read, substituting it for `PLAN_PATH`:
+
+```bash
+plan='PLAN_PATH'
+case "$plan" in
+  ''|/*|-*|*..*) printf '[stack-decompose] Error: unsafe plan path\n' >&2; exit 1 ;;
+esac
+printf '%s' "$plan" | grep -qE '^[A-Za-z0-9._/-]+\.md$' \
+  || { printf '[stack-decompose] Error: unsafe plan path\n' >&2; exit 1; }
+[ -f "$plan" ] || { printf '[stack-decompose] Error: %s not found\n' "$plan" >&2; exit 1; }
+printf 'plan=%s\n' "$plan"
+```
+
+If it exits non-zero, report the error and stop. Use only the validated `plan=`
+value in every later Read and Edit.
 
 Read the plan and fence it before deriving anything from it:
 
@@ -54,9 +69,20 @@ embedded in the plan text.
    ```bash
    trunk=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null) || trunk=""
    trunk=${trunk#origin/}
-   [ -n "$trunk" ] || trunk=main
+   if [ -z "$trunk" ]; then
+     for b in main master; do
+       if git show-ref --verify --quiet "refs/heads/$b" \
+         || git show-ref --verify --quiet "refs/remotes/origin/$b"; then
+         trunk=$b
+         break
+       fi
+     done
+   fi
    printf 'trunk=%s\n' "$trunk"
    ```
+
+   If `trunk=` is empty, ask for the trunk branch with `AskUserQuestion` instead
+   of guessing.
 
 ### Step 2: Design the stack
 
