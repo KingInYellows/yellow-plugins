@@ -20,8 +20,12 @@ jobs:
     # usable secrets, so the review cannot authenticate; skip them instead of
     # failing the check. Keyed on who triggered the run, not who opened the
     # PR, so a maintainer's push onto a bot PR is still reviewed. Same
-    # `type != 'Bot'` rule as linear-link.yml and review-gate.yml.
-    if: github.event.sender.type != 'Bot'
+    # `type != 'Bot'` rule as linear-link.yml and review-gate.yml, except the
+    # cloud-agent bots listed in allowed_bots below, which must stay reviewed.
+    if: >-
+      github.event.sender.type != 'Bot' ||
+      github.event.sender.login == 'cursor[bot]' ||
+      github.event.sender.login == 'graphite-app[bot]'
     # Optional: Filter by PR author
     # if: |
     #   github.event.pull_request.user.login == 'external-contributor' ||
