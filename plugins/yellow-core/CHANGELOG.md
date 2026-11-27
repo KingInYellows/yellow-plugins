@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.17.4
+
+### Patch Changes
+
+- [#1926](https://github.com/KingInYellows/yellow-plugins/pull/1926)
+  [`ea30219`](https://github.com/KingInYellows/yellow-plugins/commit/ea302193309d69c7c0cdffeca5627185cab8e4b3)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rewrite the
+  `debugging` skill and `/flow:plan` descriptions trigger-first so they fire
+  from natural prompts (trigger eval recall 0.13 to 1.00 and 0.25 to 0.75, no
+  near miss fired).
+
+- [#1927](https://github.com/KingInYellows/yellow-plugins/pull/1927)
+  [`0665c42`](https://github.com/KingInYellows/yellow-plugins/commit/0665c42b5d178860991500bada1c70aa77bb7b82)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/flow:work`
+  resumes without Graphite and without redoing finished work. The stack progress
+  check no longer runs `gt` before the provider is resolved; it reconciles after
+  the router, using git and `gh` only. An item submitted before its
+  `## Stack Progress` row was written is matched to its pull request
+  (repository, head, stack base, local tip) and ticked instead of being created
+  and submitted again. Single-branch step commits carry a `Flow-Work-Step`
+  trailer, so a step committed before its checkbox was ticked, including the
+  first, is recognised on resume. New read-only helper
+  `lib/flow-work-resume.js`.
+
+- [#1930](https://github.com/KingInYellows/yellow-plugins/pull/1930)
+  [`2ad1422`](https://github.com/KingInYellows/yellow-plugins/commit/2ad1422aa578f045c4253c35470e11a84c367f04)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Read
+  `claude plugin list --json` from the repository root in `/stack:status`,
+  `/stack:select`, the stack-provider router and guard, `/setup:all`,
+  `/statusline:setup`, `/claudemod:setup`, `/linear:setup` and
+  `/linear:delegate`. The CLI applies project and local enable overrides only
+  for its current directory, so from a subdirectory a project-level disable of a
+  user-level plugin read as enabled (CLAUDE-392).
+
 ## 2.17.3
 
 ### Patch Changes

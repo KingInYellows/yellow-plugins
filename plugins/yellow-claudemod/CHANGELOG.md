@@ -1,5 +1,19 @@
 # yellow-claudemod
 
+## 0.1.4
+
+### Patch Changes
+
+- [#1930](https://github.com/KingInYellows/yellow-plugins/pull/1930)
+  [`2ad1422`](https://github.com/KingInYellows/yellow-plugins/commit/2ad1422aa578f045c4253c35470e11a84c367f04)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Read
+  `claude plugin list --json` from the repository root in `/stack:status`,
+  `/stack:select`, the stack-provider router and guard, `/setup:all`,
+  `/statusline:setup`, `/claudemod:setup`, `/linear:setup` and
+  `/linear:delegate`. The CLI applies project and local enable overrides only
+  for its current directory, so from a subdirectory a project-level disable of a
+  user-level plugin read as enabled (CLAUDE-392).
+
 ## 0.1.3
 
 ### Patch Changes
