@@ -2,7 +2,8 @@
 # the repository's Code security settings.
 #
 # Plugin lockfiles under plugins/*/ are pinned on purpose (supply-chain
-# guarantee, docs/upstream-pins.md) and are not listed here.
+# guarantee, docs/upstream-pins.md) and are not listed here. Security
+# updates, if switched on in settings, can still open PRs for them.
 version: 2
 updates:
   - package-ecosystem: github-actions
