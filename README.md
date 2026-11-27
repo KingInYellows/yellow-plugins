@@ -18,45 +18,99 @@ Add the marketplace, then install individual plugins:
 /plugin install github-workflow@yellow-plugins
 ```
 
-For stacked pull requests, `github-workflow` (GitHub-native) is recommended
-for new work and `gt-workflow` (Graphite) remains available; enable one of
-them with `/stack:select`. See
+For stacked pull requests, `github-workflow` (GitHub-native) is the recommended
+provider. `gt-workflow` (Graphite) stays supported for stacks already submitted
+with Graphite; this project moves off Graphite by 2026-12-28. Exactly one
+provider is enabled at a time: check with `/stack:status` and switch with
+`/stack:select`. See
 [docs/stacked-prs-native-migration.md](docs/stacked-prs-native-migration.md).
 
 ## Plugins
 
 | Plugin                | Description                                                                                                                            | Components                                     |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                                           | 11 skills, 2 hooks, 1 MCP                      |
-| `github-workflow`     | GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)               | 9 commands, 9 skills, 2 hooks                  |
-| `yellow-agy`          | Local delegate on the Antigravity CLI (`agy`) under your Google AI Pro sign-in — yellow-jules successor (experimental)                  | 8 commands                                     |
+| `gt-workflow`         | Graphite stacked-PR provider (skills only): smart commits, stack planning, sync, and navigation — kept for stacks already on Graphite  | 11 skills, 2 hooks, 1 MCP                      |
+| `github-workflow`     | GitHub-native stacked-PR provider (recommended) — setup, status, plan, submit, amend, sync, nav, cleanup, merge, merge-single          | 10 commands, 10 skills, 2 hooks                |
+| `yellow-agy`          | Local delegate on the Antigravity CLI (`agy`) under your Google AI Pro sign-in — yellow-jules successor (experimental)                 | 8 commands                                     |
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting                                    | 3 agents, 4 commands, 2 skills                 |
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners                            | 4 agents, 9 commands, 8 skills, 1 hook         |
-| `yellow-claudemod`    | Claude Code mod: records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit (experimental)       | 1 command, 1 hooks module                      |
+| `yellow-claudemod`    | Claude Code mod: records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit (experimental)     | 1 command, 1 hooks module                      |
 | `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                                             | 3 agents, 4 commands, 2 skills                 |
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                                                     | 2 commands, 1 skill, 1 MCP                     |
-| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                                               | 21 agents, 19 commands, 23 skills              |
+| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                                               | 21 agents, 19 commands, 23 skills, 3 hooks     |
 | `yellow-council`      | On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel | 3 agents, 2 commands, 1 skill                  |
 | `yellow-cursor`       | Cursor Cloud Agent delegation — launch, track, and manage remote coding agents via a typed CLI (pilot Cursor distribution target)      | 10 commands, 2 skills                          |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns                                       | 7 agents, 6 commands, 2 skills, 1 hook         |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, orchestrate plan-implement-review chains (legacy — see yellow-cursor)   | 1 agent, 9 commands, 1 skill, 1 MCP            |
-| `yellow-jules`        | Google Jules integration (deprecated: read-only after 2026-11-11, off 2026-12-31) — delegate, supervise, review sessions under grants   | 10 commands, 2 skills                          |
+| `yellow-jules`        | Google Jules integration (deprecated: read-only after 2026-11-11, off 2026-12-31) — delegate, supervise, review sessions under grants  | 10 commands, 2 skills                          |
 | `yellow-docs`         | Documentation audit, generation, and evidence-backed technical diagrams for any repository                                             | 10 agents, 6 commands, 3 skills                |
 | `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup/request, stub run, approval-gated real run that may spend)                  | 4 commands                                     |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
-| `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 MCP                              |
-| `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, and Parallel Task MCPs                                                  | 2 agents, 4 commands, 3 skills, 6 MCPs         |
-| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review                                     | 16 agents, 9 commands, 2 skills                |
+| `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 hook, 1 MCP                      |
+| `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, and Parallel Task MCPs                                                  | 2 agents, 4 commands, 3 skills, 1 hook, 6 MCPs |
+| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review                                     | 21 agents, 9 commands, 3 skills, 1 hook        |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                                                  | 2 agents, 8 commands, 3 skills, 4 hooks, 1 MCP |
-| `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform                              | 2 agents, 5 commands, 1 skill, 1 MCP           |
+| `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform                              | 2 agents, 5 commands, 1 skill, 1 hook, 1 MCP   |
+
+## How It Fits Together
+
+yellow-core runs the development loop (`/flow:brainstorm` → `/flow:plan` →
+`/flow:work` → `/flow:review`) and owns the stack router. Every command that
+branches, commits or submits goes through that router to whichever stacked-PR
+provider is enabled, never to raw `git push`. yellow-review reviews, resolves
+and gates the resulting PRs; the other plugins add context, second opinions,
+quality checks and delegation.
+
+```mermaid
+flowchart TB
+  Core["yellow-core<br/>/flow:* dev loop, plan, stack and setup commands"]
+  Review["yellow-review<br/>/review:pr, /review:resolve, /review:merge-ready"]
+  Router{{"stack-provider-router<br/>(yellow-core)"}}
+  GH["github-workflow<br/>(recommended)"]
+  GT["gt-workflow<br/>(existing Graphite stacks)"]
+  Second["Second opinions<br/>yellow-council, yellow-codex"]
+  Context["Context and memory<br/>yellow-linear, yellow-ruvector,<br/>yellow-research, yellow-docs"]
+  Core -->|"/review:pr --report-only"| Review
+  Core --> Router
+  Review --> Router
+  Router -->|READY_GITHUB| GH
+  Router -->|READY_GRAPHITE| GT
+  Core -.-> Second
+  Review -.-> Second
+  Core -.-> Context
+  Review -.-> Context
+```
+
+More diagrams, each tied to the files that define it, are in
+[docs/workflow-diagrams.md](docs/workflow-diagrams.md): provider selection, the
+`/flow:work` sequence, the review and merge gate, knowledge compounding, and
+this repository's build, validation and release pipeline.
+
+## Documentation
+
+| Topic                                        | Where                                                                                                          |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Every command and skill, by plugin           | [docs/commands-reference.md](docs/commands-reference.md)                                                       |
+| Workflow and sequence diagrams               | [docs/workflow-diagrams.md](docs/workflow-diagrams.md)                                                         |
+| Architecture (catalog, generator, hooks, CI) | [docs/architecture-overview.md](docs/architecture-overview.md)                                                 |
+| Core concepts and glossary                   | [docs/CONCEPTS.md](docs/CONCEPTS.md)                                                                           |
+| Stacked PRs: GitHub-native migration         | [docs/stacked-prs-native-migration.md](docs/stacked-prs-native-migration.md)                                   |
+| Rule packs                                   | [docs/rule-packs.md](docs/rule-packs.md)                                                                       |
+| Security model                               | [docs/security.md](docs/security.md)                                                                           |
+| Authoring rules and repo structure           | [AGENTS.md](AGENTS.md)                                                                                         |
+| Contributing, adding a plugin, changesets    | [CONTRIBUTING.md](CONTRIBUTING.md), [docs/plugin-template.md](docs/plugin-template.md)                         |
+| Manifest catalog                             | [catalog/README.md](catalog/README.md)                                                                         |
+| Validation and troubleshooting manifests     | [docs/plugin-validation-guide.md](docs/plugin-validation-guide.md)                                             |
+| Releases and versioning                      | [docs/operations/release-checklist.md](docs/operations/release-checklist.md), [docs/CLAUDE.md](docs/CLAUDE.md) |
+| Solved problems                              | [docs/solutions/](docs/solutions/)                                                                             |
+| Per-plugin conventions                       | `plugins/<name>/README.md` and `plugins/<name>/CLAUDE.md`                                                      |
 
 ## Codex Distribution
 
 The private/local Codex catalog selects ten plugins and 32 skills. Workflows
 include worktree inventory, documentation audit, technical diagrams, complexity
 scans, public DeepWiki research, offline Cursor planning and local Codex
-readiness. See
-the exact support, setup, cache-refresh and unsupported states in
+readiness. See the exact support, setup, cache-refresh and unsupported states in
 [Codex distribution](docs/codex-distribution.md). WSL CLI evidence does not
 establish Windows desktop support. Claude command/setup behavior stays separate.
 
@@ -148,10 +202,12 @@ automatically.
 To re-authenticate or revoke access: run `/mcp` in Claude Code, select the
 server, and choose "Clear authentication".
 
-When a merge queue lands a PR by closing it (Graphite's queue does), Linear
-moves an issue to Done only through commit magic words, which needs a one-time
-GitHub push webhook from Linear's GitHub integration. The plugin never sees
-that webhook's secret; the setup steps are in `plugins/yellow-linear/README.md`
+PRs merged directly or through `/github-stack:merge` show as merged, and
+Linear's own automation moves their issues. Only PRs landed through Graphite's
+merge queue (stacks still on Graphite) show as closed; for those, Linear moves
+an issue to Done only through commit magic words, which needs a one-time GitHub
+push webhook from Linear's GitHub integration. The plugin never sees that
+webhook's secret; the setup steps are in `plugins/yellow-linear/README.md`
 "Graphite Merge Queue".
 
 These plugins require browser access and **will not work in headless SSH
@@ -172,9 +228,9 @@ health and tool availability.
 ### yellow-research (API keys)
 
 Bundles six MCP servers for multi-source deep research. Three search providers
-require API keys. Ceramic and Parallel use OAuth managed by Claude Code (no
-API key), and DeepWiki needs none. The optional `ast-grep` CLI is a local
-binary, not an MCP server.
+require API keys. Ceramic and Parallel use OAuth managed by Claude Code (no API
+key), and DeepWiki needs none. The optional `ast-grep` CLI is a local binary,
+not an MCP server.
 
 ```bash
 # Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
@@ -211,8 +267,9 @@ export SEMGREP_APP_TOKEN="sgp_your_token_here"
 ```
 
 The plugin also expects the `semgrep` CLI, `curl`, `jq`, and the enabled
-stacked-PR provider's CLI (`gh` with `gh-stack`, or Graphite's `gt`). Run `/semgrep:setup` to validate credentials, detect your deployment
-slug, and verify MCP tools.
+stacked-PR provider's CLI (`gh` with `gh-stack`, or Graphite's `gt`). Run
+`/semgrep:setup` to validate credentials, detect your deployment slug, and
+verify MCP tools.
 
 ### Jev shadow pre-filter (yellow-core, optional)
 
@@ -239,12 +296,12 @@ project's `.ruvector/` store.
 
 ### yellow-goal (process bridge)
 
-`/goal:setup`, `/goal:request`, and `/goal:run-stub` stay zero-spend. The
-fourth command, `/goal:run-real`, is user-only: it displays the engine
-manifest, forwards an operator-supplied approval path, and may spend. Default
+`/goal:setup`, `/goal:request`, and `/goal:run-stub` stay zero-spend. The fourth
+command, `/goal:run-real`, is user-only: it displays the engine manifest,
+forwards an operator-supplied approval path, and may spend. Default
 `--auth-mode subscription` uses the operator Claude Code login.
-`--auth-mode api-key` forwards `ANTHROPIC_API_KEY` from the environment.
-Never commit that key. Put the pinned `goal-gen` binary on PATH, then run
+`--auth-mode api-key` forwards `ANTHROPIC_API_KEY` from the environment. Never
+commit that key. Put the pinned `goal-gen` binary on PATH, then run
 `/goal:setup`.
 
 ## Usage
@@ -254,7 +311,9 @@ individual plugins. Each plugin's commands are namespaced (e.g., `/ci:diagnose`,
 `/linear:create`, `/devin:delegate`, `/research:deep`, `/morph:status`,
 `/semgrep:fix`).
 
-Run `/plugin` to browse all available plugins in the Discover tab.
+Run `/plugin` to browse all available plugins in the Discover tab. Every command
+and user-invocable skill is listed, by plugin, in
+[docs/commands-reference.md](docs/commands-reference.md).
 
 ## Update, Disable, Remove
 
@@ -278,7 +337,7 @@ Then in Claude Code:
 
 ```
 /plugin marketplace add ./
-/plugin install gt-workflow@yellow-plugins
+/plugin install github-workflow@yellow-plugins
 ```
 
 Verify `${CLAUDE_PLUGIN_ROOT}` resolves correctly after local install — local
@@ -314,18 +373,19 @@ guides.
 
 ```
 yellow-plugins/
+├── catalog/                   # Source of truth for manifests (catalog.json + plugins/<name>.json)
 ├── .claude-plugin/
-│   └── marketplace.json       # Plugin catalog
+│   └── marketplace.json       # Plugin catalog (generated from catalog/)
 ├── plugins/
-│   ├── gt-workflow/           # Graphite workflow (11 skills, 2 hooks, 1 MCP)
-│   ├── github-workflow/       # GitHub-native stacked-PR provider (9 commands, 9 skills, 2 hooks)
+│   ├── gt-workflow/           # Graphite stacked-PR provider, existing stacks (11 skills, 2 hooks, 1 MCP)
+│   ├── github-workflow/       # GitHub-native stacked-PR provider, recommended (10 commands, 10 skills, 2 hooks)
 │   ├── yellow-agy/            # Antigravity CLI local delegate (8 commands)
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
 │   ├── yellow-ci/             # CI toolkit (4 agents, 9 commands, 8 skills, 1 hook)
 │   ├── yellow-claudemod/      # Claude Code mod: spawn ledger + usage downshift (1 command, 1 hooks module)
 │   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 2 skills)
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
-│   ├── yellow-core/           # Dev toolkit (21 agents, 19 commands, 23 skills)
+│   ├── yellow-core/           # Dev toolkit (21 agents, 19 commands, 23 skills, 3 hooks)
 │   ├── yellow-council/        # Cross-lineage code council (3 agents, 2 commands, 1 skill)
 │   ├── yellow-cursor/         # Cursor Cloud Agent delegation, pilot target (10 commands, 2 skills)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 2 skills, 1 hook)
@@ -334,14 +394,16 @@ yellow-plugins/
 │   ├── yellow-goal/           # yellow-goal engine bridge (4 commands)
 │   ├── yellow-jules/          # Google Jules, deprecated, grant-gated (10 commands, 2 skills)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
-│   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)
-│   ├── yellow-research/       # Deep research (2 agents, 4 commands, 3 skills, 6 MCPs)
-│   ├── yellow-review/         # PR review (16 agents, 9 commands, 2 skills)
+│   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 hook, 1 MCP)
+│   ├── yellow-research/       # Deep research (2 agents, 4 commands, 3 skills, 1 hook, 6 MCPs)
+│   ├── yellow-review/         # PR review (21 agents, 9 commands, 3 skills, 1 hook)
 │   ├── yellow-ruvector/       # Vector memory (2 agents, 8 commands, 3 skills, 4 hooks, 1 MCP)
-│   └── yellow-semgrep/        # Semgrep remediation (2 agents, 5 commands, 1 skill, 1 MCP)
+│   └── yellow-semgrep/        # Semgrep remediation (2 agents, 5 commands, 1 skill, 1 hook, 1 MCP)
 ├── packages/                  # Validation tooling (domain, infrastructure, cli)
 ├── schemas/                   # JSON schemas
-└── docs/                      # Validation guides, operational docs, and solutions
+├── scripts/                   # Manifest generator, validators, release helpers
+├── tests/                     # Integration and shell-compat suites
+└── docs/                      # Architecture, workflow diagrams, guides, operations, solutions
 ```
 
 ## Troubleshooting

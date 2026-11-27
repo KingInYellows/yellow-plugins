@@ -174,6 +174,10 @@ cannot parse the hook envelope (`lib/run-hook.js`).
 
 ## Component Interactions
 
+Flow and sequence diagrams for the plugin workflows (provider selection,
+`/flow:work`, review and merge gate, release) are in
+[workflow-diagrams.md](workflow-diagrams.md).
+
 ```mermaid
 flowchart LR
   subgraph authoring [Authoring]
@@ -200,8 +204,8 @@ flowchart LR
     NodeCLI["Node CLIs (cursor SDK, goal-gen spawn)"]
   end
   subgraph ext [External systems]
-    GT[Graphite gt]
-    GH[GitHub gh]
+    GH["GitHub gh + gh-stack"]
+    GT["Graphite gt (existing stacks)"]
     APIs[Linear Morph Semgrep Composio Devin research APIs]
     CursorAPI[Cursor Cloud Agents]
   end
