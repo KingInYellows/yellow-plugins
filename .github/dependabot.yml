@@ -11,7 +11,7 @@ updates:
     schedule:
       interval: monthly
     # claude-code-action is bumped by hand: the token-hardening comments in
-    # claude.yml and claude-code-review.yml are written against its pin.
+    # claude-code-review.yml are written against its pin.
     ignore:
       - dependency-name: anthropics/claude-code-action
     groups:
