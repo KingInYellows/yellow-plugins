@@ -58,7 +58,12 @@
 # describes "refresh, then start": assert_parity runs refresh-cache.js first
 # (YELLOW_CI_NO_BACKGROUND_REFRESH=1 keeps the hook itself from launching
 # one) and compares the refresh's stderr followed by the hook's stderr with
-# the golden. The goldens are unchanged. The one-step miss is tested below.
+# the golden. The one-step miss is tested below.
+#
+# DELIBERATE DIVERGENCE (CLAUDE-382): the refresh logs one line when it stops
+# early (no `gh`, `gh auth status` fails, `gh run list` fails), where the bash
+# hook was silent. The gh-missing, gh-unauthed and rate-limited-gh goldens'
+# STDERR sections gained that line; their STDOUT is unchanged.
 #
 # STDOUT is compared JSON-semantically (jq -S -c) because the bash hook emitted
 # jq's pretty multi-line JSON while the Node port emits compact JSON — the
@@ -259,24 +264,27 @@ age_file() {
   [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"3 recent failure(s)"* ]]
 }
 
-@test "SessionStart: a stale cache is shown and refreshed; a too-old one is not shown" {
+@test "SessionStart: a stale cache is shown with its age and refreshed; a too-old one is not shown" {
   local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/stale-XXXXXX")"
   hook_scenario_setup cache-hit "$sandbox"
   cd "$HOOK_SCENARIO_WORKDIR"
   unset YELLOW_CI_NO_BACKGROUND_REFRESH
   export MOCK_GH_LOG="$sandbox/gh.log"; : >"$MOCK_GH_LOG"
   local key; key=$(hook_cache_key "$PWD")
-  local cache="$HOME/.local/share/yellow-ci/last-check-$key" i
+  local cache="$HOME/.local/share/yellow-ci/last-check-$key" i msg
 
-  age_file "$cache" 900
+  # A day-old result (one session a day) is still shown, with its age.
+  age_file "$cache" 90000
   run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
-  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
+  msg=$(printf '%s' "$output" | jq -r '.systemMessage')
+  [[ "$msg" == *"[yellow-ci] CI (as of 25 h ago): 1 recent failure(s)"* ]]
+  [[ "$msg" == *"cached-branch"* ]]
   for i in $(seq 1 50); do grep -q '^run list' "$MOCK_GH_LOG" && break; sleep 0.1; done
   grep -q '^run list' "$MOCK_GH_LOG"
 
   for i in $(seq 1 50); do [ -e "$HOME/.local/share/yellow-ci/refresh-$key" ] || break; sleep 0.1; done
   printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$cache"
-  age_file "$cache" 7200
+  age_file "$cache" $((8 * 86400))
   export YELLOW_CI_NO_BACKGROUND_REFRESH=1
   run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
   [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" != *"cached-branch"* ]]
@@ -298,42 +306,50 @@ age_file() {
   [ ! -s "$MOCK_GH_LOG" ]
 }
 
-@test "SessionStart: cache age boundaries (600 s refreshes, 3600 s is not shown)" {
+# Run the foreground core at a pinned clock (CLAUDE-381): prints
+# "<shown|hidden> <refreshWanted>" for the seeded cached-branch result.
+core_at() {
+  node -e '
+    const { runSessionStart } = require(process.argv[1]);
+    const r = runSessionStart({ cwd: process.cwd(), env: process.env, now: Number(process.argv[2]) * 1000 });
+    process.stdout.write((r.systemMessage.includes("cached-branch") ? "shown" : "hidden") + " " + r.refreshWanted + "\n");
+  ' "$SCRIPTS_DIR/lib/session-start-core.js" "$1"
+}
+
+@test "SessionStart: cache age boundaries are exact with a pinned clock" {
   local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/bounds-XXXXXX")"
   hook_scenario_setup cache-hit "$sandbox"
   cd "$HOOK_SCENARIO_WORKDIR"
   local key; key=$(hook_cache_key "$PWD")
-  local dir="$HOME/.local/share/yellow-ci" cache
-  cache="$dir/last-check-$key"
-  unset YELLOW_CI_NO_BACKGROUND_REFRESH
-  export MOCK_GH_LOG="$sandbox/gh.log"; : >"$MOCK_GH_LOG"
+  local cache="$HOME/.local/share/yellow-ci/last-check-$key"
+  local t0=1700000000 week=$((7 * 86400))
+  node -e 'require("fs").utimesSync(process.argv[1], Number(process.argv[2]), Number(process.argv[2]))' "$cache" "$t0"
 
-  # 598 s: fresh, no refresh attempted (no marker created). The hook reads
-  # the clock in a later process, so a second can tick over between
-  # age_file and the check; the "just under" cases keep a 2 s margin.
-  age_file "$cache" 598
-  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
-  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
-  [ ! -e "$dir/refresh-$key" ]
+  [ "$(core_at $((t0 + 599)))" = "shown false" ]
+  [ "$(core_at $((t0 + 600)))" = "shown true" ]
+  [ "$(core_at $((t0 + 3599)))" = "shown true" ]
+  [ "$(core_at $((t0 + 3600)))" = "shown true" ]
+  [ "$(core_at $((t0 + week - 1)))" = "shown true" ]
+  [ "$(core_at $((t0 + week)))" = "hidden true" ]
+}
 
-  # 600 s: still shown, and a refresh is started.
-  age_file "$cache" 600
-  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
-  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
-  local i
-  for i in $(seq 1 50); do grep -q '^run list' "$MOCK_GH_LOG" && break; sleep 0.1; done
-  grep -q '^run list' "$MOCK_GH_LOG"
-  for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
-
-  # 3598 s: still shown; 3600 s: not shown.
-  export YELLOW_CI_NO_BACKGROUND_REFRESH=1
-  printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$cache"
-  age_file "$cache" 3598
-  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
-  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
-  age_file "$cache" 3600
-  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
-  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" != *"cached-branch"* ]]
+@test "SessionStart: the age label appears only once the result is no longer fresh" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/label-XXXXXX")"
+  hook_scenario_setup cache-hit "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  local key; key=$(hook_cache_key "$PWD")
+  local cache="$HOME/.local/share/yellow-ci/last-check-$key" t0=1700000000
+  node -e 'require("fs").utimesSync(process.argv[1], Number(process.argv[2]), Number(process.argv[2]))' "$cache" "$t0"
+  msg_at() {
+    node -e '
+      const { runSessionStart } = require(process.argv[1]);
+      process.stdout.write(runSessionStart({ cwd: process.cwd(), env: process.env, now: Number(process.argv[2]) * 1000 }).systemMessage);
+    ' "$SCRIPTS_DIR/lib/session-start-core.js" "$1"
+  }
+  [[ "$(msg_at $((t0 + 599)))" == *"[yellow-ci] CI: 1 recent failure(s)"* ]]
+  [[ "$(msg_at $((t0 + 600)))" == *"[yellow-ci] CI (as of 10 min ago):"* ]]
+  [[ "$(msg_at $((t0 + 3 * 3600 + 59)))" == *"(as of 3 h ago)"* ]]
+  [[ "$(msg_at $((t0 + 3 * 86400)))" == *"(as of 3 days ago)"* ]]
 }
 
 @test "SessionStart: refresh warnings reach the log; a failed refresh writes no cache" {
@@ -381,4 +397,111 @@ age_file() {
   # The refresh still runs, with stderr discarded.
   for i in $(seq 1 50); do [ -s "$dir/last-check-$key" ] && break; sleep 0.1; done
   [ -s "$dir/last-check-$key" ]
+}
+
+@test "SessionStart: refresh exits log why when gh is missing, unauthenticated or failing" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/refresh-log-XXXXXX")"
+  hook_scenario_setup gh-unauthed "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  local key; key=$(hook_cache_key "$PWD")
+  local dir="$HOME/.local/share/yellow-ci" i
+
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
+  grep -q 'Refresh skipped: gh auth status failed' "$dir/refresh-$key.log"
+
+  export MOCK_GH_AUTH=ok MOCK_GH_RUNLIST=ratelimit
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
+  grep -q 'Refresh failed: gh run list' "$dir/refresh-$key.log"
+}
+
+@test "SessionStart: an unwritable data directory is reported, not silent" {
+  [ "$(id -u)" -ne 0 ] || skip "root ignores directory permissions"
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/rodir-XXXXXX")"
+  hook_scenario_setup cache-miss-failures "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  mkdir -p "$HOME/.local/share/yellow-ci"
+  chmod 500 "$HOME/.local/share/yellow-ci"
+
+  run --separate-stderr node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  chmod 700 "$HOME/.local/share/yellow-ci"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"Cannot start a CI refresh in"* ]]
+}
+
+@test "SessionStart: an expired refresh marker is replaced and the refresh runs" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/stale-marker-XXXXXX")"
+  hook_scenario_setup cache-miss-failures "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  local key; key=$(hook_cache_key "$PWD")
+  local dir="$HOME/.local/share/yellow-ci" i
+  mkdir -p "$dir"
+  : >"$dir/refresh-$key"
+  age_file "$dir/refresh-$key" 61
+
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 50); do [ -s "$dir/last-check-$key" ] && break; sleep 0.1; done
+  [ -s "$dir/last-check-$key" ]
+  for i in $(seq 1 50); do [ -e "$dir/refresh-$key" ] || break; sleep 0.1; done
+  [ ! -e "$dir/refresh-$key" ]
+}
+
+# Set a symlink's own mtime (not its target's).
+age_link() {
+  node -e 'const fs=require("fs");const t=Date.now()/1000-Number(process.argv[2]);fs.lutimesSync(process.argv[1],t,t)' "$1" "$2"
+}
+
+@test "SessionStart: a symlink planted at the refresh marker never touches its target" {
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/link-marker-XXXXXX")"
+  hook_scenario_setup cache-miss-failures "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+  unset YELLOW_CI_NO_BACKGROUND_REFRESH
+  export MOCK_GH_LOG="$sandbox/gh.log"; : >"$MOCK_GH_LOG"
+  local key; key=$(hook_cache_key "$PWD")
+  local dir="$HOME/.local/share/yellow-ci" victim="$sandbox/victim" i
+  mkdir -p "$dir"
+  printf 'keep me\n' >"$victim"
+  ln -s "$victim" "$dir/refresh-$key"
+
+  # A young link counts as a live refresh: nothing runs.
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  sleep 1
+  [ ! -s "$MOCK_GH_LOG" ]
+  [ "$(cat "$victim")" = "keep me" ]
+
+  # An expired link is removed as a link; its target survives.
+  age_link "$dir/refresh-$key" 61
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  for i in $(seq 1 50); do [ -s "$dir/last-check-$key" ] && break; sleep 0.1; done
+  [ -s "$dir/last-check-$key" ]
+  [ "$(cat "$victim")" = "keep me" ]
+  [ -f "$victim" ] && [ ! -L "$victim" ]
+}
+
+@test "SessionStart: a new git worktree shows the main checkout's cached result" {
+  command -v git >/dev/null || skip "git not installed"
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/worktree-XXXXXX")"
+  hook_scenario_setup cache-hit "$sandbox"
+  local main="$HOOK_SCENARIO_WORKDIR" wt="$sandbox/wt"
+  git -C "$main" init -q
+  git -C "$main" -c user.name=t -c user.email=t@example.invalid add -A
+  git -C "$main" -c user.name=t -c user.email=t@example.invalid commit -qm init
+  git -C "$main" worktree add -q "$wt"
+  cd "$wt"
+  main=$(cd "$main" && pwd -P)
+
+  # The worktree keys on the main checkout, so the seeded result is shown.
+  run node -e 'process.stdout.write(require(process.argv[1]).cacheKeyFor(process.cwd()))' "$SCRIPTS_DIR/lib/session-start-core.js"
+  [ "$output" = "$(hook_cache_key "$main")" ]
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  [[ "$(printf '%s' "$output" | jq -r '.systemMessage')" == *"cached-branch"* ]]
 }

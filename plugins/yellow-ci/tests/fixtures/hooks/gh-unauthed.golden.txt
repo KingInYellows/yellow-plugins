@@ -5,3 +5,4 @@ EXIT_CODE=0
   "continue": true
 }
 --- STDERR ---
+[yellow-ci] Refresh skipped: gh auth status failed (not logged in, expired token, or timeout)
