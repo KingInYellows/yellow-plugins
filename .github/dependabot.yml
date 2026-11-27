@@ -9,6 +9,10 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # claude-code-action is bumped by hand: the token-hardening comments in
+    # claude.yml and claude-code-review.yml are written against its pin.
+    ignore:
+      - dependency-name: anthropics/claude-code-action
     groups:
       actions:
         patterns: ['*']
@@ -16,15 +20,11 @@ updates:
       prefix: chore
       include: scope
 
+  # npm: security updates only. Version-update PRs are off (limit 0) because
+  # the pnpm workspace includes plugins/*, whose exact pins and Changesets
+  # gate would make routine bump PRs fail. Security PRs still open.
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 3
-    groups:
-      dev-dependencies:
-        dependency-type: development
-        update-types: [minor, patch]
-    commit-message:
-      prefix: chore
-      include: scope
+    open-pull-requests-limit: 0
