@@ -1,0 +1,15 @@
+name: Feature request
+description: Suggest a new plugin, command or improvement.
+labels: [enhancement]
+body:
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin
+      placeholder: yellow-review (or "new plugin")
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you want and why
+    validations:
+      required: true
