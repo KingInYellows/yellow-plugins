@@ -16,10 +16,10 @@ allowed-tools:
 
 # Resolve Stack: Autonomous Stack-Wide Comment Resolution
 
-Walk the current Graphite stack from base to tip and run the `/review:resolve`
+Walk the current stack from base to tip and run the `/review:resolve`
 comment-resolution flow on every open PR, **unattended** — no `AskUserQuestion`
-prompts anywhere. Each PR's comments are resolved, committed, and submitted via
-Graphite before the walk moves up. Anything that needs human attention (residual
+prompts anywhere. Each PR's comments are resolved, committed, and submitted through
+the enabled stacked-PR provider before the walk moves up. Anything that needs human attention (residual
 unresolved comments, restack conflicts, submit failures) is collected into a
 final summary instead of pausing the walk.
 

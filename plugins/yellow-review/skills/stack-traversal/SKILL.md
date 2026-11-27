@@ -5,20 +5,20 @@ description: "Use when a yellow-review command must walk a stack PR by PR, botto
 user-invocable: false
 ---
 
-# Graphite Stack Traversal
+# Stack Traversal
 
 ## What It Does
 
 Documents the canonical bottom-up stacked-PR walk: resolve the active
 stacked-PR provider, enumerate the stack, filter to open PRs, order
-base-to-tip, adopt non-Graphite PRs, check out each branch in turn, and
+base-to-tip, adopt untracked PRs (Graphite only), check out each branch in turn, and
 restack after each per-PR action. `/review:all` (`scope=stack`) and
 `/review:resolve-stack` both consume this procedure so the traversal stays
 consistent across the two commands and both providers.
 
 ## When to Use
 
-Use when a yellow-review command needs to iterate a Graphite stack one PR at a
+Use when a yellow-review command needs to iterate a stack one PR at a
 time in dependency order. The command supplies the per-PR action (review,
 resolve, etc.); this skill supplies only the walk around it.
 
@@ -104,7 +104,7 @@ filtering must issue one additional
 
 ### Step 3: Validate
 
-- If no open PRs remain: report "No open PRs found in current Graphite stack."
+- If no open PRs remain: report "No open PRs found in the current stack."
   and exit successfully — there is nothing to walk.
 - Check the working directory is clean:
 
