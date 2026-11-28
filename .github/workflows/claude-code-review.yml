@@ -16,12 +16,12 @@ concurrency:
 
 jobs:
   claude-review:
-    # Runs a bot triggers (Dependabot, the Changesets release bot) get no
-    # usable secrets, so the review cannot authenticate; skip them instead of
-    # failing the check. Keyed on who triggered the run, not who opened the
-    # PR, so a maintainer's push onto a bot PR is still reviewed. Same
-    # `type != 'Bot'` rule as linear-link.yml and review-gate.yml, except the
-    # cloud-agent bots listed in allowed_bots below, which must stay reviewed.
+    # Runs a bot triggers (Dependabot, for one) get no usable secrets, so the
+    # review cannot authenticate; skip them instead of failing the check.
+    # Keyed on who triggered the run (sender), not who opened the PR, so a
+    # maintainer's push onto a bot PR still starts the job. The cloud-agent
+    # bots listed in allowed_bots below stay reviewed. linear-link.yml and
+    # review-gate.yml use the same `type != 'Bot'` test on the PR author.
     if: >-
       github.event.sender.type != 'Bot' ||
       github.event.sender.login == 'cursor[bot]' ||
