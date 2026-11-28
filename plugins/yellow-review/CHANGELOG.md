@@ -1,5 +1,29 @@
 # Changelog
 
+## 4.0.1
+
+### Patch Changes
+
+- [#1942](https://github.com/KingInYellows/yellow-plugins/pull/1942)
+  [`07758e3`](https://github.com/KingInYellows/yellow-plugins/commit/07758e34db3748e92205bd42fd8d1ae6aa0de5f2)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Rewrite
+  yellow-core and yellow-review command, agent and skill descriptions
+  trigger-first and shorter (yellow-core 16,418 to 12,566 characters,
+  yellow-review 10,187 to 7,443). `/review:pr` trigger eval recall rose from
+  0.50 to 1.00; `/review:resolve` held at 1.00 with no near miss firing.
+
+- [#1937](https://github.com/KingInYellows/yellow-plugins/pull/1937)
+  [`43b8e74`](https://github.com/KingInYellows/yellow-plugins/commit/43b8e749b7a4923305bc37b53d71d4a1d1c73fd2)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/flow:plan` no
+  longer needs Graphite to decompose a plan into stacked PRs. It asks the
+  stack-provider router which provider is active: Graphite keeps
+  `gt-workflow:gt-stack-plan`, and every other state uses the new
+  provider-neutral `stack-decompose` skill, which writes the same
+  `## Stack Decomposition` section without running any provider command. The
+  `/flow:work` Phase 4 heading and yellow-review's plugin, `/review:all`,
+  `/review:resolve-stack` and `stack-traversal` descriptions no longer name
+  Graphite as the only stack provider.
+
 ## 4.0.0
 
 ### Major Changes

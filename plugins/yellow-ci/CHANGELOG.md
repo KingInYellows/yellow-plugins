@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.5.14
+
+### Patch Changes
+
+- [#1941](https://github.com/KingInYellows/yellow-plugins/pull/1941)
+  [`6683f71`](https://github.com/KingInYellows/yellow-plugins/commit/6683f716141e631fea9ca351ae45e426be88af81)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The
+  SessionStart hook no longer prints a false "Cannot start a CI refresh" warning
+  when a refresh finishes during the marker check. A `--separate-git-dir`
+  checkout now shares its CI result cache with its worktrees, a set `GH_REPO` is
+  part of the cache key, a worktree `.git` file is trusted only when its git dir
+  points back at it, and a different repository re-cloned at the same path no
+  longer shows the old one's failures.
+
 ## 1.5.13
 
 ### Patch Changes
