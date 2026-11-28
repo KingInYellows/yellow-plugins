@@ -16,9 +16,16 @@ concurrency:
 
 jobs:
   claude-review:
-    # Dependabot runs get no repository secrets, so the review cannot
-    # authenticate; skip its PRs instead of failing the check.
-    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    # Runs a bot triggers (Dependabot, for one) get no usable secrets, so the
+    # review cannot authenticate; skip them instead of failing the check.
+    # Keyed on who triggered the run (sender), not who opened the PR, so a
+    # maintainer's push onto a bot PR still starts the job. The cloud-agent
+    # bots listed in allowed_bots below stay reviewed. linear-link.yml and
+    # review-gate.yml use the same `type != 'Bot'` test on the PR author.
+    if: >-
+      github.event.sender.type != 'Bot' ||
+      github.event.sender.login == 'cursor[bot]' ||
+      github.event.sender.login == 'graphite-app[bot]'
     # Optional: Filter by PR author
     # if: |
     #   github.event.pull_request.user.login == 'external-contributor' ||
