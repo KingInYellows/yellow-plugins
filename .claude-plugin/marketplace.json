@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.17.4",
+      "version": "2.18.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -94,7 +94,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "4.0.0",
+      "version": "4.0.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -134,7 +134,7 @@
     {
       "name": "yellow-ci",
       "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
-      "version": "1.5.13",
+      "version": "1.5.14",
       "author": {
         "name": "KingInYellows"
       },
